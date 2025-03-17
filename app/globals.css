@@ -1,0 +1,52 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --foreground-rgb: 0, 0, 0;
+  --background-start-rgb: 214, 219, 220;
+  --background-end-rgb: 255, 255, 255;
+}
+
+body {
+  color: rgb(var(--foreground-rgb));
+  background: linear-gradient(
+      to bottom,
+      transparent,
+      rgb(var(--background-end-rgb))
+    )
+    rgb(var(--background-start-rgb));
+}
+
+.bullet-list {
+  list-style-type: disc;
+  padding-left: 1.5rem;
+
+}
+
+ul.list-disc {
+  list-style-type: disc !important;
+  margin-left: 1.5rem !important;
+}
+
+
+.fragment-item {
+  cursor: pointer;
+  padding: 0.5rem;
+  margin-bottom: 0.5rem;
+  border: 1px solid #c6d5e9;
+  border-radius: 0.25rem;
+  transition: all 0.2s;
+}
+
+.fragment-item:hover {
+  background-color: #e8f4fb;
+  transform: translateY(2px);
+}
+
+.editor-container {
+  min-height: 500px;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.25rem;
+  padding: 1rem;
+}
