@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getPool } from '@/lib/db';
+import { withConnection } from 'lib/db';
 import { createFragment } from '@/lib/fragment';
 
 export async function POST(request: NextRequest) {
@@ -43,11 +43,13 @@ export async function GET(request: NextRequest) {
       );
     }
     
-    const pool = getPool();
-    const [fragments] = await pool.query(
-      'SELECT * FROM fragments WHERE activity_id = ? ORDER BY created_at ASC',
-      [activityId]
-    );
+    const fragments = await withConnection(async (connection) => {
+      const [rows] = await connection.query(
+        'SELECT * FROM fragments WHERE activity_id = ? ORDER BY created_at ASC',
+        [activityId]
+      );
+      return rows;
+    });
     
     return NextResponse.json(fragments);
   } catch (error) {

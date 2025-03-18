@@ -6,6 +6,14 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Activity } from '@/lib/activity';
 import { Fragment } from '@/lib/fragment';
+import CircularProgress from '@mui/material/CircularProgress';
+import IconButton from '@mui/material/IconButton';
+import EditIcon from '@mui/icons-material/Edit';
+import DeleteIcon from '@mui/icons-material/Delete';
+import CheckIcon from '@mui/icons-material/Check';
+import CloseIcon from '@mui/icons-material/Close';
+import SaveIcon from '@mui/icons-material/Save';
+import TextField from '@mui/material/TextField';
 
 export default function ActivityFragments({ params }: { params: Promise<{ id: string }> }) {
   // Unwrap the Promise for params using React.use
@@ -18,6 +26,11 @@ export default function ActivityFragments({ params }: { params: Promise<{ id: st
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
+  const [deletingIds, setDeletingIds] = useState<number[]>([]);
+  const [pendingDeleteId, setPendingDeleteId] = useState<number | null>(null);
+  const [editingFragmentId, setEditingFragmentId] = useState<number | null>(null);
+  const [editedContent, setEditedContent] = useState('');
+  const [savingFragment, setSavingFragment] = useState(false);
   const router = useRouter();
 
   useEffect(() => {
@@ -84,10 +97,7 @@ export default function ActivityFragments({ params }: { params: Promise<{ id: st
   };
 
   const handleDeleteFragment = async (fragmentId: number) => {
-    if (!window.confirm('Êtes-vous sûr de vouloir supprimer ce fragment ?')) {
-      return;
-    }
-
+    setDeletingIds(prev => [...prev, fragmentId]);
     try {
       const response = await fetch(`/api/fragments/${fragmentId}`, {
         method: 'DELETE',
@@ -101,6 +111,53 @@ export default function ActivityFragments({ params }: { params: Promise<{ id: st
     } catch (err) {
       console.error('Erreur:', err);
       setError('Erreur lors de la suppression du fragment');
+    } finally {
+      setDeletingIds(prev => prev.filter(id => id !== fragmentId));
+    }
+  };
+
+  const handleEditFragment = (fragment: Fragment) => {
+    setEditingFragmentId(fragment.id || null);
+    setEditedContent(fragment.content);
+  };
+
+  const handleCancelEdit = () => {
+    setEditingFragmentId(null);
+    setEditedContent('');
+  };
+
+  const handleSaveFragment = async () => {
+    if (!editingFragmentId) return;
+    
+    setSavingFragment(true);
+    setError('');
+
+    try {
+      const response = await fetch(`/api/fragments/${editingFragmentId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ content: editedContent }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Erreur lors de la mise à jour du fragment');
+      }
+
+      const updatedFragment = await response.json();
+      
+      setFragments(fragments.map(fragment => 
+        fragment.id === editingFragmentId ? updatedFragment : fragment
+      ));
+
+      setEditingFragmentId(null);
+      setEditedContent('');
+    } catch (err) {
+      console.error('Erreur:', err);
+      setError('Erreur lors de la mise à jour du fragment');
+    } finally {
+      setSavingFragment(false);
     }
   };
 
@@ -163,22 +220,91 @@ export default function ActivityFragments({ params }: { params: Promise<{ id: st
         ) : (
           <div className="space-y-4">
             {fragments.map((fragment) => (
-              <div key={fragment.id} className="bg-white border rounded-lg p-4 shadow">
-                <div className="whitespace-pre-wrap mb-3">{fragment.content}</div>
-                <div className="flex justify-end space-x-2">
-                  <Link
-                    href={`/fragments/${fragment.id}/edit`}
-                    className="bg-yellow-500 hover:bg-yellow-600 text-white py-1 px-3 rounded text-sm"
-                  >
-                    Modifier
-                  </Link>
-                  <button
-                    onClick={() => fragment.id && handleDeleteFragment(fragment.id)}
-                    className="bg-red-500 hover:bg-red-600 text-white py-1 px-3 rounded text-sm"
-                  >
-                    Supprimer
-                  </button>
-                </div>
+              <div key={fragment.id} className="relative bg-white border rounded-lg p-4 shadow">
+                {editingFragmentId === fragment.id ? (
+                  <div>
+                    <TextField
+                      value={editedContent}
+                      onChange={(e) => setEditedContent(e.target.value)}
+                      className="w-full mb-3"
+                      multiline
+                      rows={4}
+                      variant="outlined"
+                      size="small"
+                    />
+                    <div className="flex justify-end space-x-2">
+                      <IconButton
+                        onClick={handleSaveFragment}
+                        color="success"
+                        size="small"
+                        disabled={savingFragment}
+                        title="Sauvegarder"
+                      >
+                        <SaveIcon fontSize="small" />
+                      </IconButton>
+                      <IconButton
+                        onClick={handleCancelEdit}
+                        color="inherit"
+                        size="small"
+                        title="Annuler"
+                      >
+                        <CloseIcon fontSize="small" />
+                      </IconButton>
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    <div className="whitespace-pre-wrap mb-3">{fragment.content}</div>
+                    <div className="flex justify-end space-x-2">
+                      <IconButton
+                        onClick={() => handleEditFragment(fragment)}
+                        color="warning"
+                        size="small"
+                        title="Modifier"
+                      >
+                        <EditIcon fontSize="small" />
+                      </IconButton>
+                      
+                      {pendingDeleteId === fragment.id ? (
+                        <>
+                          <IconButton
+                            onClick={() => {
+                              fragment.id && handleDeleteFragment(fragment.id);
+                              setPendingDeleteId(null);
+                            }}
+                            color="success"
+                            size="small"
+                            title="Confirmer la suppression"
+                          >
+                            <CheckIcon fontSize="small" />
+                          </IconButton>
+                          <IconButton
+                            onClick={() => setPendingDeleteId(null)}
+                            color="inherit"
+                            size="small"
+                            title="Annuler la suppression"
+                          >
+                            <CloseIcon fontSize="small" />
+                          </IconButton>
+                        </>
+                      ) : (
+                        <IconButton
+                          onClick={() => fragment.id && setPendingDeleteId(fragment.id)}
+                          color="error"
+                          size="small"
+                          title="Supprimer ce fragment"
+                        >
+                          <DeleteIcon fontSize="small" />
+                        </IconButton>
+                      )}
+                    </div>
+                  </>
+                )}
+                {typeof fragment.id === 'number' && deletingIds.includes(fragment.id) && (
+                  <div className="absolute inset-0 flex items-center justify-center bg-white bg-opacity-75">
+                    <CircularProgress size={24} />
+                  </div>
+                )}
               </div>
             ))}
           </div>

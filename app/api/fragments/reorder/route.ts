@@ -1,8 +1,6 @@
 import { NextResponse } from 'next/server';
 import { updateFragmentPosition } from '../../../../lib/fragment';
-
-import { getPool } from '@/lib/db';
-
+import { withConnection } from 'lib/db';
 
 export async function POST(request: Request) {
   try {
@@ -17,45 +15,39 @@ export async function POST(request: Request) {
       });
     }
 
-    const pool = getPool();
-    const connection = await pool.getConnection();
+    // Utiliser withConnection pour gérer la transaction et la connexion
+    const result = await withConnection(async (connection: any) => {
+      try {
+        await connection.beginTransaction();
 
-    try {
-      await connection.beginTransaction();
+        for (const update of updates) {
+          const { fragmentId, newPosition } = update;
 
-      for (const update of updates) {
-        const { fragmentId, newPosition } = update;
+          if (!fragmentId || newPosition === undefined) {
+            throw new Error('fragmentId and newPosition are required');
+          }
 
-        if (!fragmentId || newPosition === undefined) {
-          throw new Error('fragmentId and newPosition are required');
+          const success = await updateFragmentPosition(fragmentId, newPosition, connection);
+
+          if (!success) {
+            throw new Error(`Failed to update fragment ${fragmentId}`);
+          }
         }
 
-        const success = await updateFragmentPosition(fragmentId, newPosition);
-
-        if (!success) {
-          throw new Error(`Failed to update fragment ${fragmentId}`);
-        }
+        await connection.commit();
+        return { success: true };
+      } catch (error: any) {
+        await connection.rollback();
+        throw error;
       }
+    });
 
-      await connection.commit();
-      connection.release();
-      return new NextResponse(JSON.stringify({ success: true }), {
-        status: 200,
-        headers: {
-          'Cache-Control': 'no-cache, no-store, must-revalidate',
-        },
-      });
-    } catch (error: any) {
-      await connection.rollback();
-      connection.release();
-      console.error('Error reordering fragments:', error);
-      return new NextResponse(JSON.stringify({ error: 'Error during batch reordering: ' + error.message }), {
-        status: 500,
-        headers: {
-          'Cache-Control': 'no-cache, no-store, must-revalidate',
-        },
-      });
-    }
+    return new NextResponse(JSON.stringify(result), {
+      status: 200,
+      headers: {
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+      },
+    });
   } catch (error) {
     console.error('Error processing request:', error);
     return new NextResponse(JSON.stringify({ error: 'Failed to process request' }), {

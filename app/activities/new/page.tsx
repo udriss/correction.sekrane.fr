@@ -3,10 +3,13 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import React from 'react';
+import { BarChart as BarChartIcon } from '@mui/icons-material';
 
 export default function NewActivity() {
   const [name, setName] = useState('');
   const [content, setContent] = useState('');
+  const [experimentalPoints, setExperimentalPoints] = useState(5);
+  const [theoreticalPoints, setTheoreticalPoints] = useState(15);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
   const router = useRouter();
@@ -19,6 +22,13 @@ export default function NewActivity() {
       return;
     }
 
+    // Ensure the total is 20 points
+    const totalPoints = Number(experimentalPoints) + Number(theoreticalPoints);
+    if (totalPoints !== 20) {
+      setError('Le total des points doit être égal à 20');
+      return;
+    }
+
     setIsSubmitting(true);
     setError('');
 
@@ -28,7 +38,12 @@ export default function NewActivity() {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ name, content }),
+        body: JSON.stringify({ 
+          name, 
+          content,
+          experimental_points: experimentalPoints,
+          theoretical_points: theoreticalPoints
+        }),
       });
 
       if (!response.ok) {
@@ -42,6 +57,22 @@ export default function NewActivity() {
       setError('Erreur lors de la création de l\'activité');
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const handlePointsChange = (
+    e: React.ChangeEvent<HTMLInputElement>,
+    setter: React.Dispatch<React.SetStateAction<number>>,
+    isExperimental: boolean
+  ) => {
+    const value = Number(e.target.value);
+    setter(value);
+    
+    // Auto-adjust the other field to maintain a sum of 20
+    if (isExperimental) {
+      setTheoreticalPoints(20 - value);
+    } else {
+      setExperimentalPoints(20 - value);
     }
   };
 
@@ -77,6 +108,56 @@ export default function NewActivity() {
             rows={5}
             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
+        </div>
+
+        {/* Grading Scale Section */}
+        <div className="mb-6 p-4 bg-gray-50 rounded-lg">
+          <div className="flex items-center mb-3">
+            <BarChartIcon className="mr-2 text-blue-500" />
+            <h2 className="text-lg font-semibold">Barème de notation</h2>
+          </div>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label htmlFor="experimentalPoints" className="block text-gray-700 font-medium mb-2">
+                Points partie expérimentale
+              </label>
+              <input
+                type="number"
+                id="experimentalPoints"
+                min="0"
+                max="20"
+                value={experimentalPoints}
+                onChange={(e) => handlePointsChange(e, setExperimentalPoints, true)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+            <div>
+              <label htmlFor="theoreticalPoints" className="block text-gray-700 font-medium mb-2">
+                Points partie théorique
+              </label>
+              <input
+                type="number"
+                id="theoreticalPoints"
+                min="0"
+                max="20"
+                value={theoreticalPoints}
+                onChange={(e) => handlePointsChange(e, setTheoreticalPoints, false)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+          </div>
+          
+          <div className="text-sm text-gray-500 mt-2">
+            Note: Le total des points doit être égal à 20. Les valeurs sont ajustées automatiquement.
+          </div>
+          
+          <div className="text-right mt-3">
+            <p className="text-gray-700">
+              <span className="font-medium">Total:</span>{" "}
+              <span className="font-bold">{experimentalPoints + theoreticalPoints} points</span>
+            </p>
+          </div>
         </div>
 
         <button

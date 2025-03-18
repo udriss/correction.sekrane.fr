@@ -100,43 +100,111 @@ export const parseHtmlToItems = (html: string): ContentItem[] => {
   }
 };
 
-// Générer du HTML à partir des éléments
-export const generateHtmlFromItems = (contentItems: ContentItem[]): string => {
-  const topLevelItems = contentItems.filter(item => !item.parentId);
-  let html = '<ul class="list-disc ml-6">\n';
-  for (const item of topLevelItems) {
+export function generateHtmlFromItems(items: ContentItem[]): string {
+  let html = '';
+  
+  // Traiter les éléments principaux
+  for (const item of items) {
+    if (item.parentId) continue; // Les éléments enfants sont traités avec leurs parents
+    
+    html += generateHtmlForItem(item, items);
+  }
+  
+  return html;
+}
+
+function generateHtmlForItem(item: ContentItem, allItems: ContentItem[]): string {
+  // Attributs communs à tous les éléments pour faciliter le ciblage en JavaScript
+  const commonAttrs = `data-item-id="${item.id}"${item.fragmentId ? ` data-fragment-id="${item.fragmentId}"` : ''}`;
+  
+  // Ajouter un timestamp unique pour forcer le navigateur à traiter chaque rendu comme différent
+  const timestamp = Date.now();
+  const updateMarker = `data-last-update="${timestamp}"`;
+  
+  switch (item.type) {
+    case 'text':
+      // Détection de list à puces (lignes commençant par • ou - ou *)
+      if (item.content && (
+          item.content.trim().split('\n').filter(line => line.trim()).every(line => 
+            line.trim().startsWith('•') || 
+            line.trim().startsWith('-') || 
+            line.trim().startsWith('*')
+          )
+      )) {
+        // C'est une liste à puces, transformer en véritable liste HTML
+        let listItems = item.content
+          .trim()
+          .split('\n')
+          .filter(line => line.trim())
+          .map(line => {
+            const content = line.trim().substring(1).trim(); // Enlever le symbole de puce
+            return `<li>${content}</li>`;
+          })
+          .join('');
+          
+        return `<ul ${commonAttrs} ${updateMarker} class="bullet-list">${listItems}</ul>`;
+      }
+      
+      // Si ce n'est pas une liste, c'est un paragraphe normal
+      return `<p ${commonAttrs} ${updateMarker} class="text-item">${item.content || ''}</p>`;
+      
+    case 'image':
+      // Centrer l'image avec un conteneur div
+      return `<div class="image-container" ${commonAttrs} ${updateMarker} style="text-align: center; margin: 1.5rem auto;">
+        <img src="${item.src}" alt="${item.alt || 'Image'}" style="max-width: 100%; margin: 0 auto;" />
+      </div>`;
+      
+    case 'list':
+      // Transformer en véritable liste HTML avec puces
+      let listHtml = `<ul ${commonAttrs} ${updateMarker} class="correction-list">`;
+      
+      // Trouver les enfants de cette liste
+      const children = allItems.filter(child => child.parentId === item.id);
+      
+      for (const child of children) {
+        const childTimestamp = timestamp + 1000 + Math.floor(Math.random() * 1000);
+        const childMarker = `data-last-update="${childTimestamp}"`;
+        
+        // Utiliser un identifiant unique pour chaque élément de liste
+        listHtml += `<li data-item-id="${child.id}" data-parent-id="${item.id}" ${childMarker}>${child.content || ''}</li>`;
+      }
+      
+      listHtml += `</ul>`;
+      return listHtml;
+      
+    case 'listItem':
+      return `<li data-item-id="${item.id}" data-parent-id="${item.parentId || ''}" ${updateMarker}>${item.content || ''}</li>`;
+      
+    default:
+      return '';
+  }
+}
+
+// Fonction pour extraire le texte formaté (pour le presse-papier)
+export function extractFormattedText(items: ContentItem[]): string {
+  let text = '';
+  
+  for (const item of items) {
+    if (item.parentId) continue;
+    
     if (item.type === 'text') {
-      html += `  <li data-item-id="${item.id}">${item.content}</li>\n`;
+      text += `${item.content || ''}\n\n`;
+    } else if (item.type === 'image') {
+      text += `[Image: ${item.alt || 'Image uploadée'}]\n\n`;
     } else if (item.type === 'list') {
-      // For list items, only the title (item.content) is displayed as a bullet
-      html += `  <li data-item-id="${item.id}">${item.content}</li>\n`;
-      // ...existing code to optionally handle children if needed...
+      // Trouver les enfants de cette liste
+      const children = items.filter(child => child.parentId === item.id);
+      
+      for (const child of children) {
+        text += `• ${child.content || ''}\n`;
+      }
+      
+      text += '\n';
     }
   }
-  html += '</ul>\n';
-  return html;
-};
-
-// Extraire le texte visible tel qu'un utilisateur le verrait lors d'un copier-coller
-export const extractFormattedText = (_: ContentItem[]): string => {
-  // Récupérer l'élément contenant l'aperçu
-  const previewElement = document.querySelector('#preview .border.rounded-md') || 
-                        document.querySelector('.preview-area') ||
-                        document.getElementById('preview');
   
-  // Si l'élément existe, récupérer son texte tel qu'il serait copié par un utilisateur
-  if (previewElement) {
-    return (previewElement as HTMLElement).innerText || '';
-  }
-  
-  // Fallback: générer une liste à puces à partir des éléments
-  return _.filter(item => !item.parentId)
-          .map(item => `• ${item.content}`)
-          .join('\n');
-};
-
-
-
+  return text.trim();
+}
 
 // Fonction simplifiée pour traiter les fragments comme des paragraphes
 export const updateContentItemsFromEditable = (contentItems: ContentItem[]): void => {

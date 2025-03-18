@@ -1,110 +1,108 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { getActivityById, updateActivity, deleteActivity } from '@/lib/activity';
 
 export async function GET(
-  request: Request,
-  { params }: { params: Promise<{ id: string }> }
+  request: NextRequest,
+  { params }: { params: { id: string } }
 ) {
   try {
-    // Await the params object to access its properties
-    const { id } = await params;
-    const activityId = parseInt(id || '');
-    
-    if (isNaN(activityId)) {
-      return NextResponse.json(
-        { error: 'Invalid activity ID' },
-        { status: 400 }
-      );
+    // Await params before accessing its properties
+    const resolvedParams = await params;
+    const id = parseInt(resolvedParams.id);
+    if (isNaN(id)) {
+      return NextResponse.json({ error: 'ID d\'activité invalide' }, { status: 400 });
     }
 
-    const activity = await getActivityById(activityId);
+    const activity = await getActivityById(id);
     if (!activity) {
-      return NextResponse.json(
-        { error: 'Activity not found' },
-        { status: 404 }
-      );
+      return NextResponse.json({ error: 'Activité non trouvée' }, { status: 404 });
     }
 
     return NextResponse.json(activity);
   } catch (error) {
-    console.error('Erreur lors de la récupération de l\'activité:', error);
-    return NextResponse.json(
-      { error: 'Erreur serveur' },
-      { status: 500 }
-    );
+    console.error('Error fetching activity:', error);
+    return NextResponse.json({ error: 'Erreur lors de la récupération de l\'activité' }, { status: 500 });
   }
 }
 
 export async function PUT(
-  request: Request,
-  { params }: { params: Promise<{ id: string }> }
+  request: NextRequest,
+  { params }: { params: { id: string } }
 ) {
   try {
-    const { id } = await params;
-    const activityId = parseInt(id || '');
+    // Await params before accessing its properties
+    const resolvedParams = await params;
+    const id = parseInt(resolvedParams.id);
+    if (isNaN(id)) {
+      return NextResponse.json({ error: 'ID d\'activité invalide' }, { status: 400 });
+    }
+
+    const body = await request.json();
     
-    if (isNaN(activityId)) {
+    // Validate required fields
+    if (!body.name || typeof body.name !== 'string' || !body.name.trim()) {
+      return NextResponse.json({ error: 'Le nom de l\'activité est requis' }, { status: 400 });
+    }
+    
+    // Validate points total to 20
+    const experimentalPoints = body.experimental_points !== undefined ? Number(body.experimental_points) : 5;
+    const theoreticalPoints = body.theoretical_points !== undefined ? Number(body.theoretical_points) : 15;
+    
+    if (experimentalPoints + theoreticalPoints !== 20) {
       return NextResponse.json(
-        { error: 'Invalid activity ID' },
+        { error: 'Le total des points doit être égal à 20' }, 
         { status: 400 }
       );
     }
 
-    const { name, content } = await request.json();
-    if (!name) {
-      return NextResponse.json(
-        { error: 'Name is required' },
-        { status: 400 }
-      );
+    // Check if activity exists
+    const existingActivity = await getActivityById(id);
+    if (!existingActivity) {
+      return NextResponse.json({ error: 'Activité non trouvée' }, { status: 404 });
     }
 
-    const success = await updateActivity(activityId, { name, content });
+    // Update the activity with points configuration
+    const activityData = {
+      name: body.name.trim(),
+      content: body.content,
+      experimental_points: experimentalPoints,
+      theoretical_points: theoreticalPoints
+    };
+
+    const success = await updateActivity(id, activityData);
     if (!success) {
-      return NextResponse.json(
-        { error: 'Activity not found' },
-        { status: 404 }
-      );
+      return NextResponse.json({ error: 'Activité non trouvée ou non modifiée' }, { status: 404 });
     }
 
-    return NextResponse.json({ id: activityId, name, content });
+    // Get the updated activity
+    const updatedActivity = await getActivityById(id);
+    return NextResponse.json(updatedActivity);
   } catch (error) {
-    console.error('Erreur lors de la mise à jour de l\'activité:', error);
-    return NextResponse.json(
-      { error: 'Erreur serveur' },
-      { status: 500 }
-    );
+    console.error('Error updating activity:', error);
+    return NextResponse.json({ error: 'Erreur lors de la mise à jour de l\'activité' }, { status: 500 });
   }
 }
 
 export async function DELETE(
-  request: Request,
-  { params }: { params: Promise<{ id: string }> }
+  request: NextRequest,
+  { params }: { params: { id: string } }
 ) {
   try {
-    const { id } = await params;
-    const activityId = parseInt(id || '');
-    
-    if (isNaN(activityId)) {
-      return NextResponse.json(
-        { error: 'Invalid activity ID' },
-        { status: 400 }
-      );
+    // Await params before accessing its properties
+    const resolvedParams = await params;
+    const id = parseInt(resolvedParams.id);
+    if (isNaN(id)) {
+      return NextResponse.json({ error: 'ID d\'activité invalide' }, { status: 400 });
     }
 
-    const success = await deleteActivity(activityId);
+    const success = await deleteActivity(id);
     if (!success) {
-      return NextResponse.json(
-        { error: 'Activity not found' },
-        { status: 404 }
-      );
+      return NextResponse.json({ error: 'Activité non trouvée' }, { status: 404 });
     }
 
-    return new NextResponse(null, { status: 204 });
+    return NextResponse.json({ success: true });
   } catch (error) {
-    console.error('Erreur lors de la suppression de l\'activité:', error);
-    return NextResponse.json(
-      { error: 'Erreur serveur' },
-      { status: 500 }
-    );
+    console.error('Error deleting activity:', error);
+    return NextResponse.json({ error: 'Erreur lors de la suppression de l\'activité' }, { status: 500 });
   }
 }

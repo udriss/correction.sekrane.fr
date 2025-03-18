@@ -1,56 +1,28 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { getCorrectionById } from '@/lib/correction';
 import { getPool } from '@/lib/db';
-
 export async function GET(
   request: NextRequest,
-  { params }: { params: Promise<Record<string, string>> }
-): Promise<NextResponse> {
+  { params }: { params: { id: string } }
+) {
   try {
-    const { id } = await params; 
+    // Await params before accessing its properties
+    const resolvedParams = await params;
+    const id = parseInt(resolvedParams.id);
     
-    const pool = getPool();
-    const [rows] = await pool.query(
-      `SELECT c.*, a.name as activity_name 
-       FROM corrections c 
-       JOIN activities a ON c.activity_id = a.id 
-       WHERE c.id = ?`,
-      [id]
-    );
-    
-    if (!Array.isArray(rows) || rows.length === 0) {
-      return new NextResponse(JSON.stringify({ error: 'Correction non trouvée' }), {
-        status: 404,
-        headers: {
-          'Cache-Control': 'no-cache, no-store, must-revalidate',
-        },
-      });
+    if (isNaN(id)) {
+      return NextResponse.json({ error: 'ID de correction invalide' }, { status: 400 });
     }
-    
-    const correction = rows[0] as any;
-    
-    // Si content_data existe et est une string, parser en JSON
-    if (correction.content_data && typeof correction.content_data === 'string') {
-      try {
-        correction.content_data = JSON.parse(correction.content_data);
-      } catch (e) {
-        console.error('Erreur de parsing content_data:', e);
-      }
+
+    const correction = await getCorrectionById(id);
+    if (!correction) {
+      return NextResponse.json({ error: 'Correction non trouvée' }, { status: 404 });
     }
-    
-    return new NextResponse(JSON.stringify(correction), {
-      status: 200,
-      headers: {
-        'Cache-Control': 'no-cache, no-store, must-revalidate',
-      },
-    });
+
+    return NextResponse.json(correction);
   } catch (error) {
-    console.error('Erreur lors de la récupération de la correction:', error);
-    return new NextResponse(JSON.stringify({ error: 'Erreur serveur' }), {
-      status: 500,
-      headers: {
-        'Cache-Control': 'no-cache, no-store, must-revalidate',
-      },
-    });
+    console.error('Error fetching correction:', error);
+    return NextResponse.json({ error: 'Erreur lors de la récupération de la correction' }, { status: 500 });
   }
 }
 

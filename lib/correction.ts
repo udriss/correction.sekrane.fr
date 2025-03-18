@@ -1,18 +1,10 @@
 import { getPool } from './db';
 import { RowDataPacket, ResultSetHeader } from 'mysql2';
+import { Correction as CorrectionType } from './types';
 
-export interface Correction {
-  id?: number;
-  activity_id: number;
-  student_name: string;
-  content: string;
-  content_data?: any; // Ajouter ce champ à l'interface
-  created_at?: Date;
-  updated_at?: Date;
-  activity_name?: string; // Optional join field
-}
+export type Correction = CorrectionType;
 
-export async function createCorrection(correction: Correction): Promise<number> {
+export async function createCorrection(correction: Partial<CorrectionType>): Promise<number> {
   const pool = getPool();
   const [result] = await pool.execute<ResultSetHeader>(
     'INSERT INTO corrections (activity_id, student_name, content) VALUES (?, ?, ?)',
@@ -22,7 +14,7 @@ export async function createCorrection(correction: Correction): Promise<number> 
   return result.insertId;
 }
 
-export async function getCorrectionsByActivityId(activityId: number): Promise<Correction[]> {
+export async function getCorrectionsByActivityId(activityId: number): Promise<CorrectionType[]> {
   const pool = getPool();
   const [rows] = await pool.execute<RowDataPacket[]>(
     `SELECT c.*, a.name as activity_name 
@@ -33,10 +25,10 @@ export async function getCorrectionsByActivityId(activityId: number): Promise<Co
     [activityId]
   );
   
-  return rows as Correction[];
+  return rows as CorrectionType[];
 }
 
-export async function getCorrectionById(id: number): Promise<Correction | null> {
+export async function getCorrectionById(id: number): Promise<CorrectionType | null> {
   const pool = getPool();
   const [rows] = await pool.execute<RowDataPacket[]>(
     `SELECT c.*, a.name as activity_name 
@@ -46,10 +38,10 @@ export async function getCorrectionById(id: number): Promise<Correction | null> 
     [id]
   );
   
-  return rows.length > 0 ? rows[0] as Correction : null;
+  return rows.length > 0 ? rows[0] as CorrectionType : null;
 }
 
-export async function updateCorrection(id: number, data: Correction): Promise<boolean> {
+export async function updateCorrection(id: number, data: CorrectionType): Promise<boolean> {
   try {
     const pool = getPool();
     const { activity_id, student_name, content, content_data } = data;

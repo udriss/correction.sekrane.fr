@@ -50,3 +50,32 @@ ul.list-disc {
   border-radius: 0.25rem;
   padding: 1rem;
 }
+
+
+@keyframes slideIn {
+  0% { transform: translateY(-20px); opacity: 0; }
+  100% { transform: translateY(0); opacity: 1; }
+}
+
+@keyframes shrink {
+  0% { width: 100%; }
+  100% { width: 0%; }
+}
+
+.animate-slide-in {
+  animation: slideIn 0.5s ease-out forwards;
+}
+
+.animate-shrink {
+  animation: shrink 5s ease-in-out forwards;
+}
+
+.animate-once {
+  animation: pulse 1s ease-in-out;
+}
+
+@keyframes pulse {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.2); }
+  100% { transform: scale(1); }
+}

@@ -1,5 +1,5 @@
-import { getPool } from './db';
-import { RowDataPacket, ResultSetHeader } from 'mysql2';
+import { getPool, withConnection } from './db';
+import { RowDataPacket, ResultSetHeader, PoolConnection } from 'mysql2/promise';
 
 export interface Fragment {
   id?: number;
@@ -10,28 +10,47 @@ export interface Fragment {
   updated_at?: Date;
 }
 
-export async function updateFragmentPosition(fragmentId: number, newPosition: number): Promise<boolean> {
-  const pool = getPool();
+// Mettre à jour la position d'un fragment
+export async function updateFragmentPosition(
+  fragmentId: number, 
+  newPosition: number,
+  existingConnection?: PoolConnection
+): Promise<boolean> {
   try {
-    const [result] = await pool.execute<ResultSetHeader>(
-      'UPDATE fragments SET position_order = ? WHERE id = ?',
-      [newPosition, fragmentId]
-    );
-    return result.affectedRows > 0;
+    // Si on a déjà une connexion (dans une transaction), l'utiliser
+    // sinon créer une nouvelle connexion via withConnection
+    if (existingConnection) {
+      await existingConnection.query(
+        'UPDATE fragments SET position_order = ? WHERE id = ?',
+        [newPosition, fragmentId]
+      );
+      return true;
+    } else {
+      return withConnection(async (connection) => {
+        const [result] = await connection.query(
+          'UPDATE fragments SET position_order = ? WHERE id = ?',
+          [newPosition, fragmentId]
+        );
+        return true;
+      });
+    }
   } catch (error) {
     console.error('Error updating fragment position:', error);
     return false;
   }
 }
 
-export async function createFragment(fragment: Fragment): Promise<number> {
-  const pool = getPool();
-  const [result] = await pool.execute<ResultSetHeader>(
-    'INSERT INTO fragments (activity_id, content) VALUES (?, ?)',
-    [fragment.activity_id, fragment.content]
-  );
-  
-  return result.insertId;
+// Créer un nouveau fragment
+export async function createFragment({ activity_id, content }: { activity_id: number, content: string }): Promise<number> {
+  return withConnection(async (connection) => {
+    const [result] = await connection.query(
+      'INSERT INTO fragments (activity_id, content) VALUES (?, ?)',
+      [activity_id, content]
+    );
+    
+    // @ts-ignore
+    return result.insertId;
+  });
 }
 
 export async function getFragmentsByActivityId(activityId: number): Promise<Fragment[]> {
@@ -52,34 +71,43 @@ export async function getFragmentsByActivityId(activityId: number): Promise<Frag
   }
 }
 
-export async function getFragmentById(id: number): Promise<Fragment | null> {
-  const pool = getPool();
-  const [rows] = await pool.execute<RowDataPacket[]>(
-    'SELECT * FROM fragments WHERE id = ?',
-    [id]
-  );
-  
-  return rows.length > 0 ? rows[0] as Fragment : null;
+// Obtenir un fragment par ID
+export async function getFragmentById(id: number): Promise<any> {
+  return withConnection(async (connection) => {
+    const [rows] = await connection.query(
+      'SELECT * FROM fragments WHERE id = ?',
+      [id]
+    );
+    
+    // @ts-ignore
+    return rows.length ? rows[0] : null;
+  });
 }
 
+// Mettre à jour un fragment
 export async function updateFragment(id: number, content: string): Promise<boolean> {
-  const pool = getPool();
-  const [result] = await pool.execute<ResultSetHeader>(
-    'UPDATE fragments SET content = ? WHERE id = ?',
-    [content, id]
-  );
-  
-  return result.affectedRows > 0;
+  return withConnection(async (connection) => {
+    const [result] = await connection.query(
+      'UPDATE fragments SET content = ? WHERE id = ?',
+      [content, id]
+    );
+    
+    // @ts-ignore
+    return result.affectedRows > 0;
+  });
 }
 
+// Supprimer un fragment
 export async function deleteFragment(id: number): Promise<boolean> {
-  const pool = getPool();
-  const [result] = await pool.execute<ResultSetHeader>(
-    'DELETE FROM fragments WHERE id = ?',
-    [id]
-  );
-  
-  return result.affectedRows > 0;
+  return withConnection(async (connection) => {
+    const [result] = await connection.query(
+      'DELETE FROM fragments WHERE id = ?',
+      [id]
+    );
+    
+    // @ts-ignore
+    return result.affectedRows > 0;
+  });
 }
 
 

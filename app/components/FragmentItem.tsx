@@ -10,6 +10,7 @@ import DeleteIcon from '@mui/icons-material/Delete';
 import SaveIcon from '@mui/icons-material/Save';
 import CancelIcon from '@mui/icons-material/Cancel';
 import AddIcon from '@mui/icons-material/Add';
+import CheckIcon from '@mui/icons-material/Check'; // added import
 
 interface FragmentItemProps {
   fragment: Fragment;
@@ -50,6 +51,7 @@ const FragmentItem: React.FC<FragmentItemProps> = ({
   moveFragment
 }) => {
   const ref = useRef<HTMLDivElement>(null);
+  const [confirmDelete, setConfirmDelete] = React.useState(false); // added state
   
   // Set up drag functionality
   const [{ isDragging }, drag] = useDrag({
@@ -194,15 +196,38 @@ const FragmentItem: React.FC<FragmentItemProps> = ({
               >
                 <EditIcon sx={{ mr: 0.2 }} />
               </Button>
-              <IconButton
-                onClick={() => fragment.id && onDelete(fragment.id)}
-                color="error"
-                size="small"
-                title="Supprimer ce fragment"
-              >
-                <DeleteIcon fontSize="small" />
-              </IconButton>
-            
+              {confirmDelete ? (
+                <>
+                  <IconButton
+                    onClick={() => {
+                      fragment.id && onDelete(fragment.id);
+                      setConfirmDelete(false);
+                    }}
+                    color="error"
+                    size="small"
+                    title="Confirmer suppression"
+                  >
+                    <CheckIcon fontSize="small" />
+                  </IconButton>
+                  <IconButton
+                    onClick={() => setConfirmDelete(false)}
+                    color="inherit"
+                    size="small"
+                    title="Annuler suppression"
+                  >
+                    <CancelIcon fontSize="small" />
+                  </IconButton>
+                </>
+              ) : (
+                <IconButton
+                  onClick={() => setConfirmDelete(true)}
+                  color="error"
+                  size="small"
+                  title="Supprimer ce fragment"
+                >
+                  <DeleteIcon fontSize="small" />
+                </IconButton>
+              )}
           </div>
         </>
       )}

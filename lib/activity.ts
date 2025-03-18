@@ -5,8 +5,10 @@ export interface Activity {
   id?: number;
   name: string;
   content?: string;
-  created_at?: Date;
-  updated_at?: Date;
+  created_at?: string | null;
+  updated_at?: string | null;
+  experimental_points: number;
+  theoretical_points: number;
 }
 
 export async function createActivity(activity: Activity): Promise<number> {
@@ -15,8 +17,13 @@ export async function createActivity(activity: Activity): Promise<number> {
   try {
     connection = await pool.getConnection();
     const [result] = await connection.execute<ResultSetHeader>(
-      'INSERT INTO activities (name, content) VALUES (?, ?)',
-      [activity.name, activity.content || null]
+      'INSERT INTO activities (name, content, experimental_points, theoretical_points) VALUES (?, ?, ?, ?)',
+      [
+        activity.name, 
+        activity.content || null, 
+        activity.experimental_points || 5, 
+        activity.theoretical_points || 15
+      ]
     );
     return result.insertId;
   } catch (error) {
@@ -68,8 +75,14 @@ export async function updateActivity(id: number, activity: Activity): Promise<bo
   try {
     connection = await pool.getConnection();
     const [result] = await connection.execute<ResultSetHeader>(
-      'UPDATE activities SET name = ?, content = ? WHERE id = ?',
-      [activity.name, activity.content || null, id]
+      'UPDATE activities SET name = ?, content = ?, experimental_points = ?, theoretical_points = ? WHERE id = ?',
+      [
+        activity.name, 
+        activity.content || null, 
+        activity.experimental_points || 5, 
+        activity.theoretical_points || 15, 
+        id
+      ]
     );
     return result.affectedRows > 0;
   } catch (error) {

@@ -1,21 +1,18 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { getCorrectionsByActivityId, createCorrection } from '@/lib/correction';
 import { getActivityById } from '@/lib/activity';
 
 export async function GET(
-  _request: Request,
-  { params }: { params: Promise<{ id: string }> }
+  request: NextRequest,
+  { params }: { params: { id: string } }
 ) {
   try {
-    // Await the params object to access its properties
-    const { id } = await params;
-    const activityId = parseInt(id || '');
+    // Await params before accessing its properties
+    const resolvedParams = await params;
+    const activityId = parseInt(resolvedParams.id);
     
     if (isNaN(activityId)) {
-      return NextResponse.json(
-        { error: 'Invalid activity ID' },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: 'ID d\'activité invalide' }, { status: 400 });
     }
 
     const activity = await getActivityById(activityId);

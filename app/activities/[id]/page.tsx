@@ -7,8 +7,12 @@ import { useRouter } from 'next/navigation';
 import { Activity } from '@/lib/activity';
 import { Correction } from '@/lib/correction';
 import LoadingSpinner from '@/components/LoadingSpinner';
-import { Button, IconButton } from '@mui/material';
-import { Edit as EditIcon, Save as SaveIcon, Close as CloseIcon, Delete as DeleteIcon, Article as ArticleIcon, Add as AddIcon } from '@mui/icons-material';
+import { Button, IconButton, Paper, Typography, TextField, Divider } from '@mui/material';
+import { Edit as EditIcon, Save as SaveIcon, Close as CloseIcon, Delete as DeleteIcon, Article as ArticleIcon, Add as AddIcon, BarChart as BarChartIcon } from '@mui/icons-material';
+import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline';
+import RefreshIcon from '@mui/icons-material/Refresh';
+import ArrowBackIcon from '@mui/icons-material/ArrowBack';
+import UndoIcon from '@mui/icons-material/Undo';
 
 
 export default function ActivityDetail({ params }: { params: Promise<{ id: string }> }) {
@@ -25,6 +29,8 @@ export default function ActivityDetail({ params }: { params: Promise<{ id: strin
   const [isEditing, setIsEditing] = useState(false);
   const [name, setName] = useState('');
   const [content, setContent] = useState('');
+  const [experimentalPoints, setExperimentalPoints] = useState(5);
+  const [theoreticalPoints, setTheoreticalPoints] = useState(15);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
@@ -39,6 +45,9 @@ export default function ActivityDetail({ params }: { params: Promise<{ id: strin
         setActivity(activityData);
         setName(activityData.name);
         setContent(activityData.content || '');
+        // Set the grading scale values from the activity data or use defaults
+        setExperimentalPoints(activityData.experimental_points !== undefined ? activityData.experimental_points : 5);
+        setTheoreticalPoints(activityData.theoretical_points !== undefined ? activityData.theoretical_points : 15);
 
         // Fetch corrections for this activity
         const correctionsResponse = await fetch(`/api/activities/${activityId}/corrections`);
@@ -66,11 +75,20 @@ export default function ActivityDetail({ params }: { params: Promise<{ id: strin
     setIsEditing(false);
     setName(activity?.name || '');
     setContent(activity?.content || '');
+    setExperimentalPoints(activity?.experimental_points !== undefined ? activity.experimental_points : 5);
+    setTheoreticalPoints(activity?.theoretical_points !== undefined ? activity.theoretical_points : 15);
   };
 
   const handleSubmit = async () => {
     if (!name.trim()) {
       setError('Le nom de l\'activité est requis');
+      return;
+    }
+
+    // Validate that the points sum to 20
+    const totalPoints = Number(experimentalPoints) + Number(theoreticalPoints);
+    if (totalPoints !== 20) {
+      setError('Le total des points doit être égal à 20');
       return;
     }
 
@@ -83,7 +101,12 @@ export default function ActivityDetail({ params }: { params: Promise<{ id: strin
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ name, content }),
+        body: JSON.stringify({ 
+          name, 
+          content, 
+          experimental_points: experimentalPoints,
+          theoretical_points: theoreticalPoints 
+        }),
       });
 
       if (!response.ok) {
@@ -130,6 +153,23 @@ export default function ActivityDetail({ params }: { params: Promise<{ id: strin
     router.push(`/activities/${activityId}/corrections/new`);
   };
 
+  const handlePointsChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
+    setter: React.Dispatch<React.SetStateAction<number>>,
+    otherValue: number,
+    isExperimental: boolean
+  ) => {
+    const value = Number(e.target.value);
+    setter(value);
+    
+    // Auto-adjust the other field to maintain a sum of 20
+    if (isExperimental) {
+      setTheoreticalPoints(20 - value);
+    } else {
+      setExperimentalPoints(20 - value);
+    }
+  };
+
   if (loading) {
     return (
       <div className="container mx-auto px-4 py-8 flex justify-center">
@@ -140,8 +180,47 @@ export default function ActivityDetail({ params }: { params: Promise<{ id: strin
 
   if (error) {
     return (
-      <div className="container mx-auto px-4 py-8">
-        <div className="bg-red-100 border-l-4 border-red-500 text-red-700 p-4">{error}</div>
+      <div className="container mx-auto px-4 py-8 flex justify-center">
+        <div className="w-full max-w-lg animate-slide-in">
+          <Paper className="p-6 overflow-hidden relative" elevation={3}>
+            <div className="flex items-start gap-4">
+              <div className="text-red-500 animate-once">
+                <ErrorOutlineIcon fontSize="large" />
+              </div>
+              <div className="flex-1">
+                <Typography variant="h6" className="text-red-600 font-semibold mb-2">
+                {error}
+                </Typography>
+                <div className="flex justify-around items-center mt-4">
+                  <Button 
+                  variant="outlined" 
+                  color="success" 
+                  size="small" 
+                  className="mt-4"
+                  startIcon={<RefreshIcon />}
+                  onClick={() => window.location.reload()}
+                  >
+                  Recharger
+                  </Button>
+                    <Button 
+                    variant="outlined" 
+                    size="small"
+                    color="primary"
+                    className="mt-4"
+                    component={Link}
+                    href="/"
+                    startIcon={<ArrowBackIcon />}
+                    >
+                    Retour à l'accueil
+                    </Button>
+                </div>
+              </div>
+            </div>
+            <div className="absolute -bottom-1 left-0 w-full h-1">
+              <div className="bg-red-500 h-full w-full animate-shrink"></div>
+            </div>
+          </Paper>
+        </div>
       </div>
     );
   }
@@ -157,15 +236,42 @@ export default function ActivityDetail({ params }: { params: Promise<{ id: strin
   }
 
   return (
-    <div className="container mx-auto px-4 py-8">
+    <div className="container mx-auto px-4 py-8 max-w-5xl">
       <div className="flex items-center justify-between mb-6">
         {isEditing ? (
-          <input
-            type="text"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
+          <div className="flex items-center w-full">
+            <TextField
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              className="flex-grow mr-2"
+              variant="outlined"
+              size="small"
+              label="Nom de l'activité"
+              placeholder="Entrez le nom de l'activité"
+              error={!name.trim()}
+              helperText={!name.trim() ? "Le nom est requis" : ""}
+              autoFocus
+            />
+            <div className="flex space-x-2">
+              <Button
+                onClick={handleSubmit}
+                disabled={isSubmitting || !name.trim()}
+                variant="contained"
+                color="primary"
+                size="small"
+              >
+                <SaveIcon fontSize="small" />
+              </Button>
+              <Button
+                onClick={handleCancelClick}
+                variant="outlined"
+                color="error"
+                size="small"
+              >
+                <CloseIcon fontSize="small" />
+              </Button>
+            </div>
+          </div>
         ) : (
           <h1 className="text-3xl font-bold flex items-center">
             {activity.name}
@@ -174,119 +280,238 @@ export default function ActivityDetail({ params }: { params: Promise<{ id: strin
               size="small"
               color="primary"
               aria-label="edit"
+              className="ml-2"
             >
               <EditIcon />
             </IconButton>
           </h1>
         )}
-
-        {isEditing ? (
-          <div>
-            <Button
-              onClick={handleSubmit}
-              disabled={isSubmitting}
-              variant="contained"
-              color="primary"
-              className="mr-2"
-            >
-              <SaveIcon sx={{ mr: 0.2 }} />
-              Enregistrer
-            </Button>
-            <Button
-              onClick={handleCancelClick}
-              variant="outlined"
-              color="secondary"
-            >
-              <CloseIcon sx={{ mr: 0.2 }} />
-              Annuler
-            </Button>
-          </div>
-        ) : null}
       </div>
 
-      {activity.content && !isEditing ? (
-        <div className="bg-gray-50 p-4 rounded-lg mb-8">
-          <h2 className="text-xl font-semibold mb-2">Description de l'activité</h2>
-          <div className="whitespace-pre-wrap">{activity.content}</div>
+      {/* Section description */}
+      <Paper className="p-4 rounded-lg mb-8">
+        <div className="flex items-center justify-between mb-2">
+          <h2 className="text-xl font-semibold">Description de l'activité</h2>
+          {!isEditing && (
+            <IconButton 
+              onClick={handleEditClick}
+              size="small"
+              color="primary"
+              aria-label="edit"
+            >
+              <EditIcon fontSize="small" />
+            </IconButton>
+          )}
         </div>
-      ) : isEditing && (
-        <div className="mb-6">
-          <label htmlFor="content" className="block text-gray-700 font-medium mb-2">
-            Contenu (facultatif)
-          </label>
-          <textarea
-            id="content"
+        
+        {isEditing ? (
+          <TextField
             value={content}
             onChange={(e) => setContent(e.target.value)}
-            rows={5}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            multiline
+            rows={4}
+            variant="outlined"
+            fullWidth
+            placeholder="Description de l'activité (facultative)"
+            size="small"
           />
-        </div>
-      )}
+        ) : activity.content ? (
+          <div className="bg-gray-50 p-3 rounded border border-gray-200 whitespace-pre-wrap">
+            {activity.content}
+          </div>
+        ) : (
+          <div className="bg-gray-50 p-3 rounded border border-gray-200 text-gray-500 italic">
+            Aucune description fournie
+          </div>
+        )}
+      </Paper>
 
-      <div className="mb-8">
-        <h2 className="text-2xl font-semibold mb-4">Fragments d'activité</h2>
-      </div>
-
-      <div>
-        <div className="flex justify-between items-center mb-4">
-          <h2 className="text-2xl font-semibold">Corrections</h2>
-          
+      {/* Section Barème - Compact version */}
+      <Paper className="p-4 rounded-lg mb-8">
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center">
+            <BarChartIcon className="mr-2 text-blue-500" />
+            <h2 className="text-xl font-semibold">Barème de notation</h2>
+          </div>
           {!isEditing && (
-            <div className="flex space-x-2">
-              <Button
-                onClick={handleFragmentsClick}
-                variant="contained"
-                color="success"
-              >
-                <ArticleIcon sx={{ mr: 0.2 }} />
-                Gérer les fragments
-              </Button>
-              <Button
-                onClick={handleNewCorrectionClick}
-                variant="contained"
-                color="secondary"
-              >
-                <AddIcon sx={{ mr: 0.2 }} />
-                Nouvelle correction
-              </Button>
-              <Button
-                onClick={handleDelete}
-                variant="contained"
-                color="error"
-              >
-                <DeleteIcon sx={{ mr: 0.2 }} />
-                Supprimer
-              </Button>
-            </div>
+            <IconButton 
+              onClick={handleEditClick}
+              size="small"
+              color="primary"
+              aria-label="edit"
+            >
+              <EditIcon fontSize="small" />
+            </IconButton>
           )}
         </div>
 
-        {corrections.length === 0 ? (
-          <p className="text-gray-600">Aucune correction pour cette activité.</p>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {corrections.map((correction) => (
-              <div key={correction.id} className="border rounded-lg p-4 shadow">
-                <h3 className="font-semibold mb-2">
-                  {correction.student_name || `${activity.name} - Sans nom`}
-                </h3>
-                <p className="text-sm text-gray-500">
-                  Créée le {new Date(correction.created_at!).toLocaleString('fr-FR')}
-                </p>
-                <Button
-                  component={Link}
-                  href={`/corrections/${correction.id}`}
-                  variant="contained"
+        {isEditing ? (
+          <div className="bg-gray-50 p-4 rounded-md border border-gray-200">
+            <div className="flex flex-col md:flex-row gap-4 mb-2">
+              <div className="flex-1">
+                <TextField
+                  label="Points partie expérimentale"
+                  type="number"
+                  InputProps={{ inputProps: { min: 0, max: 20 } }}
+                  value={experimentalPoints}
+                  onChange={(e) => handlePointsChange(e, setExperimentalPoints, theoreticalPoints, true)}
+                  variant="outlined"
                   size="small"
-                  className="mt-3"
-                >
-                  Éditer la correction
-                </Button>
+                  fullWidth
+                />
               </div>
-            ))}
+              <div className="flex-1">
+                <TextField
+                  label="Points partie théorique"
+                  type="number"
+                  InputProps={{ inputProps: { min: 0, max: 20 } }}
+                  value={theoreticalPoints}
+                  onChange={(e) => handlePointsChange(e, setTheoreticalPoints, experimentalPoints, false)}
+                  variant="outlined"
+                  size="small"
+                  fullWidth
+                />
+              </div>
+            </div>
+            
+            <div className="flex items-center justify-between">
+              <div className="text-sm text-gray-600">
+                Le total des points doit être égal à 20
+              </div>
+              <div className="font-medium">
+                Total: <span className="font-bold">{experimentalPoints + theoreticalPoints}/20</span>
+                {experimentalPoints + theoreticalPoints !== 20 && (
+                  <span className="text-red-500 ml-2">(Ajustez pour obtenir un total de 20)</span>
+                )}
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="bg-white p-3 rounded border border-gray-200">
+                <p className="text-gray-700 font-medium">Partie expérimentale:</p>
+                <p className="text-2xl font-bold text-blue-600">{activity.experimental_points || 5} points</p>
+              </div>
+              <div className="bg-white p-3 rounded border border-gray-200">
+                <p className="text-gray-700 font-medium">Partie théorique:</p>
+                <p className="text-2xl font-bold text-blue-600">{activity.theoretical_points || 15} points</p>
+              </div>
+            </div>
+
+            <div className="text-right mt-3">
+              <p className="text-gray-700">
+                <span className="font-medium">Total:</span>{" "}
+                <span className="font-bold">
+                  {(activity.experimental_points || 5) + (activity.theoretical_points || 15)} points
+                </span>
+              </p>
+            </div>
           </div>
         )}
+      </Paper>
+
+      {/* Section Fragments et Corrections */}
+      <div className="flex flex-col lg:flex-row gap-6">
+
+        {/* Corrections */}
+        <div className="w-full lg:w-2/3">
+          <Paper className="p-4 shadow mb-4">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-xl font-semibold">Corrections</h2>
+              
+              {!isEditing && (
+                <div className="flex space-x-2">
+                  <Button
+                    onClick={handleNewCorrectionClick}
+                    variant="outlined"
+                    color="primary"
+                    size="small"
+                    startIcon={<AddIcon />}
+                  >
+                    Nouvelle correction
+                  </Button>
+                  <Button
+                    onClick={handleDelete}
+                    variant="outlined"
+                    color="error"
+                    size="small"
+                  >
+                    <DeleteIcon sx={{ mr: 0.2 }} />
+                  </Button>
+                </div>
+              )}
+            </div>
+
+            {corrections.length === 0 ? (
+              <div className="bg-gray-50 p-4 rounded border border-gray-200 text-center">
+                <Typography color="textSecondary">
+                  Aucune correction pour cette activité.
+                </Typography>
+                {!isEditing && (
+                  <Button
+                    onClick={handleNewCorrectionClick}
+                    variant="contained" 
+                    color="primary"
+                    size="small"
+                    className="mt-3"
+                    startIcon={<AddIcon />}
+                  >
+                    Créer une correction
+                  </Button>
+                )}
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-4">
+                {corrections.map((correction) => (
+                  <div key={correction.id} className="border rounded-lg p-4 shadow-sm hover:shadow-md transition-shadow">
+                    <div className="flex flex-col gap-2 mb-2">
+                      <h3 className="font-semibold">
+                      {correction.student_name || `${activity.name} - Sans nom`}
+                      </h3>
+                      <p className="text-sm text-gray-500">
+                      Créée le {new Date(correction.created_at!).toLocaleString('fr-FR')}
+                      </p>
+                    <Button
+                      component={Link}
+                      href={`/corrections/${correction.id}`}
+                      variant="outlined"
+                      size="small"
+                      className="mt-2"
+                      >
+                      Éditer la correction
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </Paper>
+        </div>
+
+        {/* Fragments */}
+        <div className="w-full lg:w-1/3">
+          <Paper className="p-4 shadow mb-4">
+            <div className="flex items-center justify-between mb-2">
+              <h2 className="text-xl font-semibold">Fragments</h2>
+              
+              {!isEditing && (
+                <Button
+                  onClick={handleFragmentsClick}
+                  variant="outlined"
+                  color="success"
+                  size="small"
+                  startIcon={<ArticleIcon />}
+                >
+                  Gérer
+                </Button>
+              )}
+            </div>
+            <Typography variant="body2" color="textSecondary">
+              Les fragments sont des morceaux de texte réutilisables pour vos corrections.
+            </Typography>
+          </Paper>
+        </div>
       </div>
     </div>
   );

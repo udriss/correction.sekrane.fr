@@ -5,7 +5,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { Activity } from '@/lib/activity';
 import LoadingSpinner from '@/components/LoadingSpinner';
-
+import { Button } from '@mui/material';
 export default function Home() {
   const [activities, setActivities] = useState<Activity[]>([]);
   const [loading, setLoading] = useState(true);
@@ -47,19 +47,13 @@ export default function Home() {
           {activities.map((activity) => (
             <div key={activity.id} className="border rounded-lg p-4 shadow hover:shadow-md transition">
               <h2 className="text-xl font-semibold mb-2">{activity.name}</h2>
-              <div className="flex space-x-2 mt-4">
-                <Link
-                  href={`/activities/${activity.id}`}
-                  className="bg-green-500 hover:bg-green-600 text-white py-1 px-3 rounded text-sm"
-                >
+                <div className="flex space-x-2 mt-4">
+                <Button variant="outlined" color="success" href={`/activities/${activity.id}`} component={Link}>
                   Voir détails
-                </Link>
-                <Link
-                  href={`/activities/${activity.id}/corrections/new`}
-                  className="bg-purple-500 hover:bg-purple-600 text-white py-1 px-3 rounded text-sm"
-                >
+                </Button>
+                <Button variant="outlined" color="secondary" href={`/activities/${activity.id}/corrections/new`} component={Link}>
                   Nouvelle correction
-                </Link>
+                </Button>
               </div>
             </div>
           ))}
