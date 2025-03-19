@@ -13,6 +13,11 @@ async function verifyToken(token: string) {
   }
 }
 
+// Fonction pour vérifier si l'utilisateur est authentifié
+function isAuthenticated(request: NextRequest) {
+  return request.cookies.has('auth_token');
+}
+
 export async function middleware(request: NextRequest) {
   // Get the pathname of the request
   const path = request.nextUrl.pathname;
@@ -26,7 +31,8 @@ export async function middleware(request: NextRequest) {
   // Check if the path should be protected
   const isPathProtected = 
     path.startsWith('/activities') || 
-    path.startsWith('/corrections');
+    path.startsWith('/corrections') ||
+    path.startsWith('/activites'); // Ajout de la nouvelle route protégée
   
   // If the path isn't protected or is a public path, proceed
   if (!isPathProtected || isPublicPath) {
@@ -38,15 +44,15 @@ export async function middleware(request: NextRequest) {
   
   // If there's no token, redirect to login
   if (!token) {
-    // Utiliser l'URL complète actuelle pour la redirection
-    const baseUrl = new URL(request.url).origin;
-    const loginUrl = new URL('/login', baseUrl);
+    // Créer une URL pour la redirection
+    const url = request.nextUrl.clone();
+    url.pathname = '/login';
     
-    // Stockez l'URL complète actuelle (pas juste le chemin)
-    loginUrl.searchParams.set('callbackUrlMiddle', request.url);
+    // Utiliser un paramètre de retour standard (callbackUrl) pour la cohérence
+    url.searchParams.set('callbackUrl', request.nextUrl.pathname + request.nextUrl.search);
     
-    console.log(`Redirecting to login: ${loginUrl.toString()}, from: ${request.url}`);
-    return NextResponse.redirect(loginUrl);
+    console.log(`Redirecting to login: ${url.toString()}, from: ${request.nextUrl.pathname}`);
+    return NextResponse.redirect(url);
   }
   
   // Verify the token
@@ -54,10 +60,10 @@ export async function middleware(request: NextRequest) {
   
   // If token is invalid, redirect to login
   if (!payload) {
-    const baseUrl = new URL(request.url).origin;
-    const loginUrl = new URL('/login', baseUrl);
-    loginUrl.searchParams.set('callbackUrl', request.url);
-    return NextResponse.redirect(loginUrl);
+    const url = request.nextUrl.clone();
+    url.pathname = '/login';
+    url.searchParams.set('callbackUrl', request.nextUrl.pathname);
+    return NextResponse.redirect(url);
   }
   
   // Token is valid, proceed
@@ -68,6 +74,7 @@ export const config = {
   matcher: [
     '/activities/:path*',
     '/corrections/:path*',
+    '/activites/:path*', // Ajout de la nouvelle route protégée
     '/login'
   ],
 };

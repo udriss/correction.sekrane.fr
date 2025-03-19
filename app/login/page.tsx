@@ -61,7 +61,7 @@ export default function LoginPage() {
         justifyContent: 'center',
         alignItems: 'center',
         minHeight: '100vh',
-        backgroundColor: '#f5f5f5',
+        backgroundColor: 'rg(214, 219, 220)',
       }}
     >
       <Paper

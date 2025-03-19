@@ -1,103 +1,179 @@
 'use client';
 
 import React from 'react';
-import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { Activity } from '@/lib/activity';
-import LoadingSpinner from '@/components/LoadingSpinner';
-import { Button, Fab } from '@mui/material';
-import AddIcon from '@mui/icons-material/Add';
-import VisibilityIcon from '@mui/icons-material/Visibility';
-import RateReviewIcon from '@mui/icons-material/RateReview';
+import { 
+  Button, 
+  Typography, 
+  Container, 
+  Box, 
+  Paper,
+  Card,
+  CardContent
+} from '@mui/material';
+import Grid from '@mui/material/Grid2';
+import { 
+  AssignmentTurnedIn, 
+  Speed, 
+  Share, 
+  Analytics,
+  School,
+  BarChart,
+  ArrowForward
+} from '@mui/icons-material';
+import Image from 'next/image';
 
-export default function Home() {
-  const [activities, setActivities] = useState<Activity[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    const fetchActivities = async () => {
-      try {
-        const response = await fetch('/api/activities');
-        if (!response.ok) throw new Error('Erreur lors du chargement des activités');
-        const data = await response.json();
-        setActivities(data);
-      } catch (error) {
-        console.error('Erreur:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchActivities();
-  }, []);
-
+export default function LandingPage() {
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="max-w-4xl mx-auto px-4 py-12">
-        <header className="text-center mb-10">
-          <h1 className="text-4xl font-bold mb-3 text-blue-800">Corrections d'activités</h1>
-          <p className="text-xl text-gray-600">Plateforme de gestion des activités pédagogiques</p>
-        </header>
-        
-        <div className="flex justify-center mb-8">
-          <Button
-            variant="contained"
-            color="primary"
-            startIcon={<AddIcon />}
-            component={Link}
-            href="/activities/new"
-            size="large"
-            className="py-2 px-4"
-          >
-            Nouvelle activité
-          </Button>
-        </div>
-
-        {loading ? (
-          <div className="py-10 flex justify-center">
-            <LoadingSpinner text="Chargement des activités" />
-          </div>
-        ) : (
-          <div className="space-y-6">
-            {activities.map((activity) => (
-              <div key={activity.id} className="bg-white border rounded-xl p-6 shadow-md hover:shadow-lg transition">
-                <h2 className="text-2xl font-semibold mb-3 text-gray-800">{activity.name}</h2>
-                <div className="flex flex-wrap gap-3 mt-4">
-                  <Button 
-                    variant="outlined" 
-                    color="primary" 
-                    href={`/activities/${activity.id}`} 
-                    component={Link}
-                    startIcon={<VisibilityIcon />}
-                  >
-                    Voir détails
-                  </Button>
-                  <Button 
-                    variant="outlined" 
-                    color="secondary" 
-                    href={`/activities/${activity.id}/corrections/new`} 
-                    component={Link}
-                    startIcon={<RateReviewIcon />}
-                  >
-                    Nouvelle correction
-                  </Button>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-      
-      {/* Floating action button for mobile */}
-{/*       <Fab 
-        color="primary" 
-        aria-label="add" 
-        className="fixed bottom-6 right-6 z-10 shadow-lg"
-        component={Link}
-        href="/activities/new"
+    <div className="min-h-screen bg-gradient-to-b from-gray-50 to-blue-50">
+      {/* Hero Section */}
+      <Box 
+        className="bg-gradient-to-r from-blue-600 to-indigo-700 text-white py-16 md:py-24"
+        sx={{ 
+          clipPath: {
+            xs: 'none',
+            md: 'polygon(0 0, 100% 0, 100% 85%, 0 100%)'
+          }
+        }}
       >
-        <AddIcon />
-      </Fab> */}
+        <Container maxWidth="lg">
+          <Grid container spacing={4} alignItems="center">
+            <Grid size={{ xs: 12, md: 6 }}>
+              <Typography 
+                variant="h2" 
+                component="h1" 
+                className="text-4xl md:text-5xl font-extrabold mb-4"
+              >
+                Simplifiez vos corrections pédagogiques
+              </Typography>
+              <Typography variant="h6" className="mb-8 text-blue-100">
+              Gérez et partagez facilement les corrections pour vos élèves
+              </Typography>
+              <Box className="flex flex-wrap gap-4">
+                <Button 
+                  variant="contained" 
+                  color="secondary" 
+                  size="large" 
+                  component={Link}
+                  href="/activites"
+                  endIcon={<ArrowForward />}
+                  className="text-lg py-3 px-6"
+                  sx={{ fontWeight: 'bold' }}
+                >
+                  Découvrir les activités
+                </Button>
+                <Button 
+                  variant="outlined" 
+                  color="inherit" 
+                  size="large" 
+                  component={Link}
+                  href="/activities/new"
+                  className="text-lg border-2"
+                >
+                  Nouvelle activité
+                </Button>
+              </Box>
+            </Grid>
+            <Grid size={{ xs: 12, md: 6 }} className="flex justify-center">
+              <Box className="relative w-full max-w-md h-64 md:h-80">
+                {/* Ici vous pourriez ajouter une image d'illustration ou une animation */}
+                <div className="w-full h-full bg-white/20 rounded-lg flex items-center justify-center backdrop-blur-sm">
+                  <School sx={{ fontSize: 100, opacity: 0.9 }} />
+                </div>
+              </Box>
+            </Grid>
+          </Grid>
+        </Container>
+      </Box>
+
+      {/* Features Section */}
+      <Container maxWidth="lg" className="py-16">
+        <Box className="text-center mb-12">
+          <Typography variant="h3" component="h2" className="font-bold mb-3 text-gray-800">
+            Une plateforme conçue pour les enseignants
+          </Typography>
+          <Typography variant="h6" className="text-gray-600 mx-auto max-w-3xl">
+            Découvrez comment notre outil peut transformer votre façon de corriger les travaux
+          </Typography>
+        </Box>
+
+        <Grid container spacing={4}>
+          {/* Feature 1 */}
+          <Grid size={{ xs: 12, md: 4 }}>
+            <Card className="h-full hover:shadow-lg transition-shadow">
+              <CardContent className="p-6">
+                <Box className="flex justify-center mb-4">
+                  <AssignmentTurnedIn fontSize="large" className="text-blue-600" />
+                </Box>
+                <Typography variant="h5" className="font-bold mb-2 text-center">
+                  Corrections Simplifiées
+                </Typography>
+                <Typography variant="body1" color="text.secondary" className="text-center">
+                  Créez des corrections structurées avec un éditeur intuitif et des modèles personnalisables
+                </Typography>
+              </CardContent>
+            </Card>
+          </Grid>
+
+          {/* Feature 2 */}
+          <Grid size={{ xs: 12, md: 4 }}>
+            <Card className="h-full hover:shadow-lg transition-shadow">
+              <CardContent className="p-6">
+                <Box className="flex justify-center mb-4">
+                  <Share fontSize="large" className="text-green-600" />
+                </Box>
+                <Typography variant="h5" className="font-bold mb-2 text-center">
+                  Partage Facile
+                </Typography>
+                <Typography variant="body1" color="text.secondary" className="text-center">
+                  Partagez instantanément les corrections avec vos élèves via un lien sécurisé
+                </Typography>
+              </CardContent>
+            </Card>
+          </Grid>
+
+          {/* Feature 3 */}
+          <Grid size={{ xs: 12, md: 4 }}>
+            <Card className="h-full hover:shadow-lg transition-shadow">
+              <CardContent className="p-6">
+                <Box className="flex justify-center mb-4">
+                  <BarChart fontSize="large" className="text-purple-600" />
+                </Box>
+                <Typography variant="h5" className="font-bold mb-2 text-center">
+                  Suivi des Performances
+                </Typography>
+                <Typography variant="body1" color="text.secondary" className="text-center">
+                  Visualisez les progrès des élèves et identifiez les points à améliorer
+                </Typography>
+              </CardContent>
+            </Card>
+          </Grid>
+        </Grid>
+      </Container>
+
+      {/* Call to Action */}
+      <Box className="bg-blue-700 py-16 text-white">
+        <Container maxWidth="md" className="text-center">
+          <Typography variant="h4" className="font-bold mb-4">
+            Prêt à améliorer votre processus de correction ?
+          </Typography>
+          <Typography variant="body1" className="mb-8 text-blue-100">
+            Rejoignez des milliers d'enseignants qui utilisent notre plateforme pour économiser du temps et fournir des retours de qualité.
+          </Typography>
+          <Box className="flex justify-center">
+            <Button 
+              variant="contained" 
+              color="secondary" 
+              size="large" 
+              component={Link}
+              href="/activites"
+              className="text-lg font-medium"
+            >
+              Commencer maintenant
+            </Button>
+          </Box>
+        </Container>
+      </Box>
     </div>
   );
 }

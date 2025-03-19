@@ -21,7 +21,8 @@ import {
   AccountCircle, 
   KeyboardArrowDown, 
   Add as AddIcon,
-  Home as HomeIcon
+  Home as HomeIcon,
+  ViewList as ViewListIcon
 } from '@mui/icons-material';
 
 interface User {
@@ -109,18 +110,24 @@ export default function MainNavbar() {
 
   return (
     <>
-      <HideOnScroll>
-        <AppBar 
-          position="fixed" 
-          elevation={0} 
-          sx={{
-            background: 'rgba(155, 155, 155, 0.22)', // Fond blanc transparent
-            backdropFilter: 'blur(10px)', // Effet de flou
-            borderBottom: '1px solid rgba(0, 0, 0, 0.07)',
-            color: 'text.primary',
-          }}
-        >
-          <Container maxWidth="xl">
+      {/* Conteneur externe centré */}
+      <Box className="flex justify-center w-full fixed top-0 z-50">
+        <HideOnScroll>
+          <AppBar 
+            position="relative" // Changed from fixed to relative
+            elevation={0} 
+            sx={{
+              background: 'rgba(155, 155, 155, 0.22)',
+              backdropFilter: 'blur(10px)',
+              borderBottom: '1px solid rgba(0, 0, 0, 0.07)',
+              color: 'text.primary',
+              maxWidth: '600px',
+              width: '100%',
+              borderBottomLeftRadius: '16px',
+              borderBottomRightRadius: '16px',
+              // Removed left: 50% and transform: translateX(-50%)
+            }}
+          >
             <Toolbar sx={{ justifyContent: 'space-between' }}>
               {/* Logo et titre de l'app */}
               <Typography 
@@ -146,20 +153,27 @@ export default function MainNavbar() {
                   component={Link} 
                   href="/" 
                   color="inherit" 
-                  startIcon={<HomeIcon />}
                   sx={{ fontWeight: 500 }}
                 >
-                  Activités
+                  <HomeIcon sx={{ fontSize: '1.5rem' }} />
+                </Button>
+                
+                <Button 
+                  component={Link} 
+                  href="/activites" 
+                  color="inherit" 
+                  sx={{ fontWeight: 500 }}
+                >
+                  <ViewListIcon sx={{ fontSize: '1.5rem' }} />
                 </Button>
                 
                 <Button 
                   component={Link} 
                   href="/activities/new" 
                   color="inherit" 
-                  startIcon={<AddIcon />}
                   sx={{ fontWeight: 500 }}
                 >
-                  Nouvelle activité
+                 <AddIcon sx={{ fontSize: '1.5rem' }} />
                 </Button>
               </Box>
               
@@ -218,14 +232,14 @@ export default function MainNavbar() {
                   variant="contained"
                   sx={{ borderRadius: '24px' }}
                 >
-                  Connexion
+                  <AccountCircle />
                 </Button>
               )}
             </Toolbar>
-          </Container>
-        </AppBar>
-      </HideOnScroll>
-      <Toolbar className='bg-gray-100' /> {/* Espace pour compenser la barre de navigation fixe */}
+          </AppBar>
+        </HideOnScroll>
+      </Box>
+      
       
       {/* Modal de changement de mot de passe */}
       <ChangePasswordModal
