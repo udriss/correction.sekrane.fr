@@ -1,14 +1,13 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { Inter } from 'next/font/google';
 import { 
   Paper, 
   Typography, 
   Box, 
   Alert, 
   CircularProgress, 
-  Skeleton,
-  Container,
   Divider,
   Button,
   Chip
@@ -20,7 +19,6 @@ import { parseContentItems } from '@/lib/services/correctionService';
 import { generateHtmlFromItems } from '@/utils/htmlUtils';
 import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
-import RemoveRedEyeIcon from '@mui/icons-material/RemoveRedEye';
 import RuleIcon from '@mui/icons-material/Rule';
 import GradeIcon from '@mui/icons-material/Grade';
 import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
@@ -28,6 +26,9 @@ import HourglassEmptyIcon from '@mui/icons-material/HourglassEmpty';
 import EventAvailableIcon from '@mui/icons-material/EventAvailable';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import ScheduleIcon from '@mui/icons-material/Schedule';
+
+// Initialiser la police Inter
+const inter = Inter({ subsets: ['latin'] });
 
 export default function FeedbackViewer({ params }: { params: Promise<{ code: string }> }) {
   // Unwrap the Promise for params using React.use in client components
@@ -38,6 +39,22 @@ export default function FeedbackViewer({ params }: { params: Promise<{ code: str
   const [error, setError] = useState('');
   const [correction, setCorrection] = useState<any>(null);
   const [renderedHtml, setRenderedHtml] = useState('');
+
+  // Version améliorée de formatGrade
+  const formatGrade = (value: number | string | null | undefined) => {
+    if (value === null || value === undefined) return '0';
+    
+    // Convertir en nombre
+    const numValue = typeof value === 'string' ? parseFloat(value) : value;
+    
+    // Vérifier si le nombre est un entier
+    if (Number.isInteger(numValue)) {
+      return numValue.toString();
+    } else {
+      // Format avec une décimale et remplace le point par une virgule
+      return numValue.toFixed(1).replace('.', ',');
+    }
+  };
 
   // Récupérer la correction partagée
   useEffect(() => {
@@ -73,46 +90,55 @@ export default function FeedbackViewer({ params }: { params: Promise<{ code: str
 
   if (loading) {
     return (
-      <Container maxWidth="md" sx={{ py: 8 }}>
-        <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}>
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
+        <div className="max-w-4xl w-full flex justify-center py-16">
           <CircularProgress size={40} />
-        </Box>
-      </Container>
+        </div>
+      </div>
     );
   }
 
   if (error) {
     return (
-      <Container maxWidth="md" sx={{ py: 8 }}>
-        <Paper elevation={2} sx={{ p: 4, borderRadius: 2 }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 3 }}>
-            <ErrorOutlineIcon color="error" fontSize="large" />
-            <Typography variant="h5" color="error.main">
-              Erreur
-            </Typography>
-          </Box>
-          <Alert severity="error" sx={{ mb: 3 }}>
-            {error}
-          </Alert>
-          <Button
-            variant="outlined"
-            startIcon={<ArrowBackIcon />}
-            onClick={() => router.push('/')}
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4 py-8">
+        <div className="max-w-4xl w-full">
+          <Paper 
+            elevation={2} 
+            sx={{ p: 4, borderRadius: 2 }}
+            className="border-l-4 border-red-500"
           >
-            Retour à l'accueil
-          </Button>
-        </Paper>
-      </Container>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 3 }}>
+              <ErrorOutlineIcon color="error" fontSize="large" />
+              <Typography variant="h5" color="error.main" className="font-bold">
+                Erreur
+              </Typography>
+            </Box>
+            <Alert severity="error" sx={{ mb: 3 }}>
+              {error}
+            </Alert>
+            <Button
+              variant="contained"
+              color="primary"
+              startIcon={<ArrowBackIcon />}
+              onClick={() => router.push('/')}
+            >
+              Retour à l'accueil
+            </Button>
+          </Paper>
+        </div>
+      </div>
     );
   }
 
   if (!correction) {
     return (
-      <Container maxWidth="md" sx={{ py: 8 }}>
-        <Alert severity="warning">
-          Correction non trouvée
-        </Alert>
-      </Container>
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4 py-8">
+        <div className="max-w-4xl w-full">
+          <Alert severity="warning">
+            Correction non trouvée
+          </Alert>
+        </div>
+      </div>
     );
   }
 
@@ -154,235 +180,204 @@ export default function FeedbackViewer({ params }: { params: Promise<{ code: str
   const isOnTime = !isLate && correction.deadline && correction.submission_date;
 
   return (
-    <Container maxWidth="md" sx={{ py: 8 }}>
-      <Paper elevation={3} sx={{ p: 4, borderRadius: 2 }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 2, mb: 3 }}>
-          <RuleIcon color="primary" />
-          <Typography variant="h5" >
-            Correction de {correction.student_name || "l'élève"}
-          </Typography>
-        </Box>
-        
-        <Typography variant="subtitle1" color="text.secondary" gutterBottom>
-         {correction.activity_name}
-        </Typography>
-
-        {/* Dates importantes */}
+    <div className={`${inter.className} min-h-screen bg-gray-50 flex justify-center px-4 py-8`}>
+      <div className="max-w-4xl w-full">
         <Paper 
-          elevation={0} 
-          variant="outlined" 
-          sx={{ 
-            p: 2, 
-            mt: 2, 
-            mb: 3, 
-            bgcolor: 'background.default',
-            borderLeft: '4px solid',
-            borderColor: 'info.main'
-          }}
+          elevation={3} 
+          className="overflow-hidden rounded-lg shadow-lg"
         >
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
-            <CalendarTodayIcon color="info" />
-            <Typography variant="h6">
-              Dates importantes
-            </Typography>
-          </Box>
-          
-          <Grid container spacing={2} sx={{ pl: 3 }}>
-            <Grid size={{ xs: 12, sm: 6 }}>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                <EventAvailableIcon fontSize="small" color="action" />
-                <Typography variant="body1">
-                  <strong>Date limite:</strong> {formatDate(correction.deadline)}
-                </Typography>
-              </Box>
-            </Grid>
-            
-            <Grid size={{ xs: 12, sm: 6 }}>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                <HourglassEmptyIcon fontSize="small" color="action" />
-                {/* Fix hydration error by changing Typography to component="div" */}
-                <Typography variant="body1" component="div">
-                  <strong>Date de rendu:</strong> {formatDate(correction.submission_date)}
-                  {isMoreThanOneDayLate && (
-                    <Chip 
-                      label="En retard" 
-                      size="small" 
-                      color="error" 
-                      sx={{ ml: 1 }}
-                    />
-                  )}
-                  {isOneDayLate && (
-                    <Chip 
-                      label="Léger retard" 
-                      size="small" 
-                      color="warning" 
-                      sx={{ ml: 1 }}
-                    />
-                  )}
-                  {isOnTime && (
-                    <Chip 
-                      label="À temps" 
-                      size="small" 
-                      color="success" 
-                      sx={{ ml: 1 }}
-                    />
-                  )}
-                </Typography>
-              </Box>
-            </Grid>
-          </Grid>
-
-          {/* Ajouter un message approprié selon le timing de rendu */}
-          {isMoreThanOneDayLate && (
-            <Box sx={{ mt: 2, ml: 3, display: 'flex', alignItems: 'center', gap: 1 }}>
-              <Alert severity="error" icon={<ScheduleIcon />} sx={{ width: '100%' }}>
-                Rendu en retard de {daysLate} jour(s) - Une pénalité s'applique à la note finale.
-              </Alert>
-            </Box>
-          )}
-          
-          {isOneDayLate && (
-            <Box sx={{ mt: 2, ml: 3, display: 'flex', alignItems: 'center', gap: 1 }}>
-              <Alert severity="warning" icon={<ScheduleIcon />} sx={{ width: '100%' }}>
-                Rendu en retard de 1 jour - Tolérance de 24h : exempté de pénalité.
-              </Alert>
-            </Box>
-          )}
-          
-          {isOnTime && (
-            <Box sx={{ mt: 2, ml: 3, display: 'flex', alignItems: 'center', gap: 1 }}>
-              <Alert severity="success" icon={<CheckCircleIcon />} sx={{ width: '100%' }}>
-                Rendu effectué dans les délais.
-              </Alert>
-            </Box>
-          )}
-        </Paper>
-
-        {/* Affichage de la note */}
-        {hasGrade && (
-          <Paper 
-            elevation={0} 
-            variant="outlined" 
-            sx={{ 
-              p: 2, 
-              mt: 2, 
-              mb: 3, 
-              bgcolor: 'background.default',
-              borderLeft: '4px solid',
-              borderColor: 'primary.main'
-            }}
-          >
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
-              <GradeIcon color="primary" />
-              <Typography variant="h6">
-                Résultat
+          {/* En-tête avec un arrière-plan gradient */}
+          <div className="bg-gradient-to-r from-blue-600 to-indigo-700 text-white p-6">
+            <div className="flex items-center justify-center gap-3 mb-2">
+              <RuleIcon sx={{ fontSize: 32 }} />
+              <Typography variant="h4" className="font-bold">
+                Correction de {correction.student_name || "l'élève"}
               </Typography>
-            </Box>
+            </div>
             
-            <Box sx={{ pl: 3 }}>
-              {/* Afficher les détails des notes expérimentales et théoriques */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-3">
-                <Box sx={{ 
-                  p: 1.5, 
-                  borderRadius: 1, 
-                  bgcolor: 'background.paper',
-                  border: '1px solid',
-                  borderColor: 'divider'
-                }}>
-                  <Typography variant="body2" color="text.secondary">Partie expérimentale</Typography>
-                  <Typography variant="h6" sx={{ fontWeight: 'medium', color: 'primary.light' }}>
-                    {correction.experimental_points_earned || '0'} / {correction.experimental_points || '5'}
+            <Typography 
+              variant="h6" 
+              className="text-center text-blue-100 mt-2 font-medium"
+            >
+              {correction.activity_name}
+            </Typography>
+          </div>
+
+          <div className="p-6">
+            {/* Dates importantes - design amélioré */}
+            <Paper 
+              elevation={0} 
+              variant="outlined" 
+              sx={{ borderRadius: 2 }}
+              className="p-4 mb-6 border-l-4 border-blue-500 bg-blue-50"
+            >
+              <Box className="flex items-center gap-2 mb-3">
+                <CalendarTodayIcon color="primary" />
+                <Typography variant="h6" className="font-bold">
+                  Dates importantes
+                </Typography>
+              </Box>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pl-2">
+                <div className="flex items-center gap-2">
+                  <EventAvailableIcon fontSize="small" className="text-blue-700" />
+                  <div>
+                    <Typography variant="subtitle2" className="text-gray-600">Date limite</Typography>
+                    <Typography variant="body1" className="font-medium">{formatDate(correction.deadline)}</Typography>
+                  </div>
+                </div>
+                
+                <div className="flex items-center gap-2">
+                  <HourglassEmptyIcon fontSize="small" className="text-blue-700" />
+                  <div>
+                    <Typography variant="subtitle2" className="text-gray-600">Date de rendu</Typography>
+                    <div className="flex items-center gap-2">
+                      <Typography variant="body1" className="font-medium">{formatDate(correction.submission_date)}</Typography>
+                      {isMoreThanOneDayLate && (
+                        <Chip label="En retard" size="small" color="error" />
+                      )}
+                      {isOneDayLate && (
+                        <Chip label="Léger retard" size="small" color="warning" />
+                      )}
+                      {isOnTime && (
+                        <Chip label="À temps" size="small" color="success" />
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Messages de statut */}
+              {isMoreThanOneDayLate && (
+                <Alert severity="error" icon={<ScheduleIcon />}
+                className="mt-4"
+                variant="outlined">
+                  Rendu en retard de {daysLate} jour(s) - Une pénalité s'applique à la note finale.
+                </Alert>
+              )}
+              
+              {isOneDayLate && (
+                <Alert severity="warning" icon={<ScheduleIcon />} 
+                className="mt-4"
+                variant="outlined">
+                  Rendu en retard de 1 jour - Tolérance de 24h : exempté de pénalité.
+                </Alert>
+              )}
+              
+              {isOnTime && (
+                <Alert 
+                  severity="success" 
+                  icon={<CheckCircleIcon />} 
+                  className="mt-4"
+                  variant="outlined"
+                >
+                  Rendu effectué dans les délais.
+                </Alert>
+              )}
+            </Paper>
+
+            {/* Affichage de la note - design amélioré */}
+            {hasGrade && (
+              <Paper 
+                elevation={0}
+                variant="outlined"
+                sx={{ borderRadius: 2 }}
+                className="p-4 mb-6 border-l-4 border-green-600 bg-green-50"
+              >
+                <Box className="flex items-center gap-2 mb-3">
+                  <GradeIcon className="text-green-700" />
+                  <Typography variant="h6" className="font-bold">
+                    Résultat
                   </Typography>
                 </Box>
                 
-                <Box sx={{ 
-                  p: 1.5, 
-                  borderRadius: 1, 
-                  bgcolor: 'background.paper',
-                  border: '1px solid',
-                  borderColor: 'divider'
-                }}>
-                  <Typography variant="body2" color="text.secondary">Partie théorique</Typography>
-                  <Typography variant="h6" sx={{ fontWeight: 'medium', color: 'primary.light' }}>
-                    {correction.theoretical_points_earned || '0'} / {correction.theoretical_points || '15'}
-                  </Typography>
-                </Box>
-              </div>
-              <Box sx={{ 
-                  display: 'flex', 
-                  alignItems: 'center', 
-                  mt: 2, 
-                  gap: 1 
-                }}>
-                  <Typography variant="h6" sx={{ fontWeight: 'bold', color: 'primary.main' }}>
-                    Note totale :
-                  </Typography>
-                  <Typography variant="h6" sx={{ fontWeight: 'bold', color: 'primary.main' }}>
-                    {correction.grade}/20
-                  </Typography>
-                </Box>
-              
-              
-              {hasPenalty && (
-                <Typography variant="body1" color="error" sx={{ mt: 1 }}>
-                  <strong>Pénalité:</strong> -{correction.penalty} point{correction.penalty > 1 ? 's' : ''}
-                  {isMoreThanOneDayLate && (
-                    <Typography component="span" variant="caption" sx={{ ml: 1 }}>
-                      (retard sur la date limite)
+                {/* Notes par partie */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                  <Paper className="p-3 border shadow-sm">
+                    <Typography variant="subtitle2" className="text-gray-600">Partie expérimentale</Typography>
+                    <Typography variant="h5" className="font-bold text-blue-700">
+                      {formatGrade(correction.experimental_points_earned)} <span className="text-gray-600 text-lg">/ {correction.experimental_points || '5'}</span>
                     </Typography>
-                  )}
-                </Typography>
-              )}
-              
-              {isOneDayLate && !hasPenalty && (
-                <Typography variant="body1" color="warning.main" sx={{ mt: 1 }}>
-                  <strong>Tolérance 24h :</strong> Exempté de pénalité malgré le léger retard.
-                </Typography>
-              )}
-              
-              {hasPenalty && (
-              <Box sx={{ 
-                display: 'flex', 
-                alignItems: 'center', 
-                mt: 2, 
-                gap: 1,
-                borderColor: 'divider' 
-              }}>
-                <Typography variant="h6" sx={{ fontWeight: 'bold', color: 'text.primary' }}>
-                  Note finale :
-                </Typography>
-                <Typography variant="h6" sx={{ fontWeight: 'bold', color: 'secondary.main' }}>
-                  {finalGrade}/20
-                </Typography>
-              </Box>
-              )}
-            </Box>
-          </Paper>
-        )}
+                  </Paper>
+                  
+                  <Paper className="p-3 border shadow-sm">
+                    <Typography variant="subtitle2" className="text-gray-600">Partie théorique</Typography>
+                    <Typography variant="h5" className="font-bold text-blue-700">
+                      {formatGrade(correction.theoretical_points_earned)} <span className="text-gray-600 text-lg">/ {correction.theoretical_points || '15'}</span>
+                    </Typography>
+                  </Paper>
+                </div>
+                
+                {/* Note totale */}
+                <div className="flex justify-center mb-2">
+                  <div className="flex flex-col items-center justify-center px-6 py-3 bg-gradient-to-r from-blue-600 to-blue-800 rounded-full text-white inline-block">
+                    <Typography variant="subtitle2">Totale</Typography>
+                    <Typography variant="h4" className="text-center font-bold">
+                      {formatGrade(correction.grade)} / 20
+                    </Typography>
+                  </div>
+                </div>
+                
+                {/* Pénalités si applicables */}
+                {hasPenalty && (
+                  <div className="mt-4">
+                    <Alert 
+                      severity="error" 
+                      variant="outlined"
+                      sx={{ mb: 1 }}
+                    >
+                      <div className="font-bold">Pénalité de retard : - {correction.penalty} point{correction.penalty > 1 ? 's' : ''}</div>
+                      {isMoreThanOneDayLate && (
+                        <Typography variant="caption">
+                          (pour {daysLate} jours de retard)
+                        </Typography>
+                      )}
+                    </Alert>
+                    
+                    <div className="mt-3 p-2 bg-gray-100 rounded-lg border border-gray-200">
+                      <div className="flex justify-between items-center">
+                        <Typography variant="subtitle2">
+                          Note finale après pénalité :
+                        </Typography>
+                        <Typography variant="h5" className="font-bold text-red-600">
+                          {formatGrade(finalGrade)} / 20
+                        </Typography>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </Paper>
+            )}
 
-        <Divider sx={{ my: 3 }} />
+            <Divider className="my-6" />
 
-        <Box sx={{ mt: 4 }}>
-          <Typography variant="h6" gutterBottom>
-            Contenu de la correction :
-          </Typography>
-          <Paper 
-            variant="outlined" 
-            sx={{ p: 3, mt: 2, bgcolor: 'background.default' }}
-          >
-            <div 
-              dangerouslySetInnerHTML={{ __html: renderedHtml }} 
-              className="correction-content"
-            />
-          </Paper>
-        </Box>
-        
-        <Box sx={{ mt: 4, textAlign: 'right' }}>
-          <Typography variant="caption" display="block" color="text.secondary">
-            Correction créée le {new Date(correction.created_at).toLocaleDateString('fr-FR')}
-          </Typography>
-        </Box>
-      </Paper>
-    </Container>
+            {/* Contenu de la correction */}
+            <div className="mt-6">
+              <div className="flex items-center gap-2 mb-4 bg-gray-100 p-2 rounded-t-lg border-b-2 border-blue-500">
+                <Typography variant="h6" className="font-bold text-gray-800">
+                  Contenu de la correction
+                </Typography>
+              </div>
+              
+              <Paper 
+                variant="outlined" 
+                className="p-5 mb-6 rounded bg-white shadow-inner"
+              >
+                <div 
+                  dangerouslySetInnerHTML={{ __html: renderedHtml }} 
+                  className="correction-content prose prose-sm md:prose-base max-w-none prose-headings:text-blue-800 prose-a:text-blue-600"
+                />
+              </Paper>
+            </div>
+          </div>
+          
+          <div className="bg-gray-100 p-4 text-right border-t">
+            <Typography variant="caption" className="text-gray-500">
+              Correction créée le {new Date(correction.created_at).toLocaleDateString('fr-FR')}
+            </Typography>
+          </div>
+        </Paper>
+      </div>
+    </div>
   );
 }

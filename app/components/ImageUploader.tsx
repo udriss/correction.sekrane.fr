@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useRef } from 'react';
-import { Button, CircularProgress } from '@mui/material';
+import { Button, CircularProgress, IconButton } from '@mui/material';
 import ImageIcon from '@mui/icons-material/Image';
 
 interface ImageUploaderProps {
@@ -75,20 +75,19 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({ activityId, correctionId,
         accept="image/*"
         style={{ display: 'none' }}
       />
-      <Button
+      <IconButton
         onClick={triggerFileInput}
         color="primary"
-        variant="text"
-        size="small"
+        size="medium"
         disabled={uploading}
-        className="ml-2"
+        title="Ajouter une image"
       >
         {uploading ? (
-          <CircularProgress size={20} className="mr-1" />
+          <CircularProgress size={20} />
         ) : (
-          <ImageIcon fontSize="small" className="mr-1" />
+          <ImageIcon />
         )}
-      </Button>
+      </IconButton>
       {error && (
         <div className="text-red-500 text-xs mt-1">{error}</div>
       )}

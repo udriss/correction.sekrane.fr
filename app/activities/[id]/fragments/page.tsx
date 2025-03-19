@@ -6,14 +6,30 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Activity } from '@/lib/activity';
 import { Fragment } from '@/lib/fragment';
-import CircularProgress from '@mui/material/CircularProgress';
-import IconButton from '@mui/material/IconButton';
-import EditIcon from '@mui/icons-material/Edit';
-import DeleteIcon from '@mui/icons-material/Delete';
-import CheckIcon from '@mui/icons-material/Check';
-import CloseIcon from '@mui/icons-material/Close';
-import SaveIcon from '@mui/icons-material/Save';
-import TextField from '@mui/material/TextField';
+import {
+  Button,
+  CircularProgress,
+  IconButton,
+  TextField,
+  Paper,
+  Typography,
+  Card,
+  CardContent,
+  CardActions,
+  Divider,
+  Alert,
+  Box
+} from '@mui/material';
+import {
+  Edit as EditIcon,
+  Delete as DeleteIcon,
+  Check as CheckIcon,
+  Close as CloseIcon,
+  Save as SaveIcon,
+  ArrowBack as ArrowBackIcon,
+  Add as AddIcon
+} from '@mui/icons-material';
+import LoadingSpinner from '@/components/LoadingSpinner';
 
 export default function ActivityFragments({ params }: { params: Promise<{ id: string }> }) {
   // Unwrap the Promise for params using React.use
@@ -26,6 +42,7 @@ export default function ActivityFragments({ params }: { params: Promise<{ id: st
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
+  const [successMessage, setSuccessMessage] = useState('');
   const [deletingIds, setDeletingIds] = useState<number[]>([]);
   const [pendingDeleteId, setPendingDeleteId] = useState<number | null>(null);
   const [editingFragmentId, setEditingFragmentId] = useState<number | null>(null);
@@ -88,6 +105,8 @@ export default function ActivityFragments({ params }: { params: Promise<{ id: st
       const newFragment = await response.json();
       setFragments([...fragments, newFragment]);
       setNewFragmentContent('');
+      setSuccessMessage('Fragment ajouté avec succès');
+      setTimeout(() => setSuccessMessage(''), 3000);
     } catch (err) {
       console.error('Erreur:', err);
       setError('Erreur lors de l\'ajout du fragment');
@@ -98,6 +117,7 @@ export default function ActivityFragments({ params }: { params: Promise<{ id: st
 
   const handleDeleteFragment = async (fragmentId: number) => {
     setDeletingIds(prev => [...prev, fragmentId]);
+    setPendingDeleteId(null);
     try {
       const response = await fetch(`/api/fragments/${fragmentId}`, {
         method: 'DELETE',
@@ -108,6 +128,8 @@ export default function ActivityFragments({ params }: { params: Promise<{ id: st
       }
 
       setFragments(fragments.filter(fragment => fragment.id !== fragmentId));
+      setSuccessMessage('Fragment supprimé');
+      setTimeout(() => setSuccessMessage(''), 3000);
     } catch (err) {
       console.error('Erreur:', err);
       setError('Erreur lors de la suppression du fragment');
@@ -153,6 +175,8 @@ export default function ActivityFragments({ params }: { params: Promise<{ id: st
 
       setEditingFragmentId(null);
       setEditedContent('');
+      setSuccessMessage('Fragment mis à jour');
+      setTimeout(() => setSuccessMessage(''), 3000);
     } catch (err) {
       console.error('Erreur:', err);
       setError('Erreur lors de la mise à jour du fragment');
@@ -162,7 +186,11 @@ export default function ActivityFragments({ params }: { params: Promise<{ id: st
   };
 
   if (loading) {
-    return <div className="container mx-auto px-4 py-8">Chargement...</div>;
+    return (
+      <div className="container mx-auto px-4 py-8 flex justify-center">
+        <LoadingSpinner size="lg" text="Chargement des fragments" />
+      </div>
+    );
   }
 
   if (!activity) {
@@ -176,89 +204,135 @@ export default function ActivityFragments({ params }: { params: Promise<{ id: st
   }
 
   return (
-    <div className="container mx-auto px-4 py-8">
+    <div className="container mx-auto px-4 py-8 max-w-4xl">
+      {/* Header avec navigation */}
       <div className="flex justify-between items-center mb-6">
         <div>
-          <h1 className="text-3xl font-bold">Fragments pour {activity.name}</h1>
-          <p className="text-gray-600">
-            <Link href={`/activities/${activityId}`} className="text-blue-600 hover:underline">
+          <div className="flex items-center mb-2">
+            <Button
+              component={Link}
+              href={`/activities/${activityId}`}
+              startIcon={<ArrowBackIcon />}
+              color="primary"
+              variant="text"
+              size="small"
+            >
               Retour à l'activité
-            </Link>
-          </p>
+            </Button>
+          </div>
+          <h1 className="text-3xl font-bold">Fragments pour {activity.name}</h1>
         </div>
       </div>
 
-      {error && <div className="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 mb-4">{error}</div>}
+      {/* Messages d'erreur et de succès */}
+      {error && (
+        <Alert severity="error" className="mb-4" onClose={() => setError('')}>
+          {error}
+        </Alert>
+      )}
+      
+      {successMessage && (
+        <Alert severity="success" className="mb-4" onClose={() => setSuccessMessage('')}>
+          {successMessage}
+        </Alert>
+      )}
 
-      <div className="mb-8">
-        <h2 className="text-xl font-semibold mb-3">Ajouter un fragment</h2>
-        <form onSubmit={handleAddFragment} className="mb-6">
-          <div className="mb-3">
-            <textarea
-              value={newFragmentContent}
-              onChange={(e) => setNewFragmentContent(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              rows={5}
-              placeholder="Contenu du fragment..."
-              required
-            />
+      {/* Section d'ajout de fragment */}
+      <Paper className="p-4 mb-6 shadow-sm">
+        <Typography variant="h6" className="mb-3 flex items-center">
+          <AddIcon fontSize="small" className="mr-1" />
+          Ajouter un fragment
+        </Typography>
+        
+        <form onSubmit={handleAddFragment}>
+          <TextField
+            value={newFragmentContent}
+            onChange={(e) => setNewFragmentContent(e.target.value)}
+            className="w-full mb-3"
+            multiline
+            rows={3}
+            placeholder="Contenu du fragment..."
+            variant="outlined"
+            size="small"
+            required
+          />
+          
+          <div className="flex justify-end mt-2">
+            <IconButton
+              type="submit"
+              color="success"
+              size="medium"
+              disabled={submitting || !newFragmentContent.trim()}
+              title="Ajouter le fragment"
+            >
+              {submitting ? <CircularProgress size={24} /> : <AddIcon />}
+            </IconButton>
           </div>
-          <button
-            type="submit"
-            disabled={submitting || !newFragmentContent.trim()}
-            className="bg-green-500 hover:bg-green-600 text-white py-2 px-4 rounded focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-opacity-50 disabled:bg-green-300"
-          >
-            {submitting ? 'Ajout en cours...' : 'Ajouter le fragment'}
-          </button>
         </form>
-      </div>
+      </Paper>
 
-      <div>
-        <h2 className="text-xl font-semibold mb-3">Fragments existants</h2>
+      {/* Liste des fragments */}
+      <Paper className="p-4 shadow-sm">
+        <Typography variant="h6" className="mb-4 pb-2 border-b">
+          Fragments existants ({fragments.length})
+        </Typography>
+        
         {fragments.length === 0 ? (
-          <p className="text-gray-600">Aucun fragment pour cette activité.</p>
+          <div className="bg-gray-50 p-4 text-center rounded-md">
+            <Typography color="textSecondary">
+              Aucun fragment pour cette activité.
+            </Typography>
+          </div>
         ) : (
           <div className="space-y-4">
             {fragments.map((fragment) => (
-              <div key={fragment.id} className="relative bg-white border rounded-lg p-4 shadow">
+              <Card 
+                key={fragment.id} 
+                variant="outlined" 
+                className="relative hover:shadow-md transition-shadow"
+              >
                 {editingFragmentId === fragment.id ? (
-                  <div>
+                  <Box className="p-3">
                     <TextField
                       value={editedContent}
                       onChange={(e) => setEditedContent(e.target.value)}
-                      className="w-full mb-3"
+                      className="w-full mb-2"
                       multiline
-                      rows={4}
+                      rows={3}
                       variant="outlined"
                       size="small"
+                      autoFocus
                     />
                     <div className="flex justify-end space-x-2">
                       <IconButton
                         onClick={handleSaveFragment}
-                        color="success"
+                        color="primary"
                         size="small"
                         disabled={savingFragment}
-                        title="Sauvegarder"
+                        title="Sauvegarder les modifications"
                       >
-                        <SaveIcon fontSize="small" />
+                        {savingFragment ? <CircularProgress size={16} /> : <SaveIcon fontSize="small" />}
                       </IconButton>
                       <IconButton
                         onClick={handleCancelEdit}
-                        color="inherit"
+                        color="error"
                         size="small"
-                        title="Annuler"
+                        title="Annuler les modifications"
                       >
                         <CloseIcon fontSize="small" />
                       </IconButton>
                     </div>
-                  </div>
+                  </Box>
                 ) : (
                   <>
-                    <div className="whitespace-pre-wrap mb-3">{fragment.content}</div>
-                    <div className="flex justify-end space-x-2">
+                    <CardContent className="pb-1 whitespace-pre-wrap">
+                      {fragment.content}
+                    </CardContent>
+                    <Divider />
+                    <CardActions className="flex justify-end bg-gray-50">
                       <IconButton
                         onClick={() => handleEditFragment(fragment)}
-                        color="warning"
+                        color="primary"
                         size="small"
                         title="Modifier"
                       >
@@ -270,7 +344,6 @@ export default function ActivityFragments({ params }: { params: Promise<{ id: st
                           <IconButton
                             onClick={() => {
                               fragment.id && handleDeleteFragment(fragment.id);
-                              setPendingDeleteId(null);
                             }}
                             color="success"
                             size="small"
@@ -297,19 +370,19 @@ export default function ActivityFragments({ params }: { params: Promise<{ id: st
                           <DeleteIcon fontSize="small" />
                         </IconButton>
                       )}
-                    </div>
+                    </CardActions>
                   </>
                 )}
                 {typeof fragment.id === 'number' && deletingIds.includes(fragment.id) && (
-                  <div className="absolute inset-0 flex items-center justify-center bg-white bg-opacity-75">
+                  <div className="absolute inset-0 flex items-center justify-center bg-white bg-opacity-75 z-10">
                     <CircularProgress size={24} />
                   </div>
                 )}
-              </div>
+              </Card>
             ))}
           </div>
         )}
-      </div>
+      </Paper>
     </div>
   );
 }

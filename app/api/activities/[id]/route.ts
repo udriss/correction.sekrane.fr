@@ -1,39 +1,50 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getActivityById, updateActivity, deleteActivity } from '@/lib/activity';
+import { getPool } from '@/lib/db';
+import { ResultSetHeader, RowDataPacket } from 'mysql2/promise'; 
 
 export async function GET(
-  request: NextRequest,
-  { params }: { params: { id: string } }
+  request: Request,
+  { params }: { params: Promise<{ id: string }> }  // Fixed: Use Promise<{ id: string }>
 ) {
   try {
-    // Await params before accessing its properties
-    const resolvedParams = await params;
-    const id = parseInt(resolvedParams.id);
-    if (isNaN(id)) {
+    const { id } = await params;  // Fixed: await the params Promise
+    const pool = getPool();
+    
+    // Vérifier que l'ID est un nombre valide
+    const activityId = parseInt(id, 10);
+    if (isNaN(activityId)) {
       return NextResponse.json({ error: 'ID d\'activité invalide' }, { status: 400 });
     }
 
-    const activity = await getActivityById(id);
-    if (!activity) {
+    // Récupérer l'activité par ID
+    const [activities] = await pool.query<RowDataPacket[]>(
+      `SELECT * FROM activities WHERE id = ?`,
+      [activityId]
+    );
+
+    if (activities.length === 0) {
       return NextResponse.json({ error: 'Activité non trouvée' }, { status: 404 });
     }
 
-    return NextResponse.json(activity);
+    return NextResponse.json(activities[0]);
   } catch (error) {
-    console.error('Error fetching activity:', error);
-    return NextResponse.json({ error: 'Erreur lors de la récupération de l\'activité' }, { status: 500 });
+    console.error('Erreur lors de la récupération de l\'activité:', error);
+    return NextResponse.json(
+      { error: 'Erreur lors de la récupération de l\'activité' },
+      { status: 500 }
+    );
   }
 }
 
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }  // Fixed: Use Promise<{ id: string }>
 ) {
   try {
-    // Await params before accessing its properties
-    const resolvedParams = await params;
-    const id = parseInt(resolvedParams.id);
-    if (isNaN(id)) {
+    const { id } = await params;  // Fixed: await the params Promise
+    const activityId = parseInt(id, 10);
+    if (isNaN(activityId)) {
       return NextResponse.json({ error: 'ID d\'activité invalide' }, { status: 400 });
     }
 
@@ -56,7 +67,7 @@ export async function PUT(
     }
 
     // Check if activity exists
-    const existingActivity = await getActivityById(id);
+    const existingActivity = await getActivityById(activityId);
     if (!existingActivity) {
       return NextResponse.json({ error: 'Activité non trouvée' }, { status: 404 });
     }
@@ -69,13 +80,13 @@ export async function PUT(
       theoretical_points: theoreticalPoints
     };
 
-    const success = await updateActivity(id, activityData);
+    const success = await updateActivity(activityId, activityData);
     if (!success) {
       return NextResponse.json({ error: 'Activité non trouvée ou non modifiée' }, { status: 404 });
     }
 
     // Get the updated activity
-    const updatedActivity = await getActivityById(id);
+    const updatedActivity = await getActivityById(activityId);
     return NextResponse.json(updatedActivity);
   } catch (error) {
     console.error('Error updating activity:', error);
@@ -85,17 +96,16 @@ export async function PUT(
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }  // Fixed: Use Promise<{ id: string }>
 ) {
   try {
-    // Await params before accessing its properties
-    const resolvedParams = await params;
-    const id = parseInt(resolvedParams.id);
-    if (isNaN(id)) {
+    const { id } = await params;  // Fixed: await the params Promise
+    const activityId = parseInt(id, 10);
+    if (isNaN(activityId)) {
       return NextResponse.json({ error: 'ID d\'activité invalide' }, { status: 400 });
     }
 
-    const success = await deleteActivity(id);
+    const success = await deleteActivity(activityId);
     if (!success) {
       return NextResponse.json({ error: 'Activité non trouvée' }, { status: 404 });
     }

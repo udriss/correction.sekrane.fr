@@ -7,12 +7,11 @@ import { useRouter } from 'next/navigation';
 import { Activity } from '@/lib/activity';
 import { Correction } from '@/lib/correction';
 import LoadingSpinner from '@/components/LoadingSpinner';
-import { Button, IconButton, Paper, Typography, TextField, Divider } from '@mui/material';
-import { Edit as EditIcon, Save as SaveIcon, Close as CloseIcon, Delete as DeleteIcon, Article as ArticleIcon, Add as AddIcon, BarChart as BarChartIcon } from '@mui/icons-material';
+import { Button, IconButton, Paper, Typography, TextField, CircularProgress } from '@mui/material';
+import { Edit as EditIcon, Save as SaveIcon, Close as CloseIcon, Delete as DeleteIcon, Article as ArticleIcon, Add as AddIcon, BarChart as BarChartIcon, Check as CheckIcon } from '@mui/icons-material';
 import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
-import UndoIcon from '@mui/icons-material/Undo';
 
 
 export default function ActivityDetail({ params }: { params: Promise<{ id: string }> }) {
@@ -32,6 +31,7 @@ export default function ActivityDetail({ params }: { params: Promise<{ id: strin
   const [experimentalPoints, setExperimentalPoints] = useState(5);
   const [theoreticalPoints, setTheoreticalPoints] = useState(15);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
 
   useEffect(() => {
     const fetchActivityAndCorrections = async () => {
@@ -124,11 +124,15 @@ export default function ActivityDetail({ params }: { params: Promise<{ id: strin
     }
   };
 
-  const handleDelete = async () => {
-    if (!window.confirm('Êtes-vous sûr de vouloir supprimer cette activité et toutes ses corrections ?')) {
-      return;
-    }
+  const handleDeleteClick = () => {
+    setConfirmingDelete(true);
+  };
 
+  const handleCancelDelete = () => {
+    setConfirmingDelete(false);
+  };
+
+  const handleConfirmDelete = async () => {
     try {
       const response = await fetch(`/api/activities/${activityId}`, {
         method: 'DELETE',
@@ -142,8 +146,11 @@ export default function ActivityDetail({ params }: { params: Promise<{ id: strin
     } catch (err) {
       console.error('Erreur:', err);
       setError('Erreur lors de la suppression de l\'activité');
+      setConfirmingDelete(false);
     }
   };
+
+  const handleDelete = handleDeleteClick; // Pour maintenir la compatibilité avec les références existantes
 
   const handleFragmentsClick = () => {
     router.push(`/activities/${activityId}/fragments`);
@@ -253,23 +260,23 @@ export default function ActivityDetail({ params }: { params: Promise<{ id: strin
               autoFocus
             />
             <div className="flex space-x-2">
-              <Button
+              <IconButton
                 onClick={handleSubmit}
                 disabled={isSubmitting || !name.trim()}
-                variant="contained"
                 color="primary"
-                size="small"
+                title="Sauvegarder les modifications"
+                size="medium"
               >
-                <SaveIcon fontSize="small" />
-              </Button>
-              <Button
+                {isSubmitting ? <CircularProgress size={24} /> : <SaveIcon />}
+              </IconButton>
+              <IconButton
                 onClick={handleCancelClick}
-                variant="outlined"
                 color="error"
-                size="small"
+                title="Annuler les modifications"
+                size="medium"
               >
-                <CloseIcon fontSize="small" />
-              </Button>
+                <CloseIcon />
+              </IconButton>
             </div>
           </div>
         ) : (
@@ -280,10 +287,38 @@ export default function ActivityDetail({ params }: { params: Promise<{ id: strin
               size="small"
               color="primary"
               aria-label="edit"
-              className="ml-2"
             >
-              <EditIcon />
+              <EditIcon className="ml-2" />
             </IconButton>
+            {confirmingDelete ? (
+                    <>
+                      <IconButton
+                        onClick={handleConfirmDelete}
+                        color="success"
+                        size="medium"
+                        title="Confirmer la suppression"
+                      >
+                        <CheckIcon />
+                      </IconButton>
+                      <IconButton
+                        onClick={handleCancelDelete}
+                        color="inherit"
+                        size="medium"
+                        title="Annuler la suppression"
+                      >
+                        <CloseIcon />
+                      </IconButton>
+                    </>
+                  ) : (
+                    <IconButton
+                      onClick={handleDeleteClick}
+                      color="error"
+                      size="medium"
+                      title="Supprimer cette activité"
+                    >
+                      <DeleteIcon />
+                    </IconButton>
+                  )}
           </h1>
         )}
       </div>
@@ -422,23 +457,15 @@ export default function ActivityDetail({ params }: { params: Promise<{ id: strin
               
               {!isEditing && (
                 <div className="flex space-x-2">
-                  <Button
+                  <IconButton
                     onClick={handleNewCorrectionClick}
-                    variant="outlined"
                     color="primary"
-                    size="small"
-                    startIcon={<AddIcon />}
+                    size="medium"
+                    title="Nouvelle correction"
                   >
-                    Nouvelle correction
-                  </Button>
-                  <Button
-                    onClick={handleDelete}
-                    variant="outlined"
-                    color="error"
-                    size="small"
-                  >
-                    <DeleteIcon sx={{ mr: 0.2 }} />
-                  </Button>
+                    <AddIcon />
+                  </IconButton>
+                
                 </div>
               )}
             </div>
@@ -496,15 +523,14 @@ export default function ActivityDetail({ params }: { params: Promise<{ id: strin
               <h2 className="text-xl font-semibold">Fragments</h2>
               
               {!isEditing && (
-                <Button
+                <IconButton
                   onClick={handleFragmentsClick}
-                  variant="outlined"
                   color="success"
-                  size="small"
-                  startIcon={<ArticleIcon />}
+                  size="medium"
+                  title="Gérer les fragments"
                 >
-                  Gérer
-                </Button>
+                  <ArticleIcon />
+                </IconButton>
               )}
             </div>
             <Typography variant="body2" color="textSecondary">

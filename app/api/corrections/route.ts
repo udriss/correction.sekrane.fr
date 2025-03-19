@@ -2,18 +2,31 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getPool } from '@/lib/db';
 import { createCorrection, generateCorrectionName } from '@/lib/correction';
 
-export async function GET() {
+export async function GET(
+  request: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
   try {
+    // Attendre la résolution des paramètres
+    const { id } = await params;
     const pool = getPool();
-    const [corrections] = await pool.query(
-      'SELECT * FROM corrections ORDER BY updated_at DESC'
+    // Vérifier que l'ID est un nombre valide
+    const activityId = parseInt(id, 10);
+    if (isNaN(activityId)) {
+      return NextResponse.json({ error: 'ID d\'activité invalide' }, { status: 400 });
+    }
+
+    // Récupérer toutes les corrections pour cette activité
+    const corrections = await pool.query(
+      `SELECT * FROM corrections WHERE activity_id = ? ORDER BY created_at DESC`,
+      [activityId]
     );
-    
+
     return NextResponse.json(corrections);
   } catch (error) {
     console.error('Erreur lors de la récupération des corrections:', error);
     return NextResponse.json(
-      { error: 'Erreur serveur' },
+      { error: 'Erreur lors de la récupération des corrections' },
       { status: 500 }
     );
   }

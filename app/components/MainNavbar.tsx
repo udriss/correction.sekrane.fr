@@ -137,7 +137,7 @@ export default function MainNavbar() {
                   gap: 1
                 }}
               >
-                Système de corrections
+                
               </Typography>
               
               {/* Navigation principale */}
@@ -225,7 +225,7 @@ export default function MainNavbar() {
           </Container>
         </AppBar>
       </HideOnScroll>
-      <Toolbar /> {/* Espace pour compenser la barre de navigation fixe */}
+      <Toolbar className='bg-gray-100' /> {/* Espace pour compenser la barre de navigation fixe */}
       
       {/* Modal de changement de mot de passe */}
       <ChangePasswordModal

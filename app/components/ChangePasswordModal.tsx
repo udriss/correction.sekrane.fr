@@ -164,7 +164,7 @@ export default function ChangePasswordModal({ open, onClose }: ChangePasswordMod
           
           <Button
             type="submit"
-            variant="contained"
+            variant="outlined"
             color="primary"
             disabled={loading || Boolean(success)}
           >

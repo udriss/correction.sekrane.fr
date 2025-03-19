@@ -1,20 +1,29 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getCorrectionById } from '@/lib/correction';
 import { getPool } from '@/lib/db';
+import { withConnection } from '@/lib/db';
+import { getUser } from '@/lib/auth';
+
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    // Await params before accessing its properties
-    const resolvedParams = await params;
-    const id = parseInt(resolvedParams.id);
+    const { id } = await params;
     
-    if (isNaN(id)) {
+    // Vérifier l'authentification
+    const user = await getUser(request);
+    if (!user) {
+      return NextResponse.json({ error: 'Non autorisé' }, { status: 401 });
+    }
+    
+    const idNumber = parseInt(id);
+    
+    if (isNaN(idNumber)) {
       return NextResponse.json({ error: 'ID de correction invalide' }, { status: 400 });
     }
 
-    const correction = await getCorrectionById(id);
+    const correction = await getCorrectionById(idNumber);
     if (!correction) {
       return NextResponse.json({ error: 'Correction non trouvée' }, { status: 404 });
     }
@@ -28,10 +37,10 @@ export async function GET(
 
 export async function PUT(
   request: NextRequest,
-  { params }: { params: Promise<Record<string, string>> }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id } = await Promise.resolve(params);
+    const { id } = await params;
     
     const body = await request.json();
     const { student_name, content, content_data } = body;
@@ -97,10 +106,10 @@ export async function PUT(
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: Promise<Record<string, string>> }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id } = await Promise.resolve(params);
+    const { id } = await params;
     
     const pool = getPool();
     

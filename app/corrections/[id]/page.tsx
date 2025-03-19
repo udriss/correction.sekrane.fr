@@ -800,7 +800,7 @@ export default function CorrectionDetail({ params }: { params: Promise<{ id: str
           </div>
 
           {/* Add date pickers in a row below the header */}
-          <div className="flex flex-wrap gap-4 mb-1">
+          <div className="flex flex-wrap gap-4 mb-2">
             <Box>
               <DatePicker
                 label="Date limite de rendu"
@@ -818,7 +818,7 @@ export default function CorrectionDetail({ params }: { params: Promise<{ id: str
               />
             </Box>
           </div>
-          <div className="flex justify-start items-center my-1 w-full">
+          <div className="flex justify-start items-center my-2 w-full">
                         {/* Show message if submitted late - update references to deadlineDate */}
                         {deadlineDate && submissionDate && submissionDate.isAfter(deadlineDate) && (  // Changed variable names
               <Box className="flex items-center">
@@ -871,15 +871,14 @@ export default function CorrectionDetail({ params }: { params: Promise<{ id: str
               <Paper className="p-4 shadow mb-6 flex justify-between items-center">
                 {/* SECTION 2: Boutons d'ajout de fragment et d'image */}
               <div className="flex space-x-2">
-                    <Button
+                    <IconButton
                       onClick={addNewParagraph}
                       color="primary"
-                      variant="text"
-                      size="small"
+                      size="medium"
+                      title="Ajouter un paragraphe"
                     >
-                      <AddIcon sx={{ mr: 0.2 }} />
-                      Ajouter un paragraphe
-                    </Button>
+                      <AddIcon />
+                    </IconButton>
                     
                     <ImageUploader 
                       activityId={correction.activity_id} 
@@ -888,49 +887,46 @@ export default function CorrectionDetail({ params }: { params: Promise<{ id: str
                     />
                   </div>
                 <div className="space-x-2 flex justify-end items-center">
-                  <Button
+                  <IconButton
                     onClick={handleUndo}
-                    variant="outlined"
                     color="inherit"
                     disabled={history.length === 0}
-                    size="small"
+                    size="medium"
                     title="Annuler la dernière modification"
                   >
-                    <UndoIcon sx={{ mr: 0.2 }} />
-                    Annuler
-                  </Button>
-                  <Button
+                    <UndoIcon />
+                  </IconButton>
+                  <IconButton
                     onClick={() => {
-                      // Force update preview before saving to ensure we save the current state
                       updatePreview();
                       handleSaveCorrection();
                     }}
-                    variant="outlined"
                     color="primary"
-                    size="small"
+                    size="medium"
                     disabled={saving}
+                    title="Sauvegarder la correction"
                   >
-                    <SaveIcon sx={{ mr: 0.2 }} />
-                    {saving ? 'Sauvegarde...' : ''}
-                  </Button>
-                  <Button
-                    variant="outlined"
+                    {saving ? <CircularProgress size={20} /> : <SaveIcon />}
+                  </IconButton>
+                  <IconButton
                     color="primary"
-                    startIcon={<ShareIcon />}
                     onClick={() => setShareModalOpen(true)}
+                    size="medium"
+                    title="Partager la correction"
                   >
-                  </Button>
-                  <Button
+                    <ShareIcon />
+                  </IconButton>
+                  <IconButton
                     onClick={() => {
                       updatePreview();
                       handleCopyToClipboard();
                     }}
-                    variant="outlined"
                     color="success"
-                    size="small"
+                    size="medium"
+                    title="Copier dans le presse-papier"
                   >
-                    <ContentCopyIcon sx={{ mr: 0.2 }} />
-                  </Button>
+                    <ContentCopyIcon />
+                  </IconButton>
                 </div>
               </Paper>
 
