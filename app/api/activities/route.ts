@@ -1,52 +1,55 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createActivity, getActivities } from '@/lib/activity';
+import { getActivities, createActivity } from '@/lib/activity';
+import { getUser } from '@/lib/auth';
 
-export async function POST(request: NextRequest) {
+export async function GET(req: NextRequest) {
   try {
-    const body = await request.json();
+    // Récupérer l'utilisateur à partir du token
+    const user = await getUser(req);
     
-    // Validate required fields
-    if (!body.name || typeof body.name !== 'string' || !body.name.trim()) {
-      return NextResponse.json({ error: 'Le nom de l\'activité est requis' }, { status: 400 });
-    }
-    
-    // Validate points total to 20
-    const experimentalPoints = body.experimental_points !== undefined ? Number(body.experimental_points) : 5;
-    const theoreticalPoints = body.theoretical_points !== undefined ? Number(body.theoretical_points) : 15;
-    
-    if (experimentalPoints + theoreticalPoints !== 20) {
-      return NextResponse.json(
-        { error: 'Le total des points doit être égal à 20' }, 
-        { status: 400 }
-      );
+    if (!user) {
+      return NextResponse.json({ error: 'Utilisateur non authentifié' }, { status: 401 });
     }
 
-    // Create activity with the points configuration
-    const activityData = {
-      name: body.name.trim(),
-      content: body.content,
-      experimental_points: experimentalPoints,
-      theoretical_points: theoreticalPoints
-    };
+    // Récupérer uniquement les activités de l'utilisateur
+    const activities = await getActivities(user.id);
     
-    const activityId = await createActivity(activityData);
-    
-    return NextResponse.json({ 
-      id: activityId, 
-      ...activityData 
-    }, { status: 201 });
-  } catch (error) {
-    console.error('Error creating activity:', error);
-    return NextResponse.json({ error: 'Erreur lors de la création de l\'activité' }, { status: 500 });
-  }
-}
-
-export async function GET() {
-  try {
-    const activities = await getActivities();
     return NextResponse.json(activities);
   } catch (error) {
     console.error('Error fetching activities:', error);
     return NextResponse.json({ error: 'Erreur lors de la récupération des activités' }, { status: 500 });
+  }
+}
+
+export async function POST(req: NextRequest) {
+  try {
+    // Récupérer l'utilisateur à partir du token
+    const user = await getUser(req);
+    
+    if (!user) {
+      return NextResponse.json({ error: 'Utilisateur non authentifié' }, { status: 401 });
+    }
+    
+    // Obtenir les données de la requête
+    const body = await req.json();
+    const { name, content, experimental_points, theoretical_points } = body;
+    
+    if (!name || name.trim() === '') {
+      return NextResponse.json({ error: 'Le nom est requis' }, { status: 400 });
+    }
+    
+    // Créer l'activité avec l'ID de l'utilisateur
+    const activityId = await createActivity({
+      name,
+      content: content || null,
+      experimental_points: experimental_points || 5,
+      theoretical_points: theoretical_points || 15,
+      user_id: user.id
+    });
+    
+    return NextResponse.json({ id: activityId }, { status: 201 });
+  } catch (error) {
+    console.error('Error creating activity:', error);
+    return NextResponse.json({ error: 'Erreur lors de la création de l\'activité' }, { status: 500 });
   }
 }

@@ -7,28 +7,25 @@ import {
   Typography, 
   Container, 
   Box, 
-  Paper,
   Card,
   CardContent
 } from '@mui/material';
 import Grid from '@mui/material/Grid2';
 import { 
   AssignmentTurnedIn, 
-  Speed, 
   Share, 
-  Analytics,
   School,
   BarChart,
   ArrowForward
 } from '@mui/icons-material';
-import Image from 'next/image';
+
 
 export default function LandingPage() {
   return (
     <div className="min-h-screen bg-gradient-to-b from-gray-50 to-blue-50">
       {/* Hero Section */}
       <Box 
-        className="bg-gradient-to-r from-blue-600 to-indigo-700 text-white py-16 md:py-24"
+        className="bg-gradient-to-r from-blue-900 to-indigo-700 text-white py-16 md:py-24"
         sx={{ 
           clipPath: {
             xs: 'none',
@@ -88,7 +85,7 @@ export default function LandingPage() {
 
       {/* Features Section */}
       <Container maxWidth="lg" className="py-16">
-        <Box className="text-center mb-12">
+        <Box className="text-center mb-12 flex flex-col items-center justify-center">
           <Typography variant="h3" component="h2" className="font-bold mb-3 text-gray-800">
             Une plateforme conçue pour les enseignants
           </Typography>
@@ -106,7 +103,7 @@ export default function LandingPage() {
                   <AssignmentTurnedIn fontSize="large" className="text-blue-600" />
                 </Box>
                 <Typography variant="h5" className="font-bold mb-2 text-center">
-                  Corrections Simplifiées
+                  Corrections simplifiées
                 </Typography>
                 <Typography variant="body1" color="text.secondary" className="text-center">
                   Créez des corrections structurées avec un éditeur intuitif et des modèles personnalisables
@@ -123,7 +120,7 @@ export default function LandingPage() {
                   <Share fontSize="large" className="text-green-600" />
                 </Box>
                 <Typography variant="h5" className="font-bold mb-2 text-center">
-                  Partage Facile
+                  Partage facile
                 </Typography>
                 <Typography variant="body1" color="text.secondary" className="text-center">
                   Partagez instantanément les corrections avec vos élèves via un lien sécurisé
@@ -140,7 +137,7 @@ export default function LandingPage() {
                   <BarChart fontSize="large" className="text-purple-600" />
                 </Box>
                 <Typography variant="h5" className="font-bold mb-2 text-center">
-                  Suivi des Performances
+                  Suivi des performances
                 </Typography>
                 <Typography variant="body1" color="text.secondary" className="text-center">
                   Visualisez les progrès des élèves et identifiez les points à améliorer
@@ -158,7 +155,7 @@ export default function LandingPage() {
             Prêt à améliorer votre processus de correction ?
           </Typography>
           <Typography variant="body1" className="mb-8 text-blue-100">
-            Rejoignez des milliers d'enseignants qui utilisent notre plateforme pour économiser du temps et fournir des retours de qualité.
+            Rejoignez nos enseignants qui utilisent notre plateforme pour économiser du temps et fournir des retours de qualité.
           </Typography>
           <Box className="flex justify-center">
             <Button 

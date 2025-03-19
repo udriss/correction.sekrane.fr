@@ -1,93 +1,87 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getActivityById, updateActivity, deleteActivity } from '@/lib/activity';
-import { getPool } from '@/lib/db';
-import { ResultSetHeader, RowDataPacket } from 'mysql2/promise'; 
+import { getUser } from '@/lib/auth';
 
 export async function GET(
-  request: Request,
-  { params }: { params: Promise<{ id: string }> }  // Fixed: Use Promise<{ id: string }>
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id } = await params;  // Fixed: await the params Promise
-    const pool = getPool();
+    // Await the params
+    const { id } = await params;
+    const activityId = parseInt(id);
     
-    // Vérifier que l'ID est un nombre valide
-    const activityId = parseInt(id, 10);
     if (isNaN(activityId)) {
-      return NextResponse.json({ error: 'ID d\'activité invalide' }, { status: 400 });
+      return NextResponse.json({ error: 'ID invalide' }, { status: 400 });
     }
 
-    // Récupérer l'activité par ID
-    const [activities] = await pool.query<RowDataPacket[]>(
-      `SELECT * FROM activities WHERE id = ?`,
-      [activityId]
-    );
-
-    if (activities.length === 0) {
+    // Récupérer l'utilisateur connecté
+    const user = await getUser(req);
+    
+    // Valeur par défaut pour user.id si user est null
+    const userId = user?.id; 
+    
+    // Récupérer l'activité, avec ou sans filtrage par utilisateur
+    const activity = await getActivityById(activityId, userId);
+    
+    if (!activity) {
       return NextResponse.json({ error: 'Activité non trouvée' }, { status: 404 });
     }
-
-    return NextResponse.json(activities[0]);
+    
+    return NextResponse.json(activity);
   } catch (error) {
-    console.error('Erreur lors de la récupération de l\'activité:', error);
-    return NextResponse.json(
-      { error: 'Erreur lors de la récupération de l\'activité' },
-      { status: 500 }
-    );
+    console.error('Error fetching activity:', error);
+    return NextResponse.json({ error: 'Erreur lors de la récupération de l\'activité' }, { status: 500 });
   }
 }
 
 export async function PUT(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }  // Fixed: Use Promise<{ id: string }>
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id } = await params;  // Fixed: await the params Promise
-    const activityId = parseInt(id, 10);
+    const { id } = await params;
+    const activityId = parseInt(id);
+    
     if (isNaN(activityId)) {
-      return NextResponse.json({ error: 'ID d\'activité invalide' }, { status: 400 });
+      return NextResponse.json({ error: 'ID invalide' }, { status: 400 });
     }
 
-    const body = await request.json();
+    // Récupérer l'utilisateur connecté
+    const user = await getUser(req);
     
-    // Validate required fields
-    if (!body.name || typeof body.name !== 'string' || !body.name.trim()) {
-      return NextResponse.json({ error: 'Le nom de l\'activité est requis' }, { status: 400 });
-    }
-    
-    // Validate points total to 20
-    const experimentalPoints = body.experimental_points !== undefined ? Number(body.experimental_points) : 5;
-    const theoreticalPoints = body.theoretical_points !== undefined ? Number(body.theoretical_points) : 15;
-    
-    if (experimentalPoints + theoreticalPoints !== 20) {
-      return NextResponse.json(
-        { error: 'Le total des points doit être égal à 20' }, 
-        { status: 400 }
-      );
+    if (!user) {
+      return NextResponse.json({ error: 'Utilisateur non authentifié' }, { status: 401 });
     }
 
-    // Check if activity exists
-    const existingActivity = await getActivityById(activityId);
+    const body = await req.json();
+    const { name, content, experimental_points, theoretical_points } = body;
+    
+    if (!name || name.trim() === '') {
+      return NextResponse.json({ error: 'Le nom est requis' }, { status: 400 });
+    }
+
+    // Vérifier que l'activité existe et appartient à l'utilisateur
+    const existingActivity = await getActivityById(activityId, user.id);
+    
     if (!existingActivity) {
       return NextResponse.json({ error: 'Activité non trouvée' }, { status: 404 });
     }
 
-    // Update the activity with points configuration
-    const activityData = {
-      name: body.name.trim(),
-      content: body.content,
-      experimental_points: experimentalPoints,
-      theoretical_points: theoreticalPoints
-    };
-
-    const success = await updateActivity(activityId, activityData);
-    if (!success) {
-      return NextResponse.json({ error: 'Activité non trouvée ou non modifiée' }, { status: 404 });
+    const updated = await updateActivity(activityId, {
+      ...existingActivity,
+      name,
+      content,
+      experimental_points: experimental_points || existingActivity.experimental_points,
+      theoretical_points: theoretical_points || existingActivity.theoretical_points,
+      user_id: user.id
+    });
+    
+    if (updated) {
+      return NextResponse.json({ success: true });
+    } else {
+      return NextResponse.json({ error: 'Échec de la mise à jour' }, { status: 500 });
     }
-
-    // Get the updated activity
-    const updatedActivity = await getActivityById(activityId);
-    return NextResponse.json(updatedActivity);
   } catch (error) {
     console.error('Error updating activity:', error);
     return NextResponse.json({ error: 'Erreur lors de la mise à jour de l\'activité' }, { status: 500 });
@@ -95,22 +89,38 @@ export async function PUT(
 }
 
 export async function DELETE(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }  // Fixed: Use Promise<{ id: string }>
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id } = await params;  // Fixed: await the params Promise
-    const activityId = parseInt(id, 10);
+    const { id } = await params;
+    const activityId = parseInt(id);
+    
     if (isNaN(activityId)) {
-      return NextResponse.json({ error: 'ID d\'activité invalide' }, { status: 400 });
+      return NextResponse.json({ error: 'ID invalide' }, { status: 400 });
     }
 
-    const success = await deleteActivity(activityId);
-    if (!success) {
+    // Récupérer l'utilisateur connecté
+    const user = await getUser(req);
+    
+    if (!user) {
+      return NextResponse.json({ error: 'Utilisateur non authentifié' }, { status: 401 });
+    }
+
+    // Vérifier que l'activité existe et appartient à l'utilisateur
+    const existingActivity = await getActivityById(activityId, user.id);
+    
+    if (!existingActivity) {
       return NextResponse.json({ error: 'Activité non trouvée' }, { status: 404 });
     }
 
-    return NextResponse.json({ success: true });
+    const deleted = await deleteActivity(activityId);
+    
+    if (deleted) {
+      return NextResponse.json({ success: true });
+    } else {
+      return NextResponse.json({ error: 'Échec de la suppression' }, { status: 500 });
+    }
   } catch (error) {
     console.error('Error deleting activity:', error);
     return NextResponse.json({ error: 'Erreur lors de la suppression de l\'activité' }, { status: 500 });

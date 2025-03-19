@@ -215,10 +215,10 @@ export default function ActivityDetail({ params }: { params: Promise<{ id: strin
                     color="primary"
                     className="mt-4"
                     component={Link}
-                    href="/"
+                    href="/activites"
                     startIcon={<ArrowBackIcon />}
                     >
-                    Retour à l'accueil
+                    Retour aux activités
                     </Button>
                 </div>
               </div>

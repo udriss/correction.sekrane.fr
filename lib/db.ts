@@ -49,10 +49,29 @@ export async function initializeDatabase() {
         id INT AUTO_INCREMENT PRIMARY KEY,
         name VARCHAR(255) NOT NULL,
         content TEXT,
+        user_id INT NULL,
+        experimental_points INT DEFAULT 5,
+        theoretical_points INT DEFAULT 15,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
       )
     `);
+    
+    // Vérifier si la colonne user_id existe déjà
+    await query(`
+      SELECT COUNT(*) as count
+      FROM INFORMATION_SCHEMA.COLUMNS
+      WHERE TABLE_NAME = 'activities' AND COLUMN_NAME = 'user_id'
+    `).then(async (rows: any) => {
+      const result = rows[0] as any[];
+      if (result[0].count === 0) {
+        await query(`
+          ALTER TABLE activities
+          ADD COLUMN user_id INT NULL
+        `);
+        console.log('Added user_id column to activities table');
+      }
+    });
     
     // Créer la table des corrections (liée aux activités)
     await query(`
