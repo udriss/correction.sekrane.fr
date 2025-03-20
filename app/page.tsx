@@ -25,7 +25,7 @@ export default function LandingPage() {
     <div className="min-h-screen bg-gradient-to-b from-gray-50 to-blue-50">
       {/* Hero Section */}
       <Box 
-        className="bg-gradient-to-r from-blue-900 to-indigo-700 text-white py-16 md:py-24"
+        className="bg-gradient-to-r from-black to-indigo-700 text-white py-16 md:py-24"
         sx={{ 
           clipPath: {
             xs: 'none',
@@ -34,49 +34,56 @@ export default function LandingPage() {
         }}
       >
         <Container maxWidth="lg">
-          <Grid container spacing={4} alignItems="center">
-            <Grid size={{ xs: 12, md: 6 }}>
+            <Grid container spacing={4} alignItems="center">
+            <Grid size={{ xs: 12, md: 10 }}>
               <Typography 
-                variant="h2" 
-                component="h1" 
-                className="text-4xl md:text-5xl font-extrabold mb-4"
+              variant="h3" 
+              component="h2" 
+              className="text-4xl md:text-5xl font-extrabold mb-4"
               >
-                Simplifiez vos corrections pédagogiques
+              Simplifiez vos corrections pédagogiques
               </Typography>
               <Typography variant="h6" className="mb-8 text-blue-100">
               Gérez et partagez facilement les corrections pour vos élèves
               </Typography>
               <Box className="flex flex-wrap gap-4">
-                <Button 
-                  variant="contained" 
-                  color="secondary" 
-                  size="large" 
-                  component={Link}
-                  href="/activites"
-                  endIcon={<ArrowForward />}
-                  className="text-lg py-3 px-6"
-                  sx={{ fontWeight: 'bold' }}
-                >
-                  Découvrir les activités
-                </Button>
-                <Button 
-                  variant="outlined" 
-                  color="inherit" 
-                  size="large" 
-                  component={Link}
-                  href="/activities/new"
-                  className="text-lg border-2"
-                >
-                  Nouvelle activité
-                </Button>
+              <Button 
+                variant="outlined" 
+                color="secondary" 
+                size="large" 
+                component={Link}
+                href="/demo"
+                endIcon={<ArrowForward />}
+                className="text-lg py-3 px-6"
+                sx={{ fontWeight: 'bold',
+                '&:hover': {
+                  boxShadow: 2,
+                  transform: 'translateY(-2px)',
+                  transition: 'all 0.2s',
+                  
+                }
+                 }}
+              >
+                Essayer en mode démo
+              </Button>
+              <Button 
+                variant="outlined" 
+                color="primary" 
+                size="large" 
+                component={Link}
+                href="/activities/new"
+                className="text-lg border-2"
+              >
+                Nouvelle activité
+              </Button>
               </Box>
             </Grid>
-            <Grid size={{ xs: 12, md: 6 }} className="flex justify-center">
+            <Grid size={{ xs: 12, md: 2 }} className="flex justify-center">
               <Box className="relative w-full max-w-md h-64 md:h-80">
-                {/* Ici vous pourriez ajouter une image d'illustration ou une animation */}
-                <div className="w-full h-full bg-white/20 rounded-lg flex items-center justify-center backdrop-blur-sm">
-                  <School sx={{ fontSize: 100, opacity: 0.9 }} />
-                </div>
+              {/* Ici vous pourriez ajouter une image d'illustration ou une animation */}
+              <div className="w-full h-full bg-white/20 rounded-lg flex items-center justify-center backdrop-blur-sm">
+                <School sx={{ fontSize: 100, opacity: 0.9 }} />
+              </div>
               </Box>
             </Grid>
           </Grid>
@@ -149,7 +156,7 @@ export default function LandingPage() {
       </Container>
 
       {/* Call to Action */}
-      <Box className="bg-blue-700 py-16 text-white">
+      <Box className="py-16 text-white" style={{ backgroundColor: 'rgba(7, 31, 97, 1)' }}>
         <Container maxWidth="md" className="text-center">
           <Typography variant="h4" className="font-bold mb-4">
             Prêt à améliorer votre processus de correction ?

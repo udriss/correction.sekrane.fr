@@ -58,6 +58,13 @@ interface DatabaseResult {
   changedRows?: number;
 }
 
+declare module '@/utils/demoUtils' {
+  // Déclarez les exports du module ici
+  export function maFonction(): void;
+  export const maConstante: string;
+  // etc.
+}
+
 // If you need to augment the NodeJS namespace
 declare namespace NodeJS {
   interface ProcessEnv {
@@ -66,9 +73,12 @@ declare namespace NodeJS {
     DB_USER: string;
     DB_PASSWORD: string;
     DB_NAME: string;
+    JWT_SECRET: string;
     // Add other environment variables your app uses
   }
 }
+
+
 
 // If you want to enhance existing modules (module augmentation)
 // For example, if you want to add a method to the Express Request:
