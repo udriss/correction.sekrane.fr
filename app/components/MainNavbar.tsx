@@ -160,7 +160,7 @@ export default function MainNavbar() {
                 
                 <Button 
                   component={Link} 
-                  href="/activites" 
+                  href="/activities" 
                   color="inherit" 
                   sx={{ fontWeight: 500 }}
                 >

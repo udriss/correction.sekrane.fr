@@ -187,7 +187,7 @@ export default function ActivityFragments({ params }: { params: Promise<{ id: st
 
   if (loading) {
     return (
-      <div className="container mx-auto px-4 py-8 flex justify-center">
+      <div className="container max-w-[400px] mx-auto px-4 py-8 flex justify-center">
         <LoadingSpinner size="lg" text="Chargement des fragments" />
       </div>
     );

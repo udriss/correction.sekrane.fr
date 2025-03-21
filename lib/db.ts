@@ -6,15 +6,63 @@ export function getPool(): Pool {
   if (!pool) {
     pool = mysql.createPool({
       host: process.env.DB_HOST || 'localhost',
-      user: process.env.DB_USER || 'int',
-      password: process.env.DB_PASSWORD || '4Na9Gm8mdTVgnUp',
-      database: process.env.DB_NAME || 'corrections',
+      user: process.env.DB_USER,
+      password: process.env.DB_PASSWORD,
+      database: process.env.DB_NAME,
       waitForConnections: true,
       connectionLimit: 10,
-      queueLimit: 0
+      queueLimit: 0,
+      maxIdle: 10,
+      idleTimeout: 60000,
+      enableKeepAlive: true,
+      keepAliveInitialDelay: 0
     });
+    
+    // Configurer un intervalle pour vérifier et nettoyer les connexions inactives
+    setInterval(() => {
+      const timeout = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Health check timeout')), 5000)
+      );
+      
+      Promise.race([
+        pool.query('SELECT 1'),
+        timeout
+      ])
+        .then(() => console.debug('Connection pool health check: OK'))
+        .catch(err => {
+          console.error('Pool health check error:', err);
+          
+          // En cas d'erreur grave liée aux connexions, réinitialiser le pool
+          if (err.code === 'ER_CON_COUNT_ERROR' || err.code === 'PROTOCOL_CONNECTION_LOST') {
+            console.warn('Resetting connection pool due to connection issues');
+            try {
+              pool.end().catch(endErr => console.error('Error ending pool:', endErr));
+              pool = createNewPool(); // Fonction pour recréer le pool
+            } catch (resetErr) {
+              console.error('Failed to reset pool:', resetErr);
+            }
+          }
+        });
+    }, 300000); // toutes les 5 minutes
   }
   return pool;
+}
+
+// Fonction pour créer un nouveau pool (utilisée lors de la réinitialisation)
+function createNewPool() {
+  return mysql.createPool({
+    host: process.env.DB_HOST,
+    user: process.env.DB_USER,
+    password: process.env.DB_PASSWORD,
+    database: process.env.DB_NAME,
+    waitForConnections: true,
+    connectionLimit: 10,
+    queueLimit: 0,
+    maxIdle: 10,
+    idleTimeout: 60000,
+    enableKeepAlive: true,
+    keepAliveInitialDelay: 0
+  });
 }
 
 // Fonction utilitaire pour exécuter des requêtes et gérer automatiquement les connexions
@@ -36,6 +84,18 @@ export async function query<T>(sql: string, params?: any[]): Promise<T> {
     const [rows] = await connection.query(sql, params);
     return rows as T;
   });
+}
+
+// Fonction de nettoyage à appeler lors de l'arrêt de l'application
+export async function closePool() {
+  if (pool) {
+    try {
+      await pool.end();
+      console.log('Database connection pool closed');
+    } catch (err) {
+      console.error('Error closing database connection pool:', err);
+    }
+  }
 }
 
 // Initialiser la base de données

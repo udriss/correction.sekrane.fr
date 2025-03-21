@@ -1,4 +1,4 @@
-import { getPool, withConnection } from './db';
+import { withConnection } from './db';
 import { RowDataPacket, ResultSetHeader, PoolConnection } from 'mysql2/promise';
 
 export interface Fragment {
@@ -48,51 +48,42 @@ export async function createFragment({ activity_id, content }: { activity_id: nu
       [activity_id, content]
     );
     
-    // @ts-ignore
-    return result.insertId;
+    const typedResult = result as ResultSetHeader;
+    return typedResult.insertId;
   });
 }
 
+// Récupérer les fragments par ID d'activité - Version corrigée avec withConnection
 export async function getFragmentsByActivityId(activityId: number): Promise<Fragment[]> {
-  const pool = getPool();
-  let connection;
-  try {
-    connection = await pool.getConnection();
+  return withConnection(async (connection) => {
     const [rows] = await connection.execute<RowDataPacket[]>(
       'SELECT * FROM fragments WHERE activity_id = ? ORDER BY position_order, id',
       [activityId]
     );
     return rows as Fragment[];
-  } catch (error) {
-    console.error('Error fetching fragments:', error);
-    throw error;
-  } finally {
-    if (connection) connection.release();
-  }
+  });
 }
 
 // Obtenir un fragment par ID
-export async function getFragmentById(id: number): Promise<any> {
+export async function getFragmentById(id: number): Promise<Fragment | null> {
   return withConnection(async (connection) => {
-    const [rows] = await connection.query(
+    const [rows] = await connection.query<RowDataPacket[]>(
       'SELECT * FROM fragments WHERE id = ?',
       [id]
     );
     
-    // @ts-ignore
-    return rows.length ? rows[0] : null;
+    return rows.length ? rows[0] as Fragment : null;
   });
 }
 
 // Mettre à jour un fragment
 export async function updateFragment(id: number, content: string): Promise<boolean> {
   return withConnection(async (connection) => {
-    const [result] = await connection.query(
+    const [result] = await connection.query<ResultSetHeader>(
       'UPDATE fragments SET content = ? WHERE id = ?',
       [content, id]
     );
     
-    // @ts-ignore
     return result.affectedRows > 0;
   });
 }
@@ -100,14 +91,38 @@ export async function updateFragment(id: number, content: string): Promise<boole
 // Supprimer un fragment
 export async function deleteFragment(id: number): Promise<boolean> {
   return withConnection(async (connection) => {
-    const [result] = await connection.query(
+    const [result] = await connection.query<ResultSetHeader>(
       'DELETE FROM fragments WHERE id = ?',
       [id]
     );
     
-    // @ts-ignore
     return result.affectedRows > 0;
   });
 }
 
-
+// Fonction pour réordonner plusieurs fragments en une seule transaction
+export async function reorderFragments(fragmentOrders: { id: number, position: number }[]): Promise<boolean> {
+  return withConnection(async (connection) => {
+    try {
+      // Démarrer une transaction pour s'assurer que toutes les mises à jour sont atomiques
+      await connection.beginTransaction();
+      
+      // Mettre à jour la position de chaque fragment
+      for (const fragment of fragmentOrders) {
+        await connection.query(
+          'UPDATE fragments SET position_order = ? WHERE id = ?',
+          [fragment.position, fragment.id]
+        );
+      }
+      
+      // Valider les modifications
+      await connection.commit();
+      return true;
+    } catch (error) {
+      // Annuler en cas d'erreur
+      await connection.rollback();
+      console.error('Error reordering fragments:', error);
+      throw error;
+    }
+  });
+}

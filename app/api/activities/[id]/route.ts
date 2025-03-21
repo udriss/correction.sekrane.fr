@@ -36,55 +36,83 @@ export async function GET(
 }
 
 export async function PUT(
-  req: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    // Await the params
     const { id } = await params;
     const activityId = parseInt(id);
     
     if (isNaN(activityId)) {
       return NextResponse.json({ error: 'ID invalide' }, { status: 400 });
     }
-
-    // Récupérer l'utilisateur connecté
-    const user = await getUser(req);
     
-    if (!user) {
-      return NextResponse.json({ error: 'Utilisateur non authentifié' }, { status: 401 });
+    const data = await request.json();
+    
+    // Vérifier que les valeurs sont valides
+    const experimentalPoints = data.experimental_points !== undefined 
+      ? Number(data.experimental_points) 
+      : 5;
+      
+    const theoreticalPoints = data.theoretical_points !== undefined 
+      ? Number(data.theoretical_points) 
+      : 15;
+      
+    // S'assurer que les valeurs sont des nombres valides
+    if (isNaN(experimentalPoints) || isNaN(theoreticalPoints)) {
+      return NextResponse.json(
+        { error: "Les valeurs de points doivent être des nombres valides" },
+        { status: 400 }
+      );
+    }
+    
+    // Vérifier que le total est égal à 20
+    if (experimentalPoints + theoreticalPoints !== 20) {
+      return NextResponse.json(
+        { error: "Le total des points doit être égal à 20" },
+        { status: 400 }
+      );
     }
 
-    const body = await req.json();
-    const { name, content, experimental_points, theoretical_points } = body;
+    // Récupérer l'utilisateur connecté (si nécessaire pour les permissions)
+    const user = await getUser(request);
     
-    if (!name || name.trim() === '') {
-      return NextResponse.json({ error: 'Le nom est requis' }, { status: 400 });
-    }
-
-    // Vérifier que l'activité existe et appartient à l'utilisateur
-    const existingActivity = await getActivityById(activityId, user.id);
-    
-    if (!existingActivity) {
-      return NextResponse.json({ error: 'Activité non trouvée' }, { status: 404 });
-    }
-
-    const updated = await updateActivity(activityId, {
-      ...existingActivity,
-      name,
-      content,
-      experimental_points: experimental_points || existingActivity.experimental_points,
-      theoretical_points: theoretical_points || existingActivity.theoretical_points,
-      user_id: user.id
+    // Mettre à jour l'activité en utilisant la fonction importée
+    // Correction: modifier l'appel à updateActivity pour ne passer que 2 paramètres
+    const success = await updateActivity(activityId, {
+      name: data.name,
+      content: data.content || '',
+      experimental_points: experimentalPoints,
+      theoretical_points: theoreticalPoints,
+      user_id: user?.id ?? 0,
     });
-    
-    if (updated) {
-      return NextResponse.json({ success: true });
-    } else {
-      return NextResponse.json({ error: 'Échec de la mise à jour' }, { status: 500 });
+
+    if (!success) {
+      return NextResponse.json(
+        { error: "Échec de la mise à jour de l'activité" },
+        { status: 500 }
+      );
     }
+    
+    // Récupérer l'activité mise à jour pour la renvoyer
+    const userId = user?.id; // Définir userId ici pour l'utiliser avec getActivityById
+    const updatedActivity = await getActivityById(activityId, userId);
+    
+    if (!updatedActivity) {
+      return NextResponse.json(
+        { error: "Activité non trouvée après la mise à jour" },
+        { status: 404 }
+      );
+    }
+    
+    return NextResponse.json(updatedActivity);
   } catch (error) {
-    console.error('Error updating activity:', error);
-    return NextResponse.json({ error: 'Erreur lors de la mise à jour de l\'activité' }, { status: 500 });
+    console.error('Erreur lors de la mise à jour de l\'activité:', error);
+    return NextResponse.json(
+      { error: "Erreur serveur lors de la mise à jour de l'activité" },
+      { status: 500 }
+    );
   }
 }
 

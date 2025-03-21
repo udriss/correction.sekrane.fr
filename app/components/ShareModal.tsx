@@ -30,9 +30,10 @@ interface ShareModalProps {
   open: boolean;
   onClose: () => void;
   correctionId: string;
+  onShareSuccess?: (code: string) => void;  // Nouvelle prop
 }
 
-export default function ShareModal({ open, onClose, correctionId }: ShareModalProps) {
+export default function ShareModal({ open, onClose, correctionId, onShareSuccess }: ShareModalProps) {
   const [shareCode, setShareCode] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -54,6 +55,10 @@ export default function ShareModal({ open, onClose, correctionId }: ShareModalPr
         .then(response => {
           if (response.exists && response.code) {
             setShareCode(response.code);
+            // Appeler la fonction de callback avec le code existant
+            if (onShareSuccess) {
+              onShareSuccess(response.code);
+            }
           }
         })
         .catch(err => {
@@ -63,7 +68,7 @@ export default function ShareModal({ open, onClose, correctionId }: ShareModalPr
           setLoading(false);
         });
     }
-  }, [open, correctionId]);
+  }, [open, correctionId, onShareSuccess]);
 
   // Fonction pour générer un nouveau code
   const handleGenerateCode = async () => {
@@ -75,6 +80,11 @@ export default function ShareModal({ open, onClose, correctionId }: ShareModalPr
       if (result.code) {
         setShareCode(result.code);
         setGenerated(result.isNew || false);
+        
+        // Appeler la fonction de callback avec le code généré
+        if (onShareSuccess) {
+          onShareSuccess(result.code);
+        }
       }
     } catch (err) {
       setError('Erreur lors de la génération du code de partage');

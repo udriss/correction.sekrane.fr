@@ -78,8 +78,8 @@ export default function EditFragment({ params }: { params: Promise<{ id: string 
 
   if (loading) {
     return (
-      <div className="container mx-auto px-4 py-8 flex justify-center">
-        <LoadingSpinner text="Chargement du fragment" />
+      <div className="py-10 flex justify-center max-w-[400px] mx-auto">
+        <LoadingSpinner text="Chargement du fragment " />
       </div>
     );
   }

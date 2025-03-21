@@ -99,14 +99,15 @@ export default function ActivitiesPage() {
         </div>
 
         {loading ? (
-          <div className="py-10 flex justify-center">
-            <LoadingSpinner text="Chargement des activités" />
+            <div className="py-10 flex justify-center max-w-[400px] mx-auto">
+            <LoadingSpinner text="Chargement des activités " />
           </div>
         ) : error ? (
           <Box mb={4}>
             <Alert severity="error">{error}</Alert>
           </Box>
-        ) : activities.length === 0 ? (
+        ) : 
+        activities.length === 0 ? (
           <Box textAlign="center" my={8}>
             <Typography variant="h6" color="text.secondary" gutterBottom>
               Aucune activité trouvée

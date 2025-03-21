@@ -20,6 +20,7 @@ import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import PersonAddIcon from '@mui/icons-material/PersonAdd';
 import SaveIcon from '@mui/icons-material/Save';
 import HomeIcon from '@mui/icons-material/Home';
+import HourglassEmptyIcon from '@mui/icons-material/HourglassEmpty';
 import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline';
 
 export default function NewCorrection({ params }: { params: Promise<{ id: string }> }) {
@@ -147,7 +148,7 @@ export default function NewCorrection({ params }: { params: Promise<{ id: string
             <div className="flex items-center gap-2">
               <AssignmentIcon />
               <Typography variant="h6">
-                Créer une correction
+              Ajouter une correction
               </Typography>
             </div>
             <IconButton 
@@ -190,7 +191,7 @@ export default function NewCorrection({ params }: { params: Promise<{ id: string
 
               <div className="bg-blue-50 p-4 rounded-lg mb-6 border border-blue-100">
                 <Typography variant="body2" className="text-blue-800">
-                  <strong>Information :</strong> Après avoir créé la correction, vous pourrez ajouter le contenu détaillé, les notes et les dates de rendu.
+                  <strong>Information :</strong> Après avoir ajouté la correction, vous pourrez ajouter le contenu détaillé, les notes et les dates de rendu.
                 </Typography>
               </div>
 
@@ -209,12 +210,18 @@ export default function NewCorrection({ params }: { params: Promise<{ id: string
                 <Button
                   variant="contained"
                   color="secondary"
-                  startIcon={<SaveIcon />}
                   type="submit"
                   disabled={isSubmitting}
                   className="w-full sm:w-auto"
                 >
-                  {isSubmitting ? 'Création en cours...' : 'Créer la correction'}
+                    {isSubmitting ? (
+                    <>
+                      <HourglassEmptyIcon className="mr-1" />
+                      En cours ...
+                    </>
+                    ) : (
+                    <SaveIcon />
+                    )}
                 </Button>
               </div>
             </form>

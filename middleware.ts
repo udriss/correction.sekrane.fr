@@ -32,7 +32,6 @@ function isValidRedirectUrl(path: string): boolean {
     '/', 
     '/activities', 
     '/corrections', 
-    '/activites', 
     '/feedback', 
     '/dashboard',
     '/admin'
@@ -57,7 +56,6 @@ export async function middleware(request: NextRequest) {
   const isPathProtected = 
     path.startsWith('/activities') || 
     path.startsWith('/corrections') ||
-    path.startsWith('/activites') ||
     path.startsWith('/admin') ||
     path.startsWith('/dashboard');
   
@@ -112,7 +110,6 @@ export const config = {
     '/',
     '/activities/:path*',
     '/corrections/:path*',
-    '/activites/:path*',
     '/dashboard/:path*',
     '/admin/:path*',
     '/login'

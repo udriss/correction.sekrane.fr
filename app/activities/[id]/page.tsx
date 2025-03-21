@@ -5,26 +5,29 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Activity } from '@/lib/activity';
-import { Correction } from '@/lib/correction';
+import { Correction } from '@/lib/types';
 import LoadingSpinner from '@/components/LoadingSpinner';
 import { Button, IconButton, Paper, Typography, TextField, CircularProgress } from '@mui/material';
 import { Edit as EditIcon, Save as SaveIcon, Close as CloseIcon, Delete as DeleteIcon, Article as ArticleIcon, Add as AddIcon, BarChart as BarChartIcon, Check as CheckIcon } from '@mui/icons-material';
 import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
-
+import PeopleAltIcon from '@mui/icons-material/PeopleAlt';
+import GroupsIcon from '@mui/icons-material/Groups';
+import Grid from '@mui/material/Grid2';
+import Box from '@mui/material/Box';
 
 export default function ActivityDetail({ params }: { params: Promise<{ id: string }> }) {
   // Unwrap the Promise for params using React.use
   const { id } = React.use(params);
   const activityId = id;
-
+  
   const [activity, setActivity] = useState<Activity | null>(null);
   const [corrections, setCorrections] = useState<Correction[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const router = useRouter();
-
+  
   const [isEditing, setIsEditing] = useState(false);
   const [name, setName] = useState('');
   const [content, setContent] = useState('');
@@ -32,7 +35,7 @@ export default function ActivityDetail({ params }: { params: Promise<{ id: strin
   const [theoreticalPoints, setTheoreticalPoints] = useState(15);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
-
+  
   useEffect(() => {
     const fetchActivityAndCorrections = async () => {
       try {
@@ -40,7 +43,7 @@ export default function ActivityDetail({ params }: { params: Promise<{ id: strin
         const activityResponse = await fetch(`/api/activities/${activityId}`);
         if (!activityResponse.ok) {
           throw new Error('Erreur lors du chargement de l\'activité');
-        }
+        } 
         const activityData = await activityResponse.json();
         setActivity(activityData);
         setName(activityData.name);
@@ -48,7 +51,7 @@ export default function ActivityDetail({ params }: { params: Promise<{ id: strin
         // Set the grading scale values from the activity data or use defaults
         setExperimentalPoints(activityData.experimental_points !== undefined ? activityData.experimental_points : 5);
         setTheoreticalPoints(activityData.theoretical_points !== undefined ? activityData.theoretical_points : 15);
-
+        
         // Fetch corrections for this activity
         const correctionsResponse = await fetch(`/api/activities/${activityId}/corrections`);
         if (!correctionsResponse.ok) {
@@ -63,14 +66,14 @@ export default function ActivityDetail({ params }: { params: Promise<{ id: strin
         setLoading(false);
       }
     };
-
+    
     fetchActivityAndCorrections();
   }, [activityId]);
-
+  
   const handleEditClick = () => {
     setIsEditing(true);
   };
-
+  
   const handleCancelClick = () => {
     setIsEditing(false);
     setName(activity?.name || '');
@@ -78,23 +81,20 @@ export default function ActivityDetail({ params }: { params: Promise<{ id: strin
     setExperimentalPoints(activity?.experimental_points !== undefined ? activity.experimental_points : 5);
     setTheoreticalPoints(activity?.theoretical_points !== undefined ? activity.theoretical_points : 15);
   };
-
+  
   const handleSubmit = async () => {
     if (!name.trim()) {
       setError('Le nom de l\'activité est requis');
       return;
     }
-
     // Validate that the points sum to 20
     const totalPoints = Number(experimentalPoints) + Number(theoreticalPoints);
     if (totalPoints !== 20) {
       setError('Le total des points doit être égal à 20');
       return;
     }
-
     setIsSubmitting(true);
     setError('');
-
     try {
       const response = await fetch(`/api/activities/${activityId}`, {
         method: 'PUT',
@@ -108,11 +108,9 @@ export default function ActivityDetail({ params }: { params: Promise<{ id: strin
           theoretical_points: theoreticalPoints 
         }),
       });
-
       if (!response.ok) {
         throw new Error('Erreur lors de la mise à jour de l\'activité');
       }
-
       const updatedActivity = await response.json();
       setActivity(updatedActivity);
       setIsEditing(false);
@@ -123,25 +121,23 @@ export default function ActivityDetail({ params }: { params: Promise<{ id: strin
       setIsSubmitting(false);
     }
   };
-
+  
   const handleDeleteClick = () => {
     setConfirmingDelete(true);
   };
-
+  
   const handleCancelDelete = () => {
     setConfirmingDelete(false);
   };
-
+  
   const handleConfirmDelete = async () => {
     try {
       const response = await fetch(`/api/activities/${activityId}`, {
         method: 'DELETE',
       });
-
       if (!response.ok) {
         throw new Error('Erreur lors de la suppression');
       }
-
       router.push('/');
     } catch (err) {
       console.error('Erreur:', err);
@@ -149,17 +145,15 @@ export default function ActivityDetail({ params }: { params: Promise<{ id: strin
       setConfirmingDelete(false);
     }
   };
-
-  const handleDelete = handleDeleteClick; // Pour maintenir la compatibilité avec les références existantes
-
-  const handleFragmentsClick = () => {
-    router.push(`/activities/${activityId}/fragments`);
-  };
-
+  
   const handleNewCorrectionClick = () => {
     router.push(`/activities/${activityId}/corrections/new`);
   };
-
+  
+  const handleFragmentsClick = () => {
+    router.push(`/activities/${activityId}/fragments`);
+  };
+  
   const handlePointsChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
     setter: React.Dispatch<React.SetStateAction<number>>,
@@ -168,7 +162,6 @@ export default function ActivityDetail({ params }: { params: Promise<{ id: strin
   ) => {
     const value = Number(e.target.value);
     setter(value);
-    
     // Auto-adjust the other field to maintain a sum of 20
     if (isExperimental) {
       setTheoreticalPoints(20 - value);
@@ -176,15 +169,15 @@ export default function ActivityDetail({ params }: { params: Promise<{ id: strin
       setExperimentalPoints(20 - value);
     }
   };
-
+  
   if (loading) {
     return (
-      <div className="container mx-auto px-4 py-8 flex justify-center">
+      <div className="container max-w-[400px] mx-auto px-4 py-8 flex justify-center">
         <LoadingSpinner size="lg" text="Chargement de l'activité" />
       </div>
     );
   }
-
+  
   if (error) {
     return (
       <div className="container mx-auto px-4 py-8 flex justify-center">
@@ -215,7 +208,7 @@ export default function ActivityDetail({ params }: { params: Promise<{ id: strin
                     color="primary"
                     className="mt-4"
                     component={Link}
-                    href="/activites"
+                    href="/activities"
                     startIcon={<ArrowBackIcon />}
                     >
                     Retour aux activités
@@ -231,7 +224,7 @@ export default function ActivityDetail({ params }: { params: Promise<{ id: strin
       </div>
     );
   }
-
+  
   if (!activity) {
     return (
       <div className="container mx-auto px-4 py-8">
@@ -241,7 +234,7 @@ export default function ActivityDetail({ params }: { params: Promise<{ id: strin
       </div>
     );
   }
-
+  
   return (
     <div className="container mx-auto px-4 py-8 max-w-5xl">
       <div className="flex items-center justify-between mb-6">
@@ -282,7 +275,7 @@ export default function ActivityDetail({ params }: { params: Promise<{ id: strin
         ) : (
           <h1 className="text-3xl font-bold flex items-center">
             {activity.name}
-            <IconButton 
+            <IconButton
               onClick={handleEditClick}
               size="small"
               color="primary"
@@ -322,13 +315,13 @@ export default function ActivityDetail({ params }: { params: Promise<{ id: strin
           </h1>
         )}
       </div>
-
+      
       {/* Section description */}
       <Paper className="p-4 rounded-lg mb-8">
         <div className="flex items-center justify-between mb-2">
           <h2 className="text-xl font-semibold">Description de l'activité</h2>
           {!isEditing && (
-            <IconButton 
+            <IconButton
               onClick={handleEditClick}
               size="small"
               color="primary"
@@ -338,7 +331,6 @@ export default function ActivityDetail({ params }: { params: Promise<{ id: strin
             </IconButton>
           )}
         </div>
-        
         {isEditing ? (
           <TextField
             value={content}
@@ -360,7 +352,7 @@ export default function ActivityDetail({ params }: { params: Promise<{ id: strin
           </div>
         )}
       </Paper>
-
+      
       {/* Section Barème - Compact version */}
       <Paper className="p-4 rounded-lg mb-8">
         <div className="flex items-center justify-between mb-3">
@@ -369,7 +361,7 @@ export default function ActivityDetail({ params }: { params: Promise<{ id: strin
             <h2 className="text-xl font-semibold">Barème de notation</h2>
           </div>
           {!isEditing && (
-            <IconButton 
+            <IconButton
               onClick={handleEditClick}
               size="small"
               color="primary"
@@ -379,7 +371,6 @@ export default function ActivityDetail({ params }: { params: Promise<{ id: strin
             </IconButton>
           )}
         </div>
-
         {isEditing ? (
           <div className="bg-gray-50 p-4 rounded-md border border-gray-200">
             <div className="flex flex-col md:flex-row gap-4 mb-2">
@@ -408,7 +399,6 @@ export default function ActivityDetail({ params }: { params: Promise<{ id: strin
                 />
               </div>
             </div>
-            
             <div className="flex items-center justify-between">
               <div className="text-sm text-gray-600">
                 Le total des points doit être égal à 20
@@ -425,18 +415,17 @@ export default function ActivityDetail({ params }: { params: Promise<{ id: strin
           <div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="bg-white p-3 rounded border border-gray-200">
-                <p className="text-gray-700 font-medium">Partie expérimentale:</p>
+                <p className="text-gray-700 font-medium">Partie expérimentale :</p>
                 <p className="text-2xl font-bold text-blue-600">{activity.experimental_points || 5} points</p>
               </div>
               <div className="bg-white p-3 rounded border border-gray-200">
-                <p className="text-gray-700 font-medium">Partie théorique:</p>
+                <p className="text-gray-700 font-medium">Partie théorique :</p>
                 <p className="text-2xl font-bold text-blue-600">{activity.theoretical_points || 15} points</p>
               </div>
             </div>
-
             <div className="text-right mt-3">
               <p className="text-gray-700">
-                <span className="font-medium">Total:</span>{" "}
+                <span className="font-medium">Total :</span>{" "}
                 <span className="font-bold">
                   {(activity.experimental_points || 5) + (activity.theoretical_points || 15)} points
                 </span>
@@ -445,31 +434,51 @@ export default function ActivityDetail({ params }: { params: Promise<{ id: strin
           </div>
         )}
       </Paper>
-
+      
       {/* Section Fragments et Corrections */}
       <div className="flex flex-col lg:flex-row gap-6">
-
         {/* Corrections */}
         <div className="w-full lg:w-2/3">
           <Paper className="p-4 shadow mb-4">
             <div className="flex justify-between items-center mb-4">
               <h2 className="text-xl font-semibold">Corrections</h2>
-              
               {!isEditing && (
                 <div className="flex space-x-2">
                   <IconButton
                     onClick={handleNewCorrectionClick}
-                    color="primary"
+                    color="success"
                     size="medium"
                     title="Nouvelle correction"
                   >
                     <AddIcon />
                   </IconButton>
-                
+                  
+                  {/* Add button for multiple corrections */}
+                  <Button
+                    component={Link}
+                    href={`/corrections/multiples?activityId=${activityId}`}
+                    variant="outlined"
+                    size="small"
+                    color='secondary'
+                    startIcon={<PeopleAltIcon />}
+                  >
+                    Corrections en lot
+                  </Button>
+                  {activityId && (
+                    <Button
+                      variant="outlined"
+                      color="primary"
+                      startIcon={<GroupsIcon />}
+                      component={Link}
+                      href={`/activities/${activityId}/groups`}
+                    >
+                      Groupes
+                    </Button>
+                  )}
                 </div>
               )}
             </div>
-
+            
             {corrections.length === 0 ? (
               <div className="bg-gray-50 p-4 rounded border border-gray-200 text-center">
                 <Typography color="textSecondary">
@@ -484,38 +493,89 @@ export default function ActivityDetail({ params }: { params: Promise<{ id: strin
                     className="mt-3"
                     startIcon={<AddIcon />}
                   >
-                    Créer une correction
+                    Ajouter une correction
                   </Button>
                 )}
               </div>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-4">
-                {corrections.map((correction) => (
-                  <div key={correction.id} className="border rounded-lg p-4 shadow-sm hover:shadow-md transition-shadow">
-                    <div className="flex flex-col gap-2 mb-2">
-                      <h3 className="font-semibold">
-                      {correction.student_name || `${activity.name} - Sans nom`}
-                      </h3>
-                      <p className="text-sm text-gray-500">
-                      Créée le {new Date(correction.created_at!).toLocaleString('fr-FR')}
-                      </p>
+              <div className="grid grid-cols-1 md:grid-cols-1 lg:grid-cols-1 gap-4">
+              {corrections.length === 0 ? (
+                <div className="bg-gray-50 p-4 rounded border border-gray-200 text-center">
+                  <Typography color="textSecondary">
+                    Aucune correction pour cette activité.
+                  </Typography>
+                  {!isEditing && (
                     <Button
-                      component={Link}
-                      href={`/corrections/${correction.id}`}
-                      variant="outlined"
+                      onClick={handleNewCorrectionClick}
+                      variant="contained" 
+                      color="primary"
                       size="small"
-                      className="mt-2"
+                      className="mt-3"
+                      startIcon={<AddIcon />}
+                    >
+                      Ajouter une correction
+                    </Button>
+                  )}
+                </div>
+              ) : (
+                <Grid container spacing={2}>
+                  {corrections.map((correction) => (
+                    <Grid size={{ xs: 12, sm: 6 }} key={correction.id}>
+                      <Box
+                        sx={{
+                          position: 'relative',
+                          border: '1px solid',
+                          borderColor: 'divider',
+                          borderRadius: 1,
+                          p: 2,
+                          boxShadow: 1,
+                          transition: 'box-shadow 0.3s',
+                          '&:hover': {
+                            boxShadow: 2
+                          }
+                        }}
                       >
-                      Éditer la correction
-                      </Button>
-                    </div>
-                  </div>
-                ))}
+                        {/* Affichage de la note en haut à droite */}
+                        {correction.grade !== null && correction.grade !== undefined && (
+                          <Box sx={{ position: 'absolute', top: 12, right: 12 }}>
+                            <Typography variant="subtitle2">{correction.grade} / {(correction.experimental_points ?? 5) + (correction.theoretical_points ?? 15)}</Typography>
+                          </Box>
+                        )}
+                        
+                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1, mb: 2, pr: 5 }}>
+                          <Typography variant="subtitle1" fontWeight="bold" noWrap>
+                            {correction.student_name || `${activity.name} - Sans nom`}
+                          </Typography>
+                          <Typography variant="body2" color="text.secondary">
+                            Ajoutée le {new Date(correction.created_at!).toLocaleString('fr-FR')}
+                          </Typography>
+                        </Box>
+                        
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <Button
+                            component={Link}
+                            href={`/corrections/${correction.id}`}
+                            variant="outlined"
+                            size="small"
+                          >
+                            Éditer la correction
+                          </Button>
+                          {correction.grade === null && (
+                            <Typography variant="caption" color="text.secondary" sx={{ fontStyle: 'italic' }}>
+                              Non notée
+                            </Typography>
+                          )}
+                        </Box>
+                      </Box>
+                    </Grid>
+                  ))}
+                </Grid>
+              )}
               </div>
             )}
           </Paper>
         </div>
-
+        
         {/* Fragments */}
         <div className="w-full lg:w-1/3">
           <Paper className="p-4 shadow mb-4">

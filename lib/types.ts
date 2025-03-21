@@ -11,9 +11,11 @@ export interface Correction {
   deadline?: string;
   submission_date?: string;
   activity_name?: string;
-  // Ajouter les nouveaux champs pour les points expérimentaux et théoriques
   experimental_points_earned?: number;
   theoretical_points_earned?: number;
+  experimental_points?: number;
+  theoretical_points?: number;
+  shareCode?: string;
 }
 
 export interface Fragment {

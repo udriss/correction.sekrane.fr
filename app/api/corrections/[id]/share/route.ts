@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getPool } from '@/lib/db';
+import { withConnection } from '@/lib/db';
 import { nanoid } from 'nanoid';
 import { getUser } from '@/lib/auth';
 
@@ -25,48 +25,49 @@ export async function POST(
 
     const { id: correctionId } = await Promise.resolve(params);
 
-    // Vérifier si la correction existe
-    const pool = getPool();
-    const [rows] = await pool.query(
-      `SELECT id FROM corrections WHERE id = ?`,
-      [correctionId]
-    );
-
-    if (!Array.isArray(rows) || rows.length === 0) {
-      return NextResponse.json(
-        { error: 'Correction non trouvée' },
-        { status: 404 }
+    return await withConnection(async (connection) => {
+      // Vérifier si la correction existe
+      const [rows] = await connection.query(
+        `SELECT id FROM corrections WHERE id = ?`,
+        [correctionId]
       );
-    }
 
-    // Vérifier si un code actif existe déjà
-    const [existingCodes] = await pool.query(
-      `SELECT code FROM share_codes WHERE correction_id = ? AND is_active = TRUE`,
-      [correctionId]
-    );
+      if (!Array.isArray(rows) || rows.length === 0) {
+        return NextResponse.json(
+          { error: 'Correction non trouvée' },
+          { status: 404 }
+        );
+      }
 
-    // Si un code existe, le retourner
-    if (Array.isArray(existingCodes) && existingCodes.length > 0) {
+      // Vérifier si un code actif existe déjà
+      const [existingCodes] = await connection.query(
+        `SELECT code FROM share_codes WHERE correction_id = ? AND is_active = TRUE`,
+        [correctionId]
+      );
+
+      // Si un code existe, le retourner
+      if (Array.isArray(existingCodes) && existingCodes.length > 0) {
+        return NextResponse.json({
+          code: (existingCodes[0] as any).code,
+          message: 'Code existant réutilisé',
+          isNew: false,
+        });
+      }
+
+      // Générer un nouveau code unique
+      const code = generateUniqueCode();
+
+      // Stocker le code dans la base de données
+      await connection.query(
+        `INSERT INTO share_codes (code, correction_id) VALUES (?, ?)`,
+        [code, correctionId]
+      );
+
       return NextResponse.json({
-        code: (existingCodes[0] as any).code,
-        message: 'Code existant réutilisé',
-        isNew: false,
+        code,
+        message: 'Code de partage généré avec succès',
+        isNew: true,
       });
-    }
-
-    // Générer un nouveau code unique
-    const code = generateUniqueCode();
-
-    // Stocker le code dans la base de données
-    await pool.query(
-      `INSERT INTO share_codes (code, correction_id) VALUES (?, ?)`,
-      [code, correctionId]
-    );
-
-    return NextResponse.json({
-      code,
-      message: 'Code de partage généré avec succès',
-      isNew: true,
     });
   } catch (error) {
     console.error('Erreur lors de la génération du code de partage:', error);
@@ -94,22 +95,23 @@ export async function GET(
 
     const { id: correctionId } = await Promise.resolve(params);
 
-    // Chercher le code actif pour cette correction
-    const pool = getPool();
-    const [rows] = await pool.query(
-      `SELECT code FROM share_codes WHERE correction_id = ? AND is_active = TRUE`,
-      [correctionId]
-    );
-
-    if (!Array.isArray(rows) || rows.length === 0) {
-      return NextResponse.json(
-        { exists: false }
+    return await withConnection(async (connection) => {
+      // Chercher le code actif pour cette correction
+      const [rows] = await connection.query(
+        `SELECT code FROM share_codes WHERE correction_id = ? AND is_active = TRUE`,
+        [correctionId]
       );
-    }
 
-    return NextResponse.json({
-      exists: true,
-      code: (rows[0] as any).code
+      if (!Array.isArray(rows) || rows.length === 0) {
+        return NextResponse.json(
+          { exists: false }
+        );
+      }
+
+      return NextResponse.json({
+        exists: true,
+        code: (rows[0] as any).code
+      });
     });
   } catch (error) {
     console.error('Erreur lors de la récupération du code de partage:', error);
@@ -137,15 +139,16 @@ export async function DELETE(
 
     const { id: correctionId } = await Promise.resolve(params);
 
-    // Désactiver tous les codes pour cette correction
-    const pool = getPool();
-    await pool.query(
-      `UPDATE share_codes SET is_active = FALSE WHERE correction_id = ?`,
-      [correctionId]
-    );
+    return await withConnection(async (connection) => {
+      // Désactiver tous les codes pour cette correction
+      await connection.query(
+        `UPDATE share_codes SET is_active = FALSE WHERE correction_id = ?`,
+        [correctionId]
+      );
 
-    return NextResponse.json({
-      message: 'Codes de partage désactivés'
+      return NextResponse.json({
+        message: 'Codes de partage désactivés'
+      });
     });
   } catch (error) {
     console.error('Erreur lors de la désactivation des codes de partage:', error);

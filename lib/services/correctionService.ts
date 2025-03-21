@@ -1,4 +1,4 @@
-import { Correction } from '../types';
+import { Correction } from '@/lib/types';
 import { ContentItem } from '@/types/correction';
 import { parseHtmlToItems, generateHtmlFromItems } from '@/utils/htmlUtils';
 

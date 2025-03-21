@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import { Correction } from '@/lib/types'; // Ensure we're importing from the central location
+import { Correction } from '@/lib/types';
 import { ContentItem } from '@/types/correction';
 import * as correctionService from '../services/correctionService';
 import { useRouter } from 'next/navigation';

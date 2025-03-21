@@ -33,8 +33,7 @@ import {
   FormControl,
   InputLabel,
   CircularProgress,
-  FormControlLabel,
-  Checkbox
+  Slider
 } from '@mui/material';
 import EditIcon from '@mui/icons-material/Edit';
 import SaveIcon from '@mui/icons-material/Save';
@@ -622,8 +621,8 @@ export default function CorrectionDetail({ params }: { params: Promise<{ id: str
 
   if (loading) {
     return (
-      <div className="container mx-auto px-4 py-8 flex justify-center">
-        <LoadingSpinner size="lg" text="Chargement de la correction" />
+      <div className="container max-w-[400px] mx-auto px-4 py-8 flex justify-center">
+        <LoadingSpinner size="lg" text="Chargement de la correction " />
       </div>
     );
   }
@@ -938,85 +937,158 @@ export default function CorrectionDetail({ params }: { params: Promise<{ id: str
                 </Typography>
                 </div>
                 <div className="flex flex-col space-y-3">
-                  <div className="flex flex-row justify-around mx-2">
-                    <div className="flex flex-col items-center">
-                      <TextField
-                        label={`Expérimentale /${experimentalPoints}`}
-                        value={experimentalGrade}
-                        onChange={handleExperimentalGradeChange}
-                        variant="outlined"
-                        size="small"
-                        type="text"
-                        inputProps={{ 
-                          inputMode: 'decimal', 
-                          pattern: '[0-9]*(.[0-9]+)?',
-                          style: { textAlign: 'center' }
-                        }}
-                        sx={{ width: 120 }}
-                      />
-                      <div className="mb-4"></div>
-                      <TextField
-                        label={`Théorique /${theoreticalPoints}`}
-                        value={theoreticalGrade}
-                        onChange={handleTheoreticalGradeChange}
-                        variant="outlined"
-                        size="small"
-                        type="text"
-                        inputProps={{ 
-                          inputMode: 'decimal', 
-                          pattern: '[0-9]*(.[0-9]+)?',
-                          style: { textAlign: 'center' }
-                        }}
-                        sx={{ width: 120 }}
-                      />
-                    </div>
-                    
-                    <div className="flex items-center">
-                      <Box className="flex items-center ml-3">
-                        <FormControlLabel
-                          control={
-                            <Checkbox
-                              checked={isPenaltyEnabled}
-                              onChange={handlePenaltyToggle}
-                              size="small"
-                            />
-                          }
-                          label="Pénalité de retard"
-                        />
-                      </Box>
-                    </div>
-                    
-                    {isPenaltyEnabled && (
-                      <div className="flex items-center">
-                        <TextField
-                          label="Points pénalité"
-                          value={penalty}
-                          onChange={handlePenaltyChange}
-                          variant="outlined"
-                          size="small"
-                          type="text"
-                          inputProps={{ 
-                            inputMode: 'decimal', 
-                            pattern: '[0-9]*(.[0-9]+)?',
-                            style: { textAlign: 'center' }
-                          }}
-                          sx={{ width: 120 }}
-                        />
-                      </div>
-                    )}
-                  </div>
-                  <div className="flex justify-center items-center border-t mt-2 pt-2">
-                    <Typography variant="body1" className="text-right">
-                      Total : {calculateTotalGrade().toFixed(1)} / {experimentalPoints + theoreticalPoints}
-                      {isPenaltyEnabled && penalty && (
-                        <>
-                          <span className="text-red-500 ml-2">- {penalty}</span>
-                          <span className="font-bold ml-2">= {calculateFinalGrade()} / {experimentalPoints + theoreticalPoints}</span>
-                        </>
-                      )}
-                    </Typography>
-                  </div>
-                </div>
+  <div className="flex flex-row justify-around mx-2">
+    <div className="flex flex-col items-center">
+      <Typography variant="body2" id="experimental-slider" gutterBottom>
+        Partie expérimentale
+      </Typography>
+      <Slider
+        aria-labelledby="experimental-slider"
+        value={parseFloat(experimentalGrade) || 0}
+        onChange={(_, newValue) => {
+          const newGrade = typeof newValue === 'number' ? newValue.toString() : newValue.toString();
+          setExperimentalGrade(newGrade);
+          
+          if (saveGradeTimeout) {
+            clearTimeout(saveGradeTimeout);
+          }
+          
+          const timeout = setTimeout(() => {
+            if (correction) {
+              correctionsHook.saveGradeAndPenalty(
+                parseFloat(newGrade),
+                parseFloat(theoreticalGrade || '0'),
+                isPenaltyEnabled ? parseFloat(penalty || '0') : 0
+              );
+            }
+          }, 500);
+          
+          setSaveGradeTimeout(timeout);
+        }}
+        min={0}
+        max={experimentalPoints}
+        step={0.5}
+        valueLabelDisplay="auto"
+        marks
+        sx={{ 
+          width: 180,
+          color: 'primary.main',
+          '& .MuiSlider-thumb': {
+            height: 20,
+            width: 20,
+          },
+          '& .MuiSlider-rail': {
+            opacity: 0.5,
+          }
+        }}
+      />
+      <Typography variant="caption" color="text.secondary" align="center" sx={{ mt: 1 }}>
+        {experimentalGrade || '0'}/{experimentalPoints}
+      </Typography>
+      
+      <div className="mb-4"></div>
+      
+      <Typography variant="body2" id="theoretical-slider" gutterBottom>
+        Partie théorique
+      </Typography>
+      <Slider
+        aria-labelledby="theoretical-slider"
+        value={parseFloat(theoreticalGrade) || 0}
+        onChange={(_, newValue) => {
+          const newGrade = typeof newValue === 'number' ? newValue.toString() : newValue.toString();
+          setTheoreticalGrade(newGrade);
+          
+          if (saveGradeTimeout) {
+            clearTimeout(saveGradeTimeout);
+          }
+          
+          const timeout = setTimeout(() => {
+            if (correction) {
+              correctionsHook.saveGradeAndPenalty(
+                parseFloat(experimentalGrade || '0'),
+                parseFloat(newGrade),
+                isPenaltyEnabled ? parseFloat(penalty || '0') : 0
+              );
+            }
+          }, 500);
+          
+          setSaveGradeTimeout(timeout);
+        }}
+        min={0}
+        max={theoreticalPoints}
+        step={0.5}
+        valueLabelDisplay="auto"
+        marks
+        sx={{ 
+          width: 180,
+          color: 'secondary.main', 
+          '& .MuiSlider-thumb': {
+            height: 20,
+            width: 20,
+          },
+          '& .MuiSlider-rail': {
+            opacity: 0.5,
+          }
+        }}
+      />
+      <Typography variant="caption" color="text.secondary" align="center" sx={{ mt: 1 }}>
+        {theoreticalGrade || '0'}/{theoreticalPoints}
+      </Typography>
+    </div>
+    
+    {/* Si vous avez une section de pénalité, vous pouvez l'ajouter ici avec le même style */}
+    {isPenaltyEnabled && (
+      <div className="flex flex-col items-center ml-4">
+        <Typography variant="body2" id="penalty-slider" gutterBottom>
+          Pénalité
+        </Typography>
+        <Slider
+          aria-labelledby="penalty-slider"
+          value={parseFloat(penalty) || 0}
+          onChange={(_, newValue) => {
+            const newPenalty = typeof newValue === 'number' ? newValue.toString() : newValue.toString();
+            setPenalty(newPenalty);
+            
+            if (saveGradeTimeout) {
+              clearTimeout(saveGradeTimeout);
+            }
+            
+            const timeout = setTimeout(() => {
+              if (correction) {
+                correctionsHook.saveGradeAndPenalty(
+                  parseFloat(experimentalGrade || '0'),
+                  parseFloat(theoreticalGrade || '0'),
+                  parseFloat(newPenalty)
+                );
+              }
+            }, 500);
+            
+            setSaveGradeTimeout(timeout);
+          }}
+          min={0}
+          max={14}
+          step={0.5}
+          valueLabelDisplay="auto"
+          marks
+          sx={{ 
+            width: 180,
+            color: 'error.main',
+            '& .MuiSlider-thumb': {
+              height: 20,
+              width: 20,
+            },
+            '& .MuiSlider-rail': {
+              opacity: 0.5,
+            }
+          }}
+        />
+        <Typography variant="caption" color="text.secondary" align="center" sx={{ mt: 1 }}>
+          {penalty || '0'} points
+        </Typography>
+      </div>
+    )}
+  </div>
+</div>
               </Paper>
 
               {/* SECTION 4: Aperçu final */}
