@@ -21,7 +21,13 @@ export async function GET(request: NextRequest) {
       ORDER BY name ASC
     `);
     
-    return NextResponse.json(categories);
+    // Ensure we have properly formatted data for the client
+    const formattedCategories = categories.map(category => ({
+      id: category.id,
+      name: category.name
+    }));
+    
+    return NextResponse.json(formattedCategories);
   } catch (error) {
     console.error('Erreur lors de la récupération des catégories:', error);
     return NextResponse.json(
@@ -60,7 +66,11 @@ export async function POST(request: NextRequest) {
       WHERE id = ?
     `, [result.insertId]);
 
-    return NextResponse.json(newCategory[0], { status: 201 });
+    // Return a consistent format with only the essential fields
+    return NextResponse.json({
+      id: newCategory[0].id,
+      name: newCategory[0].name
+    }, { status: 201 });
   } catch (error) {
     console.error('Erreur lors de la création de la catégorie:', error);
     return NextResponse.json(

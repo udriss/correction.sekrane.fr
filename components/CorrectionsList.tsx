@@ -138,7 +138,7 @@ const CorrectionsList: React.FC<CorrectionsListProps> = ({
                     {/* Utiliser getStudentFullName à la place de student_name */}
                     {getStudentFullName(correction.student_id) || `${activity?.name} - Sans nom`}
                   </Typography>
-                  <Typography variant="body2" color="text.secondary">
+                  <Typography variant="body2" color="text.primary">
                     Ajoutée le {new Date(correction.created_at!).toLocaleString('fr-FR')}
                   </Typography>
                 </Box>
@@ -153,7 +153,7 @@ const CorrectionsList: React.FC<CorrectionsListProps> = ({
                     Éditer la correction
                   </Button>
                   {correction.grade === null && (
-                    <Typography variant="caption" color="text.secondary" sx={{ fontStyle: 'italic' }}>
+                    <Typography variant="caption" color="text.primary" sx={{ fontStyle: 'italic' }}>
                       Non notée
                     </Typography>
                   )}

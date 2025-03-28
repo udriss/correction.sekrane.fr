@@ -1,34 +1,38 @@
 import { createTheme, ThemeOptions } from '@mui/material/styles';
 
-// Définition des gradients pour chaque thème
+// Define gradient map with more harmonious color combinations for each theme
 const themeGradients = {
   light: {
-    primary: 'linear-gradient(to right, rgb(88, 28, 135), rgb(7, 0, 193))',
-    secondary: 'linear-gradient(to right, rgb(126, 34, 206), rgb(37, 99, 235))',
-    success: 'linear-gradient(to right, rgb(4, 120, 87), rgb(13, 148, 136))',
-    warning: 'linear-gradient(to right, rgb(180, 83, 9), rgb(217, 119, 6))',
-    error: 'linear-gradient(to right, rgb(185, 28, 28), rgb(239, 68, 68))',
+    primary: 'linear-gradient(135deg,rgba(64, 137, 209, 0.44),rgba(245, 147, 66, 0.3))',
+    secondary: 'linear-gradient(135deg, #ff7800, #ff9d50)',
+    success: 'linear-gradient(135deg, #2e7d32, #66bb6a)',
+    warning: 'linear-gradient(135deg, #ed6c02, #ffa726)',
+    error: 'linear-gradient(135deg, #d32f2f, #ef5350)',
+    info: 'linear-gradient(135deg, #0288d1, #29b6f6)',
   },
   dark: {
-    primary: 'linear-gradient(to right, rgb(71, 7, 130), rgb(96, 103, 162))',
-    secondary: 'linear-gradient(to right, rgb(217, 70, 239), rgb(139, 92, 246))',
-    success: 'linear-gradient(to right, rgb(16, 185, 129), rgb(20, 184, 166))',
-    warning: 'linear-gradient(to right, rgb(245, 158, 11), rgb(251, 191, 36))',
-    error: 'linear-gradient(to right, rgb(220, 38, 38), rgb(248, 113, 113))',
+    primary: 'linear-gradient(135deg, #1f35b2, #3f51b5)',
+    secondary: 'linear-gradient(135deg, #5e3987, #8e24aa)',
+    success: 'linear-gradient(135deg, #1b5e20, #388e3c)',
+    warning: 'linear-gradient(135deg, #e65100, #ef6c00)',
+    error: 'linear-gradient(135deg, #b71c1c, #c62828)',
+    info: 'linear-gradient(135deg, #01579b, #0277bd)',
   },
   intermediate: {
-    primary: 'linear-gradient(to right, rgb(59, 130, 246), rgb(6, 182, 212))',
-    secondary: 'linear-gradient(to right, rgb(139, 92, 246), rgb(99, 102, 241))',
-    success: 'linear-gradient(to right, rgb(16, 185, 129), rgb(52, 211, 153))',
-    warning: 'linear-gradient(to right, rgb(245, 158, 11), rgb(252, 211, 77))',
-    error: 'linear-gradient(to right, rgb(239, 68, 68), rgb(248, 113, 113))',
+    primary: 'linear-gradient(135deg,rgb(156, 194, 255),rgb(97, 231, 255))',
+    secondary: 'linear-gradient(135deg, #8b5cf6, #6366f1)',
+    success: 'linear-gradient(135deg, #10b981, #34d399)',
+    warning: 'linear-gradient(135deg, #f59e0b, #fcd34d)',
+    error: 'linear-gradient(135deg, #ef4444, #f87171)',
+    info: 'linear-gradient(135deg, #0ea5e9, #38bdf8)',
   },
   default: {
-    primary: 'linear-gradient(to right, rgb(25, 118, 210), rgb(66, 165, 245))',
-    secondary: 'linear-gradient(to right, rgb(156, 39, 176), rgb(186, 104, 200))',
-    success: 'linear-gradient(to right, rgb(46, 125, 50), rgb(102, 187, 106))',
-    warning: 'linear-gradient(to right, rgb(237, 108, 2), rgb(255, 167, 38))',
-    error: 'linear-gradient(to right, rgb(211, 47, 47), rgb(239, 83, 80))',
+    primary: 'linear-gradient(135deg, #1976d2, #42a5f5)',
+    secondary: 'linear-gradient(135deg, #9c27b0, #ba68c8)',
+    success: 'linear-gradient(135deg, #2e7d32, #66bb6a)',
+    warning: 'linear-gradient(135deg, #ed6c02, #ffa726)',
+    error: 'linear-gradient(135deg, #d32f2f, #ef5350)',
+    info: 'linear-gradient(135deg, #0288d1, #29b6f6)',
   },
 };
 
@@ -103,6 +107,15 @@ const commonSettings: Partial<ThemeOptions> = {
         } as any,
       },
     },
+    MuiTextField: {
+      styleOverrides: {
+        root: {
+          '& .MuiOutlinedInput-root, & .MuiFilledInput-root': {
+            transition: 'background-color 0.2s ease-in-out',
+          }
+        }
+      }
+    },
   },
 };
 
@@ -137,7 +150,7 @@ export const lightTheme = createTheme({
   palette: {
     mode: 'light',
     primary: {
-      main: 'rgb(25, 118, 210)',
+      main: 'rgb(25, 118, 210)', // Blue
       light: 'rgb(66, 165, 245)',
       dark: 'rgb(21, 101, 192)',
       50: 'rgb(227, 242, 253)',
@@ -152,9 +165,9 @@ export const lightTheme = createTheme({
       900: 'rgb(8, 47, 87)',
     },
     secondary: {
-      main: 'rgb(255, 120, 0)',  // Orange
-      light: 'rgb(255, 171, 64)', // Lighter orange
-      dark: 'rgb(204, 96, 0)',   // Darker orange
+      main: 'rgb(255, 120, 0)',  // Orange - works well with blue
+      light: 'rgb(255, 171, 64)', 
+      dark: 'rgb(204, 96, 0)',   
       50: 'rgb(255, 243, 224)',
       100: 'rgb(255, 224, 178)',
       200: 'rgb(255, 204, 128)',
@@ -169,32 +182,29 @@ export const lightTheme = createTheme({
     success: {
       main: 'rgb(46, 125, 50)',
       light: 'rgb(102, 187, 106)',
-      dark: 'rgb(25, 86, 29)',
-      50: 'rgb(227, 245, 229)',
-      100: 'rgb(197, 225, 201)',
+      dark: 'rgb(27, 94, 32)',
+      50: 'rgb(232, 245, 233)',
+      100: 'rgb(200, 230, 201)',
       200: 'rgb(165, 214, 167)',
-      300: 'rgb(139, 195, 74)',
+      300: 'rgb(129, 199, 132)',
       400: 'rgb(102, 187, 106)',
-      500: 'rgb(46, 125, 50)',
-      600: 'rgb(25, 86, 29)',
-      700: 'rgb(0, 77, 64)',
-      800: 'rgb(0, 57, 48)',
-      900: 'rgb(0, 39, 32)',
+      500: 'rgb(76, 175, 80)',
+      600: 'rgb(56, 142, 60)',
+      700: 'rgb(46, 125, 50)',
+      800: 'rgb(27, 94, 32)',
+      900: 'rgb(0, 77, 64)',
     },
     background: {
       default: 'rgb(249, 250, 251)',
       paper: 'rgb(255, 255, 255)',
     },
     text: {
-      primary: 'rgb(21, 57, 135)',
-      secondary: 'rgb(173, 183, 197)',
+      primary: 'rgb(33, 43, 54)', // Dark gray for better readability
+      secondary: 'rgb(99, 115, 129)',
     },
     divider: 'rgba(0, 0, 0, 0.12)',
   },
-  gradients: {
-    ...themeGradients.light,
-    secondary: 'linear-gradient(to right, rgb(255, 120, 0), rgb(37, 99, 235))',
-  },
+  gradients: themeGradients.light,
 } as ThemeOptions);
 
 // Dark theme
@@ -203,7 +213,7 @@ export const darkTheme = createTheme({
   palette: {
     mode: 'dark',
     primary: {
-      main: 'rgb(31, 53, 178)',
+      main: 'rgb(31, 53, 178)', // Deep blue
       light: 'rgb(92, 125, 230)',
       dark: 'rgb(21, 36, 128)',
       50: 'rgb(235, 240, 255)',
@@ -218,9 +228,9 @@ export const darkTheme = createTheme({
       900: 'rgb(31, 53, 178)',
     },
     secondary: {
-      main: 'rgb(94, 57, 135)',
-      light: 'rgb(233, 213, 255)',
-      dark: 'rgb(168, 85, 247)',
+      main: 'rgb(94, 57, 135)', // Purple - complements deep blue in dark theme
+      light: 'rgb(168, 85, 247)',
+      dark: 'rgb(83, 37, 135)',
       50: 'rgb(250, 245, 255)',
       100: 'rgb(243, 232, 255)',
       200: 'rgb(233, 213, 255)',
@@ -233,7 +243,7 @@ export const darkTheme = createTheme({
       900: 'rgb(88, 28, 135)',
     },
     success: {
-      main: 'rgb(16, 185, 129)',
+      main: 'rgb(16, 185, 129)', // Brighter green for dark theme for better contrast
       light: 'rgb(52, 211, 153)',
       dark: 'rgb(5, 150, 105)',
       50: 'rgb(236, 253, 245)',
@@ -248,28 +258,48 @@ export const darkTheme = createTheme({
       900: 'rgb(6, 78, 59)',
     },
     background: {
-      default: 'rgb(19, 39, 82)',
-      paper: 'rgb(19, 21, 23)',
+      default: 'rgb(22, 28, 36)', 
+      paper: 'rgb(33, 43, 54)',
+      // Add a new light background color for inputs in dark mode
+      input: 'rgb(45, 55, 72)',
     },
     text: {
-      primary: 'rgb(249, 250, 251)',
-      secondary: 'rgb(209, 213, 219)',
+      primary: 'rgb(255, 255, 255)',
+      secondary: 'rgb(145, 158, 171)',
     },
     divider: 'rgba(255, 255, 255, 0.12)',
+  },
+  components: {
+    ...commonSettings.components,
+    MuiTextField: {
+      styleOverrides: {
+        root: {
+          '& .MuiOutlinedInput-root, & .MuiFilledInput-root': {
+            backgroundColor: 'rgb(45, 55, 72)', // Lighter than the paper color for dark mode
+            '&:hover': {
+              backgroundColor: 'rgb(55, 65, 81)',
+            },
+            '&.Mui-focused': {
+              backgroundColor: 'rgb(55, 65, 81)',
+            }
+          }
+        }
+      }
+    }
   },
   gradients: themeGradients.dark,
 } as ThemeOptions);
 
-// Intermediate theme (a more colorful, less contrasting theme)
+// Intermediate theme (more balanced, colorful theme)
 export const intermediateTheme = createTheme({
   ...commonSettings,
   palette: {
     mode: 'light',
     primary: {
-      main: 'rgb(59, 130, 246)',
+      main: 'rgb(59, 130, 246)', // Sky blue - more vibrant
       light: 'rgb(96, 165, 250)',
-      dark: 'rgb(37, 99, 235)',
-      50: 'rgb(239, 246, 255)',  // Ajout des nuances supplémentaires
+      dark: 'rgb(10, 58, 162)',
+      50: 'rgb(239, 246, 255)',
       100: 'rgb(219, 234, 254)',
       200: 'rgb(191, 219, 254)',
       300: 'rgb(147, 197, 253)',
@@ -281,27 +311,27 @@ export const intermediateTheme = createTheme({
       900: 'rgb(30, 58, 138)',
     },
     secondary: {
-      main: 'rgb(16, 185, 129)',
-      light: 'rgb(52, 211, 153)',
-      dark: 'rgb(5, 150, 105)',
-      50: 'rgb(236, 253, 245)',  // Ajout des nuances supplémentaires
-      100: 'rgb(209, 250, 229)',
-      200: 'rgb(167, 243, 208)',
-      300: 'rgb(110, 231, 183)',
-      400: 'rgb(52, 211, 153)',
-      500: 'rgb(16, 185, 129)',
-      600: 'rgb(5, 150, 105)',
-      700: 'rgb(4, 120, 87)',
-      800: 'rgb(6, 95, 70)',
-      900: 'rgb(6, 78, 59)',
+      main: 'rgb(139, 92, 246)', // Violet - complements sky blue
+      light: 'rgb(167, 139, 250)',
+      dark: 'rgb(124, 58, 237)',
+      50: 'rgb(245, 243, 255)',
+      100: 'rgb(237, 233, 254)',
+      200: 'rgb(221, 214, 254)',
+      300: 'rgb(196, 181, 253)',
+      400: 'rgb(167, 139, 250)',
+      500: 'rgb(139, 92, 246)',
+      600: 'rgb(124, 58, 237)',
+      700: 'rgb(109, 40, 217)',
+      800: 'rgb(91, 33, 182)',
+      900: 'rgb(76, 29, 149)',
     },
     background: {
-      default: 'rgb(240, 249, 255)',
-      paper: 'rgb(248, 250, 252)',
+      default: 'rgb(249, 250, 252)',
+      paper: 'rgb(255, 255, 255)',
     },
     text: {
-      primary: 'rgb(9, 41, 118)', // Couleur textPrimary pour le thème intermédiaire
-      secondary: 'rgb(105, 126, 156)',
+      primary: 'rgb(17, 24, 39)', // Better contrast than pure black
+      secondary: 'rgb(67, 92, 143)',
     },
     divider: 'rgba(0, 0, 0, 0.08)',
   },

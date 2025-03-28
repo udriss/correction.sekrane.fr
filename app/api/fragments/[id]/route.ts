@@ -59,10 +59,17 @@ export async function GET(
         if (Array.isArray(tableExists) && tableExists[0] && (tableExists[0] as any).count > 0) {
           usageCountQuery = '(SELECT COUNT(*) FROM correction_fragments WHERE fragment_id = f.id)';
         }
+
+        // Check if fragments_categories table exists
+        const fragmentCategoriesTableExists = await doesTableExist(connection, 'fragments_categories');
         
+        // Simplified query with categories
         const [rows] = await connection.query<FragmentRow[]>(
           `SELECT f.*, a.name as activity_name,
           ${usageCountQuery} as usage_count
+          ${fragmentCategoriesTableExists ? 
+            ', (SELECT GROUP_CONCAT(fc.category_id) FROM fragments_categories fc WHERE fc.fragment_id = f.id) as category_ids' :
+            ', NULL as category_ids'}
           FROM fragments f
           LEFT JOIN activities a ON f.activity_id = a.id
           WHERE f.id = ?`,
@@ -112,6 +119,13 @@ export async function GET(
         } else {
           processedFragment.isOwner = false;
         }
+
+        // Add categories from junction table
+        if (fragmentCategoriesTableExists && fragment.category_ids) {
+          processedFragment.categories = fragment.category_ids.split(',')
+            .filter((id: string) => id.trim() !== '')
+            .map((id: string) => parseInt(id));
+        }
         
         return NextResponse.json(processedFragment);
       } catch (sqlError: any) {
@@ -137,10 +151,7 @@ export async function GET(
 }
 
 // Update a fragment
-export async function PUT(
-  request: Request,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function PUT(request: NextRequest, { params }: { params: { id: string } }) {
   try {
     // Await the params
     const { id } = await params;
@@ -203,44 +214,52 @@ export async function PUT(
       // Update fragment with current timestamp for updated_at
       await connection.query(
         `UPDATE fragments
-         SET content = ?, category = ?, tags = ?, activity_id = ?, updated_at = CURRENT_TIMESTAMP
+         SET content = ?, tags = ?, activity_id = ?, updated_at = CURRENT_TIMESTAMP
          WHERE id = ?`,
         [
           fragmentData.content,
-          fragmentData.category,
           tagsJson,
           fragmentData.activity_id || null,
           fragmentId
         ]
       );
       
-      // Handle categories if provided
-      if (fragmentData.categories && Array.isArray(fragmentData.categories)) {
-        // Delete existing category associations
+      // Handle categories through junction table
+      const fragmentCategoriesTableExists = await doesTableExist(connection, 'fragments_categories');
+      
+      if (fragmentCategoriesTableExists && fragmentData.categories) {
+        // Make sure we're accessing the categories correctly
+        const categories = fragmentData.categories;
+        console.log('Categories in PUT request:', categories);
+        
+        // Delete existing associations
         await connection.query(
-          'DELETE FROM fragments_categories WHERE fragment_id = ?',
+          'DELETE FROM fragments_categories WHERE fragment_id = ?', 
           [fragmentId]
         );
         
-        // Add new category associations if there are any
-        if (fragmentData.categories.length > 0) {
-          const values = fragmentData.categories.map((categoryId: number) => [fragmentId, categoryId]);
-          const placeholders = fragmentData.categories.map(() => '(?, ?)').join(', ');
+        // Add new associations
+        if (Array.isArray(categories) && categories.length > 0) {
+          const categoryValues = categories
+            .filter((categoryId: number | string) => categoryId && Number(categoryId) > 0)
+            .map((categoryId: number | string) => [fragmentId, Number(categoryId)]);
           
-          // Flatten the values array for mysql2
-          const flatValues = values.flat();
-          
-          await connection.query(
-            `INSERT INTO fragments_categories (fragment_id, category_id) 
-            VALUES ${placeholders}`,
-            flatValues
-          );
+          if (categoryValues.length > 0) {
+            await connection.query(
+              `INSERT INTO fragments_categories (fragment_id, category_id) VALUES ?`,
+              [categoryValues]
+            );
+            console.log(`Added ${categoryValues.length} categories to fragment ${fragmentId}`);
+          }
         }
       }
       
-      // Fetch the updated fragment
+      // Get updated fragment with categories
       const [rows] = await connection.query<FragmentRow[]>(
         `SELECT f.*, a.name as activity_name
+         ${fragmentCategoriesTableExists ? 
+          ', (SELECT GROUP_CONCAT(fc.category_id) FROM fragments_categories fc WHERE fc.fragment_id = f.id) as category_ids' :
+          ', NULL as category_ids'}
          FROM fragments f
          LEFT JOIN activities a ON f.activity_id = a.id
          WHERE f.id = ?`,
@@ -259,7 +278,8 @@ export async function PUT(
       // Create a processed fragment with correct types
       const processedFragment: ProcessedFragment = {
         ...updatedFragment,
-        tags: [] // Initialize with empty array
+        tags: [], // Initialize with empty array
+        categories: [] // Initialize categories with empty array
       };
       
       // Parse tags if they exist
@@ -270,6 +290,13 @@ export async function PUT(
           console.error('Error parsing tags', e);
           // Keep the default empty array
         }
+      }
+      
+      // Process category_ids if they exist
+      if (fragmentCategoriesTableExists && updatedFragment.category_ids) {
+        processedFragment.categories = updatedFragment.category_ids.split(',')
+          .filter((id: string) => id.trim() !== '')
+          .map((id: string) => parseInt(id));
       }
       
       // Add isModified flag by comparing dates
@@ -391,7 +418,7 @@ export async function DELETE(
         }
       }
       
-      // Delete fragment category associations first (cascade should handle this, but be explicit)
+      // Delete fragment category associations first (fix table name)
       await connection.query(
         'DELETE FROM fragments_categories WHERE fragment_id = ?',
         [fragmentId]
@@ -418,4 +445,16 @@ export async function DELETE(
       { status: 500 }
     );
   }
+}
+
+// Helper function to check if a table exists (same as in route.ts)
+async function doesTableExist(connection: any, tableName: string): Promise<boolean> {
+  const [result] = await connection.query(`
+    SELECT 1 FROM information_schema.tables 
+    WHERE table_schema = DATABASE() 
+    AND table_name = ?
+    LIMIT 1
+  `, [tableName]);
+  
+  return Array.isArray(result) && result.length > 0;
 }

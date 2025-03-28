@@ -115,9 +115,19 @@ const CorrectionHeader: React.FC<CorrectionHeaderProps> = ({
                     setLocalFirstName(e.target.value);
                   }}
                   placeholder="Prénom de l'étudiant"
-                  variant="outlined"
+                  helperText="Entrée pour sauvegarder ou Échap pour annuler"
+                  variant="filled"
                   size="small"
                   autoFocus
+                  sx={{
+                    backgroundColor: 'background.paper',
+                    '& .MuiFilledInput-root': {
+                      backgroundColor: 'background.paper',
+                      '&:hover, &.Mui-focused': {
+                        backgroundColor: 'background.default',
+                      }
+                    }
+                  }}
                 />
               </Grid>
               <Grid size={{ xs: 12, sm: 6 }}>
@@ -130,8 +140,19 @@ const CorrectionHeader: React.FC<CorrectionHeaderProps> = ({
                     setLocalLastName(e.target.value);
                   }}
                   placeholder="Nom de l'étudiant"
-                  variant="outlined"
+                  variant="filled"
+                  color="primary"
+                  helperText="Entrée pour sauvegarder ou Échap pour annuler"
                   size="small"
+                  sx={{
+                    backgroundColor: 'background.paper',
+                    '& .MuiFilledInput-root': {
+                      backgroundColor: 'background.paper',
+                      '&:hover, &.Mui-focused': {
+                        backgroundColor: 'background.default',
+                      }
+                    }
+                  }}
                   onKeyDown={(e) => {
                     if (e.key === 'Enter') handleFormSubmit();
                     if (e.key === 'Escape') handleCancelEditing();
@@ -139,12 +160,6 @@ const CorrectionHeader: React.FC<CorrectionHeaderProps> = ({
                 />
               </Grid>
             </Grid>
-            
-            {/* Show current values for debugging */}
-            <Typography variant="caption" color="text.secondary">
-              Valeurs actuelles: Prénom="{localFirstName}", Nom="{localLastName}"
-            </Typography>
-            
             <Box sx={{ display: 'flex', gap: 1 }}>
               <Button
                 onClick={handleFormSubmit}
@@ -169,17 +184,16 @@ const CorrectionHeader: React.FC<CorrectionHeaderProps> = ({
           </Stack>
         ) : (
           <Box sx={{ display: 'flex', alignItems: 'center' }}>
-            <Typography variant="h4" component="h1" fontWeight="bold">
+            <Typography variant="h4" component="h1" color='text.primary' fontWeight="bold">
               {displayName}
             </Typography>
             <IconButton
               onClick={() => setIsEditingName(true)}
-              color="primary"
+              color='secondary'
               title="Modifier le nom"
-              size="small"
-              sx={{ ml: 1 }}
+              sx={{ ml: 1, fontSize: '24px' }}
             >
-              <EditIcon fontSize="small" />
+              <EditIcon fontSize="large" />
             </IconButton>
             
             {confirmingDelete ? (
@@ -191,7 +205,7 @@ const CorrectionHeader: React.FC<CorrectionHeaderProps> = ({
                   size="small"
                   sx={{ ml: 1 }}
                 >
-                  <CheckIcon fontSize="small" />
+                  <CheckIcon fontSize="large" />
                 </IconButton>
                 <IconButton
                   onClick={handleCancelDelete}
@@ -200,7 +214,7 @@ const CorrectionHeader: React.FC<CorrectionHeaderProps> = ({
                   size="small"
                   sx={{ ml: 1 }}
                 >
-                  <CloseIcon fontSize="small" />
+                  <CloseIcon fontSize="large" />
                 </IconButton>
               </>
             ) : (
@@ -211,7 +225,7 @@ const CorrectionHeader: React.FC<CorrectionHeaderProps> = ({
                 size="small"
                 sx={{ ml: 1 }}
               >
-                <DeleteIcon fontSize="small" />
+                <DeleteIcon fontSize="large" />
               </IconButton>
             )}
           </Box>
@@ -219,10 +233,14 @@ const CorrectionHeader: React.FC<CorrectionHeaderProps> = ({
         
         {!isEditingName && (
           <>
-            <Typography sx={{ color: 'text.secondary', mt: 1 }}>
-              Activité : <Link href={`/activities/${correction.activity_id}`} style={{ color: 'primary.light', textDecoration: 'none' , fontWeight: 'bold' }}>
-                <Button variant="text" color="primary" sx={{ textTransform: 'none', p: 0, minWidth: 0, verticalAlign: 'baseline' }}>
-                  {correction.activity_name}
+            <Typography sx={{ color: 'text.primary', mt: 1 }}>
+              Activité : 
+              
+              <Link href={`/activities/${correction.activity_id}`} style={{ color: 'primary.dark', textDecoration: 'none' , fontWeight: 'bold' }}>
+                <Button variant="text" sx={{
+                   textTransform: 'none', p: 0, minWidth: 0, verticalAlign: 'baseline',
+                   fontWeight: 'bold',}}>
+                  &nbsp;{correction.activity_name}
                 </Button>
               </Link>
             </Typography>

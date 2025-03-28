@@ -28,7 +28,6 @@ import DatePickerSection from '@/components/corrections/DatePickerSection';
 import CorrectionContentEditor from '@/components/corrections/CorrectionContentEditor';
 import ActionButtons from '@/components/corrections/ActionButtons';
 import GradingSection from '@/components/corrections/GradingSection';
-import FragmentsSidebar from '@/components/corrections/FragmentsSidebar';
 import StatusMessages from '@/components/corrections/StatusMessages';
 import LoadingErrorStates from '@/components/corrections/LoadingErrorStates';
 import EmailFeedback from '@/components/corrections/EmailFeedback';
@@ -40,6 +39,9 @@ import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import DescriptionIcon from '@mui/icons-material/Description';
 import AssignmentIcon from '@mui/icons-material/Assignment';
 import FormatQuoteIcon from '@mui/icons-material/FormatQuote';
+
+// Import the new combined fragment component
+import { FragmentsSidebar } from '@/components/fragments';
 
 export default function CorrectionDetail({ params }: { params: Promise<{ id: string }> }) {
   // Unwrap the Promise for params using React.use in client components
@@ -67,27 +69,11 @@ export default function CorrectionDetail({ params }: { params: Promise<{ id: str
   
   // Destructure values from fragment hook
   const {
-    fragments,
-    activities,
-    selectedActivityId,
-    loadingActivities,
-    loadingFragments,
-    addingFragment,
-    editingFragmentId,
-    editedFragmentContent,
-    savingFragment,
-    deletingIds,
     setSelectedActivityId,
-    setEditedFragmentContent,
     fetchFragmentsForActivity,
     fetchAllActivities,
     handleAddFragment: addFragment,
-    handleDeleteFragment,
-    handleCreateNewFragment,
-    handleEditFragment,
-    handleCancelEditFragment,
-    handleSaveFragment,
-    moveFragment,
+
   } = fragmentsHook;
   
   // Destructure values from correction hook
@@ -351,15 +337,56 @@ export default function CorrectionDetail({ params }: { params: Promise<{ id: str
     );
   };
 
-  // Create a new fragment
-  const handleCreateNewFragmentWrapper = async (e: React.FormEvent) => {
+  // Create a new fragment with direct API call
+  const handleCreateNewFragmentWrapper = async (e: React.FormEvent, categories: number[] = []) => {
     e.preventDefault();
     if (!newFragmentContent.trim() || !correction) return;
+    
+    // Set loading state
+    const { setAddingFragment, setError } = fragmentsHook;
+    setAddingFragment(true);
+    setError('');
+    
+    console.log('Creating fragment with categories:', categories);
+    
+    try {
+      // Directly call the API to create the fragment
+      const response = await fetch('/api/fragments', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          activity_id: correction.activity_id,
+          content: newFragmentContent.trim(),
+          categories: categories // Pass categories directly to the API
+        }),
+      });
 
-    const newFragment = await handleCreateNewFragment(correction.activity_id, newFragmentContent);
-    if (newFragment) {
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Erreur lors de l\'ajout du fragment');
+      }
+
+      // Process the successful response
+      const newFragment = await response.json();
+      
+      // Update fragments list with the new fragment
+      fragmentsHook.fragments.unshift(newFragment); // Add to beginning of array
+      
+      // Reset form
       setNewFragmentContent('');
       setShowAddFragment(false);
+      
+      // Show success message
+      setSuccessMessage('Fragment créé avec succès');
+      setTimeout(() => setSuccessMessage(''), 3000);
+    } catch (error: any) {
+      console.error('Error creating fragment:', error);
+      setError(error.message || 'Erreur lors de la création du fragment');
+      setTimeout(() => setError(''), 5000);
+    } finally {
+      setAddingFragment(false);
     }
   };
 
@@ -502,6 +529,23 @@ export default function CorrectionDetail({ params }: { params: Promise<{ id: str
     }
   };
 
+  // Add fragment to correction (use this handler with the new component)
+  const handleAddFragmentToCorrection = (fragment: any) => {
+    saveToHistory();
+    
+    // Create completely new items by deep copying the fragment data
+    const newItems = fragment.content.split("\n\n").filter((text: string) => text.trim()).map((text: string) => ({
+      id: `item-${Date.now()}-${Math.random().toString(36).substring(2, 10)}`,
+      type: 'text' as const,
+      content: text.trim(),
+      isFromFragment: true, // Marquer ces items comme provenant d'un fragment
+      originalFragmentId: fragment.id, // Stocker l'ID original du fragment
+      originalContent: text.trim() // Garder une copie du contenu original
+    }));
+    
+    setContentItems(prev => [...prev, ...newItems]);
+  };
+
   // Check for loading and error conditions directly
   if (loading) {
     return (
@@ -566,7 +610,7 @@ export default function CorrectionDetail({ params }: { params: Promise<{ id: str
                 <GradientBackground variant="primary" sx={{ position: 'relative', zIndex: 1, p: { xs: 2, sm: 3 } }}>
                   <PatternBackground 
                     pattern='dots'
-                    opacity={0.2}
+                    opacity={0.05}
                     sx={{ 
                       position: 'absolute', 
                       top: 0, 
@@ -617,7 +661,7 @@ export default function CorrectionDetail({ params }: { params: Promise<{ id: str
                 }}>
                   {/* Titre de section */}
                   <Typography variant="h6" fontWeight="bold" sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
-                    <AssignmentIcon color="primary" />
+                    <AssignmentIcon color="secondary" />
                     Contenu de la correction
                   </Typography>
                 
@@ -674,7 +718,7 @@ export default function CorrectionDetail({ params }: { params: Promise<{ id: str
                   />
                   {/* Titre de section */}
                   <Typography variant="h6" fontWeight="bold" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                    <DescriptionIcon color="primary" />
+                    <DescriptionIcon color="secondary" />
                     Informations et notation
                   </Typography>
                   {/* Date picker section */}
@@ -732,42 +776,19 @@ export default function CorrectionDetail({ params }: { params: Promise<{ id: str
                   <Box sx={{ 
                     display: { xs: 'none', lg: 'block' },
                     flexGrow: 1,
-                    borderTop: `1px solid ${alpha(theme.palette.divider, 0.3)}`,
                     pt: 2
                   }}>
                     <Typography variant="h6" fontWeight="bold" sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
-                      <FormatQuoteIcon color="primary" />
+                      <FormatQuoteIcon color="secondary" />
                       Fragments et modèles
                     </Typography>
-                    <FragmentsSidebar
-                      fragments={fragments}
-                      activities={activities}
-                      selectedActivityId={selectedActivityId}
-                      loadingActivities={loadingActivities}
-                      loadingFragments={loadingFragments}
-                      addingFragment={addingFragment}
-                      editingFragmentId={editingFragmentId}
-                      editedFragmentContent={editedFragmentContent}
-                      savingFragment={savingFragment}
-                      deletingIds={deletingIds}
-                      setSelectedActivityId={setSelectedActivityId}
-                      setEditedFragmentContent={setEditedFragmentContent}
-                      handleActivityChange={handleActivityChange}
-                      handleAddFragment={handleAddFragment}
-                      handleDeleteFragment={handleDeleteFragment}
-                      handleEditFragment={handleEditFragment}
-                      handleCancelEditFragment={handleCancelEditFragment}
-                      handleSaveFragment={handleSaveFragment}
-                      moveFragment={moveFragment}
+                    <FragmentsSidebar 
                       correction={correction}
-                      showAddFragment={showAddFragment}
-                      setShowAddFragment={setShowAddFragment}
-                      newFragmentContent={newFragmentContent}
-                      setNewFragmentContent={setNewFragmentContent}
-                      handleCreateNewFragmentWrapper={handleCreateNewFragmentWrapper}
+                      onAddFragmentToCorrection={handleAddFragmentToCorrection}
+                      inCorrectionContext={true}
                     />
                   </Box>
-                  
+                
                 </Box>
                 
                 {/* Panneau flottant des fragments - pour les petits écrans */}
@@ -792,33 +813,11 @@ export default function CorrectionDetail({ params }: { params: Promise<{ id: str
                     <Typography variant="h6" fontWeight="bold">Fragments</Typography>
                     <IconButton onClick={toggleDrawer} size="small"><ChevronRightIcon /></IconButton>
                   </Box>
-                  <FragmentsSidebar
-                      fragments={fragments}
-                      activities={activities}
-                      selectedActivityId={selectedActivityId}
-                      loadingActivities={loadingActivities}
-                      loadingFragments={loadingFragments}
-                      addingFragment={addingFragment}
-                      editingFragmentId={editingFragmentId}
-                      editedFragmentContent={editedFragmentContent}
-                      savingFragment={savingFragment}
-                      deletingIds={deletingIds}
-                      setSelectedActivityId={setSelectedActivityId}
-                      setEditedFragmentContent={setEditedFragmentContent}
-                      handleActivityChange={handleActivityChange}
-                      handleAddFragment={handleAddFragment}
-                      handleDeleteFragment={handleDeleteFragment}
-                      handleEditFragment={handleEditFragment}
-                      handleCancelEditFragment={handleCancelEditFragment}
-                      handleSaveFragment={handleSaveFragment}
-                      moveFragment={moveFragment}
-                      correction={correction}
-                      showAddFragment={showAddFragment}
-                      setShowAddFragment={setShowAddFragment}
-                      newFragmentContent={newFragmentContent}
-                      setNewFragmentContent={setNewFragmentContent}
-                      handleCreateNewFragmentWrapper={handleCreateNewFragmentWrapper}
-                    />
+                  <FragmentsSidebar 
+                    correction={correction}
+                    onAddFragmentToCorrection={handleAddFragmentToCorrection}
+                    inCorrectionContext={true}
+                  />
                 </Drawer>
                 
                 {/* Bouton flottant pour ouvrir les fragments (petits écrans) */}

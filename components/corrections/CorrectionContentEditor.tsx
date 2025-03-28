@@ -1,5 +1,5 @@
 import React from 'react';
-import { Paper, Typography, IconButton } from '@mui/material';
+import { Paper, Typography, IconButton, TextField } from '@mui/material';
 import { ContentItem } from '@/types/correction';
 import DraggableItem from '@/app/components/DraggableItem';
 import AddIcon from '@mui/icons-material/Add';
@@ -27,8 +27,7 @@ const CorrectionContentEditor: React.FC<CorrectionContentEditorProps> = ({
   correctionId
 }) => {
   return (
-    <Paper className="p-4 shadow mb-6">
-      <div className="border rounded-md p-4 bg-gray-50 mb-4 min-h-[200px]">
+      <div >
         {contentItems.map((item, index) => (
           !item.parentId && (
             <DraggableItem
@@ -42,7 +41,6 @@ const CorrectionContentEditor: React.FC<CorrectionContentEditorProps> = ({
           )
         ))}
       </div>
-    </Paper>
   );
 };
 

@@ -24,6 +24,7 @@ export function useFragments(updateContentWithFragment?: (fragmentId: number, ne
     setLoadingFragments(true);
     try {
       const fragmentsData = await fragmentService.fetchFragmentsForActivity(activityId);
+      console.log('Fetched fragments:', fragmentsData);
       setFragments(fragmentsData);
     } catch (err) {
       console.error('Erreur:', err);
@@ -134,37 +135,42 @@ export function useFragments(updateContentWithFragment?: (fragmentId: number, ne
     setEditedFragmentContent('');
   }, []);
 
-  const handleSaveFragment = async () => {
+  // Update handleSaveFragment to use the unified endpoint
+  const handleSaveFragment = async (selectedCategories: number[] = []) => {
     if (!editingFragmentId) return;
     
     setSavingFragment(true);
     try {
-      const response = await fetch(`/api/fragments/${editingFragmentId}`, {
+      // Use the unified endpoint with PUT method
+      const response = await fetch(`/api/fragments/`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ content: editedFragmentContent }),
+        body: JSON.stringify({ 
+          id: editingFragmentId, // Include the fragment ID in the request body
+          content: editedFragmentContent,
+          categories: selectedCategories // Add categories to the request
+        }),
       });
       
       if (!response.ok) throw new Error('Failed to save fragment');
       
       const updatedFragment = await response.json();
       
-      // Mettre à jour l'état local avec le fragment mis à jour
+      // Update local state with the updated fragment
       setFragments(prevFragments => 
         prevFragments.map(fragment => 
           fragment.id === updatedFragment.id ? updatedFragment : fragment
         )
       );
       
-      // Si la fonction de mise à jour est fournie, l'utiliser pour mettre à jour
-      // tous les contenus liés à ce fragment dans la correction
+      // If the update content function is provided, use it
       if (updateContentWithFragment) {
         updateContentWithFragment(editingFragmentId, editedFragmentContent);
       }
       
-      // Réinitialiser l'état d'édition
+      // Reset the editing state
       setEditingFragmentId(null);
       setEditedFragmentContent('');
       
@@ -229,6 +235,7 @@ export function useFragments(updateContentWithFragment?: (fragmentId: number, ne
     handleSaveFragment,
     moveFragment,
     setError,
-    setSuccessMessage
+    setSuccessMessage,
+    setAddingFragment  // Add this line to expose the setter
   };
 }

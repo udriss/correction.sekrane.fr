@@ -26,16 +26,22 @@ export interface ShareCode {
 }
 
 export interface Fragment {
-  id?: number;
-  activity_id: number;
+  id: number;
   content: string;
-  created_at?: Date;
-  updated_at?: Date;
-  position_order?: number;
-  category?: string; // Added missing category field used in FragmentsList
+  tags?: string[] | string;
+  categories?: Array<{id: number, name: string}> | number[];
+  category?: string;
+  category_id?: number;
+  activity_id?: number;
+  user_id?: string;
+  created_at: string;
+  updated_at?: string;
+  activity_name?: string;
+  usage_count?: number;
+  isOwner?: boolean;
+  isModified?: boolean;
 }
 
-// Add this extended interface for use in components
 export interface CorrectionWithShareCode extends Correction {
   shareCode?: string | null;
 }

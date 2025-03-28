@@ -1,10 +1,8 @@
-import React, { useRef, useEffect, useState } from 'react';
-import { useDrag, useDrop } from 'react-dnd';
+import React, { useState, useRef, useEffect } from 'react';
 import { 
-  Box, IconButton, Typography, TextField, Button, 
-  Card, CardContent, CardActions, Collapse, Tooltip,
-  alpha, useTheme, Divider, Chip, Fade, 
-  FormControl, InputLabel, Select, MenuItem, OutlinedInput, SelectChangeEvent
+  Card, CardContent, CardActions, Box, Typography, IconButton, 
+  TextField, Button, Divider, Chip, alpha, useTheme, Tooltip,
+  Fade
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import EditIcon from '@mui/icons-material/Edit';
@@ -14,74 +12,55 @@ import CancelIcon from '@mui/icons-material/Cancel';
 import DragIndicatorIcon from '@mui/icons-material/DragIndicator';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import ExpandLessIcon from '@mui/icons-material/ExpandLess';
-import CloseIcon from '@mui/icons-material/Close';
+import { useDrag, useDrop } from 'react-dnd';
+import { Fragment } from '@/lib/types';
+import CategorySelect from '@/components/fragments/CategorySelect';
 
-// Fragment item type for drag and drop
+// Type constant for drag and drop
 const FRAGMENT_ITEM_TYPE = 'fragment';
 
-interface FragmentItemProps {
-  fragment: any;
+interface FragmentCardProps {
+  fragment: Fragment;
   index: number;
-  editingFragmentId: number | null;
-  editedFragmentContent: string;
-  savingFragment: boolean;
-  deletingIds: number[];
-  categories?: { id: number, name: string }[]; 
-  editedCategories?: number[]; // Add this prop
-  onCategoriesChange?: (categories: number[]) => void; // Add this prop
-  handleAddFragment: (fragment: any) => void;
-  handleDeleteFragment: (id: number) => void;
-  handleEditFragment: (id: number, content: string) => void;
-  handleCancelEditFragment: () => void;
-  handleSaveFragment: (selectedCategories: number[]) => void;
-  setEditedFragmentContent: (content: string) => void;
+  isEditing: boolean;
+  categories: Array<{id: number, name: string}>;
+  onEdit: () => void;
+  onCancelEdit: () => void;
+  onUpdate: (fragment: Fragment) => void;
+  onDelete: () => void;
+  onAddToCorrection?: () => void;
   moveFragment: (dragIndex: number, hoverIndex: number) => void;
-  handleDeleteCategory?: (categoryId: number) => void;
+  refreshCategories: () => Promise<void>;
 }
 
-const FragmentItem: React.FC<FragmentItemProps> = ({
+const FragmentCard: React.FC<FragmentCardProps> = ({
   fragment,
   index,
-  editingFragmentId,
-  editedFragmentContent,
-  savingFragment,
-  deletingIds,
-  categories = [], 
-  editedCategories = [], // Initialize with default empty array
-  onCategoriesChange = () => {}, // Initialize with default no-op function
-  handleAddFragment,
-  handleDeleteFragment,
-  handleEditFragment,
-  handleCancelEditFragment,
-  handleSaveFragment,
-  setEditedFragmentContent,
+  isEditing,
+  categories,
+  onEdit,
+  onCancelEdit,
+  onUpdate,
+  onDelete,
+  onAddToCorrection,
   moveFragment,
-  handleDeleteCategory = () => {},
+  refreshCategories
 }) => {
   const theme = useTheme();
   const ref = useRef<HTMLDivElement>(null);
-  const [expanded, setExpanded] = React.useState(false);
+  const [expanded, setExpanded] = useState(false);
+  const [editedContent, setEditedContent] = useState('');
   const [selectedCategories, setSelectedCategories] = useState<number[]>([]);
-  
-  // Initialize selected categories when editing starts
+  const [isSaving, setIsSaving] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  // Initialize form data when editing starts
   useEffect(() => {
-    if (editingFragmentId === fragment.id) {
-      // If editedCategories are provided from parent, use those
-      if (editedCategories.length > 0) {
-        setSelectedCategories(editedCategories);
-        console.log('Using provided editedCategories:', editedCategories);
-      } else {
-        // Otherwise extract from fragment
-        const fragmentCategories = extractCategoriesFromFragment(fragment);
-        setSelectedCategories(fragmentCategories);
-        onCategoriesChange(fragmentCategories); // Update parent state
-        console.log('Extracted categories from fragment:', fragmentCategories);
-      }
-      
-      // Préremplir le contenu du fragment
-      setEditedFragmentContent(fragment.content || '');
+    if (isEditing) {
+      setEditedContent(fragment.content || '');
+      setSelectedCategories(extractCategoriesFromFragment(fragment));
     }
-  }, [editingFragmentId, fragment, editedCategories]);
+  }, [isEditing, fragment]);
 
   // Extract categories from fragment with different possible formats
   const extractCategoriesFromFragment = (fragment: any): number[] => {
@@ -103,23 +82,87 @@ const FragmentItem: React.FC<FragmentItemProps> = ({
     return [];
   };
 
-  // Gérer le changement de catégories
-  const handleCategoryChange = (event: SelectChangeEvent<typeof selectedCategories>) => {
-    const {
-      target: { value },
-    } = event;
+  // Save the fragment
+  const handleSave = async () => {
+    if (!editedContent.trim()) return;
     
-    // Update local state
-    const newCategories = typeof value === 'string' ? 
-      value.split(',').map(Number) : 
-      value as number[];
+    setIsSaving(true);
     
+    try {
+      const response = await fetch(`/api/fragments`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ 
+          id: fragment.id,
+          content: editedContent,
+          categories: selectedCategories
+        }),
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to save fragment');
+      }
+      
+      const updatedFragment = await response.json();
+      
+      // Create a properly formatted updated fragment
+      const formattedCategories = selectedCategories.length > 0 
+        ? selectedCategories.map(id => {
+            const cat = categories.find(c => c.id === id);
+            return cat ? { id: cat.id, name: cat.name } : { id, name: `Category ${id}` };
+          })
+        : [];
+      
+      const formattedFragment = {
+        ...updatedFragment,
+        categories: formattedCategories
+      };
+      
+      onUpdate(formattedFragment);
+      onCancelEdit();
+    } catch (error) {
+      console.error('Error saving fragment:', error);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  // Delete the fragment
+  const handleDelete = async () => {
+    if (window.confirm("Êtes-vous sûr de vouloir supprimer ce fragment ?")) {
+      setIsDeleting(true);
+      
+      try {
+        const response = await fetch(`/api/fragments/${fragment.id}`, {
+          method: 'DELETE',
+        });
+        
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || 'Failed to delete fragment');
+        }
+        
+        onDelete();
+      } catch (error) {
+        console.error('Error deleting fragment:', error);
+      } finally {
+        setIsDeleting(false);
+      }
+    }
+  };
+
+  // Handle category change
+  const handleCategoryChange = (newCategories: number[]) => {
     setSelectedCategories(newCategories);
-    
-    // Also update parent component state
-    onCategoriesChange(newCategories);
-    
-    console.log('Selected categories changed to:', newCategories);
+  };
+
+  // Toggle expanded state
+  const toggleExpanded = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setExpanded(!expanded);
   };
 
   // Setup drag and drop
@@ -139,16 +182,13 @@ const FragmentItem: React.FC<FragmentItemProps> = ({
       };
     },
     hover(item: any, monitor) {
-      if (!ref.current) {
-        return;
-      }
+      if (!ref.current) return;
+      
       const dragIndex = item.index;
       const hoverIndex = index;
 
       // Don't replace items with themselves
-      if (dragIndex === hoverIndex) {
-        return;
-      }
+      if (dragIndex === hoverIndex) return;
 
       // Determine rectangle on screen
       const hoverBoundingRect = ref.current?.getBoundingClientRect();
@@ -158,64 +198,33 @@ const FragmentItem: React.FC<FragmentItemProps> = ({
 
       // Determine mouse position
       const clientOffset = monitor.getClientOffset();
+      if (!clientOffset) return;
 
       // Get pixels to the top
-      const hoverClientY = clientOffset!.y - hoverBoundingRect.top;
+      const hoverClientY = clientOffset.y - hoverBoundingRect.top;
 
       // Only perform the move when the mouse has crossed half of the items height
-      // When dragging downwards, only move when the cursor is below 50%
-      // When dragging upwards, only move when the cursor is above 50%
-
-      // Dragging downwards
-      if (dragIndex < hoverIndex && hoverClientY < hoverMiddleY) {
-        return;
-      }
-
-      // Dragging upwards
-      if (dragIndex > hoverIndex && hoverClientY > hoverMiddleY) {
-        return;
-      }
+      if (dragIndex < hoverIndex && hoverClientY < hoverMiddleY) return;
+      if (dragIndex > hoverIndex && hoverClientY > hoverMiddleY) return;
 
       // Time to actually perform the action
       moveFragment(dragIndex, hoverIndex);
 
-      // Note: we're mutating the monitor item here!
-      // Generally it's better to avoid mutations,
-      // but it's good here for the sake of performance
-      // to avoid expensive index searches.
+      // Note: we're mutating the monitor item here for performance
+      // to avoid expensive index searches
       item.index = hoverIndex;
     },
   });
 
   drag(drop(ref));
 
-  // Format fragment content for display
-  const getPreviewContent = () => {
-    const content = fragment.content || "";
-    return content.length > 100 
-      ? content.substring(0, 100) + "..." 
-      : content;
-  };
-
-  // Function to toggle expanded state
-  const toggleExpanded = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    setExpanded(!expanded);
-  };
-
-  const isEditing = editingFragmentId === fragment.id;
-  const isDeleting = deletingIds.includes(fragment.id);
-  
-  // Add this function to render category chips without causing re-renders
+  // Render category chips
   const renderCategoryChips = () => {
     if (!fragment.categories) return null;
     
     // Determine what data to render based on the fragment's categories
     const categoriesToRender = Array.isArray(fragment.categories) ? 
-      // If categories is an array
-      fragment.categories : 
-      // If not an array, wrap in array for consistent handling
-      [fragment.categories];
+      fragment.categories : [fragment.categories];
       
     return categoriesToRender.map((category: any) => {
       // Handle both object format and ID-only format
@@ -254,27 +263,21 @@ const FragmentItem: React.FC<FragmentItemProps> = ({
           position: 'relative',
           opacity: isDragging ? 0.4 : 1,
           boxShadow: isEditing 
-            ? `0 0 0 2px ${theme.palette.primary.main}`
+            ? `0 0 0 1px ${theme.palette.primary.dark}`
             : isDeleting
-              ? `0 0 0 2px ${theme.palette.error.main}`
-              : `0 3px 6px ${alpha(theme.palette.text.primary, 0.1)}`,
+              ? `0 0 0 1px ${theme.palette.error.main}`
+              : `0 1px 3px ${alpha(theme.palette.text.primary, 0.1)}`,
           transition: 'all 0.2s ease',
           '&:hover': {
             boxShadow: isEditing 
-              ? `0 0 0 2px ${theme.palette.primary.main}` 
+              ? `0 0 0 2px ${theme.palette.secondary.dark}` 
               : isDeleting 
                 ? `0 0 0 2px ${theme.palette.error.main}`
-                : `0 6px 12px ${alpha(theme.palette.text.primary, 0.15)}`,
+                : `0 3px 4px ${alpha(theme.palette.text.primary, 0.15)}`,
             '& .fragment-actions': {
               opacity: 1,
             }
           },
-          border: '1px solid',
-          borderColor: isEditing 
-            ? alpha(theme.palette.primary.main, 0.5)
-            : isDeleting
-              ? alpha(theme.palette.error.main, 0.5)
-              : alpha(theme.palette.divider, 0.8),
           bgcolor: isEditing 
             ? alpha(theme.palette.primary.main, 0.05)
             : isDeleting
@@ -318,6 +321,7 @@ const FragmentItem: React.FC<FragmentItemProps> = ({
               sx={{ fontStyle: 'italic' }}
             >
               {new Date(fragment.created_at).toLocaleDateString('fr-FR')}
+              {fragment.isModified && ' (modifié)'}
             </Typography>
             
             {!isEditing && (
@@ -333,8 +337,8 @@ const FragmentItem: React.FC<FragmentItemProps> = ({
                 fullWidth
                 multiline
                 minRows={2}
-                value={editedFragmentContent}
-                onChange={(e) => setEditedFragmentContent(e.target.value)}
+                value={editedContent}
+                onChange={(e) => setEditedContent(e.target.value)}
                 variant="outlined"
                 size="small"
                 sx={{
@@ -349,83 +353,12 @@ const FragmentItem: React.FC<FragmentItemProps> = ({
                 }}
               />
               
-              {/* Sélecteur de catégories multiple */}
-              <FormControl fullWidth size="small" sx={{ mb: 1 }}>
-                <InputLabel id={`category-select-label-${fragment.id}`}>Catégories</InputLabel>
-                <Select
-                  labelId={`category-select-label-${fragment.id}`}
-                  multiple
-                  value={selectedCategories}
-                  onChange={handleCategoryChange}
-                  MenuProps={{
-                    // Standard configuration for multiple selection behavior
-                    keepMounted: false,
-                    autoFocus: false,
-                    disableAutoFocusItem: true,
-                    // Most important - don't close when selecting items
-                    PaperProps: {
-                      style: { maxHeight: 224 }
-                    },
-                    // Using native behavior of multiple select not closing on selection
-                    // closeOnSelect is not a valid prop for MenuProps
-                  }}
-                  // Add these props to ensure empty selection is possible
-                  renderValue={(selected) => {
-                    if (selected.length === 0) {
-                      return <em>Aucune catégorie</em>;
-                    }
-                    return (
-                      <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
-                        {selected.map((value) => {
-                          const category = categories.find(cat => cat.id === value);
-                          return (
-                            <Chip 
-                              key={value} 
-                              label={category ? category.name : 'Inconnu'} 
-                              size="small" 
-                              sx={{ 
-                                height: 24,
-                                bgcolor: alpha(theme.palette.primary.dark, 0.9),
-                                color: theme.palette.secondary.light
-                              }}
-                            />
-                          );
-                        })}
-                      </Box>
-                    );
-                  }}
-                >
-                  {/* Add an explicit "None" option to allow deselecting all categories */}
-                  <MenuItem value="" sx={{ fontStyle: 'italic', color: 'text.secondary' }}>
-                    <em>Aucune catégorie</em>
-                  </MenuItem>
-                  {categories.map((category) => (
-                    <MenuItem 
-                      key={category.id} 
-                      value={category.id} 
-                      sx={{ display: 'flex', justifyContent: 'space-between' }}
-                    >
-                      {category.name}
-                      <IconButton 
-                        size="small" 
-                        onClick={(e) => {
-                          e.stopPropagation(); // Keep this to prevent menu item selection when clicking delete
-                          handleDeleteCategory(category.id);
-                        }}
-                        sx={{ 
-                          ml: 1, 
-                          color: theme.palette.error.main,
-                          '&:hover': {
-                            bgcolor: alpha(theme.palette.error.main, 0.1)
-                          }
-                        }}
-                      >
-                        <CloseIcon fontSize="small" />
-                      </IconButton>
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
+              <CategorySelect
+                selectedCategories={selectedCategories}
+                availableCategories={categories}
+                onChange={handleCategoryChange}
+                refreshCategories={refreshCategories}
+              />
             </>
           ) : (
             <>
@@ -487,8 +420,8 @@ const FragmentItem: React.FC<FragmentItemProps> = ({
             <>
               <Tooltip title="Annuler">
                 <IconButton 
-                  size="small" 
-                  onClick={handleCancelEditFragment}
+                  size="medium" 
+                  onClick={onCancelEdit}
                   sx={{ 
                     color: theme.palette.grey[600],
                     '&:hover': {
@@ -497,46 +430,49 @@ const FragmentItem: React.FC<FragmentItemProps> = ({
                     }
                   }}
                 >
-                  <CancelIcon fontSize="small" />
+                  <CancelIcon fontSize="medium" />
                 </IconButton>
               </Tooltip>
               <Tooltip title="Enregistrer">
                 <IconButton 
-                  size="small" 
-                  onClick={() => handleSaveFragment(selectedCategories)}
-                  disabled={savingFragment}
-                  color="primary"
+                  size="medium" 
+                  onClick={handleSave}
+                  disabled={isSaving}
                   sx={{ 
+                    color: theme.palette.secondary.light,
                     ml: 1,
                     '&:hover': {
-                      bgcolor: alpha(theme.palette.primary.light, 0.1)
+                      bgcolor: alpha(theme.palette.primary.light, 0.1),
+                      color: theme.palette.primary.light
                     }
                   }}
                 >
-                  <SaveIcon fontSize="small" />
+                  <SaveIcon fontSize="medium" />
                 </IconButton>
               </Tooltip>
             </>
           ) : (
             <>
-              <Tooltip title="Ajouter à la correction">
-                <IconButton 
-                  size="small" 
-                  onClick={() => handleAddFragment(fragment)}
-                  sx={{ 
-                    color: theme.palette.success.main,
-                    '&:hover': {
-                      bgcolor: alpha(theme.palette.success.light, 0.1)
-                    }
-                  }}
-                >
-                  <AddIcon fontSize="small" />
-                </IconButton>
-              </Tooltip>
+              {onAddToCorrection && (
+                <Tooltip title="Ajouter à la correction">
+                  <IconButton 
+                    size="small" 
+                    onClick={onAddToCorrection}
+                    sx={{ 
+                      color: theme.palette.success.main,
+                      '&:hover': {
+                        bgcolor: alpha(theme.palette.success.light, 0.1)
+                      }
+                    }}
+                  >
+                    <AddIcon fontSize="small" />
+                  </IconButton>
+                </Tooltip>
+              )}
               <Tooltip title="Modifier">
                 <IconButton 
                   size="small" 
-                  onClick={() => handleEditFragment(fragment.id, fragment.content)}
+                  onClick={onEdit}
                   sx={{ 
                     ml: 1,
                     color: theme.palette.info.light,
@@ -551,7 +487,7 @@ const FragmentItem: React.FC<FragmentItemProps> = ({
               <Tooltip title="Supprimer">
                 <IconButton 
                   size="small"
-                  onClick={() => handleDeleteFragment(fragment.id)}
+                  onClick={handleDelete}
                   disabled={isDeleting}
                   sx={{ 
                     ml: 1,
@@ -573,4 +509,4 @@ const FragmentItem: React.FC<FragmentItemProps> = ({
   );
 };
 
-export default FragmentItem;
+export default FragmentCard;
