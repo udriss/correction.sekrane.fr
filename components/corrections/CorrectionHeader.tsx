@@ -220,7 +220,7 @@ const CorrectionHeader: React.FC<CorrectionHeaderProps> = ({
         {!isEditingName && (
           <>
             <Typography sx={{ color: 'text.secondary', mt: 1 }}>
-              Activité : <Link href={`/activities/${correction.activity_id}`} style={{ color: 'primary.main', textDecoration: 'none' }}>
+              Activité : <Link href={`/activities/${correction.activity_id}`} style={{ color: 'primary.light', textDecoration: 'none' , fontWeight: 'bold' }}>
                 <Button variant="text" color="primary" sx={{ textTransform: 'none', p: 0, minWidth: 0, verticalAlign: 'baseline' }}>
                   {correction.activity_name}
                 </Button>
@@ -228,7 +228,7 @@ const CorrectionHeader: React.FC<CorrectionHeaderProps> = ({
             </Typography>
             {correction.created_at && (
               <Typography variant="body2" sx={{ color: 'text.secondary', mt: 0.5 }}>
-                Créée le {new Date(correction.created_at).toLocaleDateString('fr-FR', {
+                Ajoutée le {new Date(correction.created_at).toLocaleDateString('fr-FR', {
                   year: 'numeric',
                   month: 'long',
                   day: 'numeric',

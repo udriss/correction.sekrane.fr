@@ -1,0 +1,39 @@
+model Category {
+  id        Int       @id @default(autoincrement())
+  name      String
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  
+  // Relation many-to-many avec Fragment
+  fragments FragmentsOnCategories[]
+
+  @@map("categories")
+}
+
+model Fragment {
+  id         Int       @id @default(autoincrement())
+  content    String    @db.Text
+  order      Int       @default(0)
+  activityId Int       @map("activity_id")
+  createdAt  DateTime  @default(now()) @map("created_at")
+  updatedAt  DateTime  @updatedAt @map("updated_at")
+  
+  // Relation avec Activity
+  activity   Activity  @relation(fields: [activityId], references: [id], onDelete: Cascade)
+  
+  // Relation many-to-many avec Category
+  categories FragmentsOnCategories[]
+
+  @@map("fragments")
+}
+
+// Table de jointure pour la relation many-to-many entre Fragment et Category
+model FragmentsOnCategories {
+  fragmentId Int      @map("fragment_id")
+  categoryId Int      @map("category_id")
+  fragment   Fragment @relation(fields: [fragmentId], references: [id], onDelete: Cascade)
+  category   Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  @@id([fragmentId, categoryId])
+  @@map("fragments_categories")
+}

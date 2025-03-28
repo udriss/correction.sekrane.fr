@@ -1,106 +1,151 @@
-import { NextResponse } from 'next/server';
-import { getFragmentsByActivityId } from '@/lib/fragment';
-import { getActivityById } from '@/lib/activity';
-import { withConnection } from '@/lib/db';
-import authOptions from "@/lib/auth";
-import { getUser } from '@/lib/auth'; // Add import for custom auth
-import { getServerSession } from "next-auth/next";
+import { NextRequest, NextResponse } from 'next/server';
+import { query } from '@/lib/db';
+import { getServerSession } from 'next-auth/next';
+import authOptions from '@/lib/auth';
+import { getUser } from '@/lib/auth';
 
 export async function GET(
-  request: Request,
+  request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    // Await the params object to access its properties
-    const { id } = await params;
-    const activityId = parseInt(id || '');
+    // Authentication check
+    const session = await getServerSession(authOptions);
+    const customUser = await getUser(request);
+    const userId = customUser?.id || session?.user?.id;
     
+    if (!userId) {
+      return NextResponse.json({ error: 'Non autorisé' }, { status: 401 });
+    }
+
+    // Await the params
+    const { id } = await params;
+    const activityId = parseInt(id);
+
     if (isNaN(activityId)) {
-      return NextResponse.json(
-        { error: 'Invalid activity ID' },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: 'ID d\'activité invalide' }, { status: 400 });
     }
 
-    const activity = await getActivityById(activityId);
-    if (!activity) {
-      return NextResponse.json(
-        { error: 'Activity not found' },
-        { status: 404 }
-      );
-    }
+    // Récupérer les fragments
+    const fragments = await query<any[]>(`
+      SELECT * FROM fragments 
+      WHERE activity_id = ? 
+      ORDER BY position_order ASC
+    `, [activityId]);
 
-    const fragments = await getFragmentsByActivityId(activityId);
-    return NextResponse.json(fragments);
+    // Pour chaque fragment, récupérer ses catégories
+    const fragmentsWithCategories = await Promise.all(
+      fragments.map(async (fragment) => {
+        const categories = await query<any[]>(`
+          SELECT c.id, c.name 
+          FROM categories c
+          JOIN fragments_categories fc ON c.id = fc.category_id
+          WHERE fc.fragment_id = ?
+        `, [fragment.id]);
+
+        return {
+          ...fragment,
+          categories
+        };
+      })
+    );
+
+    return NextResponse.json(fragmentsWithCategories);
   } catch (error) {
     console.error('Erreur lors de la récupération des fragments:', error);
     return NextResponse.json(
-      { error: 'Erreur serveur' },
+      { error: 'Erreur lors de la récupération des fragments' },
       { status: 500 }
     );
   }
 }
 
 export async function POST(
-  request: Request,
+  request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-
-    // Get the user from both auth systems
-    const session = await getServerSession(authOptions);
-    const customUser = await getUser();
-    
-    // Use either auth system, starting with custom auth
-    const userId = customUser?.id || session?.user?.id;
-
   try {
-    // Await the params object to access its properties
+    // Authentication check
+    const session = await getServerSession(authOptions);
+    const customUser = await getUser(request);
+    const userId = customUser?.id || session?.user?.id;
+    
+    if (!userId) {
+      return NextResponse.json({ error: 'Non autorisé' }, { status: 401 });
+    }
+
+    // Await the params
     const { id } = await params;
-    const activityId = parseInt(id || '');
-    
+    const activityId = parseInt(id);
+
     if (isNaN(activityId)) {
-      return NextResponse.json({ error: 'Invalid activity ID' }, { status: 400 });
+      return NextResponse.json({ error: 'ID d\'activité invalide' }, { status: 400 });
     }
-    
-    const body = await request.json();
-    
-    // Validate required fields - now using content and category instead of title and content
-    if (!body.content) {
-      return NextResponse.json({ 
-        error: 'Le contenu est requis' 
-      }, { status: 400 });
+
+    // Parse the request body
+    const { content, categories } = await request.json();
+
+    if (!content || typeof content !== 'string') {
+      return NextResponse.json({ error: 'Le contenu du fragment est requis' }, { status: 400 });
     }
+
+    // Calculer la position maximale actuelle
+    const maxPositionResult = await query<any[]>(`
+      SELECT MAX(position_order) as max_position 
+      FROM fragments 
+      WHERE activity_id = ?
+    `, [activityId]);
     
-    // Insérer le fragment dans la base de données
-    return await withConnection(async (connection) => {
-      // Updated fields to match our Fragment model
-      const [result] = await connection.query(
-        `INSERT INTO fragments (activity_id, content, category, user_id)
-         VALUES (?, ?, ?, ?)`,
-        [activityId, body.content, body.category || 'Général', userId]
-      );
+    const maxPosition = maxPositionResult[0].max_position || 0;
+    const newPosition = maxPosition + 1;
+
+    // Créer le fragment
+    const result = await query<any>(`
+      INSERT INTO fragments (content, activity_id, position_order, user_id) 
+      VALUES (?, ?, ?, ?)
+    `, [content, activityId, newPosition, userId]);
+
+    const fragmentId = result.insertId;
+
+    // Ajouter les catégories si spécifiées
+    if (categories && categories.length > 0) {
+      const values = categories.map((categoryId: number) => [fragmentId, categoryId]);
+      const placeholders = categories.map(() => '(?, ?)').join(', ');
       
-      const fragmentId = (result as any).insertId;
+      // Aplatir les valeurs pour le format attendu par mysql2
+      const flatValues = values.flat();
       
-      // Récupérer le fragment complet pour le retourner
-      const [rows] = await connection.query(
-        `SELECT * FROM fragments WHERE id = ?`,
-        [fragmentId]
-      );
-      
-      if (!Array.isArray(rows) || rows.length === 0) {
-        return NextResponse.json({ 
-          error: 'Erreur lors de la récupération du fragment créé' 
-        }, { status: 500 });
-      }
-      
-      return NextResponse.json(rows[0]);
-    });
+      await query(`
+        INSERT INTO fragments_categories (fragment_id, category_id) 
+        VALUES ${placeholders}
+      `, flatValues);
+    }
+
+    // Récupérer le fragment créé
+    const fragment = await query<any[]>(`
+      SELECT * FROM fragments WHERE id = ?
+    `, [fragmentId]);
+
+    // Récupérer les catégories associées
+    const fragmentCategories = await query<any[]>(`
+      SELECT c.id, c.name 
+      FROM categories c
+      JOIN fragments_categories fc ON c.id = fc.category_id
+      WHERE fc.fragment_id = ?
+    `, [fragmentId]);
+
+    // Construire la réponse
+    const newFragment = {
+      ...fragment[0],
+      categories: fragmentCategories
+    };
+
+    return NextResponse.json(newFragment, { status: 201 });
   } catch (error) {
     console.error('Erreur lors de la création du fragment:', error);
-    return NextResponse.json({ 
-      error: 'Erreur lors de la création du fragment',
-      details: String(error)
-    }, { status: 500 });
+    return NextResponse.json(
+      { error: 'Erreur lors de la création du fragment' }, 
+      { status: 500 }
+    );
   }
 }

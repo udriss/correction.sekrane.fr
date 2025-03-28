@@ -249,6 +249,56 @@ export async function initializeDatabase() {
       }
     });
 
+    // Créer la table des catégories si elle n'existe pas
+    await query(`
+      CREATE TABLE IF NOT EXISTS categories (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        name VARCHAR(255) NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+      )
+    `);
+
+    // Créer la table de liaison fragments_categories si elle n'existe pas
+    await query(`
+      CREATE TABLE IF NOT EXISTS fragments_categories (
+        fragment_id INT NOT NULL,
+        category_id INT NOT NULL,
+        PRIMARY KEY (fragment_id, category_id),
+        FOREIGN KEY (fragment_id) REFERENCES fragments(id) ON DELETE CASCADE,
+        FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE CASCADE
+      )
+    `);
+
+    // Vérifier si la colonne category existe dans la table fragments
+    // Si oui, migrer les données vers la nouvelle structure
+    await query(`
+      SELECT COUNT(*) as count
+      FROM INFORMATION_SCHEMA.COLUMNS
+      WHERE TABLE_NAME = 'fragments' AND COLUMN_NAME = 'category'
+    `).then(async (rows: any) => {
+      if (rows && rows.length > 0 && rows[0].count > 0) {
+        // Migrer les catégories existantes vers la nouvelle table
+        // 1. Créer les catégories uniques
+        await query(`
+          INSERT IGNORE INTO categories (name)
+          SELECT DISTINCT category FROM fragments WHERE category IS NOT NULL AND category != ''
+        `);
+
+        // 2. Créer les associations dans la table de liaison
+        await query(`
+          INSERT INTO fragments_categories (fragment_id, category_id)
+          SELECT f.id, c.id 
+          FROM fragments f 
+          JOIN categories c ON f.category = c.name
+          WHERE f.category IS NOT NULL AND f.category != ''
+        `);
+
+        // On pourrait supprimer la colonne category ici, mais pour la compatibilité,
+        // nous la gardons pendant la transition
+      }
+    });
+
     console.log('Base de données initialisée avec succès');
   } catch (error) {
     console.error('Erreur lors de l\'initialisation de la base de données:', error);

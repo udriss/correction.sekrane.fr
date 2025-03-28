@@ -24,6 +24,7 @@ interface FragmentRow extends RowDataPacket {
 interface ProcessedFragment extends Omit<FragmentRow, 'tags'> {
   tags: string[];
   isModified?: boolean; // Add flag to indicate if fragment was modified
+  categories?: any[]; // Added for category support
 }
 
 
@@ -155,8 +156,6 @@ export async function PUT(
     // Use either auth system
     const userId = session?.user?.id || customUser?.id;
     
-
-    
     // Check if user is authenticated
     if (!userId) {
       console.error('[Auth Error] No valid session or user ID');
@@ -166,8 +165,6 @@ export async function PUT(
         { status: 401 }
       );
     }
-    
-
     
     return await withConnection(async (connection) => {
       // Check fragment ownership
@@ -189,7 +186,6 @@ export async function PUT(
       const userIdStr = String(userId);
       const fragmentUserIdStr = String(owner.user_id);
       
-
       // Check ownership using string comparison
       if (userIdStr !== fragmentUserIdStr) {
         return NextResponse.json(
@@ -217,6 +213,30 @@ export async function PUT(
           fragmentId
         ]
       );
+      
+      // Handle categories if provided
+      if (fragmentData.categories && Array.isArray(fragmentData.categories)) {
+        // Delete existing category associations
+        await connection.query(
+          'DELETE FROM fragments_categories WHERE fragment_id = ?',
+          [fragmentId]
+        );
+        
+        // Add new category associations if there are any
+        if (fragmentData.categories.length > 0) {
+          const values = fragmentData.categories.map((categoryId: number) => [fragmentId, categoryId]);
+          const placeholders = fragmentData.categories.map(() => '(?, ?)').join(', ');
+          
+          // Flatten the values array for mysql2
+          const flatValues = values.flat();
+          
+          await connection.query(
+            `INSERT INTO fragments_categories (fragment_id, category_id) 
+            VALUES ${placeholders}`,
+            flatValues
+          );
+        }
+      }
       
       // Fetch the updated fragment
       const [rows] = await connection.query<FragmentRow[]>(
@@ -263,6 +283,18 @@ export async function PUT(
       
       // Add isOwner flag
       processedFragment.isOwner = true;
+      
+      // Fetch categories associated with this fragment
+      const [categoryRows] = await connection.query(
+        `SELECT c.id, c.name 
+         FROM categories c
+         JOIN fragments_categories fc ON c.id = fc.category_id
+         WHERE fc.fragment_id = ?`,
+        [fragmentId]
+      );
+      
+      // Add categories to the response
+      processedFragment.categories = Array.isArray(categoryRows) ? categoryRows : [];
       
       return NextResponse.json(processedFragment);
     });
@@ -358,6 +390,12 @@ export async function DELETE(
           throw sqlError;
         }
       }
+      
+      // Delete fragment category associations first (cascade should handle this, but be explicit)
+      await connection.query(
+        'DELETE FROM fragments_categories WHERE fragment_id = ?',
+        [fragmentId]
+      );
       
       // Delete the fragment
       await connection.query(

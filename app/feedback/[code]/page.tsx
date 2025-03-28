@@ -10,7 +10,13 @@ import {
   CircularProgress, 
   Divider,
   Button,
-  Chip
+  Chip,
+  Zoom,
+  Container,
+  Accordion,
+  AccordionSummary,
+  AccordionDetails,
+  Grid 
 } from '@mui/material';
 import { useRouter } from 'next/navigation';
 import { parseContentItems } from '@/lib/services/correctionService';
@@ -24,6 +30,7 @@ import HourglassEmptyIcon from '@mui/icons-material/HourglassEmpty';
 import EventAvailableIcon from '@mui/icons-material/EventAvailable';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import ScheduleIcon from '@mui/icons-material/Schedule';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 
 // Initialiser la police Inter
 const inter = Inter({ subsets: ['latin'] });
@@ -43,6 +50,9 @@ export default function FeedbackViewer({ params }: { params: Promise<{ code: str
   // Ajout des états manquants
   const [correctionContent, setCorrectionContent] = useState<string>('');
   const [editorContent, setEditorContent] = useState<any[]>([]);
+  const [datesExpanded, setDatesExpanded] = useState<boolean>(false);
+  // Add new state for grades accordion
+  const [gradesExpanded, setGradesExpanded] = useState<boolean>(false);
 
   // Version améliorée de formatGrade
   const formatGrade = (value: number | string | null | undefined) => {
@@ -106,26 +116,57 @@ export default function FeedbackViewer({ params }: { params: Promise<{ code: str
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
-        <div className="max-w-4xl w-full flex justify-center py-16">
+      <Box 
+        sx={{ 
+          minHeight: '100vh', 
+          bgcolor: 'grey.50', 
+          display: 'flex', 
+          alignItems: 'center', 
+          justifyContent: 'center', 
+          px: 2 
+        }}
+      >
+        <Box 
+          sx={{ 
+            maxWidth: '4xl', 
+            width: '100%', 
+            display: 'flex', 
+            justifyContent: 'center', 
+            py: 8 
+          }}
+        >
           <CircularProgress size={40} />
-        </div>
-      </div>
+        </Box>
+      </Box>
     );
   }
 
   if (error) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4 py-8">
-        <div className="max-w-4xl w-full">
+      <Box 
+        sx={{ 
+          minHeight: '100vh', 
+          bgcolor: 'grey.50', 
+          display: 'flex', 
+          alignItems: 'center', 
+          justifyContent: 'center', 
+          px: 2, 
+          py: 4 
+        }}
+      >
+        <Box sx={{ maxWidth: '4xl', width: '100%' }}>
           <Paper 
             elevation={2} 
-            sx={{ p: 4, borderRadius: 2 }}
-            className="border-l-4 border-red-500"
+            sx={{ 
+              p: 4, 
+              borderRadius: 2,
+              borderLeft: '4px solid',
+              borderColor: 'error.main'
+            }}
           >
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 3 }}>
               <ErrorOutlineIcon color="error" fontSize="large" />
-              <Typography variant="h5" color="error.main" className="font-bold">
+              <Typography variant="h5" color="error.main" sx={{ fontWeight: 'bold' }}>
                 Erreur
               </Typography>
             </Box>
@@ -141,20 +182,30 @@ export default function FeedbackViewer({ params }: { params: Promise<{ code: str
               Retour à l'accueil
             </Button>
           </Paper>
-        </div>
-      </div>
+        </Box>
+      </Box>
     );
   }
 
   if (!correction) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4 py-8">
-        <div className="max-w-4xl w-full">
+      <Box 
+        sx={{ 
+          minHeight: '100vh', 
+          bgcolor: 'grey.50', 
+          display: 'flex', 
+          alignItems: 'center', 
+          justifyContent: 'center', 
+          px: 2, 
+          py: 4 
+        }}
+      >
+        <Box sx={{ maxWidth: '4xl', width: '100%' }}>
           <Alert severity="warning">
             Correction non trouvée
           </Alert>
-        </div>
-      </div>
+        </Box>
+      </Box>
     );
   }
 
@@ -196,226 +247,480 @@ export default function FeedbackViewer({ params }: { params: Promise<{ code: str
   const isOnTime = !isLate && correction.deadline && correction.submission_date;
 
   return (
-    <div className={`${inter.className} min-h-screen bg-gradient-to-b from-gray-50 to-blue-50 flex justify-center px-4 py-8`}>
-      <div className="max-w-4xl w-full">
+    <Box 
+      className={inter.className} 
+      sx={{ 
+        minHeight: '100vh', 
+        background: (theme) => `linear-gradient(to bottom, ${theme.palette.grey[50]}, ${theme.palette.primary.light}20)`,
+        display: 'flex',
+        justifyContent: 'center',
+        px: 2,
+        py: 4
+      }}
+    >
+      <Container maxWidth="lg">
         {/* En-tête avec une apparence plus moderne */}
-        <div className="mb-6">
-          <Paper 
-            elevation={3} 
-            className="overflow-hidden rounded-lg shadow-lg"
-          >
-            {/* Bannière supérieure avec dégradé et image de fond */}
-            <div className="bg-gradient-to-r from-blue-700 to-indigo-800 text-white p-8 relative overflow-hidden">
-              {/* Motif de fond discret */}
-              <div className="absolute inset-0 opacity-10" 
-                   style={{backgroundImage: 'url("data:image/svg+xml,%3Csvg width=\'60\' height=\'60\' viewBox=\'0 0 60 60\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cg fill=\'none\' fill-rule=\'evenodd\'%3E%3Cg fill=\'%23ffffff\' fill-opacity=\'1\'%3E%3Cpath d=\'M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z\'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")'}}
-              ></div>
-              
-              {/* Contenu de l'en-tête */}
-              <div className="relative z-10 text-center">
-                <div className="inline-flex items-center justify-center mb-4 bg-white/20 p-3 rounded-full">
-                  <RuleIcon sx={{ fontSize: 38 }} />
-                </div>
-                <Typography variant="h3" className="font-bold mb-2">
-                  Correction de {correction.student_name || "l'élève"}
-                </Typography>
-                <Typography variant="h5" className="text-blue-100 font-medium">
-                  {correction.activity_name}
-                </Typography>
-              </div>
-            </div>
-
-            {/* Contenu principal avec présentation améliorée */}
-            <div className="p-8">
-              {/* Section des notes avec un design d'affichage plus percutant */}
-              <div className="grid grid-cols-1 lg:grid-cols-6 gap-6 mb-8">
-                {/* Notes par partie - 4 colonnes */}
-                <div className="lg:col-span-4">
-                  {hasGrade && (
-                    <Paper 
-                      elevation={0}
-                      variant="outlined"
-                      sx={{ borderRadius: 2 }}
-                      className="h-full p-5 bg-gradient-to-br from-green-50 to-blue-50 border-l-4 border-green-600"
-                    >
-                      <Box className="flex items-center gap-2 mb-4">
-                        <GradeIcon className="text-green-700" />
-                        <Typography variant="h6" className="font-bold">
-                          Résultats
-                        </Typography>
-                      </Box>
-                      
-                      {/* Notes par partie affichées horizontalement */}
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-5">
-                        <Paper className="p-4 border shadow-sm transition-all hover:shadow-md bg-white">
-                          <Typography variant="subtitle2" className="text-gray-600 mb-1">Partie expérimentale</Typography>
-                          <Typography variant="h4" className="font-bold text-blue-700 flex items-baseline">
-                            {formatGrade(correction.experimental_points_earned)} <span className="text-gray-500 text-lg ml-1">/ {correction.experimental_points || '5'}</span>
-                          </Typography>
-                        </Paper>
-                        
-                        <Paper className="p-4 border shadow-sm transition-all hover:shadow-md bg-white">
-                          <Typography variant="subtitle2" className="text-gray-600 mb-1">Partie théorique</Typography>
-                          <Typography variant="h4" className="font-bold text-blue-700 flex items-baseline">
-                            {formatGrade(correction.theoretical_points_earned)} <span className="text-gray-500 text-lg ml-1">/ {correction.theoretical_points || '15'}</span>
-                          </Typography>
-                        </Paper>
-                      </div>
-                      
-                      {/* Affichage des pénalités */}
-                      {hasPenalty && (
-                        <Alert 
-                          severity="warning" 
-                          variant="outlined"
-                          className="mb-3"
-                          icon={<ScheduleIcon />}
-                        >
-                          <Typography variant="subtitle2" className="font-bold">
-                            Pénalité de retard : — {correction.penalty} point{correction.penalty > 1 ? 's' : ''}
-                          </Typography>
-                          {isMoreThanOneDayLate && (
-                            <Typography variant="caption">
-                              (pour {daysLate} jours de retard)
-                            </Typography>
-                          )}
-                        </Alert>
-                      )}
-                    </Paper>
-                  )}
-                </div>
-                
-                {/* Note totale - 2 colonnes */}
-                <div className="lg:col-span-2">
-                  {hasGrade && (
-                    <Paper
-                      elevation={0}
-                      className="h-full flex flex-col justify-center items-center p-6 bg-gradient-to-br from-blue-600 to-indigo-800 text-white rounded-lg shadow-lg"
-                    >
-                      <Typography variant="overline" className="tracking-wider text-blue-500">
-                        NOTE FINALE
-                      </Typography>
-                      <Typography variant="h1" className="text-5xl sm:text-6xl font-bold mb-2">
-                        {formatGrade(hasPenalty ? finalGrade : correction.grade)}
-                      </Typography>
-                      <Typography variant="subtitle1">
-                        sur 20 points
-                      </Typography>
-                    </Paper>
-                  )}
-                </div>
-              </div>
-
-              {/* Section des dates avec design modernisé */}
-              <Paper 
-                elevation={0} 
-                variant="outlined" 
-                sx={{ borderRadius: 2 }}
-                className="p-6 mb-8 bg-blue-50 border-l-4 border-blue-500"
+        <Box mb={3}>
+          <Zoom in={true} timeout={500}>
+            <Paper 
+              elevation={3} 
+              sx={{ 
+                overflow: 'hidden', 
+                borderRadius: 2, 
+                boxShadow: (theme) => theme.shadows[3]
+              }}
+            >
+              {/* Bannière supérieure avec dégradé et image de fond */}
+              <Box 
+                sx={{ 
+                  background: (theme) => `linear-gradient(to right, ${theme.palette.secondary.dark}, ${theme.palette.primary.dark})`,
+                  color: 'white', 
+                  p: 4, 
+                  position: 'relative', 
+                  overflow: 'hidden'
+                }}
               >
-                <Box className="flex flex-wrap items-center justify-between">
-                  <Box className="flex items-center gap-2 mb-3">
-                    <CalendarTodayIcon color="primary" />
-                    <Typography variant="h6" className="font-bold">
-                      Dates importantes
+                {/* Motif de fond discret */}
+                <Box 
+                  sx={{ 
+                    position: 'absolute', 
+                    inset: 0, 
+                    opacity: 0.1,
+                    backgroundImage: 'url("data:image/svg+xml,%3Csvg width=\'60\' height=\'60\' viewBox=\'0 0 60 60\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cg fill=\'none\' fill-rule=\'evenodd\'%3E%3Cg fill=\'%23ffffff\' fill-opacity=\'1\'%3E%3Cpath d=\'M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z\'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")'
+                  }}
+                />
+                
+                {/* Contenu de l'en-tête */}
+                <Box sx={{ position: 'relative', zIndex: 10, textAlign: 'center' }}>
+                  <Box 
+                    sx={{ 
+                      display: 'inline-flex', 
+                      alignItems: 'center', 
+                      justifyContent: 'center', 
+                      mb: 2, 
+                      bgcolor: 'rgba(255, 255, 255, 0.2)', 
+                      p: 1.5, 
+                      borderRadius: '50%' 
+                    }}
+                  >
+                    <RuleIcon sx={{ fontSize: 38 }} />
+                  </Box>
+                  <Typography variant="h4" sx={{ fontWeight: 'bold', mb: 1 }}>
+                    Correction de {correction.student_name || "l'élève"}
+                  </Typography>
+                  <Typography variant="h5"  sx={{ color: 'text.secondary', fontWeight: 700 }}>
+                    {correction.activity_name}
+                  </Typography>
+                </Box>
+              </Box>
+
+              {/* Contenu principal avec présentation améliorée */}
+              <Box sx={{ p: 4 }}>
+                {/* Section des notes avec un design d'affichage plus percutant */}
+                <Grid container spacing={3} sx={{ mb: 4 }}>
+                  {/* Notes par partie - 2 colonnes */}
+                  <Grid size={{ xs: 12, lg: 8 }}>
+                    {hasGrade && (
+                      <Accordion 
+                        expanded={gradesExpanded}
+                        onChange={() => setGradesExpanded(!gradesExpanded)}
+                        slotProps={{
+                          transition: { timeout: 300 }
+                        }}
+                        sx={{
+                          height: '100%',
+                          borderRadius: 2,
+                          overflow: 'hidden',
+                          '&:before': {
+                            display: 'none',
+                          },
+                          boxShadow: 'none',
+                          border: '1px solid',
+                          borderColor: 'divider',
+                          '& .MuiAccordionSummary-root': {
+                            borderLeft: '4px solid',
+                            borderColor: 'success.main'
+                          }
+                        }}
+                      >
+                        <AccordionSummary
+                          expandIcon={<ExpandMoreIcon />}
+                          aria-controls="grades-content"
+                          id="grades-header"
+                          sx={{
+                            bgcolor: 'background.paper',
+                            '&:hover': { backgroundColor: 'rgb(212, 212, 212)' },
+                            flexDirection: 'row',
+                            display: 'flex',
+                          }}
+                        >
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                            <GradeIcon color="success" />
+                            <Typography variant="h6" sx={{ fontWeight: 'bold' }}>
+                              Points détaillés
+                            </Typography>
+                          </Box>
+                        </AccordionSummary>
+                        
+                        <AccordionDetails sx={{ 
+                          bgcolor: 'background.paper',
+                          p: 3
+                        }}>                           
+                            {/* Notes par partie affichées horizontalement */}
+                            <Grid container spacing={2} sx={{ mb: 2.5 }}>
+                              <Grid  size={{ xs: 12, md: 6 }}>
+                                <Paper sx={{ 
+                                  p: 2, 
+                                  border: 1, 
+                                  borderColor: 'divider',
+                                  boxShadow: (theme) => theme.shadows[1],
+                                  transition: 'all 0.2s',
+                                  '&:hover': { boxShadow: (theme) => theme.shadows[3] },
+                                  bgcolor: 'background.paper',
+                                }}>
+                                  <Typography variant="subtitle2" sx={{ 
+                                    color: 'text.secondary', mb: 0.5,
+                                    justifyContent: 'center', 
+                                    alignItems: 'center', 
+                                    display: 'flex'                                
+                                  }}>
+                                    PARTIE EXPÉRIMENTALE
+                                  </Typography>
+                                  <Typography variant="h4" sx={{ 
+                                    fontWeight: 'bold', 
+                                    color: 'primary.light', 
+                                    display: 'flex', 
+                                    alignItems: 'center', 
+                                    justifyContent: 'center'
+                                  }}>
+                                    {formatGrade(correction.experimental_points_earned)} 
+                                    <Box component="span" sx={{ color: 'text.secondary', fontSize: '1rem', ml: 0.5 }}>
+                                      / {correction.experimental_points || '5'}
+                                    </Box>
+                                  </Typography>
+                                </Paper>
+                              </Grid>
+                              
+                              <Grid size={{ xs: 12, md: 6 }}>
+                                <Paper sx={{ 
+                                  p: 2, 
+                                  border: 1, 
+                                  borderColor: 'divider',
+                                  boxShadow: (theme) => theme.shadows[1],
+                                  transition: 'all 0.2s',
+                                  '&:hover': { boxShadow: (theme) => theme.shadows[3] },
+                                  bgcolor: 'background.paper',
+                                }}>
+                                  <Typography variant="subtitle2" sx={{ 
+                                    color: 'text.secondary', mb: 0.5,
+                                    flexDirection: 'column', 
+                                    justifyContent: 'center', 
+                                    alignItems: 'center', 
+                                    display: 'flex'
+                                    }}>
+                                    PARTIE THÉORIQUE
+                                  </Typography>
+                                  <Typography variant="h4" sx={{ 
+                                    fontWeight: 'bold', 
+                                    color: 'primary.light', 
+                                    display: 'flex', 
+                                    alignItems: 'center', 
+                                    justifyContent: 'center'
+                                  }}>
+                                    {formatGrade(correction.theoretical_points_earned)} 
+                                    <Box component="span" sx={{ color: 'text.secondary', fontSize: '1rem', ml: 0.5 }}>
+                                      / {correction.theoretical_points || '15'}
+                                    </Box>
+                                  </Typography>
+                                </Paper>
+                              </Grid>
+                            </Grid>
+                            
+                            {/* Affichage des pénalités */}
+                            {hasPenalty && (
+                              <Alert 
+                                severity="warning" 
+                                variant="outlined"
+                                sx={{ mb: 1.5 }}
+                                icon={<ScheduleIcon />}
+                              >
+                                <Typography variant="subtitle2" sx={{ fontWeight: 'bold' }}>
+                                  Pénalité de retard : — {correction.penalty} point{correction.penalty > 1 ? 's' : ''}
+                                </Typography>
+                                {isMoreThanOneDayLate && (
+                                  <Typography variant="caption">
+                                    (pour {daysLate} jours de retard)
+                                  </Typography>
+                                )}
+                              </Alert>
+                            )}
+                        </AccordionDetails>
+                      </Accordion>
+                    )}
+                  </Grid>
+                  
+                  {/* Note totale reste en dehors de l'accordéon */}
+                  <Grid size={{ xs: 12, lg: 4 }}>
+                    {hasGrade && (
+                      <Paper
+                        elevation={2}
+                        sx={{ 
+                          height: '100%', 
+                          display: 'flex', 
+                          flexDirection: 'column', 
+                          justifyContent: 'center', 
+                          alignItems: 'center', 
+                          p: 3,
+                          background: (theme) => `linear-gradient(to bottom right, ${theme.palette.primary.main}, ${theme.palette.secondary.main})`,
+                          color: 'white', 
+                          borderRadius: 2, 
+                          boxShadow: (theme) => theme.shadows[5]
+                        }}
+                      >
+                        <Typography variant="overline" sx={{ letterSpacing: 1, color: `primary` }}>
+                          NOTE FINALE
+                        </Typography>
+                        <Typography variant="h1" sx={{ fontSize: { xs: '3rem', sm: '4rem' }, fontWeight: 'bold', mb: 1 }}>
+                          {formatGrade(hasPenalty ? finalGrade : correction.grade)}
+                        </Typography>
+                        <Typography variant="subtitle1">
+                          sur 20 points
+                        </Typography>
+                      </Paper>
+                    )}
+                  </Grid>
+                </Grid>
+
+
+
+                {/* Contenu de la correction avec style amélioré */}
+                <Paper 
+                  elevation={0}
+                  variant="outlined" 
+                  sx={{ 
+                    borderRadius: 2,
+                    overflow: 'hidden',
+                    mb: 3
+                  }}
+                >
+                  {/* En-tête stylisé pour le contenu */}
+                  <Box 
+                    sx={{ 
+                      background: (theme) => `linear-gradient(to bottom right, ${theme.palette.secondary.main}, ${theme.palette.primary.main})`,
+                      borderBottom: 1,
+                      borderColor: 'divider',
+                      p: 2, 
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      gap: 1
+                    }}
+                  >
+                    <Typography variant="h6" sx={{ fontWeight: 'bold', color: 'white' }}>
+                      Contenu de la correction
                     </Typography>
                   </Box>
                   
-                  {/* Badge de statut plus visible */}
-                  <Box>
-                    {isMoreThanOneDayLate && (
-                      <Chip 
-                        label="Rendu en retard" 
-                        size="medium" 
-                        color="error" 
-                        icon={<ScheduleIcon />} 
-                        className="font-medium" 
-                      />
-                    )}
-                    {isOneDayLate && (
-                      <Chip 
-                        label="Léger retard" 
-                        size="medium" 
-                        color="warning" 
-                        icon={<ScheduleIcon />} 
-                        className="font-medium" 
-                      />
-                    )}
-                    {isOnTime && (
-                      <Chip 
-                        label="Rendu à temps" 
-                        size="medium" 
-                        color="success" 
-                        icon={<CheckCircleIcon />} 
-                        className="font-medium" 
-                      />
-                    )}
+                  {/* Contenu avec style amélioré */}
+                  <Box 
+                    sx={{ 
+                      p: 3, 
+                      bgcolor: 'background.paper',
+                      boxShadow: 'inset 0 2px 4px 0 rgba(0,0,0,0.06)'
+                    }}
+                  >
+                    <Box 
+                      dangerouslySetInnerHTML={{ __html: renderedHtml }} 
+                      sx={{
+                        '& h1, & h2, & h3, & h4, & h5, & h6': {
+                          color: 'primary.800'
+                        },
+                        '& a': {
+                          color: 'primary.600'
+                        },
+                        maxWidth: 'none',
+                        '& img': {
+                          maxWidth: '100%',
+                          height: 'auto'
+                        }
+                      }}
+                      className="correction-content prose prose-sm md:prose-base"
+                    />
                   </Box>
-                </Box>
+                </Paper>
                 
-                {/* Présentation des dates en deux colonnes */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-4">
-                  <div className="bg-white rounded-lg p-4 border border-blue-100 flex items-center gap-3">
-                    <div className="bg-blue-100 p-2 rounded-full">
-                      <EventAvailableIcon fontSize="medium" className="text-blue-700" />
-                    </div>
-                    <div>
-                      <Typography variant="subtitle2" className="text-gray-600">Date limite</Typography>
-                      <Typography variant="h6" className="font-medium">{formatDate(correction.deadline)}</Typography>
-                    </div>
-                  </div>
-                  
-                  <div className="bg-white rounded-lg p-4 border border-blue-100 flex items-center gap-3">
-                    <div className="bg-blue-100 p-2 rounded-full">
-                      <HourglassEmptyIcon fontSize="medium" className="text-blue-700" />
-                    </div>
-                    <div>
-                      <Typography variant="subtitle2" className="text-gray-600">Date de rendu</Typography>
-                      <Typography variant="h6" className="font-medium">{formatDate(correction.submission_date)}</Typography>
-                    </div>
-                  </div>
-                </div>
-              </Paper>
 
-              {/* Contenu de la correction avec style amélioré */}
-              <Paper 
-                elevation={0}
-                variant="outlined" 
-                sx={{ borderRadius: 2 }}
-                className="overflow-hidden mb-6"
+                {/* Section des dates en accordéon (fermé par défaut) */}
+                <Accordion 
+                  expanded={datesExpanded}
+                  onChange={() => setDatesExpanded(!datesExpanded)}
+                  slotProps={{
+                    transition: { timeout: 300 }
+                  }}
+                  sx={{
+                    mb: 4,
+                    borderRadius: 2,
+                    overflow: 'hidden',
+                    '&:before': {
+                      display: 'none',
+                    },
+                    boxShadow: 'none',
+                    border: '1px solid',
+                    borderColor: 'divider',
+                    '& .MuiAccordionSummary-root': {
+                      borderLeft: '4px solid',
+                      borderColor: 'primary.main'
+                    }
+                  }}
+                >
+                  <AccordionSummary
+                    expandIcon={<ExpandMoreIcon />}
+                    aria-controls="dates-content"
+                    id="dates-header"
+                    sx={{
+                      bgcolor: 'background.paper',
+                      '&:hover': { backgroundColor: 'rgb(212, 212, 212)' },
+                      flexDirection: 'col',
+                      display: 'flex',
+                    }}
+                  >
+                    <Box sx={{ display: 'flex', alignItems: 'left', flexDirection: 'column' , gap: 1 }}>
+
+                    <Box sx={{ display: 'flex', alignItems: 'center', flexDirection: 'row' , gap: 1 }}>
+                      <CalendarTodayIcon color="primary" />
+                      <Typography variant="h6" sx={{ fontWeight: 'bold' }}>
+                        Dates importantes
+                      </Typography>
+                      </Box>
+                    {/* Badge de statut toujours visible dans l'en-tête */}
+                      {isMoreThanOneDayLate && (
+                        <Chip 
+                          label="Rendu en retard" 
+                          size="small" 
+                          color="error" 
+                          icon={<ScheduleIcon />} 
+                          sx={{ fontWeight: 500 }} 
+                        />
+                      )}
+                      {isOneDayLate && (
+                        <Chip 
+                          label="Léger retard" 
+                          size="small" 
+                          color="warning" 
+                          icon={<ScheduleIcon />} 
+                          sx={{ fontWeight: 500 }} 
+                        />
+                      )}
+                      {isOnTime && (
+                        <Chip 
+                          label="Rendu à temps" 
+                          size="small" 
+                          color="success" 
+                          icon={<CheckCircleIcon />} 
+                          sx={{ fontWeight: 500 }} 
+                        />
+                      )}
+                    </Box>
+                  </AccordionSummary>
+                  
+                  <AccordionDetails sx={{ 
+                    bgcolor: 'background.paper',
+                    p: 3
+                  }}>
+                    {/* Présentation des dates en deux colonnes (contenu inchangé) */}
+                    <Grid container spacing={3} sx={{ mt: 1 }}>
+                      <Grid size={{ xs: 12, md: 6 }}>
+                        <Paper sx={{ 
+                          p: 2, 
+                          borderRadius: 2, 
+                          border: 1, 
+                          borderColor: 'primary.100',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 1.5
+                        }}>
+                          <Box sx={{ 
+                            bgcolor: 'primary.50', 
+                            p: 1, 
+                            borderRadius: '50%',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center'
+                          }}>
+                            <EventAvailableIcon fontSize="medium" sx={{ color: 'primary.main' }} />
+                          </Box>
+                          <Box>
+                            <Typography variant="subtitle2" sx={{ color: 'text.secondary' }}>
+                              Date limite
+                            </Typography>
+                            <Typography variant="h6" sx={{ fontWeight: 500 }}>
+                              {formatDate(correction.deadline)}
+                            </Typography>
+                          </Box>
+                        </Paper>
+                      </Grid>
+                      
+                      <Grid size={{ xs: 12, md: 6 }}>
+                        <Paper sx={{ 
+                          p: 2, 
+                          borderRadius: 2, 
+                          border: 1, 
+                          borderColor: 'primary.100',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 1.5
+                        }}>
+                          <Box sx={{ 
+                            bgcolor: 'primary.50', 
+                            p: 1, 
+                            borderRadius: '50%',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center'
+                          }}>
+                            <HourglassEmptyIcon fontSize="medium" sx={{ color: 'primary.main' }} />
+                          </Box>
+                          <Box>
+                            <Typography variant="subtitle2" sx={{ color: 'text.secondary' }}>
+                              Date de rendu
+                            </Typography>
+                            <Typography variant="h6" sx={{ fontWeight: 500 }}>
+                              {formatDate(correction.submission_date)}
+                            </Typography>
+                          </Box>
+                        </Paper>
+                      </Grid>
+                    </Grid>
+                  </AccordionDetails>
+                </Accordion>
+
+              </Box>
+              
+              {/* Pied de page amélioré */}
+              <Box 
+                sx={{ 
+                  background: (theme) => `linear-gradient(to right, ${theme.palette.grey[800]}, ${theme.palette.grey[900]})`,
+                  color: 'white', 
+                  p: 2, 
+                  display: 'flex', 
+                  justifyContent: 'space-between', 
+                  alignItems: 'center'
+                }}
               >
-                {/* En-tête stylisé pour le contenu */}
-                <div className="bg-gradient-to-r from-gray-100 to-blue-50 border-b p-4 flex items-center gap-2">
-                  <Typography variant="h6" className="font-bold text-gray-800">
-                    Contenu de la correction
-                  </Typography>
-                </div>
-                
-                {/* Contenu avec style amélioré */}
-                <div className="p-6 bg-white shadow-inner">
-                  <div 
-                    dangerouslySetInnerHTML={{ __html: renderedHtml }} 
-                    className="correction-content prose prose-sm md:prose-base max-w-none prose-headings:text-blue-800 prose-a:text-blue-600"
-                  />
-                </div>
-              </Paper>
-            </div>
-            
-            {/* Pied de page amélioré */}
-            <div className="bg-gradient-to-r from-gray-800 to-gray-900 text-white p-4 flex justify-between items-center">
-              <Typography variant="caption" className="text-gray-300">
-                Correction #{correction.id}
-              </Typography>
-              <Typography variant="caption" className="text-gray-300">
-                Créée le {new Date(correction.created_at).toLocaleDateString('fr-FR', {
-                  day: 'numeric',
-                  month: 'long',
-                  year: 'numeric'
-                })}
-              </Typography>
-            </div>
-          </Paper>
-        </div>
-      </div>
-    </div>
+                <Typography variant="caption" sx={{ color: 'grey.300' }}>
+                  Correction #{correction.id}
+                </Typography>
+                <Typography variant="caption" sx={{ color: 'grey.300' }}>
+                  Créée le {new Date(correction.created_at).toLocaleDateString('fr-FR', {
+                    day: 'numeric',
+                    month: 'long',
+                    year: 'numeric'
+                  })}
+                </Typography>
+              </Box>
+            </Paper>
+          </Zoom>
+        </Box>
+      </Container>
+    </Box>
   );
 }

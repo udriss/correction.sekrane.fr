@@ -222,7 +222,7 @@ export default function MultipleCorrections() {
               {activity && (
               <Typography variant="h4" component="h1" className="font-bold text-black mb-1">
                   Activité : {activity.name}
-                </Typography>
+              </Typography>
               )}
             <Typography variant="subtitle1" className="text-blue-600">
             Corrections multiples

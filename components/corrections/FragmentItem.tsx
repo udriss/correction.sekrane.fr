@@ -1,9 +1,10 @@
-import React, { useRef } from 'react';
+import React, { useRef, useEffect, useState } from 'react';
 import { useDrag, useDrop } from 'react-dnd';
 import { 
   Box, IconButton, Typography, TextField, Button, 
   Card, CardContent, CardActions, Collapse, Tooltip,
-  alpha, useTheme, Divider, Chip, Fade
+  alpha, useTheme, Divider, Chip, Fade, 
+  FormControl, InputLabel, Select, MenuItem, OutlinedInput, SelectChangeEvent
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import EditIcon from '@mui/icons-material/Edit';
@@ -13,6 +14,7 @@ import CancelIcon from '@mui/icons-material/Cancel';
 import DragIndicatorIcon from '@mui/icons-material/DragIndicator';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import ExpandLessIcon from '@mui/icons-material/ExpandLess';
+import CloseIcon from '@mui/icons-material/Close';
 
 // Fragment item type for drag and drop
 const FRAGMENT_ITEM_TYPE = 'fragment';
@@ -24,13 +26,15 @@ interface FragmentItemProps {
   editedFragmentContent: string;
   savingFragment: boolean;
   deletingIds: number[];
+  categories?: { id: number, name: string }[]; // Make optional
   handleAddFragment: (fragment: any) => void;
   handleDeleteFragment: (id: number) => void;
   handleEditFragment: (id: number, content: string) => void;
   handleCancelEditFragment: () => void;
-  handleSaveFragment: () => void;
+  handleSaveFragment: (selectedCategories: number[]) => void;
   setEditedFragmentContent: (content: string) => void;
   moveFragment: (dragIndex: number, hoverIndex: number) => void;
+  handleDeleteCategory?: (categoryId: number) => void; // Make optional
 }
 
 const FragmentItem: React.FC<FragmentItemProps> = ({
@@ -40,6 +44,7 @@ const FragmentItem: React.FC<FragmentItemProps> = ({
   editedFragmentContent,
   savingFragment,
   deletingIds,
+  categories = [], // Provide default empty array
   handleAddFragment,
   handleDeleteFragment,
   handleEditFragment,
@@ -47,11 +52,40 @@ const FragmentItem: React.FC<FragmentItemProps> = ({
   handleSaveFragment,
   setEditedFragmentContent,
   moveFragment,
+  handleDeleteCategory = () => {}, // Provide default no-op function
 }) => {
   const theme = useTheme();
   const ref = useRef<HTMLDivElement>(null);
   const [expanded, setExpanded] = React.useState(false);
+  const [selectedCategories, setSelectedCategories] = useState<number[]>([]);
   
+  // Initialize selected categories when editing starts
+  useEffect(() => {
+    if (editingFragmentId === fragment.id) {
+      // Convertir les catégories du fragment en array d'IDs
+      const fragmentCategories = fragment.categories 
+        ? Array.isArray(fragment.categories) 
+          ? fragment.categories.map((cat: any) => cat.id)
+          : [fragment.categories.id]
+        : [];
+      
+      setSelectedCategories(fragmentCategories);
+      // Préremplir le contenu du fragment
+      setEditedFragmentContent(fragment.content || '');
+    }
+  }, [editingFragmentId, fragment]);
+
+  // Gérer le changement de catégories
+  const handleCategoryChange = (event: SelectChangeEvent<typeof selectedCategories>) => {
+    const {
+      target: { value },
+    } = event;
+    setSelectedCategories(
+      // On cast pour convertir correctement
+      typeof value === 'string' ? value.split(',').map(Number) : value as number[]
+    );
+  };
+
   // Setup drag and drop
   const [{ isDragging }, drag] = useDrag({
     type: FRAGMENT_ITEM_TYPE,
@@ -213,43 +247,122 @@ const FragmentItem: React.FC<FragmentItemProps> = ({
               {new Date(fragment.created_at).toLocaleDateString('fr-FR')}
             </Typography>
             
-            <Chip 
-              label={fragment.category || "Général"} 
-              size="small" 
-              variant="outlined"
-              sx={{ 
-                height: 20, 
-                fontSize: '0.7rem', 
-                borderRadius: 1,
-                bgcolor: alpha(theme.palette.primary.main, 0.1),
-                borderColor: alpha(theme.palette.primary.main, 0.3),
-                color: theme.palette.primary.main
-              }} 
-            />
+            {!isEditing && (
+              <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                {Array.isArray(fragment.categories) ? (
+                  fragment.categories.map((category: any) => (
+                    <Chip 
+                      key={category.id}
+                      label={category.name || "Général"} 
+                      size="small" 
+                      variant="outlined"
+                      sx={{ 
+                        height: 20, 
+                        fontSize: '0.7rem', 
+                        borderRadius: 1,
+                        bgcolor: alpha(theme.palette.primary.main, 0.1),
+                        borderColor: alpha(theme.palette.primary.main, 0.3),
+                        color: theme.palette.primary.main
+                      }} 
+                    />
+                  ))
+                ) : (
+                  <Chip 
+                    label={fragment.category || "Général"} 
+                    size="small" 
+                    variant="outlined"
+                    sx={{ 
+                      height: 20, 
+                      fontSize: '0.7rem', 
+                      borderRadius: 1,
+                      bgcolor: alpha(theme.palette.primary.main, 0.1),
+                      borderColor: alpha(theme.palette.primary.main, 0.3),
+                      color: theme.palette.primary.main
+                    }} 
+                  />
+                )}
+              </Box>
+            )}
           </Box>
 
           {isEditing ? (
-            <TextField
-              multiline
-              fullWidth
-              minRows={4}
-              maxRows={10}
-              value={editedFragmentContent}
-              onChange={(e) => setEditedFragmentContent(e.target.value)}
-              variant="outlined"
-              size="small"
-              sx={{
-                '& .MuiOutlinedInput-root': {
-                  borderRadius: 1,
-                  '& fieldset': {
-                    borderColor: alpha(theme.palette.primary.main, 0.3),
+            <>
+              <TextField
+                multiline
+                fullWidth
+                minRows={4}
+                maxRows={10}
+                value={editedFragmentContent}
+                onChange={(e) => setEditedFragmentContent(e.target.value)}
+                variant="outlined"
+                size="small"
+                sx={{
+                  mb: 2,
+                  '& .MuiOutlinedInput-root': {
+                    borderRadius: 1,
+                    '& fieldset': {
+                      borderColor: alpha(theme.palette.primary.main, 0.3),
+                    },
+                    '&:hover fieldset': {
+                      borderColor: theme.palette.primary.main,
+                    },
                   },
-                  '&:hover fieldset': {
-                    borderColor: theme.palette.primary.main,
-                  },
-                },
-              }}
-            />
+                }}
+              />
+              
+              {/* Sélecteur de catégories multiple */}
+              <FormControl fullWidth size="small" sx={{ mb: 1 }}>
+                <InputLabel id={`category-select-label-${fragment.id}`}>Catégories</InputLabel>
+                <Select
+                  labelId={`category-select-label-${fragment.id}`}
+                  multiple
+                  value={selectedCategories}
+                  onChange={handleCategoryChange}
+                  input={<OutlinedInput label="Catégories" />}
+                  renderValue={(selected) => (
+                    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                      {selected.map((value) => {
+                        const category = categories.find(cat => cat.id === value);
+                        return (
+                          <Chip 
+                            key={value} 
+                            label={category ? category.name : 'Inconnu'} 
+                            size="small" 
+                            sx={{ 
+                              height: 24,
+                              bgcolor: alpha(theme.palette.primary.main, 0.1),
+                              color: theme.palette.primary.main
+                            }}
+                          />
+                        );
+                      })}
+                    </Box>
+                  )}
+                >
+                  {categories.map((category) => (
+                    <MenuItem key={category.id} value={category.id} sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                      {category.name}
+                      <IconButton 
+                        size="small" 
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDeleteCategory(category.id);
+                        }}
+                        sx={{ 
+                          ml: 1, 
+                          color: theme.palette.error.main,
+                          '&:hover': {
+                            bgcolor: alpha(theme.palette.error.main, 0.1)
+                          }
+                        }}
+                      >
+                        <CloseIcon fontSize="small" />
+                      </IconButton>
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+            </>
           ) : (
             <>
               <Typography 
@@ -326,7 +439,7 @@ const FragmentItem: React.FC<FragmentItemProps> = ({
               <Tooltip title="Enregistrer">
                 <IconButton 
                   size="small" 
-                  onClick={handleSaveFragment}
+                  onClick={() => handleSaveFragment(selectedCategories)}
                   disabled={savingFragment}
                   color="primary"
                   sx={{ 
@@ -357,20 +470,20 @@ const FragmentItem: React.FC<FragmentItemProps> = ({
                 </IconButton>
               </Tooltip>
               <Tooltip title="Modifier">
-  <IconButton 
-    size="small" 
-    onClick={() => handleEditFragment(fragment.id, fragment.content)}
-    sx={{ 
-      ml: 1,
-      color: theme.palette.info.main,
-      '&:hover': {
-        bgcolor: alpha(theme.palette.info.main, 0.1)
-      }
-    }}
-  >
-    <EditIcon fontSize="small" />
-  </IconButton>
-</Tooltip>
+                <IconButton 
+                  size="small" 
+                  onClick={() => handleEditFragment(fragment.id, fragment.content)}
+                  sx={{ 
+                    ml: 1,
+                    color: theme.palette.info.main,
+                    '&:hover': {
+                      bgcolor: alpha(theme.palette.info.main, 0.1)
+                    }
+                  }}
+                >
+                  <EditIcon fontSize="small" />
+                </IconButton>
+              </Tooltip>
               <Tooltip title="Supprimer">
                 <IconButton 
                   size="small"

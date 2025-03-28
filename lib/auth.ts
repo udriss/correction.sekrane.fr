@@ -173,7 +173,13 @@ export const authOptions: NextAuthOptions = {
     strategy: "jwt",
     maxAge: 3 * 24 * 60 * 60, // 30 days
   },
-  secret: process.env.NEXTAUTH_SECRET || process.env.JWT_SECRET || 'your-secret-value-here',
+  secret: (() => {
+    const secret = process.env.NEXTAUTH_SECRET || process.env.JWT_SECRET;
+    if (!secret) {
+      throw new Error("Missing required environment variable: NEXTAUTH_SECRET or JWT_SECRET");
+    }
+    return secret;
+  })(),
   debug: process.env.NODE_ENV === "development",
   // Handle errors properly
   logger: {
