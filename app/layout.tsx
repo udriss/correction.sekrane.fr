@@ -1,40 +1,35 @@
-'use client';
-
 import './globals.css';
-import React from 'react';
-import MainNavbar from './components/MainNavbar';
-import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
-import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import { Inter } from 'next/font/google';
-import { usePathname } from 'next/navigation';
+import { Providers } from './providers';
+import ClientLayout from '@/components/layout/ClientLayout';
+import '@/styles/editor.css';
 
+// Initialiser la police Inter
 const inter = Inter({ subsets: ['latin'] });
+
+export const metadata = {
+  title: 'Correction Sekrane',
+  description: 'Plateforme de gestion des corrections et évaluations pédagogiques',
+};
 
 export default function RootLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  // Utilisez usePathname pour déterminer le chemin actuel
-  const pathname = usePathname();
-  
-  // Vérifiez si nous sommes dans la route /feedback ou ses sous-routes
-  const isFeedbackRoute = pathname && pathname.startsWith('/feedback');
-  
   return (
     <html lang="fr">
-      <body className={inter.className}>
-        <LocalizationProvider dateAdapter={AdapterDayjs}>
-          {/* N'affichez la navbar que si nous ne sommes pas dans la route feedback */}
-          {!isFeedbackRoute && <MainNavbar />}
-          <main className="pt-20 bg-gray-50">{children}</main>
-
-          <footer className="bg-gray-100 py-4 mt-12">
-            <div className="container mx-auto px-4 text-center text-gray-600">
-              <p>&copy; {new Date().getFullYear()} - Système de corrections d'activités</p>
-            </div>
-          </footer>
-        </LocalizationProvider>
+      <head>
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <meta name="author" content="Idriss SEKRANE" />
+        <link rel="icon" href="/favicon.ico" sizes="any" />
+      </head>
+      <body className={`${inter.className} flex flex-col min-h-screen`}>
+        <Providers>
+          <ClientLayout>
+            {children}
+          </ClientLayout>
+        </Providers>
       </body>
     </html>
   );

@@ -35,11 +35,13 @@ export async function GET(
       // Récupérer la correction avec les notes et calculer le grade si nécessaire
       const [rows] = await connection.query(
         `SELECT c.*, a.name as activity_name, a.experimental_points, a.theoretical_points,
+                CONCAT(s.first_name, ' ', s.last_name) as student_name,
                 IFNULL(c.grade, (c.experimental_points_earned + c.theoretical_points_earned)) as grade, 
                 IFNULL(c.penalty, 0) as penalty,
                 (IFNULL(c.grade, (c.experimental_points_earned + c.theoretical_points_earned)) - IFNULL(c.penalty, 0)) as final_grade
          FROM corrections c 
          JOIN activities a ON c.activity_id = a.id 
+         LEFT JOIN students s ON c.student_id = s.id
          WHERE c.id = ?`,
         [correctionId]
       );
@@ -136,14 +138,14 @@ export async function POST(
         `UPDATE corrections 
          SET content = ?, 
              content_data = ?,
-             student_name = ?,
+             student_id = ?,
              experimental_points_earned = ?,
              theoretical_points_earned = ?
          WHERE id = ?`,
         [
           body.content || '',
           JSON.stringify(contentData),
-          body.student_name,
+          body.student_id,
           body.experimental_points_earned,
           body.theoretical_points_earned,
           correctionId
@@ -152,9 +154,11 @@ export async function POST(
       
       // Récupérer la correction mise à jour
       const [updatedRows] = await connection.query(
-        `SELECT c.*, a.name as activity_name, a.experimental_points, a.theoretical_points 
+        `SELECT c.*, a.name as activity_name, a.experimental_points, a.theoretical_points,
+         CONCAT(s.first_name, ' ', s.last_name) as student_name
          FROM corrections c
          JOIN activities a ON c.activity_id = a.id
+         LEFT JOIN students s ON c.student_id = s.id
          WHERE c.id = ?`,
         [correctionId]
       );

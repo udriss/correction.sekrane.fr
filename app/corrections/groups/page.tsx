@@ -6,23 +6,10 @@ import {
   Typography, 
   Paper, 
   Box, 
-  List, 
-  ListItemButton,
-  ListItemText, 
-  ListItemSecondaryAction,
-  IconButton,
-  Divider,
-  Chip,
   Button,
-  ListItem,
   Alert
 } from '@mui/material';
-import { 
-  Visibility as VisibilityIcon, 
-  ArrowBack as ArrowBackIcon,
-  CalendarToday as CalendarTodayIcon
-} from '@mui/icons-material';
-import LoadingSpinner from '@/components/LoadingSpinner';
+import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import Link from 'next/link';
 
 // Définition du type pour un groupe
@@ -39,7 +26,7 @@ interface CorrectionGroup {
 export default function CorrectionGroupsPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const activityId = searchParams.get('activityId');
+  const activityId = searchParams?.get('activityId') || null;
   
   useEffect(() => {
     // Si un activityId est fourni, rediriger vers la nouvelle route

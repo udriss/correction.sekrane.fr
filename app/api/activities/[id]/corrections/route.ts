@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getActivityById } from '@/lib/activity';
 import { getUser } from '@/lib/auth';
 import { getCorrectionsByActivityId, createCorrection } from '@/lib/correction';
+import { withConnection } from '@/lib/db';
 
 export async function GET(
   req: NextRequest,
@@ -26,8 +27,20 @@ export async function GET(
       return NextResponse.json({ error: 'Activité non trouvée' }, { status: 404 });
     }
     
-    const corrections = await getCorrectionsByActivityId(activityId);
-    return NextResponse.json(corrections);
+    return await withConnection(async (connection) => {
+      const [rows] = await connection.query(
+        `SELECT c.*, a.name as activity_name, 
+         CONCAT(s.first_name, ' ', s.last_name) as student_name
+         FROM corrections c 
+         JOIN activities a ON c.activity_id = a.id 
+         LEFT JOIN students s ON c.student_id = s.id
+         WHERE c.activity_id = ? 
+         ORDER BY c.created_at DESC`,
+        [activityId]
+      );
+      
+      return NextResponse.json(rows);
+    });
   } catch (error) {
     console.error('Error fetching corrections:', error);
     return NextResponse.json({ error: 'Erreur lors de la récupération des corrections' }, { status: 500 });
@@ -57,12 +70,13 @@ export async function POST(
       );
     }
 
-    const { student_name, content } = await request.json();
+    const { student_id, content } = await request.json();
 
     const correctionData = {
       activity_id: activityId,
-      student_name: student_name || null,
-      content: content || ''
+      student_id: student_id || null,
+      content: content || '',
+      group_id: 0 // Add default group_id of 0 for isolated corrections
     };
 
     const newId = await createCorrection(correctionData);

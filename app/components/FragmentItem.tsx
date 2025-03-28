@@ -2,7 +2,7 @@
 
 import React, { useRef } from 'react';
 import { useDrag, useDrop } from 'react-dnd';
-import { Fragment } from '@/lib/fragment';
+import { Fragment } from '@/lib/types';
 // Import Material UI components
 import { Button, TextField, IconButton } from '@mui/material';
 import EditIcon from '@mui/icons-material/Edit';

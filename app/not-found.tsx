@@ -10,16 +10,15 @@ import {
   Container,
   useTheme
 } from '@mui/material';
-import { 
-  School as SchoolIcon,
-  MenuBook as MenuBookIcon,
-  EmojiObjects as EmojiObjectsIcon,
-  Science as ScienceIcon,
-  Error as ErrorIcon,
-  FindInPage as FindInPageIcon,
-  Home as HomeIcon
-} from '@mui/icons-material';
+import SchoolIcon from '@mui/icons-material/School';
+import MenuBookIcon from '@mui/icons-material/MenuBook';
+import EmojiObjectsIcon from '@mui/icons-material/EmojiObjects';
+import ScienceIcon from '@mui/icons-material/Science';
+import ErrorIcon from '@mui/icons-material/Error';
+import FindInPageIcon from '@mui/icons-material/FindInPage';
+import HomeIcon from '@mui/icons-material/Home';
 import { motion } from 'framer-motion';
+import H1Title from '@/components/ui/H1Title';
 
 export default function NotFound() {
   const theme = useTheme();
@@ -42,13 +41,14 @@ export default function NotFound() {
         <Box 
           className="bg-gradient-to-r from-blue-600 to-indigo-700 text-white px-6 py-1"
           sx={{
-            borderBottom: `4px solid ${theme.palette.secondary.main}`
+            borderBottom: `4px solid ${theme.palette.secondary.main}`,
+            padding: '24px',
           }}
         >
-          <Typography variant="h4" component="h1" className="flex items-center gap-2 font-bold">
+          <H1Title className="flex items-center gap-2 font-bold">
             <ErrorIcon fontSize="large" />
-            Page non trouvée
-          </Typography>
+            Page introuvable
+          </H1Title>
         </Box>
         
         {/* Contenu principal */}

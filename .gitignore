@@ -14,7 +14,7 @@ coverage/
 .env.development
 .env.production
 
-# Secret files
+#  files
 secrets.json
 *.key
 *.pem

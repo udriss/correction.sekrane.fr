@@ -17,13 +17,10 @@ import {
   Typography,
   Snackbar
 } from '@mui/material';
-import {
-  Share as ShareIcon,
-  ContentCopy as CopyIcon,
-  Link as LinkIcon,
-  Check as CheckIcon,
-  FileCopy as FileCopyIcon
-} from '@mui/icons-material';
+import ShareIcon from '@mui/icons-material/Share';
+import CopyIcon from '@mui/icons-material/ContentCopy';
+import LinkIcon from '@mui/icons-material/Link';
+import CheckIcon from '@mui/icons-material/Check';
 import * as shareService from '@/lib/services/shareService';
 
 interface ShareModalProps {

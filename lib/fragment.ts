@@ -8,6 +8,7 @@ export interface Fragment {
   position_order?: number;
   created_at?: Date;
   updated_at?: Date;
+  category?: string; // Added missing category field used in FragmentsList
 }
 
 // Mettre à jour la position d'un fragment

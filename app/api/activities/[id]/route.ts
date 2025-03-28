@@ -25,13 +25,13 @@ export async function GET(
     const activity = await getActivityById(activityId, userId);
     
     if (!activity) {
-      return NextResponse.json({ error: 'Activité non trouvée' }, { status: 404 });
+      return NextResponse.json({ error: 'activité non trouvée' }, { status: 404 });
     }
     
     return NextResponse.json(activity);
   } catch (error) {
     console.error('Error fetching activity:', error);
-    return NextResponse.json({ error: 'Erreur lors de la récupération de l\'activité' }, { status: 500 });
+    return NextResponse.json({ error: 'erreur lors de la récupération de l\'activité' }, { status: 500 });
   }
 }
 
@@ -43,6 +43,7 @@ export async function PUT(
     // Await the params
     const { id } = await params;
     const activityId = parseInt(id);
+    console.log('activityId:', activityId);
     
     if (isNaN(activityId)) {
       return NextResponse.json({ error: 'ID invalide' }, { status: 400 });
@@ -62,18 +63,18 @@ export async function PUT(
     // S'assurer que les valeurs sont des nombres valides
     if (isNaN(experimentalPoints) || isNaN(theoreticalPoints)) {
       return NextResponse.json(
-        { error: "Les valeurs de points doivent être des nombres valides" },
+        { error: "les valeurs de points doivent être des nombres valides" },
         { status: 400 }
       );
     }
     
     // Vérifier que le total est égal à 20
-    if (experimentalPoints + theoreticalPoints !== 20) {
-      return NextResponse.json(
-        { error: "Le total des points doit être égal à 20" },
-        { status: 400 }
-      );
-    }
+    // if (experimentalPoints + theoreticalPoints !== 20) {
+    //   return NextResponse.json(
+    //     { error: "le total des points doit être égal à 20" },
+    //     { status: 400 }
+    //   );
+    // }
 
     // Récupérer l'utilisateur connecté (si nécessaire pour les permissions)
     const user = await getUser(request);
@@ -132,7 +133,7 @@ export async function DELETE(
     const user = await getUser(req);
     
     if (!user) {
-      return NextResponse.json({ error: 'Utilisateur non authentifié' }, { status: 401 });
+      return NextResponse.json({ error: 'utilisateur non authentifié' }, { status: 401 });
     }
 
     // Vérifier que l'activité existe et appartient à l'utilisateur

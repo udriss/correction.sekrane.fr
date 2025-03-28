@@ -1,120 +1,209 @@
-import { NextResponse } from 'next/server';
-import { query } from '@/lib/db';
-import { Correction } from '@/lib/types';
+import { NextRequest, NextResponse } from 'next/server';
+import { withConnection } from '@/lib/db';
+import { getServerSession } from 'next-auth/next';
+import authOptions from '@/lib/auth';
+import { getUser } from '@/lib/auth';
+
+// Get corrections for a group
 export async function GET(
-  request: Request,
-  { params }: { params: Promise<{ id: string }> }) {
-  try {
-    // Await the params
-    const { id } = await params;
-    const groupId = parseInt(id);
-    
-    if (isNaN(groupId)) {
-      return NextResponse.json({ error: 'Invalid group ID' }, { status: 400 });
-    }
-    
-    // Requête SQL modifiée incluant les dates de soumission et deadline
-    const corrections = await query<any[]>(`
-      SELECT 
-        c.id,
-        c.student_name,
-        CAST(c.experimental_points_earned AS DECIMAL(10,2)) as experimental_points_earned,
-        CAST(c.theoretical_points_earned AS DECIMAL(10,2)) as theoretical_points_earned,
-        CAST(a.experimental_points AS DECIMAL(10,2)) as experimental_points,
-        CAST(a.theoretical_points AS DECIMAL(10,2)) as theoretical_points,
-        c.submission_date,
-        c.deadline,
-        a.id as activity_id
-      FROM 
-        correction_group_items cgi
-      JOIN 
-        corrections c ON cgi.correction_id = c.id
-      JOIN 
-        activities a ON c.activity_id = a.id
-      WHERE 
-        cgi.group_id = ?
-      ORDER BY
-        c.student_name ASC
-    `, [groupId]);
-    
-    const formattedCorrections: Correction[] = corrections.map((correction: any) => ({
-      id: correction.id,
-      student_name: correction.student_name || 'Sans nom',
-      experimental_points_earned: Number(correction.experimental_points_earned),
-      theoretical_points_earned: Number(correction.theoretical_points_earned),
-      experimental_points: Number(correction.experimental_points),
-      theoretical_points: Number(correction.theoretical_points),
-      submission_date: correction.submission_date,
-      deadline: correction.deadline,
-      activity_id: correction.activity_id
-    }));
-    
-    
-    console.log(`Fetched ${formattedCorrections.length} corrections for group ${groupId}`);
-    
-    return NextResponse.json(formattedCorrections);
-  } catch (error) {
-    console.error('Error fetching corrections for group:', error);
-    return NextResponse.json({ 
-      error: 'Failed to fetch corrections for this group',
-      details: String(error)
-    }, { status: 500 });
-  }
-}
-
-
-export async function POST(
-  request: Request,
+  request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    // Await the params object to access its properties
     const { id } = await params;
-    const groupId = parseInt(id || '');
+    const groupId = parseInt(id);
+
+    // Authentication check
+    const session = await getServerSession(authOptions);
+    const customUser = await getUser(request);
+    const userId = customUser?.id || session?.user?.id;
+    
+    if (!userId) {
+      return NextResponse.json(
+        { error: 'Authentication required' },
+        { status: 401 }
+      );
+    }
     
     if (isNaN(groupId)) {
       return NextResponse.json({ error: 'Invalid group ID' }, { status: 400 });
     }
-    
-    const body = await request.json();
-    console.log("POST request body:", body);
-    
-    if (!body.correction_ids || !Array.isArray(body.correction_ids) || body.correction_ids.length === 0) {
-      return NextResponse.json({ error: 'Correction IDs are required' }, { status: 400 });
-    }
-    
-    console.log(`Adding ${body.correction_ids.length} corrections to group ${groupId}`);
-    
-    // Nettoyer les associations existantes pour éviter les doublons
-    await query(`DELETE FROM correction_group_items WHERE group_id = ? AND correction_id IN (?)`, 
-      [groupId, body.correction_ids]);
-    
-    // Insérer les associations dans la table pivot un par un plutôt qu'en masse
-    // pour mieux gérer les erreurs potentielles
-    let successCount = 0;
-    
-    for (const correctionId of body.correction_ids) {
-      try {
-        console.log(`Associating correction ${correctionId} with group ${groupId}`);
-        
-        await query(
-          `INSERT INTO correction_group_items (group_id, correction_id) VALUES (?, ?)`,
-          [groupId, correctionId]
-        );
-        
-        successCount++;
-      } catch (err) {
-        console.error(`Error associating correction ${correctionId}:`, err);
-      }
-    }
-    
-    return NextResponse.json({ 
-      success: true, 
-      count: successCount,
-      message: `Successfully associated ${successCount} out of ${body.correction_ids.length} corrections`
+
+    return await withConnection(async (connection) => {
+      // Fetch corrections that belong to this group
+      const [rows] = await connection.query(
+        `SELECT c.*, a.name as activity_name,
+         CONCAT(s.first_name, ' ', s.last_name) as student_name
+         FROM corrections c 
+         JOIN activities a ON c.activity_id = a.id 
+         LEFT JOIN students s ON c.student_id = s.id
+         WHERE c.group_id = ? 
+         ORDER BY s.last_name ASC, s.first_name ASC`,
+        [groupId]
+      );
+      
+      return NextResponse.json(rows);
     });
   } catch (error) {
+    console.error('Error retrieving group corrections:', error);
+    return NextResponse.json(
+      { error: 'Failed to retrieve corrections for this group' },
+      { status: 500 }
+    );
+  }
+}
+
+// Add corrections to a group
+export async function POST(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { id } = await params;
+    const groupId = parseInt(id);
+
+    // Authentication check
+    const session = await getServerSession(authOptions);
+    const customUser = await getUser(request);
+    const userId = customUser?.id || session?.user?.id;
+    
+    if (!userId) {
+      return NextResponse.json(
+        { error: 'Authentication required' },
+        { status: 401 }
+      );
+    }
+    
+    const body = await request.json();
+    console.log("Received body:", body); // Debug log
+    
+    // Handle correction_ids format (from MultipleCorrectionsForm)
+    if (body.correction_ids && Array.isArray(body.correction_ids)) {
+      return await withConnection(async (connection) => {
+        const results = [];
+        
+        // Update existing corrections to add them to this group
+        for (const correctionId of body.correction_ids) {
+          try {
+            // Update the correction with the group ID
+            await connection.query(
+              `UPDATE corrections SET group_id = ? WHERE id = ?`,
+              [groupId, correctionId]
+            );
+            
+            results.push({
+              status: 'success',
+              message: 'Correction linked to group',
+              data: { id: correctionId, group_id: groupId }
+            });
+          } catch (err) {
+            results.push({
+              status: 'error',
+              message: `Failed to link correction: ${(err as Error).message}`,
+              data: { id: correctionId }
+            });
+          }
+        }
+        
+        return NextResponse.json(results);
+      });
+    }
+    // Original corrections array format
+    else if (body.corrections && Array.isArray(body.corrections)) {
+      // Keep original implementation for backward compatibility
+      return await withConnection(async (connection) => {
+        // Original code for handling complete correction objects
+        const results = [];
+        
+        for (const correction of body.corrections) {
+          // Ensure correction has required fields
+          if (!correction.activity_id || !correction.student_id) {
+            results.push({
+              status: 'error',
+              message: 'Activity ID and student ID are required',
+              data: correction
+            });
+            continue;
+          }
+          
+          // Calculate grade if needed
+          const expPoints = parseFloat(correction.experimental_points_earned) || 0;
+          const theoPoints = parseFloat(correction.theoretical_points_earned) || 0;
+          const totalGrade = expPoints + theoPoints;
+          
+          // Prepare correction data with group_id
+          const correctionData = {
+            activity_id: correction.activity_id,
+            student_id: correction.student_id,
+            content: correction.content || '',
+            experimental_points_earned: expPoints,
+            theoretical_points_earned: theoPoints,
+            grade: totalGrade,
+            penalty: correction.penalty || 0,
+            group_id: groupId, // Set the group ID for this correction
+          };
+          
+          try {
+            // Insert the correction with group_id
+            const [result] = await connection.query(
+              `INSERT INTO corrections 
+              (activity_id, student_id, content, experimental_points_earned, theoretical_points_earned, grade, penalty, group_id)
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+              [
+                correctionData.activity_id,
+                correctionData.student_id,
+                correctionData.content,
+                correctionData.experimental_points_earned,
+                correctionData.theoretical_points_earned,
+                correctionData.grade,
+                correctionData.penalty,
+                correctionData.group_id
+              ]
+            );
+            
+            const insertId = (result as any).insertId;
+            
+            // Get student name for response
+            const [studentRows] = await connection.query<any[]>(
+              `SELECT CONCAT(first_name, ' ', last_name) as student_name 
+               FROM students WHERE id = ?`,
+              [correctionData.student_id]
+            );
+            
+            const studentName = studentRows.length > 0 ? studentRows[0].student_name : null;
+            
+            results.push({
+              status: 'success',
+              message: 'Correction added to group',
+              data: { 
+                id: insertId, 
+                ...correctionData,
+                student_name: studentName 
+              }
+            });
+          } catch (err) {
+            results.push({
+              status: 'error',
+              message: `Failed to add correction: ${(err as Error).message}`,
+              data: correction
+            });
+          }
+        }
+        
+        return NextResponse.json(results);
+      });
+    }
+    else {
+      return NextResponse.json(
+        { error: 'Invalid request format. Expected correction_ids array or corrections array.' },
+        { status: 400 }
+      );
+    }
+  } catch (error) {
     console.error('Error adding corrections to group:', error);
-    return NextResponse.json({ error: 'Failed to add corrections to group', details: String(error) }, { status: 500 });
+    return NextResponse.json(
+      { error: 'Failed to add corrections to group' },
+      { status: 500 }
+    );
   }
 }

@@ -1,21 +1,37 @@
 'use client';
 
-import React from 'react';
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Activity } from '@/lib/activity';
 import { Correction } from '@/lib/types';
 import LoadingSpinner from '@/components/LoadingSpinner';
-import { Button, IconButton, Paper, Typography, TextField, CircularProgress } from '@mui/material';
-import { Edit as EditIcon, Save as SaveIcon, Close as CloseIcon, Delete as DeleteIcon, Article as ArticleIcon, Add as AddIcon, BarChart as BarChartIcon, Check as CheckIcon } from '@mui/icons-material';
+import { Button, IconButton, Paper, Typography, TextField, CircularProgress, Alert, Tooltip, Container, Tabs, Tab } from '@mui/material';
+import EditIcon from '@mui/icons-material/Edit';
+import SaveIcon from '@mui/icons-material/Save';
+import CloseIcon from '@mui/icons-material/Close';
+import DeleteIcon from '@mui/icons-material/Delete';
+import ArticleIcon from '@mui/icons-material/Article';
+import AddIcon from '@mui/icons-material/Add';
+import BarChartIcon from '@mui/icons-material/BarChart';
+import CheckIcon from '@mui/icons-material/Check';
 import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline';
+import { useSnackbar } from 'notistack';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
-import PeopleAltIcon from '@mui/icons-material/PeopleAlt';
-import GroupsIcon from '@mui/icons-material/Groups';
-import Grid from '@mui/material/Grid2';
 import Box from '@mui/material/Box';
+import ActivityStatsGraphs from '@/components/ActivityStatsGraphs';
+// Import components
+import FragmentsList from '@/components/FragmentsList';
+import CorrectionsList from '@/components/CorrectionsList';
+import ActivityDetails from '@/components/ActivityDetails';
+import H1Title from '@/components/ui/H1Title';
+import GradientBackground from '@/components/ui/GradientBackground';
+// Import the Fragment type from FragmentEditModal
+import FragmentEditModal, { Fragment as EditModalFragment } from '@/components/FragmentEditModal';
+
+// Replace custom Fragment interface with the imported type
+type Fragment = EditModalFragment;
 
 export default function ActivityDetail({ params }: { params: Promise<{ id: string }> }) {
   // Unwrap the Promise for params using React.use
@@ -26,7 +42,12 @@ export default function ActivityDetail({ params }: { params: Promise<{ id: strin
   const [corrections, setCorrections] = useState<Correction[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  // Add state for fragments
+  const [fragments, setFragments] = useState<Fragment[]>([]);
+  const [loadingFragments, setLoadingFragments] = useState(false);
+
   const router = useRouter();
+  const { enqueueSnackbar } = useSnackbar();
   
   const [isEditing, setIsEditing] = useState(false);
   const [name, setName] = useState('');
@@ -35,6 +56,12 @@ export default function ActivityDetail({ params }: { params: Promise<{ id: strin
   const [theoreticalPoints, setTheoreticalPoints] = useState(15);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [totalPoints, setTotalPoints] = useState(20); // Nouveau state pour le total des points
+  
+  // Remplacer l'état pour suivre la correction à supprimer
+  const [correctionToDelete, setCorrectionToDelete] = useState<number | null>(null);
+  const [isProcessing, setIsProcessing] = useState<boolean>(false);
+  const [tabValue, setTabValue] = useState(0);
   
   useEffect(() => {
     const fetchActivityAndCorrections = async () => {
@@ -51,6 +78,10 @@ export default function ActivityDetail({ params }: { params: Promise<{ id: strin
         // Set the grading scale values from the activity data or use defaults
         setExperimentalPoints(activityData.experimental_points !== undefined ? activityData.experimental_points : 5);
         setTheoreticalPoints(activityData.theoretical_points !== undefined ? activityData.theoretical_points : 15);
+        
+        // Calculer le total des points
+        const total = (activityData.experimental_points || 5) + (activityData.theoretical_points || 15);
+        setTotalPoints(total);
         
         // Fetch corrections for this activity
         const correctionsResponse = await fetch(`/api/activities/${activityId}/corrections`);
@@ -70,8 +101,112 @@ export default function ActivityDetail({ params }: { params: Promise<{ id: strin
     fetchActivityAndCorrections();
   }, [activityId]);
   
+  // Add useEffect to load fragments when needed (when tab changes to fragments tab)
+  useEffect(() => {
+    const fetchFragments = async () => {
+      if (tabValue === 1 && activityId) {
+        setLoadingFragments(true);
+        try {
+          const response = await fetch(`/api/activities/${activityId}/fragments`);
+          if (!response.ok) {
+            const errorData = await response.json().catch(() => ({}));
+            throw new Error(`Erreur (${response.status}): ${errorData.message || response.statusText}`);
+          }
+          const data = await response.json();
+          setFragments(data);
+        } catch (err) {
+          console.error('Erreur:', err);
+          enqueueSnackbar(`Erreur lors du chargement des fragments: ${(err as Error).message}`, { 
+            variant: 'error' 
+          });
+        } finally {
+          setLoadingFragments(false);
+        }
+      }
+    };
+    
+    fetchFragments();
+  }, [activityId, tabValue, enqueueSnackbar]);
+  
   const handleEditClick = () => {
     setIsEditing(true);
+  };
+  
+  // Add handlers for fragments
+  const handleAddFragment = async (fragmentData: Omit<EditModalFragment, 'id' | 'activity_id' | 'created_at' | 'updated_at'>) => {
+    try {
+      const response = await fetch(`/api/activities/${activityId}/fragments`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          ...fragmentData,
+          activity_id: parseInt(activityId)
+        }),
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(`Erreur (${response.status}): ${errorData.message || response.statusText}`);
+      }
+      
+      const newFragment = await response.json();
+      setFragments([...fragments, newFragment]);
+      enqueueSnackbar('Fragment ajouté avec succès', { variant: 'success' });
+    } catch (err) {
+      console.error('Erreur:', err);
+      enqueueSnackbar(`Erreur lors de l'ajout du fragment: ${(err as Error).message}`, { 
+        variant: 'error' 
+      });
+    }
+  };
+  
+  const handleUpdateFragment = async (id: number, fragmentData: Partial<EditModalFragment>) => {
+    try {
+      const response = await fetch(`/api/fragments/${id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(fragmentData),
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(`Erreur (${response.status}): ${errorData.message || response.statusText}`);
+      }
+      
+      const updatedFragment = await response.json();
+      setFragments(fragments.map(f => f.id === id ? updatedFragment : f));
+      enqueueSnackbar('Fragment mis à jour avec succès', { variant: 'success' });
+    } catch (err) {
+      console.error('Erreur:', err);
+      enqueueSnackbar(`Erreur lors de la mise à jour du fragment: ${(err as Error).message}`, { 
+        variant: 'error' 
+      });
+    }
+  };
+  
+  const handleDeleteFragment = async (id: number) => {
+    try {
+      const response = await fetch(`/api/fragments/${id}`, {
+        method: 'DELETE',
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(`Erreur (${response.status}): ${errorData.message || response.statusText}`);
+      }
+      
+      setFragments(fragments.filter(f => f.id !== id));
+      enqueueSnackbar('Fragment supprimé avec succès', { variant: 'success' });
+    } catch (err) {
+      console.error('Erreur:', err);
+      enqueueSnackbar(`Erreur lors de la suppression du fragment: ${(err as Error).message}`, { 
+        variant: 'error' 
+      });
+    }
   };
   
   const handleCancelClick = () => {
@@ -85,14 +220,18 @@ export default function ActivityDetail({ params }: { params: Promise<{ id: strin
   const handleSubmit = async () => {
     if (!name.trim()) {
       setError('Le nom de l\'activité est requis');
+      enqueueSnackbar('Le nom de l\'activité est requis', { variant: 'error' });
       return;
     }
-    // Validate that the points sum to 20
-    const totalPoints = Number(experimentalPoints) + Number(theoreticalPoints);
-    if (totalPoints !== 20) {
-      setError('Le total des points doit être égal à 20');
+    
+    // Validation de barème flexible - vérifie seulement que le total est positif
+    const currentTotal = Number(experimentalPoints) + Number(theoreticalPoints);
+    if (currentTotal <= 0) {
+      setError('Le total des points doit être supérieur à 0');
+      enqueueSnackbar('Le total des points doit être supérieur à 0', { variant: 'error' });
       return;
     }
+    
     setIsSubmitting(true);
     setError('');
     try {
@@ -102,21 +241,39 @@ export default function ActivityDetail({ params }: { params: Promise<{ id: strin
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ 
+          activityId: activityId,
           name, 
           content, 
           experimental_points: experimentalPoints,
-          theoretical_points: theoreticalPoints 
+          theoretical_points: theoreticalPoints,
+          total_points: currentTotal // Ajouter le total des points
         }),
       });
+      
       if (!response.ok) {
-        throw new Error('Erreur lors de la mise à jour de l\'activité');
+        // Extraire l'objet d'erreur JSON
+        const errorData = await response.json();
+        // Vous pouvez maintenant accéder à errorData.error
+        console.error('Erreur:', errorData.error);
+        // Gérer l'erreur (par ex. avec un state React)
+        // setError(`Erreur lors de la mise à jour de l'activité : ${errorData.error}`);
+        enqueueSnackbar(`Erreur lors de la mise à jour de l'activité :  ${errorData.error as Error}`,
+          { variant: 'error' }
+        );
+        return;
       }
+
+      
+      
       const updatedActivity = await response.json();
       setActivity(updatedActivity);
       setIsEditing(false);
-    } catch (err) {
-      console.error('Erreur:', err);
-      setError('Erreur lors de la mise à jour de l\'activité');
+      enqueueSnackbar('Activité mise à jour avec succès', { variant: 'success' });
+    } catch (error) {
+      console.error('Erreur:', error);
+      // setError(`Erreur lors de la mise à jour de l'activité : ${(error as Error).message}`);
+      enqueueSnackbar(`Erreur lors de la mise à jour de l'activité: ${(error as Error).message}`,
+      { variant: 'error' });
     } finally {
       setIsSubmitting(false);
     }
@@ -135,13 +292,20 @@ export default function ActivityDetail({ params }: { params: Promise<{ id: strin
       const response = await fetch(`/api/activities/${activityId}`, {
         method: 'DELETE',
       });
+      
       if (!response.ok) {
-        throw new Error('Erreur lors de la suppression');
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(`Erreur (${response.status}): ${errorData.message || response.statusText}`);
       }
+      
+      enqueueSnackbar('Activité supprimée avec succès', { variant: 'success' });
       router.push('/');
     } catch (err) {
       console.error('Erreur:', err);
-      setError('Erreur lors de la suppression de l\'activité');
+      setError(`Erreur lors de la suppression de l'activité: ${(err as Error).message}`);
+      enqueueSnackbar(`Erreur lors de la suppression de l'activité: ${(err as Error).message}`, { 
+        variant: 'error' 
+      });
       setConfirmingDelete(false);
     }
   };
@@ -162,12 +326,54 @@ export default function ActivityDetail({ params }: { params: Promise<{ id: strin
   ) => {
     const value = Number(e.target.value);
     setter(value);
-    // Auto-adjust the other field to maintain a sum of 20
-    if (isExperimental) {
-      setTheoreticalPoints(20 - value);
-    } else {
-      setExperimentalPoints(20 - value);
+    
+    // Mise à jour du total au lieu d'ajuster automatiquement l'autre valeur
+    setTotalPoints(value + otherValue);
+  };
+
+  // Fonction pour initier la suppression
+  const handleDeleteCorrection = (correctionId: number) => {
+    setCorrectionToDelete(correctionId);
+  };
+  
+  // Fonction pour confirmer et exécuter la suppression
+  const confirmDeleteCorrection = async (correctionId: number) => {
+    try {
+      setIsProcessing(true);
+      const response = await fetch(`/api/corrections/${correctionId}`, {
+        method: 'DELETE',
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(`Erreur (${response.status}): ${errorData.message || response.statusText}`);
+      }
+      
+      // Mise à jour de l'état local pour retirer la correction supprimée
+      setCorrections(corrections.filter(c => c.id !== correctionId));
+      
+      // Notification de succès
+      enqueueSnackbar('Correction supprimée avec succès', { 
+        variant: 'success' 
+      });
+    } catch (error) {
+      console.error('Erreur:', error);
+      enqueueSnackbar(`Erreur lors de la suppression de la correction: ${(error as Error).message}`, { 
+        variant: 'error' 
+      });
+    } finally {
+      setCorrectionToDelete(null);
+      setIsProcessing(false);
     }
+  };
+  
+  // Fonction pour annuler la suppression
+  const cancelDelete = () => {
+    setCorrectionToDelete(null);
+  };
+
+  const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
+    setTabValue(newValue);
   };
   
   if (loading) {
@@ -236,369 +442,191 @@ export default function ActivityDetail({ params }: { params: Promise<{ id: strin
   }
   
   return (
-    <div className="container mx-auto px-4 py-8 max-w-5xl">
-      <div className="flex items-center justify-between mb-6">
-        {isEditing ? (
-          <div className="flex items-center w-full">
-            <TextField
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              className="flex-grow mr-2"
-              variant="outlined"
-              size="small"
-              label="Nom de l'activité"
-              placeholder="Entrez le nom de l'activité"
-              error={!name.trim()}
-              helperText={!name.trim() ? "Le nom est requis" : ""}
-              autoFocus
-            />
-            <div className="flex space-x-2">
+    <Container maxWidth="md" className="py-8">
+      <Paper elevation={2} className="p-6">
+      <GradientBackground 
+          variant="primary" 
+          
+          sx={{
+            mt: 4,
+            borderRadius: 2,
+            py: 3,
+            px: 3
+          }}
+        >
+          {isEditing ? (
+            <div className="flex items-center w-full">
+            <IconButton
+              component={Link}
+              href={`/activities`}
+              className="mr-2 bg-white/20 hover:bg-white/30"
+              sx={{ transform: 'translateX(-10px)' }}
+            >
+              <ArrowBackIcon sx={{ fontSize: 30, padding: 0, color: "secondary.light" }} />
+            </IconButton>
+              <TextField
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                className="flex-grow mr-2"
+                variant="outlined"
+                size="small"
+                label="Nom de l'activité"
+                placeholder="Entrez le nom de l'activité"
+                error={!name.trim()}
+                helperText={!name.trim() ? "Le nom est requis" : ""}
+                autoFocus
+              />
+              <div className="flex space-x-2">
+                <IconButton
+                  onClick={handleSubmit}
+                  disabled={isSubmitting || !name.trim()}
+                  title="Sauvegarder les modifications"
+                  size="medium"
+                  color="success"
+                >
+                  {isSubmitting ? <CircularProgress size={24} /> : <SaveIcon />}
+                </IconButton>
+                <IconButton
+                  onClick={handleCancelClick}
+                  color="error"
+                  title="Annuler les modifications"
+                  size="medium"
+                >
+                  <CloseIcon />
+                </IconButton>
+              </div>
+            </div>
+          ) : (
+            <div className="flex items-center w-full">
+            <IconButton
+            component={Link}
+            href={`/activities`}
+            className="mr-2 bg-white/20 hover:bg-white/30"
+            sx={{ transform: 'translateX(-10px)' }}
+          >
+            <ArrowBackIcon sx={{ fontSize: 30, padding: 0, color: "secondary.light" }} />
+          </IconButton>
+            <H1Title className="font-bold" sx={{ transform: 'translateX(-10px)' }}>
+              {activity.name}
               <IconButton
-                onClick={handleSubmit}
-                disabled={isSubmitting || !name.trim()}
+                onClick={handleEditClick}
+                size="small"
                 color="primary"
-                title="Sauvegarder les modifications"
-                size="medium"
+                aria-label="edit"
               >
-                {isSubmitting ? <CircularProgress size={24} /> : <SaveIcon />}
+                <EditIcon className="ml-2" sx={{color: "secondary.light" }} />
               </IconButton>
-              <IconButton
-                onClick={handleCancelClick}
-                color="error"
-                title="Annuler les modifications"
-                size="medium"
-              >
-                <CloseIcon />
-              </IconButton>
-            </div>
-          </div>
-        ) : (
-          <h1 className="text-3xl font-bold flex items-center">
-            {activity.name}
-            <IconButton
-              onClick={handleEditClick}
-              size="small"
-              color="primary"
-              aria-label="edit"
-            >
-              <EditIcon className="ml-2" />
-            </IconButton>
-            {confirmingDelete ? (
-                    <>
+              {confirmingDelete ? (
+                      <>
+                        <IconButton
+                          onClick={handleCancelDelete}
+                          color="inherit"
+                          size="medium"
+                          title="Annuler la suppression"
+                        >
+                          <CloseIcon />
+                        </IconButton>
+                        <IconButton
+                          onClick={handleConfirmDelete}
+                          color="success"
+                          size="medium"
+                          title="Confirmer la suppression"
+                        >
+                          <CheckIcon />
+                        </IconButton>
+                      </>
+                    ) : (
                       <IconButton
-                        onClick={handleConfirmDelete}
-                        color="success"
+                        onClick={handleDeleteClick}
+                        color="error"
                         size="medium"
-                        title="Confirmer la suppression"
+                        title="Supprimer cette activité"
                       >
-                        <CheckIcon />
+                        <DeleteIcon />
                       </IconButton>
-                      <IconButton
-                        onClick={handleCancelDelete}
-                        color="inherit"
-                        size="medium"
-                        title="Annuler la suppression"
-                      >
-                        <CloseIcon />
-                      </IconButton>
-                    </>
-                  ) : (
-                    <IconButton
-                      onClick={handleDeleteClick}
-                      color="error"
-                      size="medium"
-                      title="Supprimer cette activité"
-                    >
-                      <DeleteIcon />
-                    </IconButton>
-                  )}
-          </h1>
-        )}
-      </div>
-      
-      {/* Section description */}
-      <Paper className="p-4 rounded-lg mb-8">
-        <div className="flex items-center justify-between mb-2">
-          <h2 className="text-xl font-semibold">Description de l'activité</h2>
-          {!isEditing && (
-            <IconButton
-              onClick={handleEditClick}
-              size="small"
-              color="primary"
-              aria-label="edit"
-            >
-              <EditIcon fontSize="small" />
-            </IconButton>
+                    )}
+            </H1Title>
+            </div>
           )}
-        </div>
-        {isEditing ? (
-          <TextField
-            value={content}
-            onChange={(e) => setContent(e.target.value)}
-            multiline
-            rows={4}
-            variant="outlined"
-            fullWidth
-            placeholder="Description de l'activité (facultative)"
-            size="small"
-          />
-        ) : activity.content ? (
-          <div className="bg-gray-50 p-3 rounded border border-gray-200 whitespace-pre-wrap">
-            {activity.content}
-          </div>
-        ) : (
-          <div className="bg-gray-50 p-3 rounded border border-gray-200 text-gray-500 italic">
-            Aucune description fournie
-          </div>
-        )}
-      </Paper>
-      
-      {/* Section Barème - Compact version */}
-      <Paper className="p-4 rounded-lg mb-8">
-        <div className="flex items-center justify-between mb-3">
-          <div className="flex items-center">
-            <BarChartIcon className="mr-2 text-blue-500" />
-            <h2 className="text-xl font-semibold">Barème de notation</h2>
-          </div>
-          {!isEditing && (
-            <IconButton
-              onClick={handleEditClick}
-              size="small"
-              color="primary"
-              aria-label="edit"
-            >
-              <EditIcon fontSize="small" />
-            </IconButton>
+        </GradientBackground>
+        <Box sx={{ mt: 4 }}>
+          <Tabs
+            value={tabValue}
+            onChange={handleTabChange}
+            variant="scrollable"
+            scrollButtons="auto"
+          >
+            <Tab label="Détails" />
+            <Tab label="Fragments" />
+            <Tab label="Corrections" />
+            <Tab label="Statistiques" />
+          </Tabs>
+        </Box>
+        
+        {/* Tab Content */}
+        <Box sx={{ mt: 3 }}>
+          {tabValue === 0 && (
+            <Box>
+              <ActivityDetails 
+                activity={activity}
+                isEditing={isEditing}
+                content={content}
+                experimentalPoints={experimentalPoints}
+                theoreticalPoints={theoreticalPoints}
+                onEditClick={handleEditClick}
+                onContentChange={(e) => setContent(e.target.value)}
+                handlePointsChange={handlePointsChange}
+                setExperimentalPoints={setExperimentalPoints}
+                setTheoreticalPoints={setTheoreticalPoints}
+              />
+            </Box>
           )}
-        </div>
-        {isEditing ? (
-          <div className="bg-gray-50 p-4 rounded-md border border-gray-200">
-            <div className="flex flex-col md:flex-row gap-4 mb-2">
-              <div className="flex-1">
-                <TextField
-                  label="Points partie expérimentale"
-                  type="number"
-                  InputProps={{ inputProps: { min: 0, max: 20 } }}
-                  value={experimentalPoints}
-                  onChange={(e) => handlePointsChange(e, setExperimentalPoints, theoreticalPoints, true)}
-                  variant="outlined"
-                  size="small"
-                  fullWidth
-                />
-              </div>
-              <div className="flex-1">
-                <TextField
-                  label="Points partie théorique"
-                  type="number"
-                  InputProps={{ inputProps: { min: 0, max: 20 } }}
-                  value={theoreticalPoints}
-                  onChange={(e) => handlePointsChange(e, setTheoreticalPoints, experimentalPoints, false)}
-                  variant="outlined"
-                  size="small"
-                  fullWidth
-                />
-              </div>
-            </div>
-            <div className="flex items-center justify-between">
-              <div className="text-sm text-gray-600">
-                Le total des points doit être égal à 20
-              </div>
-              <div className="font-medium">
-                Total: <span className="font-bold">{experimentalPoints + theoreticalPoints}/20</span>
-                {experimentalPoints + theoreticalPoints !== 20 && (
-                  <span className="text-red-500 ml-2">(Ajustez pour obtenir un total de 20)</span>
-                )}
-              </div>
-            </div>
-          </div>
-        ) : (
-          <div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="bg-white p-3 rounded border border-gray-200">
-                <p className="text-gray-700 font-medium">Partie expérimentale :</p>
-                <p className="text-2xl font-bold text-blue-600">{activity.experimental_points || 5} points</p>
-              </div>
-              <div className="bg-white p-3 rounded border border-gray-200">
-                <p className="text-gray-700 font-medium">Partie théorique :</p>
-                <p className="text-2xl font-bold text-blue-600">{activity.theoretical_points || 15} points</p>
-              </div>
-            </div>
-            <div className="text-right mt-3">
-              <p className="text-gray-700">
-                <span className="font-medium">Total :</span>{" "}
-                <span className="font-bold">
-                  {(activity.experimental_points || 5) + (activity.theoretical_points || 15)} points
-                </span>
-              </p>
-            </div>
-          </div>
-        )}
-      </Paper>
-      
-      {/* Section Fragments et Corrections */}
-      <div className="flex flex-col lg:flex-row gap-6">
-        {/* Corrections */}
-        <div className="w-full lg:w-2/3">
-          <Paper className="p-4 shadow mb-4">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-xl font-semibold">Corrections</h2>
-              {!isEditing && (
-                <div className="flex space-x-2">
-                  <IconButton
-                    onClick={handleNewCorrectionClick}
-                    color="success"
-                    size="medium"
-                    title="Nouvelle correction"
-                  >
-                    <AddIcon />
-                  </IconButton>
-                  
-                  {/* Add button for multiple corrections */}
-                  <Button
-                    component={Link}
-                    href={`/corrections/multiples?activityId=${activityId}`}
-                    variant="outlined"
-                    size="small"
-                    color='secondary'
-                    startIcon={<PeopleAltIcon />}
-                  >
-                    Corrections en lot
-                  </Button>
-                  {activityId && (
-                    <Button
-                      variant="outlined"
-                      color="primary"
-                      startIcon={<GroupsIcon />}
-                      component={Link}
-                      href={`/activities/${activityId}/groups`}
-                    >
-                      Groupes
-                    </Button>
-                  )}
-                </div>
-              )}
-            </div>
-            
-            {corrections.length === 0 ? (
-              <div className="bg-gray-50 p-4 rounded border border-gray-200 text-center">
-                <Typography color="textSecondary">
-                  Aucune correction pour cette activité.
-                </Typography>
-                {!isEditing && (
-                  <Button
-                    onClick={handleNewCorrectionClick}
-                    variant="contained" 
-                    color="primary"
-                    size="small"
-                    className="mt-3"
-                    startIcon={<AddIcon />}
-                  >
-                    Ajouter une correction
-                  </Button>
-                )}
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-1 lg:grid-cols-1 gap-4">
-              {corrections.length === 0 ? (
-                <div className="bg-gray-50 p-4 rounded border border-gray-200 text-center">
-                  <Typography color="textSecondary">
-                    Aucune correction pour cette activité.
-                  </Typography>
-                  {!isEditing && (
-                    <Button
-                      onClick={handleNewCorrectionClick}
-                      variant="contained" 
-                      color="primary"
-                      size="small"
-                      className="mt-3"
-                      startIcon={<AddIcon />}
-                    >
-                      Ajouter une correction
-                    </Button>
-                  )}
+          
+          {tabValue === 1 && (
+            <Box>
+              <Typography variant="body2" color="textSecondary">
+              Les fragments sont des morceaux de texte réutilisables pour vos corrections.
+              </Typography>
+              {loadingFragments ? (
+                <div className="py-10 flex justify-center max-w-[400px] mx-auto">
+                  <LoadingSpinner size="md" text="Chargement des fragments" />
                 </div>
               ) : (
-                <Grid container spacing={2}>
-                  {corrections.map((correction) => (
-                    <Grid size={{ xs: 12, sm: 6 }} key={correction.id}>
-                      <Box
-                        sx={{
-                          position: 'relative',
-                          border: '1px solid',
-                          borderColor: 'divider',
-                          borderRadius: 1,
-                          p: 2,
-                          boxShadow: 1,
-                          transition: 'box-shadow 0.3s',
-                          '&:hover': {
-                            boxShadow: 2
-                          }
-                        }}
-                      >
-                        {/* Affichage de la note en haut à droite */}
-                        {correction.grade !== null && correction.grade !== undefined && (
-                          <Box sx={{ position: 'absolute', top: 12, right: 12 }}>
-                            <Typography variant="subtitle2">{correction.grade} / {(correction.experimental_points ?? 5) + (correction.theoretical_points ?? 15)}</Typography>
-                          </Box>
-                        )}
-                        
-                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1, mb: 2, pr: 5 }}>
-                          <Typography variant="subtitle1" fontWeight="bold" noWrap>
-                            {correction.student_name || `${activity.name} - Sans nom`}
-                          </Typography>
-                          <Typography variant="body2" color="text.secondary">
-                            Ajoutée le {new Date(correction.created_at!).toLocaleString('fr-FR')}
-                          </Typography>
-                        </Box>
-                        
-                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <Button
-                            component={Link}
-                            href={`/corrections/${correction.id}`}
-                            variant="outlined"
-                            size="small"
-                          >
-                            Éditer la correction
-                          </Button>
-                          {correction.grade === null && (
-                            <Typography variant="caption" color="text.secondary" sx={{ fontStyle: 'italic' }}>
-                              Non notée
-                            </Typography>
-                          )}
-                        </Box>
-                      </Box>
-                    </Grid>
-                  ))}
-                </Grid>
+                <FragmentsList 
+                  fragments={fragments} 
+                  activityId={parseInt(activityId)} 
+                  onAddFragment={handleAddFragment}
+                  onUpdateFragment={handleUpdateFragment}
+                  onDeleteFragment={handleDeleteFragment}
+                />
               )}
-              </div>
-            )}
-          </Paper>
-        </div>
-        
-        {/* Fragments */}
-        <div className="w-full lg:w-1/3">
-          <Paper className="p-4 shadow mb-4">
-            <div className="flex items-center justify-between mb-2">
-              <h2 className="text-xl font-semibold">Fragments</h2>
-              
-              {!isEditing && (
-                <IconButton
-                  onClick={handleFragmentsClick}
-                  color="success"
-                  size="medium"
-                  title="Gérer les fragments"
-                >
-                  <ArticleIcon />
-                </IconButton>
-              )}
-            </div>
-            <Typography variant="body2" color="textSecondary">
-              Les fragments sont des morceaux de texte réutilisables pour vos corrections.
-            </Typography>
-          </Paper>
-        </div>
-      </div>
-    </div>
+            </Box>
+          )}
+          
+          {tabValue === 2 && (
+            <Box>
+              <CorrectionsList 
+                corrections={corrections}
+                activity={activity}
+                activityId={activityId}
+                isEditing={isEditing}
+                isProcessing={isProcessing}
+                correctionToDelete={correctionToDelete}
+                onNewCorrection={handleNewCorrectionClick}
+                onDeleteCorrection={handleDeleteCorrection}
+                onConfirmDelete={confirmDeleteCorrection}
+                onCancelDelete={cancelDelete}
+              />
+            </Box>
+          )}
+          
+          {tabValue === 3 && (
+            <Box>
+              <ActivityStatsGraphs activityId={parseInt(id)} />
+            </Box>
+          )}
+        </Box>
+      </Paper>
+    </Container>
   );
 }

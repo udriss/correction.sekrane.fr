@@ -12,8 +12,6 @@ import {
   Button,
   Chip
 } from '@mui/material';
-import Grid from '@mui/material/Grid2';
-import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { parseContentItems } from '@/lib/services/correctionService';
 import { generateHtmlFromItems } from '@/utils/htmlUtils';

@@ -2,6 +2,9 @@ import { NextResponse } from 'next/server';
 import { getFragmentsByActivityId } from '@/lib/fragment';
 import { getActivityById } from '@/lib/activity';
 import { withConnection } from '@/lib/db';
+import authOptions from "@/lib/auth";
+import { getUser } from '@/lib/auth'; // Add import for custom auth
+import { getServerSession } from "next-auth/next";
 
 export async function GET(
   request: Request,
@@ -42,6 +45,14 @@ export async function POST(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
+
+    // Get the user from both auth systems
+    const session = await getServerSession(authOptions);
+    const customUser = await getUser();
+    
+    // Use either auth system, starting with custom auth
+    const userId = customUser?.id || session?.user?.id;
+
   try {
     // Await the params object to access its properties
     const { id } = await params;
@@ -52,28 +63,28 @@ export async function POST(
     }
     
     const body = await request.json();
-    console.log("Création d'un fragment pour l'activité:", activityId, body);
     
-    // Valider les données requises
-    if (!body.title || !body.content) {
+    // Validate required fields - now using content and category instead of title and content
+    if (!body.content) {
       return NextResponse.json({ 
-        error: 'Le titre et le contenu sont requis' 
+        error: 'Le contenu est requis' 
       }, { status: 400 });
     }
     
     // Insérer le fragment dans la base de données
     return await withConnection(async (connection) => {
+      // Updated fields to match our Fragment model
       const [result] = await connection.query(
-        `INSERT INTO activity_fragments (activity_id, title, content, type)
+        `INSERT INTO fragments (activity_id, content, category, user_id)
          VALUES (?, ?, ?, ?)`,
-        [activityId, body.title, body.content, body.type || 'text']
+        [activityId, body.content, body.category || 'Général', userId]
       );
       
       const fragmentId = (result as any).insertId;
       
       // Récupérer le fragment complet pour le retourner
       const [rows] = await connection.query(
-        `SELECT * FROM activity_fragments WHERE id = ?`,
+        `SELECT * FROM fragments WHERE id = ?`,
         [fragmentId]
       );
       

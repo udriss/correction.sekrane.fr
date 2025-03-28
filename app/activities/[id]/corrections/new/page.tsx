@@ -12,7 +12,12 @@ import {
   CircularProgress, 
   TextField,
   Button,
-  IconButton
+  IconButton,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
+  SelectChangeEvent
 } from '@mui/material';
 import Link from 'next/link';
 import AssignmentIcon from '@mui/icons-material/Assignment';
@@ -22,15 +27,19 @@ import SaveIcon from '@mui/icons-material/Save';
 import HomeIcon from '@mui/icons-material/Home';
 import HourglassEmptyIcon from '@mui/icons-material/HourglassEmpty';
 import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline';
+import {Student} from '@/lib/types'
+
 
 export default function NewCorrection({ params }: { params: Promise<{ id: string }> }) {
   // Unwrap the Promise for params using React.use
   const { id } = React.use(params);
   const activityId = id;
   
-  const [studentName, setStudentName] = useState('');
+  const [studentId, setStudentId] = useState<number | null>(null);
+  const [students, setStudents] = useState<Student[]>([]);
   const [activity, setActivity] = useState<Activity | null>(null);
   const [loading, setLoading] = useState(true);
+  const [studentsLoading, setStudentsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
   const router = useRouter();
@@ -49,9 +58,29 @@ export default function NewCorrection({ params }: { params: Promise<{ id: string
         setLoading(false);
       }
     };
+    
+    const fetchStudents = async () => {
+      try {
+        setStudentsLoading(true);
+        const response = await fetch('/api/students');
+        if (!response.ok) throw new Error('Erreur lors du chargement des étudiants');
+        const data = await response.json();
+        setStudents(data);
+      } catch (err) {
+        console.error('Erreur:', err);
+        // Ne pas définir d'erreur pour ne pas bloquer l'interface
+      } finally {
+        setStudentsLoading(false);
+      }
+    };
 
     fetchActivity();
+    fetchStudents();
   }, [activityId]);
+
+  const handleStudentChange = (event: SelectChangeEvent<number>) => {
+    setStudentId(event.target.value as number);
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -65,7 +94,7 @@ export default function NewCorrection({ params }: { params: Promise<{ id: string
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ 
-          student_name: studentName.trim() || null,
+          student_id: studentId,
           content: '' 
         }),
       });
@@ -171,26 +200,34 @@ export default function NewCorrection({ params }: { params: Promise<{ id: string
             
             <form onSubmit={handleSubmit}>
               <div className="mb-6">
-                <TextField
-                  id="studentName"
-                  label="Nom de l'étudiant (facultatif)"
-                  variant="outlined"
-                  fullWidth
-                  value={studentName}
-                  onChange={(e) => setStudentName(e.target.value)}
-                  placeholder={`${activity.name} - [horodatage sera ajouté automatiquement]`}
-                  InputProps={{
-                    startAdornment: <PersonAddIcon className="mr-2 text-gray-400" />,
-                  }}
-                  className="bg-white"
-                />
+                <FormControl fullWidth>
+                  <InputLabel id="student-select-label">Étudiant</InputLabel>
+                  <Select
+                    labelId="student-select-label"
+                    id="student-select"
+                    value={studentId || ''}
+                    onChange={handleStudentChange}
+                    label="Étudiant"
+                    startAdornment={<PersonAddIcon className="mr-2 text-gray-400" />}
+                    disabled={studentsLoading}
+                  >
+                    <MenuItem value="">
+                      <em>Aucun étudiant sélectionné</em>
+                    </MenuItem>
+                    {students.map((student) => (
+                      <MenuItem key={student.id} value={student.id}>
+                        {student.first_name} {student.last_name}
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
                 <Typography variant="caption" className="text-gray-500 mt-1 block">
-                  Si non spécifié, la correction sera identifiée uniquement par l'horodatage
+                  Sélectionnez un étudiant pour cette correction ou laissez vide
                 </Typography>
               </div>
 
               <div className="bg-blue-50 p-4 rounded-lg mb-6 border border-blue-100">
-                <Typography variant="body2" className="text-blue-800">
+                <Typography variant="body2" >
                   <strong>Information :</strong> Après avoir ajouté la correction, vous pourrez ajouter le contenu détaillé, les notes et les dates de rendu.
                 </Typography>
               </div>

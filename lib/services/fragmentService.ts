@@ -1,4 +1,4 @@
-import { Fragment } from '@/lib/fragment';
+import { Fragment } from '@/lib/types';
 
 export async function fetchFragmentsForActivity(activityId: number): Promise<Fragment[]> {
   const fragmentsResponse = await fetch(`/api/activities/${activityId}/fragments`);

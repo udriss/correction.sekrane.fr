@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import { Fragment } from '@/lib/fragment';
+import { Fragment } from '@/lib/types';
 import { ContentItem } from '@/types/correction';
 import * as fragmentService from '../services/fragmentService';
 
@@ -124,9 +124,9 @@ export function useFragments(updateContentWithFragment?: (fragmentId: number, ne
     }
   }, []);
 
-  const handleEditFragment = useCallback((fragment: Fragment) => {
-    setEditingFragmentId(fragment.id || null);
-    setEditedFragmentContent(fragment.content);
+  const handleEditFragment = useCallback((id: number, content: string) => {
+    setEditingFragmentId(id || null);
+    setEditedFragmentContent(content);
   }, []);
 
   const handleCancelEditFragment = useCallback(() => {

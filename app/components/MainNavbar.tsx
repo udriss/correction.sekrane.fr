@@ -12,18 +12,29 @@ import {
   Container,
   useScrollTrigger,
   Slide,
-  IconButton
+  IconButton,
+  Tooltip,
+  Divider,
+  ListItemIcon,
+  ListItemText
 } from '@mui/material';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import ChangePasswordModal from './ChangePasswordModal';
-import { 
-  AccountCircle, 
-  KeyboardArrowDown, 
-  Add as AddIcon,
-  Home as HomeIcon,
-  ViewList as ViewListIcon
-} from '@mui/icons-material';
+import AccountCircle from '@mui/icons-material/AccountCircle';
+import KeyboardArrowDown from '@mui/icons-material/KeyboardArrowDown';
+import AddIcon from '@mui/icons-material/Add';
+import HomeIcon from '@mui/icons-material/Home';
+import ViewListIcon from '@mui/icons-material/ViewList';
+import SchoolIcon from '@mui/icons-material/School';
+import PeopleIcon from '@mui/icons-material/People';
+import MenuBookIcon from '@mui/icons-material/MenuBook';
+import FormatListBulletedIcon from '@mui/icons-material/FormatListBulleted';
+import FilterListIcon from '@mui/icons-material/FilterList';
+import AssignmentIcon from '@mui/icons-material/Assignment';
+import CategoryIcon from '@mui/icons-material/Category';
+import SearchIcon from '@mui/icons-material/Search';
+import ThemeSwitcher from '@/components/layout/ThemeSwitcher';
 
 interface User {
   id: number;
@@ -55,9 +66,13 @@ export default function MainNavbar() {
   const [loading, setLoading] = useState(true);
   const router = useRouter();
   
-  // États pour le menu de l'utilisateur
+  // États pour les menus
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
+  const [classMenuAnchor, setClassMenuAnchor] = useState<null | HTMLElement>(null);
+  const [activitiesMenuAnchor, setActivitiesMenuAnchor] = useState<null | HTMLElement>(null);
   const open = Boolean(anchorEl);
+  const classMenuOpen = Boolean(classMenuAnchor);
+  const activitiesMenuOpen = Boolean(activitiesMenuAnchor);
   
   // État pour le modal de changement de mot de passe
   const [passwordModalOpen, setPasswordModalOpen] = useState(false);
@@ -104,6 +119,24 @@ export default function MainNavbar() {
   const handleChangePasswordClick = () => {
     handleMenuClose(); 
     setPasswordModalOpen(true);
+  };
+
+  // Gestionnaires pour le menu classe
+  const handleClassMenuClick = (event: React.MouseEvent<HTMLElement>) => {
+    setClassMenuAnchor(event.currentTarget);
+  };
+  
+  const handleClassMenuClose = () => {
+    setClassMenuAnchor(null);
+  };
+
+  // Gestionnaires pour le menu activities
+  const handleActivitiesMenuClick = (event: React.MouseEvent<HTMLElement>) => {
+    setActivitiesMenuAnchor(event.currentTarget);
+  };
+  
+  const handleActivitiesMenuClose = () => {
+    setActivitiesMenuAnchor(null);
   };
 
   if (loading) return null;
@@ -158,32 +191,156 @@ export default function MainNavbar() {
                   <HomeIcon sx={{ fontSize: '1.5rem' }} />
                 </Button>
                 
-                <Button 
-                  component={Link} 
-                  href="/activities" 
-                  color="inherit" 
-                  sx={{ fontWeight: 500 }}
-                >
-                  <ViewListIcon sx={{ fontSize: '1.5rem' }} />
-                </Button>
+                {/* Modified Activities button to trigger dropdown */}
+                <Tooltip title="Activités">
+                  <Button
+                    color="inherit"
+                    onClick={handleActivitiesMenuClick}
+                    sx={{ fontWeight: 500 }}
+                  >
+                    <ViewListIcon sx={{ fontSize: '1.5rem' }} />
+                  </Button>
+                </Tooltip>
                 
-                <Button 
-                  component={Link} 
-                  href="/activities/new" 
-                  color="inherit" 
-                  sx={{ fontWeight: 500 }}
+                {/* Activities Dropdown Menu */}
+                <Menu
+                  anchorEl={activitiesMenuAnchor}
+                  open={activitiesMenuOpen}
+                  onClose={handleActivitiesMenuClose}
+                  onClick={handleActivitiesMenuClose}
+                  PaperProps={{
+                    elevation: 3,
+                    sx: {
+                      mt: 1,
+                      minWidth: 200,
+                      borderRadius: 2,
+                      '& .MuiMenuItem-root': {
+                        px: 2,
+                        py: 1,
+                      },
+                    },
+                  }}
+                  transformOrigin={{ horizontal: 'center', vertical: 'top' }}
+                  anchorOrigin={{ horizontal: 'center', vertical: 'bottom' }}
                 >
-                 <AddIcon sx={{ fontSize: '1.5rem' }} />
-                </Button>
+                  <MenuItem component={Link} href="/activities">
+                    <ListItemIcon>
+                      <FormatListBulletedIcon fontSize="small" />
+                    </ListItemIcon>
+                    <ListItemText primary="Liste des activités" />
+                  </MenuItem>
+                  
+                  <MenuItem component={Link} href="/activities/new">
+                    <ListItemIcon>
+                      <AddIcon fontSize="small" />
+                    </ListItemIcon>
+                    <ListItemText primary="Nouvelle activité" />
+                  </MenuItem>
+                  
+                  <Divider />
+                  
+                  <MenuItem component={Link} href="/activities?filter=recent">
+                    <ListItemIcon>
+                      <FilterListIcon fontSize="small" />
+                    </ListItemIcon>
+                    <ListItemText primary="Activités récentes" />
+                  </MenuItem>
+                  
+                  <MenuItem component={Link} href="/corrections">
+                    <ListItemIcon>
+                      <AssignmentIcon fontSize="small" />
+                    </ListItemIcon>
+                    <ListItemText primary="Corrections" />
+                  </MenuItem>
+                  
+                  <MenuItem component={Link} href="/fragments">
+                    <ListItemIcon>
+                      <CategoryIcon fontSize="small" />
+                    </ListItemIcon>
+                    <ListItemText primary="Fragments" />
+                  </MenuItem>
+                  
+                  <MenuItem component={Link} href="/activities/search">
+                    <ListItemIcon>
+                      <SearchIcon fontSize="small" />
+                    </ListItemIcon>
+                    <ListItemText primary="Recherche avancée" />
+                  </MenuItem>
+                </Menu>
+                
+                {/* Nouveau bouton pour la gestion des classes */}
+                <Tooltip title="Gestion des classes">
+                  <Button
+                    color="inherit"
+                    onClick={handleClassMenuClick}
+                    sx={{ fontWeight: 500 }}
+                  >
+                    <SchoolIcon sx={{ fontSize: '1.5rem' }} />
+                  </Button>
+                </Tooltip>
+                
+                {/* Menu déroulant pour la gestion des classes */}
+                <Menu
+                  anchorEl={classMenuAnchor}
+                  open={classMenuOpen}
+                  onClose={handleClassMenuClose}
+                  onClick={handleClassMenuClose}
+                  PaperProps={{
+                    elevation: 3,
+                    sx: {
+                      mt: 1,
+                      minWidth: 200,
+                      borderRadius: 2,
+                      '& .MuiMenuItem-root': {
+                        px: 2,
+                        py: 1,
+                      },
+                    },
+                  }}
+                  transformOrigin={{ horizontal: 'center', vertical: 'top' }}
+                  anchorOrigin={{ horizontal: 'center', vertical: 'bottom' }}
+                >
+                  <MenuItem component={Link} href="/classes">
+                    <ListItemIcon>
+                      <FormatListBulletedIcon fontSize="small" />
+                    </ListItemIcon>
+                    <ListItemText primary="Liste des classes" />
+                  </MenuItem>
+                  
+                  <MenuItem component={Link} href="/classes/new">
+                    <ListItemIcon>
+                      <AddIcon fontSize="small" />
+                    </ListItemIcon>
+                    <ListItemText primary="Nouvelle classe" />
+                  </MenuItem>
+                  
+                  <Divider />
+                  
+                  <MenuItem component={Link} href="/students">
+                    <ListItemIcon>
+                      <PeopleIcon fontSize="small" />
+                    </ListItemIcon>
+                    <ListItemText primary="Gestion des étudiants" />
+                  </MenuItem>
+                  
+                  <MenuItem component={Link} href="/classes?view=activities">
+                    <ListItemIcon>
+                      <MenuBookIcon fontSize="small" />
+                    </ListItemIcon>
+                    <ListItemText primary="Activités par classe" />
+                  </MenuItem>
+                </Menu>
               </Box>
               
               {/* Authentification */}
               {user ? (
                 <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                  <ThemeSwitcher />
                   <Button
                     color="primary"
                     variant="outlined"
-                    onClick={handleMenuClick}
+                    onClick={handleMenuClick
+                    }
                     endIcon={<KeyboardArrowDown />}
                     startIcon={<AccountCircle />}
                     size="small"

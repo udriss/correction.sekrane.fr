@@ -1,40 +1,112 @@
-import { NextResponse } from 'next/server';
-import { updateCorrectionName } from '../../../../../lib/correction';
+import { NextRequest, NextResponse } from 'next/server';
+import { withConnection } from '@/lib/db';
+import { getServerSession } from 'next-auth/next';
+import authOptions from '@/lib/auth';
+import { getUser } from '@/lib/auth';
 
 export async function PUT(
-  request: Request,
-  { params }: { params: Promise<Record<string, string>> }
-): Promise<NextResponse> {
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+
   try {
-    const { id } = await params; // await the params as suggested
-    const { student_name } = await request.json();
-    const correctionId = parseInt(id, 10);
+
+    // Authentication check
+    const session = await getServerSession(authOptions);
+    const customUser = await getUser(request);
     
-    if (isNaN(correctionId)) {
-      return NextResponse.json(
-        { error: 'ID de correction invalide' },
-        { status: 400 }
-      );
+    
+    // Use either auth system
+    const userId = customUser?.id || session?.user?.id;
+
+    console.log('[API] Name update request received for ID:', userId);
+
+    
+    if (!userId) {
+      return NextResponse.json({ error: 'Utilisateur non authentifié' }, { status: 401 });
     }
+
+    // Await the params
+    const { id } = await params;
+    const correctionId = parseInt(id);
     
-    const success = await updateCorrectionName(correctionId, student_name);
-    
-    if (!success) {
-      return NextResponse.json(
-        { error: 'Correction non trouvée' },
-        { status: 404 }
-      );
+    if (!correctionId) {
+      return NextResponse.json({ error: 'ID de correction manquant' }, { status: 400 });
     }
+
+    // Get the request body
+    const body = await request.json();
+    console.log('[API] Request body:', body);
     
-    return NextResponse.json({ 
-      success: true,
-      student_name
+    // Check if we have the necessary data
+    const studentFirstName = body.student_first_name;
+    const studentLastName = body.student_last_name;
+    
+    console.log('[API] Student name data:', { studentFirstName, studentLastName });
+    
+    if (!studentFirstName && !studentLastName) {
+      return NextResponse.json({ error: 'Prénom ou nom requis' }, { status: 400 });
+    }
+
+    return await withConnection(async (connection) => {
+      // First, get the student_id from the correction
+      const [correctionResult] = await connection.query(
+        'SELECT student_id FROM corrections WHERE id = ?',
+        [correctionId]
+      );
+
+      if (!Array.isArray(correctionResult) || (correctionResult as any[]).length === 0) {
+        return NextResponse.json({ error: 'Correction non trouvée' }, { status: 404 });
+      }
+
+      const student_id = (correctionResult as any[])[0].student_id;
+      
+      if (!student_id) {
+        return NextResponse.json({ error: "ID d'étudiant non trouvé dans la correction" }, { status: 404 });
+      }
+
+      // Check if the student exists
+      const [studentResult] = await connection.query(
+        'SELECT * FROM students WHERE id = ?',
+        [student_id]
+      );
+
+      if (!Array.isArray(studentResult) || (studentResult as any[]).length === 0) {
+        return NextResponse.json({ error: 'Étudiant non trouvé' }, { status: 404 });
+      }
+
+      // Update the student's name in the students table
+      await connection.query(
+        'UPDATE students SET first_name = ?, last_name = ? WHERE id = ?',
+        [studentFirstName, studentLastName, student_id]
+      );
+
+      // Get the updated student data
+      const [updatedStudentResult] = await connection.query(
+        'SELECT * FROM students WHERE id = ?',
+        [student_id]
+      );
+
+      if (!Array.isArray(updatedStudentResult) || (updatedStudentResult as any[]).length === 0) {
+        return NextResponse.json({ error: 'Erreur lors de la récupération des données mises à jour' }, { status: 500 });
+      }
+
+      const updatedStudent = (updatedStudentResult as any[])[0];
+
+      // Return the updated student data with additional logging
+      const response = {
+        success: true,
+        student_id: updatedStudent.id,
+        student_first_name: updatedStudent.first_name,
+        student_last_name: updatedStudent.last_name,
+        student_name: `${updatedStudent.first_name || ''} ${updatedStudent.last_name || ''}`.trim()
+      };
+      
+      console.log('[API] Response data:', response);
+      return NextResponse.json(response);
     });
   } catch (error) {
-    console.error('Error updating correction name:', error);
-    return NextResponse.json(
-      { error: 'Erreur lors de la mise à jour du nom' },
-      { status: 500 }
-    );
+    console.error('Error updating student name:', error);
+    return NextResponse.json({ error: "Erreur lors de la mise à jour du nom de l'étudiant" }, { status: 500 });
   }
 }

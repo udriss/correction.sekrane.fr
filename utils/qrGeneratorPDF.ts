@@ -1,277 +1,227 @@
 import { jsPDF } from 'jspdf';
 import QRCode from 'qrcode';
-import { Correction } from '@/lib/types';
-import { svg2pdf } from 'svg2pdf.js';
+import { Correction, Student } from '@/lib/types';
 
-interface Group {
-  name?: string;
-  activity_name?: string;
-  description?: string;
-  [key: string]: any;
-}
-
+// Ajout d'une interface pour les activités
 interface Activity {
-  id?: number;
-  name?: string;
-  description?: string;
-  experimental_points?: number;
-  theoretical_points?: number;
-  [key: string]: any;
+  id: number;
+  name: string;
 }
 
-interface GeneratePdfOptions {
+// Define the options type for the function
+interface QRCodePDFOptions {
   corrections: Correction[];
-  group: Group | null;
-  activity?: Activity | null;
-  generateShareCode: (correctionId: string) => Promise<{ code?: string }>;
+  group: { name: string; activity_name?: string } | null;
+  generateShareCode: (correctionId: string) => Promise<{ isNew: boolean; code: string }>;
   getExistingShareCode: (correctionId: string) => Promise<{ exists: boolean; code?: string }>;
   onSuccess?: (updatedCorrections: Correction[]) => void;
+  students?: Student[]; // Ajouter un tableau d'étudiants optionnel
+  activities?: Activity[]; // Ajouter un tableau d'activités optionnel
 }
 
-/**
- * Génère un QR Code haute résolution en PNG
- * @param url URL à encoder dans le QR code
- * @returns Promise avec l'URL de données du QR code en PNG
- */
-async function generateHighResQRCode(url: string): Promise<string> {
-  return QRCode.toDataURL(url, {
-    width: 1000,          // Largeur élevée pour une meilleure qualité
-    margin: 2,            // Marge pour la lisibilité
-    scale: 8,             // Échelle élevée pour une meilleure netteté
-    errorCorrectionLevel: 'H', // Niveau élevé de correction d'erreur pour une meilleure lecture
-    color: {
-      dark: '#000000',    // Noir pour un contraste maximal
-      light: '#ffffff'    // Blanc pur pour le fond
-    }
-  });
+// Fonction utilitaire pour récupérer le nom complet d'un étudiant
+function getStudentFullName(studentId: number | null, students: Student[]): string {
+  if (!studentId) return 'Sans nom';
+  const student = students.find(s => s.id === studentId);
+  if (!student) return 'Sans nom';
+  return `${student.first_name} ${student.last_name}`;
 }
 
-/**
- * Génère un PDF avec des QR codes haute résolution pour chaque étudiant
- */
+// Fonction utilitaire pour récupérer le nom d'une activité
+function getActivityName(activityId: number | null, activities: Activity[]): string {
+  if (!activityId) return 'Activité inconnue';
+  const activity = activities.find(a => a.id === activityId);
+  if (!activity) return `Activité ${activityId}`;
+  return activity.name;
+}
+
 export async function generateQRCodePDF({
   corrections,
   group,
-  activity,
   generateShareCode,
   getExistingShareCode,
-  onSuccess
-}: GeneratePdfOptions): Promise<string | null> {
+  onSuccess,
+  students = [], // Valeur par défaut : tableau vide
+  activities = [] // Valeur par défaut : tableau vide
+}: QRCodePDFOptions): Promise<string | null> {
   try {
-    const doc = new jsPDF();
-    const baseUrl = typeof window !== 'undefined' ? window.location.origin : 'https://correction.sekrane.fr';
+    if (!corrections || corrections.length === 0) {
+      throw new Error('No corrections provided');
+    }
+
+    // Create a new jsPDF instance
+    const doc = new jsPDF({
+      orientation: 'portrait',
+      unit: 'mm',
+      format: 'a4'
+    });
+
+    // Créer un dictionnaire des codes de partage pour chaque correction
+    // au lieu de modifier directement les objets corrections
+    const shareCodes: Record<number, string> = {};
     
-    // Dimensions de la page
+    // Title and header
+    const groupName = group?.name || 'Group';
+    
+    // Utiliser la fonction getActivityName pour récupérer le nom de l'activité
+    const firstCorrection = corrections[0];
+    const activityId = firstCorrection?.activity_id;
+    // Utiliser l'activité spécifiée dans le groupe, sinon la récupérer depuis la liste des activités
+    const activityName = group?.activity_name || getActivityName(activityId, activities);
+    
+    const title = `${activityName} - ${groupName}`;
+    const date = new Date().toLocaleDateString('fr-FR');
+    
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(18);
+    doc.text(title, 105, 20, { align: 'center' });
+    
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(12);
+    doc.text(`Generated on ${date}`, 105, 28, { align: 'center' });
+    doc.text(`${corrections.length} corrections`, 105, 34, { align: 'center' });
+    
+    // Page dimensions
     const pageWidth = doc.internal.pageSize.getWidth();
     const pageHeight = doc.internal.pageSize.getHeight();
-    const margin = 20;
-    let yPosition = margin;
+    const margin = 15;
+    const qrSize = 40; // in mm
+    const itemsPerRow = 2;
+    const rowHeight = qrSize + 30; // QR code + text space
     
-    // --- PAGE DE GARDE ---
+    let x = margin;
+    let y = 50; // Starting position after header
+    let pageNumber = 1;
     
-    // En-tête avec date
-    doc.setFontSize(10);
-    doc.setFont("helvetica", "normal");
-    doc.setTextColor(100, 100, 100);
-    doc.text(`Généré le ${new Date().toLocaleDateString()}`, pageWidth - margin, margin, { align: "right" });
-    
-    // Titre du document
-    yPosition = 60;
-    doc.setFontSize(24);
-    doc.setFont("helvetica", "bold");
-    doc.setTextColor(0, 0, 0);
-    doc.text("FEEDBACK ÉTUDIANTS", pageWidth / 2, yPosition, { align: "center" });
-    
-    // Titre du groupe
-    yPosition += 20;
-    doc.setFontSize(18);
-    doc.text(`${group?.name || "Groupe de corrections"}`, pageWidth / 2, yPosition, { align: "center" });
-    
-    // Encadré d'informations
-    yPosition += 40;
-    const infoBoxWidth = pageWidth - (margin * 2);
-    const infoBoxHeight = 120;
-    doc.setDrawColor(200, 200, 200);
-    doc.setFillColor(248, 249, 250);
-    doc.roundedRect(margin, yPosition, infoBoxWidth, infoBoxHeight, 5, 5, 'FD');
-    
-    // Informations sur l'activité
-    yPosition += 15;
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(14);
-    doc.text("Détails de l'activité", pageWidth / 2, yPosition, { align: "center" });
-    
-    // Nom de l'activité
-    yPosition += 15;
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(12);
-    doc.text("Activité :", margin + 5, yPosition);
-    doc.setFont("helvetica", "normal");
-    doc.text(activity?.name || group?.activity_name || "Non spécifiée", margin + 70, yPosition);
-    
-    // Points 
-    yPosition += 15;
-    doc.setFont("helvetica", "bold");
-    doc.text("Points :", margin + 5, yPosition);
-    doc.setFont("helvetica", "normal");
-  
-    // Calculer les points totaux
-    const expPoints = activity?.experimental_points || 
-                      corrections[0]?.experimental_points || NaN;
-    const theoPoints = activity?.theoretical_points || 
-                       corrections[0]?.theoretical_points || NaN;
-    const totalPoints = expPoints + theoPoints;
-                     
-    doc.text(`${expPoints} expérimentaux + ${theoPoints} théoriques = ${totalPoints} points`, margin + 70, yPosition);
-    
-    // Informations sur le nombre d'étudiants
-    yPosition += 10;
-    doc.setFont("helvetica", "normal");
-    doc.text("Nombre d'étudiants :", margin + 5, yPosition);
-    doc.text(`${corrections.length}`, margin + 70, yPosition);
-    
-
-    
-    // Description de l'activité
-    yPosition += 15;
-    doc.setFont("helvetica", "bold");
-    doc.text("Description :", margin + 5, yPosition);
-    
-    // Ajouter la description avec gestion du texte long
-    const description = activity?.description || 
-                        group?.description || 
-                        "Aucune description disponible.";
-    
-                        
-    doc.setFont("helvetica", "normal");
-    
-    // Traitement du texte long avec retour à la ligne automatique
-    const splitDescription = doc.splitTextToSize(description, infoBoxWidth - 80);
-    doc.text(splitDescription, margin + 70, yPosition);
-    
-    // Pied de page avec instructions
-    yPosition = pageHeight - 50;
-    doc.setFont("helvetica", "italic");
-    doc.setFontSize(11);
-    doc.setTextColor(80, 80, 80);
-    doc.text("Ce document contient des QR codes personnalisés pour chaque étudiant.", pageWidth / 2, yPosition, { align: "center" });
-    
-    yPosition += 10;
-    doc.text("Chaque page suivante doit être distribuée individuellement à l'étudiant concerné.", pageWidth / 2, yPosition, { align: "center" });
-    
-
-    // Liste mise à jour des corrections avec leurs codes de partage
-    const updatedCorrections = [...corrections];
-    
-    // --- PAGES POUR CHAQUE ÉTUDIANT ---
-    
-    // Taille et position fixe pour les QR codes
-    const qrSize = 150;  // Taille plus grande pour une meilleure lisibilité
-    const qrX = (pageWidth - qrSize) / 2; // Centré horizontalement
-    
-    // Générer une page pour chaque étudiant
+    // Generate QR codes for each correction
     for (let i = 0; i < corrections.length; i++) {
-      const correction = updatedCorrections[i];
+      const correction = corrections[i];
       
-      // Ajouter une nouvelle page pour chaque étudiant
-      doc.addPage();
-      
-      // En-tête de la page
-      doc.setFontSize(14);
-      doc.setFont("helvetica", "bold");
-      doc.setTextColor(70, 70, 70);
-      doc.text(`${group?.name || "Groupe de corrections"}`, pageWidth / 2, margin + 10, { align: "center" });
-      
-      // Nom de l'activité
-      doc.setFontSize(12);
-      doc.setFont("helvetica", "normal");
-      doc.text(`Activité: ${activity?.name || group?.activity_name || ""}`, pageWidth / 2, margin + 25, { align: "center" });
-      
-      // Séparateur
-      doc.setDrawColor(200, 200, 200);
-      doc.line(margin, margin + 35, pageWidth - margin, margin + 35);
-      
-      // Nom de l'étudiant
-      doc.setFontSize(20);
-      doc.setFont("helvetica", "bold");
-      doc.setTextColor(0, 0, 0);
-      doc.text(correction.student_name || "Nom indisponible", pageWidth / 2, margin + 55, { align: "center" });
-      
-      // Message d'introduction
-      doc.setFontSize(12);
-      doc.setFont("helvetica", "normal");
-      doc.text("Scannez ce code pour accéder à votre feedback personnalisé", pageWidth / 2, margin + 75, { align: "center" });
-      
-      // Vérifier ou générer un code de partage
-      let shareCode = (correction as any).shareCode;
-      if (!shareCode) {
-        // Vérifier d'abord s'il existe un code
-        const existingShareCheck = await getExistingShareCode(String(correction.id));
+      // If this QR code won't fit on the page, start a new page
+      if (y + rowHeight > pageHeight - margin) {
+        doc.addPage();
+        pageNumber++;
+        y = margin + 15; // Reset y position for the new page
         
-        if (existingShareCheck.exists && existingShareCheck.code) {
-          shareCode = existingShareCheck.code;
-        } else {
-          // Sinon, générer un nouveau code
-          const shareResult = await generateShareCode(String(correction.id));
-          if (!shareResult.code) {
-            throw new Error(`Impossible de générer un code de partage pour ${correction.student_name}`);
-          }
-          shareCode = shareResult.code;
-        }
+        // Add header to new page
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(14);
+        doc.text(`${title} (continued)`, 105, 20, { align: 'center' });
         
-        // Mettre à jour la correction
-        updatedCorrections[i] = {
-          ...correction,
-          shareCode
-        } as any;
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(10);
+        doc.text(`Page ${pageNumber}`, pageWidth - margin, pageHeight - 10, { align: 'right' });
       }
       
-      // URL complète du feedback
-      const feedbackUrl = `${baseUrl}/feedback/${shareCode}`;
-      
-      // Positionner le QR code
-      const qrY = margin + 90;
+      // Get share code for this correction
+      let shareCode;
       
       try {
-        // Générer le QR code haute résolution
-        console.log(`Génération du QR code pour: ${correction.student_name}`);
-        const qrDataUrl = await generateHighResQRCode(feedbackUrl);
+        // Appel à l'API pour vérifier si un code de partage existe déjà
+        const existingShareResponse = await fetch(`/api/corrections/${correction.id}/share`);
+        const existingShareData = await existingShareResponse.json();
         
-        // Ajouter le QR code au PDF
-        doc.addImage(qrDataUrl, 'PNG', qrX, qrY, qrSize, qrSize);
-        console.log(`QR code ajouté avec succès pour: ${correction.student_name}`);
+        if (existingShareData.exists && existingShareData.code) {
+          // Un code existe déjà, l'utiliser
+          shareCode = existingShareData.code;
+        } else {
+          // Aucun code existant, en générer un nouveau via l'API
+          const generateResponse = await fetch(`/api/corrections/${correction.id}/share`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            }
+          });
+          
+          if (!generateResponse.ok) {
+            throw new Error(`Impossible de générer un code de partage pour la correction ${correction.id}`);
+          }
+          
+          const result = await generateResponse.json();
+          shareCode = result.code;
+        }
       } catch (error) {
-        console.error(`Erreur lors de la génération du QR code pour ${correction.student_name}:`, error);
+        console.error(`Erreur lors de la gestion du code de partage pour la correction ${correction.id}:`, error);
+        shareCode = `ERROR-${correction.id}`;
       }
       
-      // URL du feedback sous le QR code
-      yPosition = qrY + qrSize + 20;
+      // Stocker le code dans notre dictionnaire au lieu de modifier l'objet correction
+      if (correction.id) {
+        shareCodes[correction.id] = shareCode;
+      }
+      
+      // Generate QR code URL
+      const qrData = `${window.location.origin}/feedback/${shareCode}`;
+      const qrCodeDataURL = await QRCode.toDataURL(qrData, {
+        width: 200,
+        margin: 1
+      });
+      
+      // Calculate position
+      x = margin + (i % itemsPerRow) * ((pageWidth - margin * 2) / itemsPerRow);
+      
+      // Add QR code to PDF
+      doc.addImage(qrCodeDataURL, 'PNG', x, y, qrSize, qrSize);
+      
+      // Add text below QR code
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(12);
+      
+      // Récupérer le nom de l'étudiant à partir de son ID et de la liste des étudiants
+      // Utiliser student_name si disponible, sinon calculer le nom depuis les données étudiants
+      const studentName = getStudentFullName(correction.student_id, students);
+      
+      doc.text(studentName, x + qrSize / 2, y + qrSize + 10, { align: 'center' });
+      
+      doc.setFont('helvetica', 'normal');
       doc.setFontSize(10);
-      doc.setTextColor(100, 100, 100);
-      doc.text("URL du feedback:", pageWidth / 2, yPosition, { align: "center" });
+      doc.text(shareCode, x + qrSize / 2, y + qrSize + 18, { align: 'center' });
       
-      yPosition += 8;
-      doc.text(feedbackUrl, pageWidth / 2, yPosition, { align: "center" });
+      // Add grade if available
+      if (correction.grade !== null && correction.grade !== undefined) {
+        doc.setFontSize(11);
+        doc.text(`Note: ${correction.grade}/20`, x + qrSize / 2, y + qrSize + 25, { align: 'center' });
+      }
       
-      // Instructions en bas de page
-      yPosition = pageHeight - 30;
-      doc.setFontSize(9);
-      doc.setFont("helvetica", "italic");
-      doc.text("Ce QR code est personnel et vous donne accès à votre feedback individuel.", pageWidth / 2, yPosition, { align: "center" });
+      // Move to next row if needed
+      if ((i + 1) % itemsPerRow === 0) {
+        y += rowHeight;
+      }
     }
     
-    // Appeler le callback avec les corrections mises à jour si fourni
-    if (onSuccess) {
-      onSuccess(updatedCorrections as any);
+    // Add page numbers
+    for (let i = 0; i < pageNumber; i++) {
+      doc.setPage(i + 1);
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(10);
+      doc.text(`Page ${i + 1} of ${pageNumber}`, pageWidth - margin, pageHeight - 10, { align: 'right' });
     }
     
-    // Sauvegarder le PDF
-    const fileName = `feedback-codes-${group?.name?.replace(/\s+/g, '-') || 'groupe'}-${new Date().toISOString().split('T')[0]}.pdf`;
+    // Save PDF
+    const fileName = `${groupName.replace(/\s+/g, '_')}_QRCodes_${new Date().toISOString().split('T')[0]}.pdf`;
     doc.save(fileName);
+    
+    // Pour le callback onSuccess, créer un nouvel array avec les shareCode ajoutés
+    // seulement si le callback est fourni
+    if (onSuccess && typeof onSuccess === 'function') {
+      // Créer une copie profonde des corrections avec les codes de partage
+      const updatedCorrectionsWithShareCodes = corrections.map(correction => {
+        if (correction.id && shareCodes[correction.id]) {
+          // Utiliser une assertion de type pour éviter l'erreur TypeScript
+          return {
+            ...correction,
+            shareCode: shareCodes[correction.id]
+          } as Correction & { shareCode: string };
+        }
+        return correction;
+      });
+      
+      onSuccess(updatedCorrectionsWithShareCodes as any);
+    }
     
     return fileName;
   } catch (error) {
-    console.error('Erreur lors de la génération du PDF:', error);
+    console.error('Error generating QR code PDF:', error);
     return null;
   }
 }

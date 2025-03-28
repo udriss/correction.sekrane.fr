@@ -12,7 +12,7 @@ import {
   Alert,
   CircularProgress
 } from '@mui/material';
-import { Lock as LockIcon } from '@mui/icons-material';
+import LockIcon from '@mui/icons-material/Lock';
 
 interface ChangePasswordModalProps {
   open: boolean;

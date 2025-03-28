@@ -15,10 +15,8 @@ import {
   IconButton,
   Divider
 } from '@mui/material';
-import {
-  ArrowBack as ArrowBackIcon,
-  Visibility as VisibilityIcon,
-} from '@mui/icons-material';
+import ArrowBackIcon from '@mui/icons-material/ArrowBack';
+import VisibilityIcon from '@mui/icons-material/Visibility';
 import LoadingSpinner from '@/components/LoadingSpinner';
 
 interface Correction {
@@ -38,7 +36,7 @@ interface Group {
   description?: string;
 }
 
-export default function CorrectionGroupDetailPage() {
+export default function CorrectionGroupDetailPageFromCorrection() {
   const router = useRouter();
   const params = useParams();
   const groupId = params?.id as string;

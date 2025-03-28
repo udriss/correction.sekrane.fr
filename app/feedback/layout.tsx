@@ -1,6 +1,5 @@
 import React from 'react';
 import { Metadata } from 'next';
-import '../globals.css';
 import { Inter } from 'next/font/google';
 
 // Initialiser la police Inter
@@ -16,13 +15,12 @@ export default function FeedbackLayout({
 }: {
   children: React.ReactNode;
 }) {
+  // Pour un layout imbriqué, ne pas inclure les balises html et body
   return (
-    <html lang="fr">
-      <body className={inter.className}>
-        <main className="min-h-screen bg-white">
-          {children}
-        </main>
-      </body>
-    </html>
+    <div className={`${inter.className} min-h-screen bg-white`}>
+      <main>
+        {children}
+      </main>
+    </div>
   );
 }

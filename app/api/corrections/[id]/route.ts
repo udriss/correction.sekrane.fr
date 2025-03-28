@@ -22,11 +22,35 @@ export async function GET(
       return NextResponse.json({ error: 'ID de correction invalide' }, { status: 400 });
     }
 
+    // Récupérer la correction
     const correction = await getCorrectionById(idNumber);
     if (!correction) {
       return NextResponse.json({ error: 'Correction non trouvée' }, { status: 404 });
     }
 
+    // Récupérer les informations de l'étudiant si student_id existe
+    if (correction.student_id) {
+      return await withConnection(async (connection) => {
+        const [studentRows] = await connection.query(
+          'SELECT * FROM students WHERE id = ?',
+          [correction.student_id]
+        );
+        
+        if (Array.isArray(studentRows) && studentRows.length > 0) {
+          // Combiner les données de correction avec les données de l'étudiant
+          const student = studentRows[0];
+          return NextResponse.json({
+            ...correction,
+            student_data: student
+          });
+        }
+        
+        // Si l'étudiant n'est pas trouvé, renvoyer simplement la correction
+        return NextResponse.json(correction);
+      });
+    }
+
+    // Si pas de student_id, renvoyer simplement la correction
     return NextResponse.json(correction);
   } catch (error) {
     console.error('Error fetching correction:', error);
@@ -57,9 +81,22 @@ export async function PUT(
       const updateValues: any[] = [];
       
       // Gérer les champs de base
-      if (body.student_name !== undefined) {
-        updateFields.push('student_name = ?');
-        updateValues.push(body.student_name);
+      if (body.student_id !== undefined) {
+        updateFields.push('student_id = ?');
+        updateValues.push(body.student_id);
+      }
+      
+      // Gérer l'association avec une classe
+      if (body.class_id !== undefined) {
+        const classId = parseInt(body.class_id);
+        if (!isNaN(classId)) {
+          updateFields.push('class_id = ?');
+          updateValues.push(classId);
+          console.log(`Mise à jour de la classe associée: ${classId}`);
+        } else if (body.class_id === null) {
+          // Permet de supprimer l'association avec une classe
+          updateFields.push('class_id = NULL');
+        }
       }
       
       // Variables pour calculer le grade total si nécessaire
@@ -176,9 +213,11 @@ export async function PUT(
       
       // Récupérer la correction mise à jour pour la retourner
       const [updatedData] = await connection.query(
-        `SELECT c.*, a.name as activity_name 
+        `SELECT c.*, a.name as activity_name, 
+         CONCAT(s.first_name, ' ', s.last_name) as student_name
          FROM corrections c
          JOIN activities a ON c.activity_id = a.id
+         LEFT JOIN students s ON c.student_id = s.id
          WHERE c.id = ?`,
         [idNumber]
       );
@@ -266,42 +305,129 @@ export async function PATCH(
     const { id } = await Promise.resolve(params);
     
     const body = await request.json();
-    const { student_name, content, content_data } = body;
+    console.log('Updating correction with ID:', id, 'Data:', body);
+
+    // Convertir explicitement les valeurs numériques si présentes
+    if (body.experimental_points_earned !== undefined) {
+      body.experimental_points_earned = parseFloat(body.experimental_points_earned);
+    }
     
-    // Sauvegarder content_data en JSON si c'est un objet
-    const dataToSave = typeof content_data === 'object' 
-      ? JSON.stringify(content_data) 
-      : content_data;
+    if (body.theoretical_points_earned !== undefined) {
+      body.theoretical_points_earned = parseFloat(body.theoretical_points_earned);
+    }
+
+    // Recalculer la note totale si l'une des notes a été modifiée
+    if (body.experimental_points_earned !== undefined || body.theoretical_points_earned !== undefined) {
+      return await withConnection(async (connection) => {
+        // Récupérer les valeurs actuelles si nécessaire
+        const [currentData] = await connection.query(
+          'SELECT experimental_points_earned, theoretical_points_earned, activity_id FROM corrections WHERE id = ?',
+          [id]
+        );
+        
+        if (!Array.isArray(currentData) || currentData.length === 0) {
+          return NextResponse.json({ error: 'Correction non trouvée' }, { status: 404 });
+        }
+        
+        const current = currentData[0] as any;
+        
+        // Utiliser les nouvelles valeurs ou conserver les anciennes
+        const expPoints = body.experimental_points_earned !== undefined 
+          ? body.experimental_points_earned 
+          : parseFloat(current.experimental_points_earned) || 0;
+          
+        const theoPoints = body.theoretical_points_earned !== undefined 
+          ? body.theoretical_points_earned 
+          : parseFloat(current.theoretical_points_earned) || 0;
+        
+        // Calculer la note totale (grade)
+        const grade = expPoints + theoPoints;
+        
+        // Mettre à jour la correction
+        await connection.query(
+          `UPDATE corrections 
+           SET experimental_points_earned = ?, 
+               theoretical_points_earned = ?, 
+               grade = ?,
+               updated_at = NOW()
+           WHERE id = ?`,
+          [expPoints, theoPoints, grade, id]
+        );
+        
+        // Récupérer la correction mise à jour
+        const [rows] = await connection.query(
+          `SELECT c.*, a.name as activity_name,
+           CONCAT(s.first_name, ' ', s.last_name) as student_name
+           FROM corrections c 
+           JOIN activities a ON c.activity_id = a.id 
+           LEFT JOIN students s ON c.student_id = s.id
+           WHERE c.id = ?`,
+          [id]
+        );
+        
+        if (!Array.isArray(rows) || rows.length === 0) {
+          return NextResponse.json({ error: 'Correction non trouvée après mise à jour' }, { status: 404 });
+        }
+        
+        return NextResponse.json(rows[0]);
+      });
+    }
     
+    // Pour les autres types de mises à jour (student_id, content, content_data)
     return await withConnection(async (connection) => {
-      const [result] = await connection.query(
-        `UPDATE corrections 
-         SET student_name = ?, content = ?, content_data = ? 
-         WHERE id = ?`,
-        [student_name, content, dataToSave, id]
+      // Construire dynamiquement la requête SQL
+      const updateFields: string[] = [];
+      const updateValues: any[] = [];
+      
+      // Ajouter chaque champ présent dans body
+      if (body.student_id !== undefined) {
+        updateFields.push('student_id = ?');
+        updateValues.push(body.student_id);
+      }
+      
+      if (body.content !== undefined) {
+        updateFields.push('content = ?');
+        updateValues.push(body.content);
+      }
+      
+      if (body.content_data !== undefined) {
+        updateFields.push('content_data = ?');
+        updateValues.push(typeof body.content_data === 'object' 
+          ? JSON.stringify(body.content_data) 
+          : body.content_data);
+      }
+      
+      if (updateFields.length === 0) {
+        return NextResponse.json({ error: 'Aucun champ valide à mettre à jour' }, { status: 400 });
+      }
+      
+      // Ajouter l'ID à la fin des valeurs
+      updateValues.push(id);
+      
+      // Exécuter la requête de mise à jour
+      await connection.query(
+        `UPDATE corrections SET ${updateFields.join(', ')}, updated_at = NOW() WHERE id = ?`,
+        updateValues
       );
       
       // Récupérer la correction mise à jour
       const [rows] = await connection.query(
-        `SELECT c.*, a.name as activity_name 
+        `SELECT c.*, a.name as activity_name,
+         CONCAT(s.first_name, ' ', s.last_name) as student_name
          FROM corrections c 
          JOIN activities a ON c.activity_id = a.id 
+         LEFT JOIN students s ON c.student_id = s.id
          WHERE c.id = ?`,
         [id]
       );
       
       if (!Array.isArray(rows) || rows.length === 0) {
-        return new NextResponse(JSON.stringify({ error: 'Correction non trouvée après mise à jour' }), {
-          status: 404,
-          headers: {
-            'Cache-Control': 'no-cache, no-store, must-revalidate',
-          },
-        });
+        return NextResponse.json({ error: 'Correction non trouvée après mise à jour' }, { status: 404 });
       }
       
       const updatedCorrection = rows[0] as any;
       
-      // Parser content_data pour le retour
+      // Parser content_data pour le retour si nécessaire
       if (updatedCorrection.content_data && typeof updatedCorrection.content_data === 'string') {
         try {
           updatedCorrection.content_data = JSON.parse(updatedCorrection.content_data);
@@ -310,20 +436,11 @@ export async function PATCH(
         }
       }
       
-      return new NextResponse(JSON.stringify(updatedCorrection), {
-        status: 200,
-        headers: {
-          'Cache-Control': 'no-cache, no-store, must-revalidate',
-        },
-      });
+      return NextResponse.json(updatedCorrection);
     });
+    
   } catch (error) {
     console.error('Erreur lors de la mise à jour de la correction:', error);
-    return new NextResponse(JSON.stringify({ error: 'Erreur serveur' }), {
-      status: 500,
-      headers: {
-        'Cache-Control': 'no-cache, no-store, must-revalidate',
-      },
-    });
+    return NextResponse.json({ error: 'Erreur serveur', details: String(error) }, { status: 500 });
   }
 }

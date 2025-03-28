@@ -1,28 +1,78 @@
 export interface Correction {
   id: number;
   activity_id: number;
-  student_name?: string;
-  content?: string;
-  content_data?: any;
-  created_at?: string;
-  updated_at?: string;
-  grade?: number;
-  penalty?: number;
-  deadline?: string;
-  submission_date?: string;
-  activity_name?: string;
-  experimental_points_earned?: number;
-  theoretical_points_earned?: number;
-  experimental_points?: number;
-  theoretical_points?: number;
-  shareCode?: string;
+  student_id: number | null;
+  content: string | null;
+  content_data?: Date | string; // Could be JSON or string
+  created_at?: Date | string;
+  updated_at?: Date | string;
+  grade?: number | null;
+  penalty?: number | null;
+  deadline?: Date | string | null;
+  submission_date?: Date | string | null;
+  experimental_points_earned?: number | null;
+  theoretical_points_earned?: number | null;
+  group_id: number | null;
+  class_id: number | null;
+}
+
+export interface ShareCode {
+  id: number;
+  code: string;
+  correction_id: number;
+  created_at: string;
+  expires_at?: string | null;
+  is_active: boolean;
 }
 
 export interface Fragment {
-  id: number;
-  activity_id: number; // Changed from correction_id to align with actual usage
+  id?: number;
+  activity_id: number;
   content: string;
+  created_at?: Date;
+  updated_at?: Date;
+  position_order?: number;
+  category?: string; // Added missing category field used in FragmentsList
+}
+
+// Add this extended interface for use in components
+export interface CorrectionWithShareCode extends Correction {
+  shareCode?: string | null;
+}
+
+export interface Student {
+  id: number;
+  email: string;
+  first_name: string;
+  last_name: string;
+  gender: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface Class {
+  id: number;
+  name: string;
+  description: string;
+  academic_year: string;
+  nbre_subclasses?: number | null;
   created_at: string;
   updated_at: string;
-  position_order?: number;
+  // Add these properties returned by the API
+  student_count?: number;
+  activity_count?: number;
+}
+
+export interface ClassStudent {
+  id: number;
+  class_id: number;
+  student_id: number;
+  sub_class?: number | null;
+  created_at?: string;
+  updated_at?: string;
+  // These fields are included when joined with student data
+  first_name?: string;
+  last_name?: string;
+  email?: string;
+  gender?: string;
 }

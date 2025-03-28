@@ -59,7 +59,7 @@ export default function LoginPage() {
       sx={{
         display: 'flex',
         justifyContent: 'center',
-        alignItems: 'center',
+        alignItems: 'start',
         minHeight: '100vh',
         backgroundColor: 'rg(214, 219, 220)',
       }}
@@ -73,6 +73,7 @@ export default function LoginPage() {
           alignItems: 'center',
           maxWidth: 400,
           width: '100%',
+          marginTop: 8,
         }}
       >
         <Box

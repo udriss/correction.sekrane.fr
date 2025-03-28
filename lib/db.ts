@@ -1,89 +1,60 @@
-import mysql, { Pool, PoolConnection } from 'mysql2/promise';
+import mysql from 'mysql2/promise';
+import { Pool, PoolConnection } from 'mysql2/promise';
+import { updateFragmentsTable } from './migrations/updateFragmentsTable';
 
-let pool: Pool;
+// Database configuration
+const dbConfig = {
+  host: process.env.DB_HOST || 'localhost',
+  user: process.env.DB_USER,
+  password: process.env.DB_PASSWORD || '',
+  database: process.env.DB_NAME || 'correction',
+  waitForConnections: true,
+  connectionLimit: 10,
+  queueLimit: 0
+};
 
-export function getPool(): Pool {
-  if (!pool) {
-    pool = mysql.createPool({
-      host: process.env.DB_HOST || 'localhost',
-      user: process.env.DB_USER,
-      password: process.env.DB_PASSWORD,
-      database: process.env.DB_NAME,
-      waitForConnections: true,
-      connectionLimit: 10,
-      queueLimit: 0,
-      maxIdle: 10,
-      idleTimeout: 60000,
-      enableKeepAlive: true,
-      keepAliveInitialDelay: 0
-    });
-    
-    // Configurer un intervalle pour vérifier et nettoyer les connexions inactives
-    setInterval(() => {
-      const timeout = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Health check timeout')), 5000)
-      );
-      
-      Promise.race([
-        pool.query('SELECT 1'),
-        timeout
-      ])
-        .then(() => console.debug('Connection pool health check: OK'))
-        .catch(err => {
-          console.error('Pool health check error:', err);
-          
-          // En cas d'erreur grave liée aux connexions, réinitialiser le pool
-          if (err.code === 'ER_CON_COUNT_ERROR' || err.code === 'PROTOCOL_CONNECTION_LOST') {
-            console.warn('Resetting connection pool due to connection issues');
-            try {
-              pool.end().catch(endErr => console.error('Error ending pool:', endErr));
-              pool = createNewPool(); // Fonction pour recréer le pool
-            } catch (resetErr) {
-              console.error('Failed to reset pool:', resetErr);
-            }
-          }
-        });
-    }, 300000); // toutes les 5 minutes
-  }
-  return pool;
-}
+// Create pool
+const pool: Pool = mysql.createPool({
+  host: process.env.DB_HOST,
+  port: parseInt(process.env.DB_PORT || '3306'),
+  user: process.env.DB_USER,
+  password: process.env.DB_PASSWORD,
+  database: process.env.DB_NAME,
+  // Paramètres de pool pour limiter les connexions
+  connectionLimit: 10, // Limiter le nombre maximum de connexions
+  queueLimit: 0, // 0 = illimité, défini un nombre max pour limiter la file d'attente
+  waitForConnections: true, // Attendre une connexion disponible ou rejeter
+  connectTimeout: 10000, // Timeout de connexion en millisecondes
+  // acquireTimeout is not a valid option in mysql2/promise PoolOptions
+  idleTimeout: 60000, // Temps d'inactivité avant fermeture d'une connexion (ms)
+  // Paramètres supplémentaires utiles
+  enableKeepAlive: true, // Maintenir les connexions actives
+  keepAliveInitialDelay: 10000, // Délai initial pour keepAlive
+});
 
-// Fonction pour créer un nouveau pool (utilisée lors de la réinitialisation)
-function createNewPool() {
-  return mysql.createPool({
-    host: process.env.DB_HOST,
-    user: process.env.DB_USER,
-    password: process.env.DB_PASSWORD,
-    database: process.env.DB_NAME,
-    waitForConnections: true,
-    connectionLimit: 10,
-    queueLimit: 0,
-    maxIdle: 10,
-    idleTimeout: 60000,
-    enableKeepAlive: true,
-    keepAliveInitialDelay: 0
-  });
-}
-
-// Fonction utilitaire pour exécuter des requêtes et gérer automatiquement les connexions
-export async function withConnection<T>(callback: (connection: PoolConnection) => Promise<T>): Promise<T> {
-  const pool = getPool();
+// Helper function to handle database connections
+export async function withConnection<T>(
+  callback: (connection: PoolConnection) => Promise<T>
+): Promise<T> {
   const connection = await pool.getConnection();
-  
   try {
     return await callback(connection);
   } finally {
-    // Toujours libérer la connexion, même en cas d'erreur
     connection.release();
   }
 }
 
+export default pool;
+
 // Fonction utilitaire pour les requêtes simples
 export async function query<T>(sql: string, params?: any[]): Promise<T> {
-  return withConnection(async (connection) => {
-    const [rows] = await connection.query(sql, params);
-    return rows as T;
-  });
+  try {
+    const [results] = await pool.execute(sql, params);
+    return results as unknown as T;
+  } catch (error) {
+    console.error('Database query error:', error);
+    throw error;
+  }
 }
 
 // Fonction de nettoyage à appeler lors de l'arrêt de l'application
@@ -91,7 +62,6 @@ export async function closePool() {
   if (pool) {
     try {
       await pool.end();
-      console.log('Database connection pool closed');
     } catch (err) {
       console.error('Error closing database connection pool:', err);
     }
@@ -100,8 +70,6 @@ export async function closePool() {
 
 // Initialiser la base de données
 export async function initializeDatabase() {
-  const pool = getPool();
-  
   try {
     // Créer la table des activités
     await query(`
@@ -109,7 +77,7 @@ export async function initializeDatabase() {
         id INT AUTO_INCREMENT PRIMARY KEY,
         name VARCHAR(255) NOT NULL,
         content TEXT,
-        user_id INT NULL,
+        user_id VARCHAR(100) NULL,
         experimental_points INT DEFAULT 5,
         theoretical_points INT DEFAULT 15,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -123,13 +91,11 @@ export async function initializeDatabase() {
       FROM INFORMATION_SCHEMA.COLUMNS
       WHERE TABLE_NAME = 'activities' AND COLUMN_NAME = 'user_id'
     `).then(async (rows: any) => {
-      const result = rows[0] as any[];
-      if (result[0].count === 0) {
+      if (rows && rows.length > 0 && rows[0].count === 0) {
         await query(`
           ALTER TABLE activities
-          ADD COLUMN user_id INT NULL
+          ADD COLUMN user_id VARCHAR(100) NULL
         `);
-        console.log('Added user_id column to activities table');
       }
     });
     
@@ -149,17 +115,38 @@ export async function initializeDatabase() {
       )
     `);
 
-    // Créer la table des fragments (liés aux activités et non aux corrections)
+    // Créer la table des fragments si elle n'existe pas
     await query(`
       CREATE TABLE IF NOT EXISTS fragments (
         id INT AUTO_INCREMENT PRIMARY KEY,
-        activity_id INT NOT NULL,
+        activity_id INT NULL,
         content TEXT NOT NULL,
+        category VARCHAR(100) DEFAULT 'Général',
+        tags JSON DEFAULT NULL,
+        user_id VARCHAR(100) DEFAULT NULL,
+        position_order INT DEFAULT 0,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-        FOREIGN KEY (activity_id) REFERENCES activities(id) ON DELETE CASCADE
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
       )
     `);
+
+    // Create the correction_fragments table if it doesn't exist
+    await query(`
+      CREATE TABLE IF NOT EXISTS correction_fragments (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        correction_id INT NOT NULL,
+        fragment_id INT NOT NULL,
+        position INT DEFAULT 0,
+        custom_content TEXT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (correction_id) REFERENCES corrections(id) ON DELETE CASCADE,
+        FOREIGN KEY (fragment_id) REFERENCES fragments(id)
+      )
+    `);
+    console.log('Created correction_fragments table if it didn\'t exist');
+
+    // Run migrations to update existing tables
+    await updateFragmentsTable();
 
     // Check if position column exists in fragments table, add if not
     await query(`
@@ -167,8 +154,7 @@ export async function initializeDatabase() {
       FROM INFORMATION_SCHEMA.COLUMNS
       WHERE TABLE_NAME = 'fragments' AND COLUMN_NAME = 'position_order'
     `).then(async (rows: any) => {
-      const result = rows[0] as any[];
-      if (result[0].count === 0) {
+      if (rows && rows.length > 0 && rows[0].count === 0) {
         await query(`
           ALTER TABLE fragments
           ADD COLUMN position_order INT DEFAULT 0
@@ -188,8 +174,7 @@ export async function initializeDatabase() {
       FROM INFORMATION_SCHEMA.COLUMNS
       WHERE TABLE_NAME = 'corrections' AND COLUMN_NAME = 'grade'
     `).then(async (rows: any) => {
-      const result = rows[0] as any[];
-      if (result[0].count === 0) {
+      if (rows && rows.length > 0 && rows[0].count === 0) {
         await query(`
           ALTER TABLE corrections
           ADD COLUMN grade DECIMAL(4,2) DEFAULT NULL,
@@ -199,8 +184,74 @@ export async function initializeDatabase() {
       }
     });
 
+    // Create the class management tables
+    await query(`
+      CREATE TABLE IF NOT EXISTS classes (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        name VARCHAR(255) NOT NULL,
+        description TEXT,
+        academic_year VARCHAR(20) NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+      )
+    `);
+    
+    await query(`
+      CREATE TABLE IF NOT EXISTS students (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        email VARCHAR(255) NOT NULL UNIQUE,
+        first_name VARCHAR(100) NOT NULL,
+        last_name VARCHAR(100) NOT NULL,
+        gender CHAR(1) NOT NULL COMMENT 'M for Male, F for Female, N for Neutral',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+      )
+    `);
+    
+    await query(`
+      CREATE TABLE IF NOT EXISTS class_activities (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        class_id INT NOT NULL,
+        activity_id INT NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        FOREIGN KEY (class_id) REFERENCES classes(id) ON DELETE CASCADE,
+        FOREIGN KEY (activity_id) REFERENCES activities(id) ON DELETE CASCADE,
+        UNIQUE KEY (class_id, activity_id)
+      )
+    `);
+    
+    await query(`
+      CREATE TABLE IF NOT EXISTS class_students (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        class_id INT NOT NULL,
+        student_id INT NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        FOREIGN KEY (class_id) REFERENCES classes(id) ON DELETE CASCADE,
+        FOREIGN KEY (student_id) REFERENCES students(id) ON DELETE CASCADE,
+        UNIQUE KEY (class_id, student_id)
+      )
+    `);
+    
+    // Check if class_id column exists in corrections table, add if not
+    await query(`
+      SELECT COUNT(*) as count
+      FROM INFORMATION_SCHEMA.COLUMNS
+      WHERE TABLE_NAME = 'corrections' AND COLUMN_NAME = 'class_id'
+    `).then(async (rows: any) => {
+      if (rows && rows.length > 0 && rows[0].count === 0) {
+        await query(`
+          ALTER TABLE corrections
+          ADD COLUMN class_id INT NULL,
+          ADD CONSTRAINT fk_correction_class FOREIGN KEY (class_id) REFERENCES classes(id) ON DELETE SET NULL
+        `);
+      }
+    });
+
     console.log('Base de données initialisée avec succès');
   } catch (error) {
     console.error('Erreur lors de l\'initialisation de la base de données:', error);
+    throw error;
   }
 }

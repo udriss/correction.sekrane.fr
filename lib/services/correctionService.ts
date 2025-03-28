@@ -17,11 +17,13 @@ export async function fetchCorrection(id: string): Promise<Correction> {
   return data as Correction; // Ensure the response is cast to our Correction type
 }
 
-// Update the method signature to accept optional student_name
+// Update to support first_name and last_name separately
 export async function saveCorrection(
   id: string, 
-  studentName: string = '', // Provide default empty string
-  contentItems: ContentItem[]
+  studentName: string = '', // Keep for backward compatibility
+  contentItems: ContentItem[],
+  firstName?: string,
+  lastName?: string
 ): Promise<Correction> {
   // Générer le HTML pour l'affichage
   const htmlContent = generateHtmlFromItems(contentItems);
@@ -32,16 +34,25 @@ export async function saveCorrection(
     items: contentItems
   };
   
+  // Use firstName and lastName if provided, otherwise use combined studentName
+  const requestBody: any = {
+    content: htmlContent,
+    content_data: contentData
+  };
+  
+  if (firstName !== undefined && lastName !== undefined) {
+    requestBody.student_first_name = firstName;
+    requestBody.student_last_name = lastName;
+  } else if (studentName) {
+    requestBody.student_name = studentName;
+  }
+  
   const response = await fetch(`/api/corrections/${id}`, {
     method: 'PUT',
     headers: {
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({
-      student_name: studentName,
-      content: htmlContent,
-      content_data: contentData
-    }),
+    body: JSON.stringify(requestBody),
   });
 
   if (!response.ok) {
@@ -52,16 +63,38 @@ export async function saveCorrection(
   return data as Correction;
 }
 
+// Update to support first_name and last_name separately
 export async function updateCorrectionName(
   correctionId: string, 
-  studentName: string
+  studentName: string,
+  firstName?: string,
+  lastName?: string
 ): Promise<Correction> {
+  // Create request body based on available information
+  const requestBody: any = {};
+  
+  if (firstName !== undefined && lastName !== undefined) {
+    // If first and last names are provided separately, use them
+    requestBody.student_first_name = firstName;
+    requestBody.student_last_name = lastName;
+  } else if (studentName) {
+    // Otherwise, try to split the full name
+    const nameParts = studentName.trim().split(/\s+/);
+    if (nameParts.length > 1) {
+      requestBody.student_first_name = nameParts[0];
+      requestBody.student_last_name = nameParts.slice(1).join(' ');
+    } else {
+      requestBody.student_first_name = studentName;
+      requestBody.student_last_name = '';
+    }
+  }
+
   const response = await fetch(`/api/corrections/${correctionId}/name`, {
     method: 'PUT',
     headers: {
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({ student_name: studentName }),
+    body: JSON.stringify(requestBody),
   });
 
   if (!response.ok) {
@@ -118,7 +151,6 @@ export function parseContentItems(correction: Correction): ContentItem[] {
         'items' in correction.content_data && 
         Array.isArray((correction.content_data as any).items)
       ) {
-        console.log('Chargement depuis content_data (objet)');
         return (correction.content_data as unknown as ContentData).items;
       }
       

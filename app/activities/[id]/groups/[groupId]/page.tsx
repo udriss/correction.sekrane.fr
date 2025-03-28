@@ -1,73 +1,27 @@
 'use client';
 
-
 import { generateQRCodePDF } from '@/utils/qrGeneratorPDF';
 import { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
-import Link from 'next/link';
 import {
-  Typography,
   Paper,
   Box,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
-  IconButton,
-  Divider,
-  Tooltip,
-  Chip,
-  Button,
-  Card,
-  CardContent,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogTitle,
-  DialogContentText,
-  Alert,
   Snackbar,
-  CircularProgress,
-  TextField,
-  Slider
+  Alert
 } from '@mui/material';
-import {
-  ArrowBack as ArrowBackIcon,
-  ArrowForward as ArrowForwardIcon,
-  Visibility as VisibilityIcon,
-  Share as ShareIcon,
-  Delete as DeleteIcon,
-  Edit as EditIcon,
-  Domain as DomainIcon,
-  Groups as GroupsIcon,
-  CalendarToday as CalendarTodayIcon,
-  Description as DescriptionIcon,
-  Event as EventIcon,
-  Download as DownloadIcon,
-  PictureAsPdf as PictureAsPdfIcon,
-  Grade as GradeIcon,
-  Save as SaveIcon,
-  Close as CloseIcon,
-  OpenInNew as OpenInNewIcon,
-  Add as AddIcon
-} from '@mui/icons-material';
 import LoadingSpinner from '@/components/LoadingSpinner';
 import ShareModal from '@/app/components/ShareModal';
 import * as shareService from '@/lib/services/shareService';
+import AddCorrectionToGroupModal from '@/components/AddCorrectionToGroupModal';
+import { useSnackbar } from 'notistack';
+import { Correction, CorrectionWithShareCode, Student } from '@/lib/types';
 
-interface Correction {
-  id: number;
-  activity_id: number;
-  student_name?: string;
-  experimental_points_earned?: number;
-  experimental_points?: number;
-  theoretical_points_earned?: number;
-  theoretical_points?: number;
-  grade?: number;
-  shareCode?: string;
-}
+// Import des composants modulaires
+import GroupHeader from '@/components/groups/GroupHeader';
+import GroupEditForm from '@/components/groups/GroupEditForm';
+import InfoCards from '@/components/groups/InfoCards';
+import CorrectionsList from '@/components/groups/CorrectionsList';
+import GroupDialogs from '@/components/groups/GroupDialogs';
 
 interface Group {
   id: number;
@@ -78,6 +32,15 @@ interface Group {
   description?: string;
 }
 
+interface Activity {
+  id: number;
+  name: string;
+  experimental_points: number;
+  theoretical_points: number;
+}
+
+// Removed local Student interface in favor of the one imported from '@/lib/types'
+
 export default function CorrectionGroupDetailPage() {
   const router = useRouter();
   const params = useParams();
@@ -85,14 +48,13 @@ export default function CorrectionGroupDetailPage() {
   const activityId = params?.id as string;
 
   const [group, setGroup] = useState<Group | null>(null);
-  const [corrections, setCorrections] = useState<Correction[]>([]);
-  const [updatedCorrections, setUpdatedCorrections] = useState<Correction[]>([]);
+  const [activity, setActivity] = useState<Activity | null>(null);
+  const [corrections, setCorrections] = useState<CorrectionWithShareCode[]>([]);
+  const [updatedCorrections, setUpdatedCorrections] = useState<CorrectionWithShareCode[]>([]);
   const [editMode, setEditMode] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [correctionToDelete, setCorrectionToDelete] = useState<number | null>(null);
-  const [isDeleting, setIsDeleting] = useState(false);
   const [savingGrades, setSavingGrades] = useState(false);
   const [notification, setNotification] = useState({
     open: false,
@@ -108,6 +70,24 @@ export default function CorrectionGroupDetailPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [isSharing, setIsSharing] = useState(false);
   const [groupToDelete, setGroupToDelete] = useState<Group | null>(null);
+  const [addCorrectionsModalOpen, setAddCorrectionsModalOpen] = useState(false);
+
+  const [correctionToDelete, setCorrectionToDelete] = useState<number | null>(null);
+  const [groupDeleteDialogOpen, setGroupDeleteDialogOpen] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const { enqueueSnackbar } = useSnackbar();
+
+  const [correctionToRemove, setCorrectionToRemove] = useState<number | null>(null);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [students, setStudents] = useState<Student[]>([]); // Ajouter un état pour stocker les étudiants
+
+  // Fonction pour obtenir le nom complet d'un étudiant à partir de son ID
+  const getStudentFullName = (studentId: number | null): string => {
+    if (!studentId) return 'Sans nom';
+    const student = students.find(s => s.id === studentId);
+    if (!student) return 'Sans nom';
+    return `${student.first_name} ${student.last_name}`;
+  };
 
   useEffect(() => {
     async function fetchGroupDetails() {
@@ -126,6 +106,22 @@ export default function CorrectionGroupDetailPage() {
         setEditedName(groupData.name || '');
         setEditedDescription(groupData.description || '');
 
+        // Fetch the activity data
+        if (activityId) {
+          const activityResponse = await fetch(`/api/activities/${activityId}`);
+          if (activityResponse.ok) {
+            const activityData = await activityResponse.json();
+            setActivity(activityData);
+          }
+        }
+
+        // Récupérer les étudiants
+        const studentsResponse = await fetch('/api/students');
+        if (studentsResponse.ok) {
+          const studentsData = await studentsResponse.json();
+          setStudents(studentsData);
+        }
+
         // Récupérer les corrections associées avec toutes les données nécessaires
         const correctionsResponse = await fetch(`/api/correction-groups/${groupId}/corrections`);
 
@@ -135,15 +131,13 @@ export default function CorrectionGroupDetailPage() {
 
         const correctionsData = await correctionsResponse.json();
         
-        // S'assurer que les notes sont des nombres valides
-        const validatedCorrections = correctionsData.map((correction: any) => ({
+        // S'assurer que les notes sont des nombres valides et ajouter shareCode comme null
+        const validatedCorrections: CorrectionWithShareCode[] = correctionsData.map((correction: Correction) => ({
           ...correction,
-          student_name: correction.student_name || "",
-          experimental_points_earned: parseFloat(correction.experimental_points_earned) || 0,
-          theoretical_points_earned: parseFloat(correction.theoretical_points_earned) || 0,
-          experimental_points: parseFloat(correction.experimental_points) || 0,
-          theoretical_points: parseFloat(correction.theoretical_points) || 0,
-          grade: parseFloat(correction.grade) || 0
+          experimental_points_earned: parseFloat(correction.experimental_points_earned as any) || 0,
+          theoretical_points_earned: parseFloat(correction.theoretical_points_earned as any) || 0,
+          grade: parseFloat(correction.grade as any) || 0,
+          shareCode: null
         }));
         
         setCorrections(validatedCorrections);
@@ -157,7 +151,7 @@ export default function CorrectionGroupDetailPage() {
     }
 
     fetchGroupDetails();
-  }, [groupId]);
+  }, [groupId, activityId]);
 
   // Ajouter un effet pour récupérer les codes de partage existants au chargement
   useEffect(() => {
@@ -171,17 +165,24 @@ export default function CorrectionGroupDetailPage() {
         for (let i = 0; i < corrections.length; i++) {
           const correction = corrections[i];
           
-          // Vérifier s'il existe un code de partage
-          const existingShareCheck = await shareService.getExistingShareCode(String(correction.id));
-          
-          if (existingShareCheck.exists && existingShareCheck.code) {
-            updatedCorrections[i].shareCode = existingShareCheck.code;
-            foundShareCodes++;
+          try {
+            // Utiliser l'API share-code-status pour obtenir le code de partage
+            const shareResponse = await fetch(`/api/corrections/${correction.id}/share-code-status`);
+            if (shareResponse.ok) {
+              const shareData = await shareResponse.json();
+              
+              if (shareData.exists && shareData.code) {
+                updatedCorrections[i].shareCode = shareData.code;
+                foundShareCodes++;
+              }
+            }
+          } catch (shareErr) {
+            console.error(`Erreur lors de la récupération du code de partage pour la correction ${correction.id}:`, shareErr);
           }
         }
         
         if (foundShareCodes > 0) {
-          console.log(`Trouvé ${foundShareCodes} codes de partage existants`);
+          console.log(`${foundShareCodes} codes de partage récupérés`);
           setCorrections(updatedCorrections);
           setUpdatedCorrections(JSON.parse(JSON.stringify(updatedCorrections)));
         }
@@ -195,88 +196,127 @@ export default function CorrectionGroupDetailPage() {
     }
   }, [corrections.length]);
 
-  const handleDeleteCorrection = (correctionId: number) => {
-    setCorrectionToDelete(correctionId);
-    setDeleteDialogOpen(true);
-  };
-
-  const handleConfirmDelete = async () => {
-    if (correctionToDelete === null) return;
-    
-    setIsDeleting(true);
-    try {
-      // Supprimer seulement l'association, pas la correction elle-même
-      const response = await fetch(`/api/correction-groups/${groupId}/corrections/${correctionToDelete}`, {
-        method: 'DELETE',
-      });
-      
-      if (!response.ok) {
-        throw new Error('Erreur lors de la suppression');
-      }
-      
-      // Mettre à jour la liste des corrections
-      setCorrections(corrections.filter(c => c.id !== correctionToDelete));
-      setUpdatedCorrections(updatedCorrections.filter(c => c.id !== correctionToDelete));
-      
-      setNotification({
-        open: true,
-        message: 'Correction supprimée du groupe avec succès',
-        severity: 'success'
-      });
-    } catch (err) {
-      console.error('Erreur:', err);
-      setNotification({
-        open: true,
-        message: 'Erreur lors de la suppression',
-        severity: 'error'
-      });
-    } finally {
-      setIsDeleting(false);
-      setDeleteDialogOpen(false);
-      setCorrectionToDelete(null);
-    }
+  // Fonctions de gestion pour retirer une correction d'un groupe
+  const handleRemoveFromGroup = (correctionId: number) => {
+    setCorrectionToRemove(correctionId);
   };
 
   const handleCloseNotification = () => {
     setNotification({...notification, open: false});
   };
 
-
-const handleGeneratePdfReport = async () => {
-  setGeneratePdfLoading(true);
-  try {
-    const fileName = await generateQRCodePDF({
-      corrections,
-      group,
-      generateShareCode: shareService.generateShareCode,
-      getExistingShareCode: shareService.getExistingShareCode,
-      onSuccess: (updatedCorrections: Correction[]) => {
-        // Mettre à jour l'état des corrections avec les nouveaux codes de partage
-        setCorrections(updatedCorrections);
-        setUpdatedCorrections(JSON.parse(JSON.stringify(updatedCorrections)));
-      }
-    });
+  const confirmRemoveFromGroup = async () => {
+    if (!correctionToRemove) return;
     
-    if (fileName) {
+    try {
+      setIsProcessing(true);
+      const response = await fetch(`/api/correction-groups/${groupId}/corrections/${correctionToRemove}`, {
+        method: 'DELETE',
+      });
+      
+      if (!response.ok) {
+        throw new Error('Erreur lors du retrait de la correction du groupe');
+      }
+      
+      // Mise à jour de l'état local
+      setCorrections(corrections.filter(c => c.id !== correctionToRemove));
       setNotification({
         open: true,
-        message: `Rapport PDF "${fileName}" généré avec succès`,
+        message: 'Correction retirée du groupe avec succès',
         severity: 'success'
       });
-    } else {
-      throw new Error('Échec de génération du PDF');
+    } catch (error) {
+      console.error('Erreur:', error);
+      setNotification({
+        open: true,
+        message: `Erreur: ${(error as Error).message}`,
+        severity: 'error'
+      });
+    } finally {
+      setCorrectionToRemove(null);
+      setIsProcessing(false);
     }
-  } catch (err) {
-    console.error('Erreur lors de la génération du PDF:', err);
-    setNotification({
-      open: true,
-      message: 'Erreur lors de la génération du PDF',
-      severity: 'error'
-    });
-  } finally {
-    setGeneratePdfLoading(false);
-  }
-};
+  };
+
+  // Fonctions de gestion pour supprimer complètement une correction
+  const handleDeleteCorrection = (correctionId: number) => {
+    setCorrectionToDelete(correctionId);
+  };
+
+  const confirmDeleteCorrection = async () => {
+    if (!correctionToDelete) return;
+    
+    try {
+      setIsProcessing(true);
+      const response = await fetch(`/api/corrections/${correctionToDelete}`, {
+        method: 'DELETE',
+      });
+      
+      if (!response.ok) {
+        throw new Error('Erreur lors de la suppression de la correction');
+      }
+      
+      // Mise à jour de l'état local
+      setCorrections(corrections.filter(c => c.id !== correctionToDelete));
+      setNotification({
+        open: true,
+        message: 'Correction supprimée définitivement avec succès',
+        severity: 'success'
+      });
+    } catch (error) {
+      console.error('Erreur:', error);
+      setNotification({
+        open: true,
+        message: `Erreur: ${(error as Error).message}`,
+        severity: 'error'
+      });
+    } finally {
+      setCorrectionToDelete(null);
+      setIsProcessing(false);
+    }
+  };
+
+  // Initier la suppression du groupe entier
+  const handleInitiateGroupDelete = () => {
+    setGroupDeleteDialogOpen(true);
+  };
+
+  const handleGeneratePdfReport = async () => {
+    setGeneratePdfLoading(true);
+    try {
+      const fileName = await generateQRCodePDF({
+        corrections,
+        group,
+        generateShareCode: shareService.generateShareCode,
+        getExistingShareCode: shareService.getExistingShareCode,
+        students, // Passer les étudiants à la fonction
+        onSuccess: (updatedCorrections: Correction[]) => {
+          // Mettre à jour l'état des corrections avec les nouveaux codes de partage
+          setCorrections(updatedCorrections);
+          setUpdatedCorrections(JSON.parse(JSON.stringify(updatedCorrections)));
+        }
+      });
+      
+      if (fileName) {
+        setNotification({
+          open: true,
+          message: `Rapport PDF "${fileName}" généré avec succès`,
+          severity: 'success'
+        });
+      } else {
+        throw new Error('Échec de génération du PDF');
+      }
+    } catch (err) {
+      console.error('Erreur lors de la génération du PDF:', err);
+      setNotification({
+        open: true,
+        message: 'Erreur lors de la génération du PDF',
+        severity: 'error'
+      });
+    } finally {
+      setGeneratePdfLoading(false);
+    }
+  };
 
   // Fonctions pour la gestion de l'édition des notes
   const handleEditCorrections = () => {
@@ -288,10 +328,11 @@ const handleGeneratePdfReport = async () => {
     setUpdatedCorrections(JSON.parse(JSON.stringify(corrections)));
   };
 
-  // Fonction pour modifier le nom d'un étudiant
-  const handleStudentNameChange = (index: number, newName: string) => {
+  // Fonction pour gérer la modification de l'étudiant d'une correction
+  // Cette fonction doit être modifiée pour utiliser un système de sélection d'étudiant par ID au lieu du nom
+  const handleStudentIdChange = (index: number, newStudentId: number | null) => {
     const updated = [...updatedCorrections];
-    updated[index].student_name = newName;
+    updated[index].student_id = newStudentId;
     setUpdatedCorrections(updated);
   };
 
@@ -318,7 +359,7 @@ const handleGeneratePdfReport = async () => {
       // Comparer les corrections originales avec les updatedCorrections pour déterminer lesquelles ont changé
       const changedCorrections = updatedCorrections.filter((correction, index) => {
         const original = corrections[index];
-        return correction.student_name !== original.student_name ||
+        return correction.student_id !== original.student_id ||
                correction.experimental_points_earned !== original.experimental_points_earned ||
                correction.theoretical_points_earned !== original.theoretical_points_earned;
       });
@@ -344,7 +385,8 @@ const handleGeneratePdfReport = async () => {
               'Content-Type': 'application/json',
             },
             body: JSON.stringify({
-              student_name: correction.student_name,
+              // Utiliser uniquement l'ID de l'étudiant
+              student_id: correction.student_id,
               experimental_points_earned: correction.experimental_points_earned,
               theoretical_points_earned: correction.theoretical_points_earned
             }),
@@ -388,41 +430,26 @@ const handleGeneratePdfReport = async () => {
     }
   };
 
-  // Fonction pour gérer la suppression du groupe
+  // Confirmer la suppression du groupe entier
   const handleDeleteGroup = async () => {
-    if (!groupId) return;
-    
-    setIsDeleting(true);
     try {
+      setIsDeleting(true);
       const response = await fetch(`/api/correction-groups/${groupId}`, {
         method: 'DELETE',
       });
       
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Erreur lors de la suppression du groupe');
+        throw new Error('Erreur lors de la suppression du groupe');
       }
       
-      setNotification({
-        open: true,
-        message: 'Groupe supprimé avec succès',
-        severity: 'success'
-      });
-      
-      // Redirection vers la liste des groupes après suppression
-      setTimeout(() => {
-        router.push(`/activities/${activityId}/groups`);
-      }, 1500);
-    } catch (err) {
-      console.error('Erreur:', err);
-      setNotification({
-        open: true,
-        message: err instanceof Error ? err.message : 'Erreur lors de la suppression',
-        severity: 'error'
-      });
+      enqueueSnackbar('Groupe supprimé avec succès', { variant: 'success' });
+      router.push(`/activities/${activityId}`);
+    } catch (error) {
+      console.error('Erreur:', error);
+      enqueueSnackbar(`Erreur: ${(error as Error).message}`, { variant: 'error' });
     } finally {
+      setGroupDeleteDialogOpen(false);
       setIsDeleting(false);
-      setDeleteDialogOpen(false);
     }
   };
 
@@ -550,33 +577,36 @@ const handleGeneratePdfReport = async () => {
   const handleCloseShareModal = async () => {
     setShareModalOpen(false);
     
-    // Si un ID de correction a été sélectionné, vérifier si un code a été généré
+    // If a correction ID was selected, check if a share code was generated
     if (selectedCorrectionId) {
       try {
-        const existingShareCheck = await shareService.getExistingShareCode(selectedCorrectionId);
-        
-        if (existingShareCheck.exists && existingShareCheck.code) {
-          // Trouver l'index de la correction correspondante
-          const index = corrections.findIndex(c => String(c.id) === selectedCorrectionId);
+        // Use the API to get the current share code status
+        const shareResponse = await fetch(`/api/corrections/${selectedCorrectionId}/share-code-status`);
+        if (shareResponse.ok) {
+          const shareData = await shareResponse.json();
           
-          if (index !== -1) {
+          if (shareData.exists && shareData.code) {
+            // Find the correction and update its share code
             const updatedCorrections = [...corrections];
-            updatedCorrections[index].shareCode = existingShareCheck.code;
-            setCorrections(updatedCorrections);
-            setUpdatedCorrections(JSON.parse(JSON.stringify(updatedCorrections)));
+            const index = updatedCorrections.findIndex(c => String(c.id) === selectedCorrectionId);
+            
+            if (index !== -1) {
+              updatedCorrections[index].shareCode = shareData.code;
+              setCorrections(updatedCorrections);
+              setUpdatedCorrections(JSON.parse(JSON.stringify(updatedCorrections)));
+            }
           }
         }
       } catch (err) {
-        console.error('Erreur lors de la vérification du code de partage après fermeture du modal:', err);
+        console.error('Error checking share code after modal close:', err);
       }
     }
     
-    // Réinitialiser l'ID de correction sélectionnée
     setSelectedCorrectionId('');
   };
 
   const calculateAverage = () => {
-    if (corrections.length === 0) return 0;
+    if (corrections.length === 0) return "0";
     
     const total = corrections.reduce((sum, correction) => {
       const total = (correction.experimental_points_earned || 0) + (correction.theoretical_points_earned || 0);
@@ -586,18 +616,12 @@ const handleGeneratePdfReport = async () => {
     return (total / corrections.length).toFixed(1);
   };
   
-
   // Formater les nombres pour l'affichage
   const formatNumber = (value: number): string => {
     if (Number.isInteger(value)) {
       return value.toString();
     }
     return value.toFixed(1);
-  };
-
-  // Classes de style pour l'alternance des lignes du tableau
-  const getRowClass = (index: number) => {
-    return index % 2 === 0 ? 'bg-white hover:bg-blue-50' : 'bg-gray-50 hover:bg-blue-50';
   };
 
   // Fonction pour déterminer la couleur de la note
@@ -609,601 +633,127 @@ const handleGeneratePdfReport = async () => {
     return 'error';
   };
 
+  const handleCorrectionsAdded = async (correctionIds: string[]) => {
+    // Refresh corrections list after new ones are added
+    try {
+      const correctionsResponse = await fetch(`/api/correction-groups/${groupId}/corrections`);
+      if (correctionsResponse.ok) {
+        const correctionsData = await correctionsResponse.json();
+        
+        // Validate corrections data
+        const validatedCorrections = correctionsData.map((correction: any) => ({
+          ...correction,
+          student_name: correction.student_name || "",
+          experimental_points_earned: parseFloat(correction.experimental_points_earned) || 0,
+          theoretical_points_earned: parseFloat(correction.theoretical_points_earned) || 0,
+          experimental_points: parseFloat(correction.experimental_points) || 0,
+          theoretical_points: parseFloat(correction.theoretical_points) || 0,
+          grade: parseFloat(correction.grade) || 0
+        }));
+        
+        setCorrections(validatedCorrections);
+        setUpdatedCorrections(JSON.parse(JSON.stringify(validatedCorrections)));
+        
+        setNotification({
+          open: true,
+          message: `${correctionIds.length} correction(s) ajoutée(s) avec succès`,
+          severity: 'success'
+        });
+      }
+    } catch (err) {
+      console.error('Error refreshing corrections:', err);
+    }
+  };
+
   if (loading) {
     return (
-          <div className="py-10 flex justify-center max-w-[400px] mx-auto">
-            <LoadingSpinner text="Chargement des données du groupe " />
-          </div>
+      <div className="py-10 flex justify-center max-w-[400px] mx-auto">
+        <LoadingSpinner text="Chargement des données du groupe " />
+      </div>
     );
   }
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-8">
-      {/* En-tête avec bannière stylisée */}
-      <Paper 
-  elevation={3} 
-  sx={{ 
-    borderRadius: '10px', 
-    overflow: 'hidden',
-    marginBottom: '24px',
-    background: 'linear-gradient(90deg,rgb(10, 68, 125) 0%, #2c387e 100%)' // Dégradé bleu plus distinct
-  }}
->
-  <Box 
-    className="p-6 relative" 
-    sx={{
-      position: 'relative',
-      overflow: 'hidden'
-    }}
-  >
-    {/* Motif de fond décoratif avec opacité augmentée */}
-    <Box 
-      sx={{ 
-        position: 'absolute', 
-        inset: 0, 
-        opacity: 0.15, // Opacité légèrement augmentée pour meilleure visibilité
-        backgroundImage: 'url("data:image/svg+xml,%3Csvg width=\'60\' height=\'60\' viewBox=\'0 0 60 60\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cg fill=\'none\' fill-rule=\'evenodd\'%3E%3Cg fill=\'%23ffffff\' fill-opacity=\'1\'%3E%3Cpath d=\'M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z\'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")',
-        backgroundSize: '60px 60px'
-      }}
-    />
-    
-    {/* Contenu de l'en-tête */}
-    <Box sx={{ position: 'relative', zIndex: 1 }}>
-      <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 1 }}>
-        <GroupsIcon sx={{ fontSize: 32, color: '#f0f4ff' }} /> {/* Bleu très clair pour l'icône */}
-        <Typography variant="h4" fontWeight="bold" sx={{ color: '#f0f4ff' }}> {/* Bleu très clair pour le titre */}
-          {group?.name || "Groupe sans nom"}
-        </Typography>
-        
-        {/* IconButtons pour les actions principales */}
-        <Box sx={{ ml: 'auto', display: 'flex', gap: 1 }}>
-          {!isEditing && (
-            <>
-              <IconButton
-                sx={{ 
-                  color: '#f0f4ff', // Bleu très clair pour l'icône
-                  bgcolor: 'rgba(255, 255, 255, 0.15)', // Semi-transparent pour le fond
-                  '&:hover': { 
-                    bgcolor: 'rgba(255, 255, 255, 0.25)',  // Plus visible au survol
-                    boxShadow: '0 0 5px rgba(255,255,255,0.3)' // Effet de lueur
-                  }
-                }}
-                onClick={() => setIsEditing(true)}
-                title="Modifier le groupe"
-              >
-                <EditIcon />
-              </IconButton>
-              <IconButton
-                sx={{ 
-                  color: '#ffdddd', // Rouge pâle pour indiquer une action de suppression
-                  bgcolor: 'rgba(255, 100, 100, 0.35)', // Fond légèrement rouge
-                  '&:hover': { 
-                    bgcolor: 'rgba(255, 100, 100, 0.55)',  // Plus rouge au survol
-                    boxShadow: '0 0 5px rgba(255,150,150,0.8)' // Effet de lueur rouge
-                  }
-                }}
-                onClick={() => setDeleteDialogOpen(true)}
-                title="Supprimer le groupe"
-              >
-                <DeleteIcon />
-              </IconButton>
-            </>
-          )}
-        </Box>
-      </Box>
-      
-      <Typography variant="subtitle1" sx={{ color: '#d0e3ff', opacity: 0.95, mb: 2 }}> {/* Bleu clair pour le sous-titre */}
-        {group?.activity_name || "Activité non spécifiée"}
-      </Typography>
-      
-      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mt: 3 }}>
-        <Button
-          component={Link}
-          href={`/activities/${activityId}/groups`}
-          startIcon={<ArrowBackIcon />}
-          variant="outlined"
-          size="small"
-          sx={{ 
-            color: '#f0f4ff', // Bleu très clair
-            borderColor: 'rgba(240,244,255,0.6)',
-            '&:hover': { 
-              borderColor: '#f0f4ff',
-              backgroundColor: 'rgba(240,244,255,0.15)'
-            }
-          }}
-        >
-          Retour aux groupes
-        </Button>
-        
-        <Button
-          component={Link}
-          href={`/activities/${activityId}`}
-          variant="outlined"
-          size="small"
-          sx={{ 
-            color: '#ddecff', // Bleu très clair légèrement différent
-            borderColor: 'rgba(221,236,255,0.4)',
-            '&:hover': { 
-              borderColor: '#ddecff',
-              backgroundColor: 'rgba(221,236,255,0.1)'
-            }
-          }}
-        >
-          Activité
-        </Button>
-      </Box>
-    </Box>
-  </Box>
-</Paper>
+      {/* En-tête du groupe */}
+      <GroupHeader 
+        group={group}
+        activityId={activityId}
+        isEditing={isEditing}
+        setIsEditing={setIsEditing}
+        setGroupDeleteDialogOpen={setGroupDeleteDialogOpen}
+      />
 
       {/* Zone d'édition du groupe */}
       {isEditing && (
-        <Paper className="p-4 mb-6">
-          <div className="space-y-4">
-            <Typography variant="h6" className="mb-2">Modifier le groupe</Typography>
-            <Divider className="mb-3" />
-            
-            <TextField
-              label="Nom du groupe"
-              value={editedName}
-              onChange={(e) => setEditedName(e.target.value)}
-              fullWidth
-              margin="normal"
-              required
-              error={!editedName.trim()}
-              helperText={!editedName.trim() && "Le nom du groupe est requis"}
-            />
-            
-            <TextField
-              label="Description (optionnelle)"
-              value={editedDescription}
-              onChange={(e) => setEditedDescription(e.target.value)}
-              fullWidth
-              margin="normal"
-              multiline
-              rows={3}
-            />
-            
-            <Box display="flex" justifyContent="flex-end" gap={2} mt={2}>
-              <Button
-                variant="outlined"
-                color="inherit"
-                startIcon={<CloseIcon />}
-                onClick={handleCancelEdit}
-                disabled={isSaving}
-              >
-                Annuler
-              </Button>
-              <Button
-                variant="contained"
-                color="primary"
-                startIcon={<SaveIcon />}
-                onClick={handleSaveChanges}
-                disabled={isSaving || !editedName.trim()}
-              >
-                {isSaving ? 'Enregistrement...' : 'Enregistrer'}
-              </Button>
-            </Box>
-          </div>
-        </Paper>
+        <GroupEditForm 
+          editedName={editedName}
+          setEditedName={setEditedName}
+          editedDescription={editedDescription}
+          setEditedDescription={setEditedDescription}
+          handleSaveChanges={handleSaveChanges}
+          handleCancelEdit={handleCancelEdit}
+          isSaving={isSaving}
+        />
       )}
 
-      {/* Cartes d'informations et statistiques */}
+      {/* Cartes d'informations */}
       {!isEditing && (
-        <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr 1.5fr' }, gap: 3, mb: 4 }}>
-          {/* Carte des infos du groupe */}
-          <Card sx={{ 
-            height: '100%', 
-            display: 'flex',
-            flexDirection: 'column',
-            borderTop: '4px solid #3f51b5'
-          }}>
-            <CardContent>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
-                <DomainIcon color="primary" />
-                <Typography variant="h6" fontWeight="bold">
-                  Informations
-                </Typography>
-              </Box>
-              
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5 }}>
-                <CalendarTodayIcon fontSize="small" color="action" />
-                <Typography variant="body1">
-                  {group ? new Date(group.created_at).toLocaleDateString() : '-'}
-                </Typography>
-              </Box>
-              
-              <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1 }}>
-                <DescriptionIcon fontSize="small" color="action" sx={{ mt: 0.5 }} />
-                <Box>
-                  <Typography variant="body2" color="text.secondary">
-                    Description:
-                  </Typography>
-                  <Typography variant="body2" sx={{ mt: 0.5 }}>
-                    {group?.description || "Aucune description disponible"}
-                  </Typography>
-                </Box>
-              </Box>
-            </CardContent>
-          </Card>
-
-          {/* Carte des statistiques */}
-          <Card sx={{ 
-            height: '100%',
-            borderTop: '4px solid #4caf50'
-          }}>
-            <CardContent>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
-                <GroupsIcon color="success" />
-                <Typography variant="h6" fontWeight="bold">
-                  Statistiques
-                </Typography>
-              </Box>
-              
-              <Box sx={{ textAlign: 'center', py: 1 }}>
-                <Typography variant="h3" color="primary" fontWeight="bold">
-                  {corrections.length}
-                </Typography>
-                <Typography variant="body2" color="text.secondary">
-                  {corrections.length > 1 ? 'Corrections' : 'Correction'}
-                </Typography>
-              </Box>
-              
-              {corrections.length > 0 && (
-                <Box sx={{ textAlign: 'center', mt: 2, py: 1, bgcolor: 'background.default', borderRadius: 1 }}>
-                  <Typography variant="body2" color="text.secondary">
-                    Note moyenne
-                  </Typography>
-                    <Typography variant="h5" color="primary" fontWeight="bold" sx={{ mt: '4px' }}>
-                    {calculateAverage()} / {(corrections[0]?.experimental_points || 0) + (corrections[0]?.theoretical_points || 0)}
-                    </Typography>
-                </Box>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* Carte des actions */}
-          <Card sx={{ 
-            height: '100%',
-            borderTop: '4px solid #ff9800'
-          }}>
-            <CardContent>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
-                <EventIcon color="warning" />
-                <Typography variant="h6" fontWeight="bold">
-                  Actions
-                </Typography>
-              </Box>
-              
-              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                <Button
-                  variant="contained"
-                  color="primary"
-                  startIcon={<ShareIcon />}
-                  onClick={handleShareCorrections}
-                  disabled={isSharing || corrections.length === 0}
-                  fullWidth
-                >
-                  {isSharing ? 'Partage en cours...' : 'Partager tout'}
-                </Button>
-                
-                <Button
-                  variant="contained"
-                  color="warning"
-                  startIcon={<PictureAsPdfIcon />}
-                  onClick={handleGeneratePdfReport}
-                  disabled={generatePdfLoading || corrections.length === 0}
-                  fullWidth
-                >
-                  {generatePdfLoading ? 'Génération...' : 'Rapport PDF'}
-                </Button>
-                
-                <Button
-                  variant="outlined"
-                  color="secondary"
-                  endIcon={<ArrowForwardIcon />}
-                  component={Link}
-                  href={`/corrections/multiples?activityId=${activityId}`}
-                  fullWidth
-                >
-                  Nouvelles correction
-                </Button>
-              </Box>
-            </CardContent>
-          </Card>
-        </Box>
+        <InfoCards 
+          group={group}
+          activityId={activityId}
+          corrections={corrections}
+          activity={activity}
+          isSharing={isSharing}
+          handleShareCorrections={handleShareCorrections}
+          generatePdfLoading={generatePdfLoading}
+          handleGeneratePdfReport={handleGeneratePdfReport}
+          setAddCorrectionsModalOpen={setAddCorrectionsModalOpen}
+          calculateAverage={calculateAverage}
+        />
       )}
 
-      {/* Section des corrections avec barre d'outils pour l'édition */}
+      {/* Liste des corrections */}
       <Paper elevation={2} sx={{ borderRadius: 2, overflow: 'hidden' }}>
-        <Box sx={{ 
-          bgcolor: 'seondary', 
-          color: 'black', 
-          px: 1, 
-          py: 2,
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center'
-        }}>
-          <Typography variant="h6" fontWeight="bold">
-            Liste des corrections {/*({corrections.length})*/}
-          </Typography>
-          
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            {corrections.length > 0 && (
-              <Chip 
-                label={`Moyenne: ${calculateAverage()} / 20`} 
-                color="default"
-                sx={{ bgcolor: 'white', fontWeight: 'bold', mr: 1 }}
-              />
-            )}
-
-            {editMode ? (
-              <>
-                <Button 
-                  size="small"
-                  variant="contained"
-                  color="success"
-                  onClick={handleSaveGrades}
-                  disabled={savingGrades}
-                  startIcon={savingGrades ? <CircularProgress size={20} color="inherit" /> : <SaveIcon />}
-                >
-                  {savingGrades ? 'Sauvegarde...' : 'Enregistrer'}
-                </Button>
-
-                <Button 
-                  size="small"
-                  variant="contained"
-                  color="error"
-                  onClick={handleCancelEditCorrections}
-                  disabled={savingGrades}
-                  startIcon={<CloseIcon />}
-                >
-                  Annuler
-                </Button>
-              </>
-            ) : (
-              <Button 
-                size="small"
-                variant="outlined"
-                color="info"
-                onClick={handleEditCorrections}
-                startIcon={<GradeIcon />}
-                disabled={corrections.length === 0}
-              >
-                Éditer les notes
-              </Button>
-            )}
-          </Box>
-        </Box>
-        
-        {corrections.length === 0 ? (
-          <Box sx={{ p: 4, textAlign: 'center' }}>
-            <Typography color="text.secondary" sx={{ mb: 2 }}>
-              Aucune correction dans ce groupe
-            </Typography>
-            <Button
-              component={Link}
-              href={`/corrections/multiples?activityId=${activityId}`}
-              variant="contained"
-              color="primary"
-            >
-              Ajouter des corrections
-            </Button>
-          </Box>
-        ) : (
-          <TableContainer>
-            <Table>
-              <TableHead sx={{ bgcolor: '#f5f5f5' }}>
-                <TableRow>
-                  <TableCell sx={{ fontWeight: 'bold' }}>Étudiant</TableCell>
-                  <TableCell align="center" sx={{ fontWeight: 'bold' }}>Note exp.</TableCell>
-                  <TableCell align="center" sx={{ fontWeight: 'bold' }}>Note théo.</TableCell>
-                  <TableCell align="center" sx={{ fontWeight: 'bold' }}>Total</TableCell>
-                  <TableCell align="center" sx={{ fontWeight: 'bold' }}>Actions</TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {(editMode ? updatedCorrections : corrections).map((correction, index) => {
-                  const expGrade = correction.experimental_points_earned || 0;
-                  const theoGrade = correction.theoretical_points_earned || 0;
-                  const totalGrade = expGrade + theoGrade;
-                  const totalPoints = (correction.experimental_points || 0) + (correction.theoretical_points || 0);
-                  const gradeColor = getGradeColor(totalGrade, totalPoints);
-                  
-                  return (
-                    <TableRow key={correction.id} className={getRowClass(index)}>
-                      <TableCell>
-                        {editMode ? (
-                          <TextField
-                            value={correction.student_name}
-                            onChange={(e) => handleStudentNameChange(index, e.target.value)}
-                            variant="standard"
-                            size="small"
-                            fullWidth
-                          />
-                        ) : (
-                          <Typography fontWeight="medium">
-                            {correction.student_name || 'Sans nom'}
-                          </Typography>
-                        )}
-                      </TableCell>
-                      <TableCell align="center">
-                        {editMode ? (
-                          <Box sx={{ width: '100%', px: 1 }}>
-                            <Slider
-                              value={expGrade}
-                              onChange={(_, value) => handleExperimentalGradeChange(index, value)}
-                              min={0}
-                              max={correction.experimental_points || 5}
-                              step={0.5}
-                              valueLabelDisplay="auto"
-                              size="small"
-                            />
-                            <Typography variant="caption" display="block" textAlign="center">
-                              {formatNumber(expGrade)} / {formatNumber(correction.experimental_points || 0)}
-                            </Typography>
-                          </Box>
-                        ) : (
-                          <Chip 
-                            size="small" 
-                            label={`${formatNumber(expGrade)} / ${formatNumber(correction.experimental_points || 0)}`}
-                            color="primary"
-                            variant="outlined"
-                          />
-                        )}
-                      </TableCell>
-                      <TableCell align="center">
-                        {editMode ? (
-                          <Box sx={{ width: '100%', px: 1 }}>
-                            <Slider
-                              value={theoGrade}
-                              onChange={(_, value) => handleTheoreticalGradeChange(index, value)}
-                              min={0}
-                              max={correction.theoretical_points || 15}
-                              step={0.5}
-                              valueLabelDisplay="auto"
-                              size="small"
-                            />
-                            <Typography variant="caption" display="block" textAlign="center">
-                              {formatNumber(theoGrade)} / {formatNumber(correction.theoretical_points || 0)}
-                            </Typography>
-                          </Box>
-                        ) : (
-                          <Chip 
-                            size="small" 
-                            label={`${formatNumber(theoGrade)} / ${formatNumber(correction.theoretical_points || 0)}`}
-                            color="primary"
-                            variant="outlined"
-                          />
-                        )}
-                      </TableCell>
-                      <TableCell align="center">
-                        <Chip 
-                          label={`${formatNumber(totalGrade)} / ${formatNumber(totalPoints)}`}
-                          color={gradeColor}
-                          variant='outlined'
-                          sx={{ fontWeight: 'bold' }}
-                        />
-                      </TableCell>
-                      <TableCell align="center">
-                        <Box sx={{ display: 'flex', justifyContent: 'center', gap: 1 }}>
-                          <Tooltip title="Voir la correction">
-                            <IconButton
-                              size="small"
-                              color="primary"
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              component={Link}
-                              href={`/corrections/${correction.id}`}
-                            >
-                              <VisibilityIcon />
-                            </IconButton>
-                          </Tooltip>
-                          
-                          <Tooltip title="Partager">
-                            <IconButton
-                              size="small"
-                              color="primary"
-                              onClick={() => handleOpenShareModal(String(correction.id))}
-                            >
-                              <ShareIcon />
-                            </IconButton>
-                          </Tooltip>
-                          
-                          {/* Afficher l'icône de lien externe si un code de partage existe */}
-                          {correction.shareCode && (
-                            <Tooltip title="Voir le feedback partagé">
-                              <IconButton
-                                size="small"
-                                component={Link}
-                                href={`/feedback/${correction.shareCode}`}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                sx={{ color: 'primary.main' }}
-                              >
-                                <OpenInNewIcon />
-                              </IconButton>
-                            </Tooltip>
-                          )}
-                          
-                          <Tooltip title="Retirer du groupe">
-                            <IconButton
-                              size="small"
-                              color="error"
-                              onClick={() => handleDeleteCorrection(correction.id)}
-                            >
-                              <DeleteIcon />
-                            </IconButton>
-                          </Tooltip>
-                        </Box>
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
-          </TableContainer>
-        )}
+        <CorrectionsList 
+          corrections={corrections}
+          updatedCorrections={updatedCorrections}
+          activity={activity}
+          editMode={editMode}
+          savingGrades={savingGrades}
+          setEditMode={setEditMode}
+          handleEditCorrections={handleEditCorrections}
+          handleCancelEditCorrections={handleCancelEditCorrections}
+          handleSaveGrades={handleSaveGrades}
+          handleStudentNameChange={handleStudentIdChange} // Renommé mais requiert aussi un changement dans CorrectionsList
+          handleExperimentalGradeChange={handleExperimentalGradeChange}
+          handleTheoreticalGradeChange={handleTheoreticalGradeChange}
+          handleOpenShareModal={handleOpenShareModal}
+          handleRemoveFromGroup={handleRemoveFromGroup}
+          handleDeleteCorrection={handleDeleteCorrection}
+          setAddCorrectionsModalOpen={setAddCorrectionsModalOpen}
+          calculateAverage={calculateAverage}
+          formatNumber={formatNumber}
+          getGradeColor={getGradeColor}
+          getStudentFullName={getStudentFullName}
+        />
       </Paper>
 
-{/* Modal de confirmation de suppression */}
-<Dialog
-  open={deleteDialogOpen}
-  onClose={() => setDeleteDialogOpen(false)}
-  slotProps={{
-    paper: {
-      elevation: 3,
-      sx: { 
-        borderRadius: 2,
-        maxWidth: '750px',  // Définir la largeur maximale ici
-        width: '100%'       // Assurer qu'il prend 100% jusqu'à maxWidth
-      }
-    }
-  }}
->
-  <DialogTitle sx={{ bgcolor: '#f8f9fa', borderBottom: '1px solid #e0e0e0', py: 2 }}>
-    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-      <DeleteIcon color="error" />
-      <Typography variant="h6">Confirmation de suppression</Typography>
-    </Box>
-  </DialogTitle>
-  <DialogContent sx={{ pt: 3 }}>
-    <DialogContentText>
-      <br />
-      Êtes-vous sûr de vouloir supprimer le groupe 
-      <Typography variant="body1" color="secondary" component="span" sx={{ fontWeight: 'bold' }}>
-        {group?.name} 
-      </Typography> ? <strong>Cette action est irréversible</strong>.
-    </DialogContentText>
-    
-    {/* Ajouter un espace entre le texte et l'alerte */}
-    <Box sx={{ mt: 2, mb: 2 }}></Box>
-    
-    {/* L'alerte est maintenant à l'extérieur du DialogContentText */}
-    <Alert severity="warning">
-      Attention : cela supprimera uniquement le groupe, pas les corrections individuelles.
-    </Alert>
-  </DialogContent>
-  <DialogActions sx={{ px: 3, py: 2, borderTop: '1px solid #f0f0f0' }}>
-    <Button 
-      onClick={() => setDeleteDialogOpen(false)} 
-      variant="outlined"
-      disabled={isDeleting}
-    >
-      Annuler
-    </Button>
-    <Button 
-      onClick={handleDeleteGroup} 
-      color="error" 
-      variant="contained"
-      disabled={isDeleting}
-      startIcon={isDeleting ? <CircularProgress size={20} color="inherit" /> : <DeleteIcon />}
-    >
-      {isDeleting ? "Suppression..." : "Supprimer"}
-    </Button>
-  </DialogActions>
-</Dialog>
+      {/* Dialogues et modals */}
+      <GroupDialogs 
+        correctionToRemove={correctionToRemove}
+        setCorrectionToRemove={setCorrectionToRemove}
+        confirmRemoveFromGroup={confirmRemoveFromGroup}
+        isProcessing={isProcessing}
+        correctionToDelete={correctionToDelete}
+        setCorrectionToDelete={setCorrectionToDelete}
+        confirmDeleteCorrection={confirmDeleteCorrection}
+        groupDeleteDialogOpen={groupDeleteDialogOpen}
+        setGroupDeleteDialogOpen={setGroupDeleteDialogOpen}
+        handleDeleteGroup={handleDeleteGroup}
+        isDeleting={isDeleting}
+        group={group}
+      />
 
       {/* Modal de partage */}
       <ShareModal 
@@ -1220,6 +770,15 @@ const handleGeneratePdfReport = async () => {
             setUpdatedCorrections(JSON.parse(JSON.stringify(updatedCorrections)));
           }
         }}
+      />
+
+      {/* Modal d'ajout de corrections */}
+      <AddCorrectionToGroupModal
+        open={addCorrectionsModalOpen}
+        onClose={() => setAddCorrectionsModalOpen(false)}
+        activityId={activityId}
+        groupId={groupId}
+        onSuccess={handleCorrectionsAdded}
       />
 
       {/* Notifications */}

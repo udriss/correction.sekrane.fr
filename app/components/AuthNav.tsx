@@ -5,7 +5,8 @@ import { AppBar, Toolbar, Typography, Button, Box, Menu, MenuItem } from '@mui/m
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import ChangePasswordModal from './ChangePasswordModal';
-import { AccountCircle, KeyboardArrowDown } from '@mui/icons-material';
+import AccountCircle from '@mui/icons-material/AccountCircle';
+import KeyboardArrowDown from '@mui/icons-material/KeyboardArrowDown';
 
 interface User {
   id: number;

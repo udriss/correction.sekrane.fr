@@ -9,7 +9,7 @@ export async function POST(req: NextRequest) {
     const user = await getUser(req);
     if (!user) {
       return NextResponse.json(
-        { error: 'Utilisateur non authentifié' },
+        { error: 'utilisateur non authentifié' },
         { status: 401 }
       );
     }

@@ -10,7 +10,7 @@ import {
   List, 
   ListItemButton,
   ListItemText, 
-  ListItemSecondaryAction,
+  Tooltip,
   IconButton,
   Divider,
   Chip,
@@ -26,16 +26,15 @@ import {
   Card,
   CardContent
 } from '@mui/material';
-import { 
-  Visibility as VisibilityIcon, 
-  ArrowBack as ArrowBackIcon,
-  CalendarToday as CalendarTodayIcon,
-  Add as AddIcon,
-  Delete as DeleteIcon,
-  Groups as GroupsIcon
-} from '@mui/icons-material';
+import VisibilityIcon from '@mui/icons-material/Visibility';
+import ArrowBack from '@mui/icons-material/ArrowBack';
+import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
+import AddIcon from '@mui/icons-material/Add';
+import DeleteIcon from '@mui/icons-material/Delete';
+import GroupsIcon from '@mui/icons-material/Groups';
 import LoadingSpinner from '@/components/LoadingSpinner';
 import { Activity } from '@/lib/activity';
+import GroupAddIcon from '@mui/icons-material/GroupAdd';
 
 // Définition du type pour un groupe
 interface CorrectionGroup {
@@ -71,7 +70,10 @@ export default function ActivityGroupsPage() {
     severity: 'info'
   });
 
+  
+
   useEffect(() => {
+
     if (!activityId) return;
 
     async function fetchData() {
@@ -82,8 +84,10 @@ export default function ActivityGroupsPage() {
         if (!activityResponse.ok) {
           throw new Error("Erreur lors du chargement de l'activité");
         }
-        const activityData = await activityResponse.ok ? await activityResponse.json() : null;
+        const activityData = await activityResponse.json();
         setActivity(activityData);
+
+        console.log('activityData:', activityData);
         
         // Charger les groupes associés à cette activité
         const groupsResponse = await fetch(`/api/activities/${activityId}/groups`);
@@ -92,7 +96,19 @@ export default function ActivityGroupsPage() {
         }
         
         const groupsData = await groupsResponse.json();
-        setGroups(groupsData);
+        console.log('Groups data received:', groupsData);
+        
+        // Handle both array and single object responses properly
+        if (Array.isArray(groupsData)) {
+          setGroups(groupsData);
+        } else if (groupsData && typeof groupsData === 'object' && groupsData.id) {
+          // If a single object with an id is returned, wrap it in an array
+          setGroups([groupsData]);
+          console.log('Converted single group to array:', [groupsData]);
+        } else {
+          console.warn('API returned unexpected data format for groups:', groupsData);
+          setGroups([]); // Default to empty array for any other case
+        }
       } catch (err) {
         console.error('Erreur:', err);
         setError(err instanceof Error ? err.message : 'Une erreur est survenue');
@@ -153,11 +169,18 @@ export default function ActivityGroupsPage() {
     setNotification(prev => ({ ...prev, open: false }));
   };
   
+  // Add debug rendering to check what's happening with groups
+  console.log('Current groups state:', groups);
+  
   if (loading) {
     return <div className="py-10 flex justify-center max-w-[400px] mx-auto">
       <LoadingSpinner text="Chargement des groupes de corrections " />
     </div>;
   }
+
+  // Always set a default value for groups if it's null or undefined
+  const safeGroups = Array.isArray(groups) ? groups : [];
+  const hasGroups = safeGroups.length > 0;
   
   return (
     <div className="flex justify-start items-center min-h-screen bg-gray-50 py-10 px-4">
@@ -170,12 +193,17 @@ export default function ActivityGroupsPage() {
           </Box>
           
           <Box className="relative z-10 p-6">
-            <Box display="flex" alignItems="center" className="mb-2">
-              <IconButton component={Link} href={`/activities/${activityId}`} className="mr-2 bg-white/20 hover:bg-white/30">
-                <ArrowBackIcon className="text-white" />
-              </IconButton>
+            <Box display="flex" flexDirection="row" gap="4px" alignItems="center" justifyItems="center" className="mb-2">
+                <IconButton
+                  component={Link}
+                  href={`/activities/${activityId}`}
+                  className="mr-2 bg-white/20 hover:bg-white/30"
+                  sx={{ transform: 'translateX(-10px)' }}
+                >
+                  <ArrowBack color="primary" sx={{ fontSize: 30, padding: 0,  }} />
+                </IconButton>
               {activity && (
-                <Typography variant="h4" component="h1" className="font-bold">
+                <Typography variant="h4" component="h1" className="font-bold" sx={{ transform: 'translateX(-10px)' }}>
                   {activity.name}
                 </Typography>
               )}
@@ -191,15 +219,17 @@ export default function ActivityGroupsPage() {
             </Box>
             
             <div className="flex justify-end">
-              <Button 
-                variant="contained" 
-                color="primary"
-                size="large"
-                className="font-bold shadow-lg hover:shadow-xl transition-all"
-                onClick={() => router.push(`/corrections/multiples?activityId=${activityId}`)}
-              >
-                <AddIcon />
-              </Button>
+                <Tooltip title="Ajouter mon premier groupe">
+                <Button 
+                  variant="contained" 
+                  color="primary"
+                  size="large"
+                  className="font-bold shadow-lg hover:shadow-xl transition-all"
+                  onClick={() => router.push(`/corrections/multiples?activityId=${activityId}`)}
+                >
+                  <AddIcon />
+                </Button>
+                </Tooltip>
             </div>
           </Box>
         </Card>
@@ -210,28 +240,34 @@ export default function ActivityGroupsPage() {
           </Alert>
         )}
         
-        {groups.length === 0 && !error ? (
+        {!hasGroups && !error ? (
           <Card className="text-center p-10 border-2 border-dashed border-gray-300 bg-white">
-            <GroupsIcon sx={{ fontSize: 60 }} className="text-gray-300 mb-4" />
-            <Typography variant="h6" className="mb-4 text-gray-700">Aucun groupe d'évaluation</Typography>
-            <Typography variant="body1" className="mb-6 text-gray-500">
-              Créez votre premier groupe pour organiser les corrections et analyser les résultats collectifs
+            <Box sx={{ mb: 1 }}>
+              <GroupAddIcon style={{ fontSize: 120, margin: '0 auto', display: 'block', color: '#9ca3af' }} />
+            </Box>
+            <Typography variant="h6" className="mb-4 text-gray-700">
+              Aucun groupe d'évaluation
             </Typography>
-            <Button 
-              variant="contained" 
-              onClick={() => router.push(`/corrections/multiples?activityId=${activityId}`)}
-              startIcon={<AddIcon />}
-              color="primary"
-              size="large"
-            >
-              Créer mon premier groupe
-            </Button>
+            <Typography sx={{ mb: 1 }} variant="body1" className="mb-6 text-gray-500">
+              Ajoutez un premier groupe pour organiser les corrections et analyser les résultats collectifs
+            </Typography>
+            <Tooltip title="Cliquer pour ajouter un groupe">
+              <Button 
+                variant="contained" 
+                onClick={() => router.push(`/corrections/multiples?activityId=${activityId}`)}
+                startIcon={<AddIcon />}
+                color="primary"
+                size="large"
+              >
+                Ajouter mon premier groupe
+              </Button>
+            </Tooltip>
           </Card>
         ) : (
           <Card elevation={2} className="overflow-hidden">
             <Box className="bg-gray-100 p-4 border-b border-gray-200 flex justify-between items-center">
               <Typography variant="subtitle1" className="font-medium">
-              {groups.length} {groups.length > 1 ? 'groupes disponibles' : 'groupe disponible'}
+                {safeGroups.length} {safeGroups.length > 1 ? 'groupes disponibles' : 'groupe disponible'}
               </Typography>
               <Chip 
               sx={{ p: 1 }}
@@ -244,7 +280,7 @@ export default function ActivityGroupsPage() {
             </Box>
             
             <List className="bg-white">
-              {groups.map((group, index) => (
+              {safeGroups.map((group, index) => (
                 <React.Fragment key={group.id}>
                   {index > 0 && <Divider />}
                   <ListItem 
@@ -313,6 +349,11 @@ export default function ActivityGroupsPage() {
                   </ListItem>
                 </React.Fragment>
               ))}
+              {safeGroups.length === 0 && (
+                <ListItem>
+                  <ListItemText primary="Aucun groupe trouvé" />
+                </ListItem>
+              )}
             </List>
           </Card>
         )}
@@ -343,9 +384,9 @@ export default function ActivityGroupsPage() {
             <DialogContent sx={{ pt: 3 }}>
               <DialogContentText>
                 <br />
-                Êtes-vous sûr de vouloir supprimer le groupe 
+                Êtes-vous sûr de vouloir supprimer le groupe&nbsp;
                 <Typography variant="body1" color="secondary" component="span" sx={{ fontWeight: 'bold' }}>
-                &nbsp;{groupToDelete?.name}&nbsp;
+                {groupToDelete?.name}&nbsp;
                 </Typography>?&nbsp;<strong>Cette action est irréversible</strong>.
               </DialogContentText>
               

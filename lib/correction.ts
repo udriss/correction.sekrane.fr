@@ -4,23 +4,38 @@ import { Correction as CorrectionType } from './types';
 
 export type Correction = CorrectionType;
 
-export async function createCorrection(correction: Partial<CorrectionType>): Promise<number> {
-  return withConnection(async (connection) => {
-    const [result] = await connection.execute<ResultSetHeader>(
-      'INSERT INTO corrections (activity_id, student_name, content) VALUES (?, ?, ?)',
-      [correction.activity_id, correction.student_name || null, correction.content || null]
+export async function createCorrection(data: {
+  activity_id: number;
+  student_id: number | null;
+  content: string | null;
+  group_id?: number; // Make group_id optional in the function parameters
+}) {
+  return await withConnection(async (connection) => {
+    // Add group_id to the insertion with default 0 if not provided
+    const [result] = await connection.query(
+      `INSERT INTO corrections 
+       (activity_id, student_id, content, group_id) 
+       VALUES (?, ?, ?, ?)`,
+      [
+        data.activity_id,
+        data.student_id,
+        data.content,
+        data.group_id || 0 // Default to 0 if not provided
+      ]
     );
     
-    return result.insertId;
+    return (result as any).insertId;
   });
 }
 
 export async function getCorrectionsByActivityId(activityId: number): Promise<CorrectionType[]> {
   return withConnection(async (connection) => {
     const [rows] = await connection.execute<RowDataPacket[]>(
-      `SELECT c.*, a.name as activity_name 
+      `SELECT c.*, a.name as activity_name, 
+       CONCAT(s.first_name, ' ', s.last_name) as student_name
        FROM corrections c 
        JOIN activities a ON c.activity_id = a.id 
+       LEFT JOIN students s ON c.student_id = s.id
        WHERE c.activity_id = ? 
        ORDER BY c.created_at DESC`,
       [activityId]
@@ -34,9 +49,11 @@ export async function getCorrectionById(id: number): Promise<CorrectionType | nu
   try {
     return await withConnection(async (connection) => {
       const [rows] = await connection.execute<RowDataPacket[]>(
-        `SELECT c.*, a.name as activity_name 
+        `SELECT c.*, a.name as activity_name,
+         CONCAT(s.first_name, ' ', s.last_name) as student_name
          FROM corrections c 
          JOIN activities a ON c.activity_id = a.id 
+         LEFT JOIN students s ON c.student_id = s.id
          WHERE c.id = ?`,
         [id]
       );
@@ -67,16 +84,16 @@ export async function getCorrectionById(id: number): Promise<CorrectionType | nu
 
 export async function updateCorrection(id: number, data: CorrectionType): Promise<boolean> {
   return withConnection(async (connection) => {
-    const { activity_id, student_name, content, content_data } = data;
+    const { activity_id, student_id, content, content_data } = data;
     
     // Convertir content_data en JSON si nécessaire
     const contentDataJson = content_data ? JSON.stringify(content_data) : null;
     
     const [result] = await connection.query(
       `UPDATE corrections 
-       SET activity_id = ?, student_name = ?, content = ?, content_data = ?
+       SET activity_id = ?, student_id = ?, content = ?, content_data = ?
        WHERE id = ?`,
-      [activity_id, student_name, content, contentDataJson, id]
+      [activity_id, student_id, content, contentDataJson, id]
     );
     
     const resultObj = result as { affectedRows: number };
@@ -87,12 +104,12 @@ export async function updateCorrection(id: number, data: CorrectionType): Promis
   });
 }
 
-// Function to update just the student name (more efficient)
-export async function updateCorrectionName(id: number, student_name: string): Promise<boolean> {
+// Function to update just the student ID (more efficient)
+export async function updateCorrectionStudentId(id: number, student_id: number): Promise<boolean> {
   return withConnection(async (connection) => {
     const [result] = await connection.execute<ResultSetHeader>(
-      'UPDATE corrections SET student_name = ? WHERE id = ?',
-      [student_name, id]
+      'UPDATE corrections SET student_id = ? WHERE id = ?',
+      [student_id, id]
     );
     return result.affectedRows > 0;
   });
@@ -154,10 +171,12 @@ export async function getCorrectionStatsByActivity(activityId: number): Promise<
 export async function getCorrectionsByGroup(groupId: number): Promise<CorrectionType[]> {
   return withConnection(async (connection) => {
     const [rows] = await connection.query(
-      `SELECT c.*, a.name as activity_name 
+      `SELECT c.*, a.name as activity_name,
+       CONCAT(s.first_name, ' ', s.last_name) as student_name
        FROM corrections c 
        JOIN group_corrections gc ON c.id = gc.correction_id
        JOIN activities a ON c.activity_id = a.id 
+       LEFT JOIN students s ON c.student_id = s.id
        WHERE gc.group_id = ? 
        ORDER BY c.created_at DESC`,
       [groupId]
@@ -213,7 +232,8 @@ export async function getCorrectionsForPdfReport(groupId: number): Promise<any[]
   return withConnection(async (connection) => {
     const [rows] = await connection.query(
       `SELECT 
-        c.id, c.student_name, c.grade, c.experimental_points_earned, 
+        c.id, c.student_id, CONCAT(s.first_name, ' ', s.last_name) as student_name, 
+        c.grade, c.experimental_points_earned, 
         c.theoretical_points_earned, c.penalty, a.name as activity_name,
         a.experimental_points as max_experimental_points,
         a.theoretical_points as max_theoretical_points,
@@ -221,8 +241,9 @@ export async function getCorrectionsForPdfReport(groupId: number): Promise<any[]
        FROM corrections c 
        JOIN group_corrections gc ON c.id = gc.correction_id
        JOIN activities a ON c.activity_id = a.id 
+       LEFT JOIN students s ON c.student_id = s.id
        WHERE gc.group_id = ? 
-       ORDER BY c.student_name`,
+       ORDER BY s.last_name, s.first_name`,
       [groupId]
     );
     

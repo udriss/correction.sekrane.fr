@@ -27,10 +27,9 @@ import {
   FormControlLabel,
   Checkbox,
   Chip,
-  CircularProgress
+  CircularProgress,
+  Slider
 } from '@mui/material';
-import Grid from '@mui/material/Grid2';
-import Link from 'next/link';
 
 // Icons
 import EditIcon from '@mui/icons-material/Edit';
@@ -39,17 +38,13 @@ import DeleteIcon from '@mui/icons-material/Delete';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import UndoIcon from '@mui/icons-material/Undo';
 import AddIcon from '@mui/icons-material/Add';
-import CheckIcon from '@mui/icons-material/Check';
-import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline';
-import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import RuleIcon from '@mui/icons-material/Rule';
 import GradeIcon from '@mui/icons-material/Grade';
 import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
 import HourglassEmptyIcon from '@mui/icons-material/HourglassEmpty';
 import EventAvailableIcon from '@mui/icons-material/EventAvailable';
-import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import ScheduleIcon from '@mui/icons-material/Schedule';
-import { Share as ShareIcon } from '@mui/icons-material';
+import ShareIcon from '@mui/icons-material/Share';
 
 // Mock components
 import DraggableItemMock from './DraggableItemMock';
@@ -73,6 +68,7 @@ export default function DemoPage() {
   const [theoreticalGrade, setTheoreticalGrade] = useState('12.5');
   const [isPenaltyEnabled, setIsPenaltyEnabled] = useState(true);
   const [penalty, setPenalty] = useState('6.0');
+  const [saveGradeTimeout, setSaveGradeTimeout] = useState<NodeJS.Timeout | null>(null);
   
   const experimentalPoints = 5;
   const theoreticalPoints = 15;
@@ -150,7 +146,7 @@ export default function DemoPage() {
       </Box>
       
       {/* SECTION 1: CORRECTIONS INTERFACE */}
-      <div className="container mx-auto px-4 py-8 mb-12">
+      <div className="container mx-auto max-w-5xl px-4 py-8 mb-12">
         <Typography variant="h5" component="h2" gutterBottom sx={{ borderLeft: '4px solid #1976d2', pl: 2 }}>
           Vue du professeur: interface de correction
         </Typography>
@@ -159,9 +155,9 @@ export default function DemoPage() {
           <LocalizationProvider dateAdapter={AdapterDayjs}>
             <div className="container mx-auto px-4 py-4 min-h-[600px]">
               {/* Header with student name */}
-              <div className="flex justify-between items-start mb-6">
+              <Paper elevation={2} className="p-4 mb-6 border-l-4 border-blue-500">
                 <div>
-                  <h1 className="text-3xl font-bold flex items-center">
+                  <h1 className="text-2xl font-bold flex items-center">
                     Jean Dupont
                     <IconButton 
                       color="primary"
@@ -179,32 +175,34 @@ export default function DemoPage() {
                     Créée le 12 décembre 2023, 14:30
                   </p>
                 </div>
-              </div>
+              </Paper>
 
-              {/* Date pickers */}
-              <div className="flex flex-wrap gap-4 mb-2">
-                <Box>
-                  <DatePicker
-                    label="Date limite de rendu"
-                    value={deadlineDate}
-                    onChange={(newDate) => setDeadlineDate(newDate)}
-                    slotProps={{ textField: { size: 'small' } }}
-                  />
-                </Box>
-                <Box>
-                  <DatePicker
-                    label="Date de rendu effective"
-                    value={submissionDate}
-                    onChange={(newDate) => setSubmissionDate(newDate)}
-                    slotProps={{ textField: { size: 'small' } }}
-                  />
-                </Box>
-              </div>
-              
-              {/* Late submission alert */}
-              {daysLate > 0 && (
-                <div className="flex justify-start items-center my-2 w-full">
+              {/* Date pickers in a nice card */}
+              <Paper elevation={1} className="p-4 mb-4 bg-gray-50">
+                <Box className="flex flex-col sm:flex-row gap-4 items-center">
                   <Box className="flex items-center">
+                    <EventAvailableIcon className="mr-2 text-blue-600" />
+                    <DatePicker
+                      label="Date limite de rendu"
+                      value={deadlineDate}
+                      onChange={(newDate) => setDeadlineDate(newDate)}
+                      slotProps={{ textField: { size: 'small' } }}
+                    />
+                  </Box>
+                  <Box className="flex items-center">
+                    <HourglassEmptyIcon className="mr-2 text-blue-600" />
+                    <DatePicker
+                      label="Date de rendu effective"
+                      value={submissionDate}
+                      onChange={(newDate) => setSubmissionDate(newDate)}
+                      slotProps={{ textField: { size: 'small' } }}
+                    />
+                  </Box>
+                </Box>
+                
+                {/* Late submission alert */}
+                {daysLate > 0 && (
+                  <Box className="mt-3">
                     <Alert severity="error" sx={{ py: 0.5 }}>
                       Rendu en retard de {daysLate} jour(s)
                       <strong className="ml-2">
@@ -212,8 +210,8 @@ export default function DemoPage() {
                       </strong>
                     </Alert>
                   </Box>
-                </div>
-              )}
+                )}
+              </Paper>
 
               {/* Two-column layout */}
               <div className="flex flex-col md:flex-row gap-6">
@@ -221,7 +219,10 @@ export default function DemoPage() {
                 <div className="w-full md:w-2/3">
                   {/* Content editor */}
                   <Paper className="p-4 shadow mb-6">
-                    <Typography variant="h6" className="mb-3">Contenu de la correction</Typography>
+                    <Typography variant="h6" className="mb-3 font-semibold border-b pb-2 flex items-center">
+                      <EditIcon className="mr-2 text-blue-600" /> 
+                      Contenu de la correction
+                    </Typography>
                     <DropTarget onDrop={handleFragmentDrop}>
                       <div className="border rounded-md p-4 bg-gray-50 mb-4 min-h-[200px]">
                         {contentItems.map((item, index) => (
@@ -238,15 +239,17 @@ export default function DemoPage() {
                   </Paper>
 
                   {/* Action buttons */}
-                  <Paper className="p-4 shadow mb-6 flex justify-between items-center">
+                  <Paper className="p-3 shadow mb-6 flex justify-between items-center bg-gray-50">
                     <div className="flex space-x-2">
-                      <IconButton
+                      <Button
+                        variant="contained"
                         color="primary"
-                        size="medium"
+                        size="small"
                         title="Ajouter un paragraphe"
+                        startIcon={<AddIcon />}
                       >
-                        <AddIcon />
-                      </IconButton>
+                        Ajouter
+                      </Button>
                     </div>
                     <div className="space-x-2 flex justify-end items-center">
                       <IconButton
@@ -280,90 +283,164 @@ export default function DemoPage() {
                     </div>
                   </Paper>
 
-                  {/* Grading section */}
-                  <Paper className="p-4 shadow mb-6">
-                    <div className="mb-3">
-                      <Typography variant="h6">
+                  {/* Grading section - Enhanced with sliders */}
+                  <Paper className="p-6 shadow mb-6 bg-white">
+                    <div className="mb-4">
+                      <Typography variant="h6" className="font-semibold border-b pb-2 flex items-center">
+                        <GradeIcon className="mr-2 text-amber-500" /> 
                         Notation sur {experimentalPoints + theoreticalPoints} points
                       </Typography>
                     </div>
-                    <div className="flex flex-col space-y-3">
-                      <div className="flex flex-row justify-around mx-2">
-                        <div className="flex flex-col items-center">
-                          <TextField
-                            label={`Expérimentale /${experimentalPoints}`}
-                            value={experimentalGrade}
-                            onChange={(e) => setExperimentalGrade(e.target.value)}
-                            variant="outlined"
-                            size="small"
-                            type="text"
-                            inputProps={{ 
-                              inputMode: 'decimal', 
-                              style: { textAlign: 'center' }
-                            }}
-                            sx={{ width: 120 }}
-                          />
-                          <div className="mb-4"></div>
-                          <TextField
-                            label={`Théorique /${theoreticalPoints}`}
-                            value={theoreticalGrade}
-                            onChange={(e) => setTheoreticalGrade(e.target.value)}
-                            variant="outlined"
-                            size="small"
-                            type="text"
-                            inputProps={{ 
-                              inputMode: 'decimal', 
-                              style: { textAlign: 'center' }
-                            }}
-                            sx={{ width: 120 }}
-                          />
-                        </div>
+                    
+                    <Box className="flex flex-col md:flex-row justify-around gap-4 mt-4">
+                      {/* Experimental Points Slider */}
+                        <Box className="flex flex-col justify-center items-center bg-blue-50 p-4 rounded-lg border border-blue-100">
+                        <Typography variant="body2" id="experimental-slider" gutterBottom fontWeight="medium" color="primary">
+                          Partie expérimentale
+                        </Typography>
+                        <Slider
+                          aria-labelledby="experimental-slider"
+                          value={parseFloat(experimentalGrade) || 0}
+                          onChange={(_, newValue) => {
+                          const newGrade = newValue.toString();
+                          setExperimentalGrade(newGrade);
+                          }}
+                          min={0}
+                          max={experimentalPoints}
+                          step={0.5}
+                          valueLabelDisplay="auto"
+                          marks
+                          sx={{ 
+                          width: '100%',
+                          maxWidth: 180,
+                          color: 'primary.main',
+                          '& .MuiSlider-thumb': {
+                            height: 20,
+                            width: 20,
+                          },
+                          '& .MuiSlider-rail': {
+                            opacity: 0.5,
+                          }
+                          }}
+                        />
+                        <Typography variant="caption" color="text.secondary" align="center" sx={{ mt: 1 }}>
+                          {experimentalGrade || '0'}/{experimentalPoints}
+                        </Typography>
+                        </Box>
                         
-                        <div className="flex items-center">
-                          <Box className="flex items-center ml-3">
-                            <FormControlLabel
-                              control={
-                                <Checkbox
-                                  checked={isPenaltyEnabled}
-                                  onChange={(e) => setIsPenaltyEnabled(e.target.checked)}
-                                  size="small"
-                                />
-                              }
-                              label="Pénalité de retard"
+                        {/* Theoretical Points Slider */}
+                        <Box className="flex flex-col justify-center  items-center bg-purple-50 p-4 rounded-lg border border-purple-100">
+                        <Typography variant="body2" id="theoretical-slider" gutterBottom fontWeight="medium" color="secondary">
+                          Partie théorique
+                        </Typography>
+                        <Slider
+                          aria-labelledby="theoretical-slider"
+                          value={parseFloat(theoreticalGrade) || 0}
+                          onChange={(_, newValue) => {
+                          const newGrade = newValue.toString();
+                          setTheoreticalGrade(newGrade);
+                          }}
+                          min={0}
+                          max={theoreticalPoints}
+                          step={0.5}
+                          valueLabelDisplay="auto"
+                          marks
+                          sx={{ 
+                          width: '100%',
+                          maxWidth: 180,
+                          color: 'secondary.main', 
+                          '& .MuiSlider-thumb': {
+                            height: 20,
+                            width: 20,
+                          },
+                          '& .MuiSlider-rail': {
+                            opacity: 0.5,
+                          }
+                          }}
+                        />
+                        <Typography variant="caption" color="text.secondary" align="center" sx={{ mt: 1 }}>
+                          {theoreticalGrade || '0'}/{theoreticalPoints}
+                        </Typography>
+                        </Box>
+                        
+                        <Box className="flex flex-col items-center">
+                        <FormControlLabel
+                          control={
+                            <Checkbox
+                              checked={isPenaltyEnabled}
+                              onChange={(e) => setIsPenaltyEnabled(e.target.checked)}
+                              size="small"
                             />
-                          </Box>
-                        </div>
+                          }
+                          label="Pénalité de retard"
+                          sx={{ mb: 1 }}
+                        />
                         
                         {isPenaltyEnabled && (
-                          <div className="flex items-center">
-                            <TextField
-                              label="Points pénalité"
-                              value={penalty}
-                              onChange={(e) => setPenalty(e.target.value)}
-                              variant="outlined"
-                              size="small"
-                              type="text"
-                              inputProps={{ 
-                                inputMode: 'decimal', 
-                                style: { textAlign: 'center' }
+                          <Box className="flex flex-col justify-center  max-w-[180px] items-center bg-red-50 p-4 rounded-lg border border-red-100">
+                            <Typography variant="body2" id="penalty-slider" gutterBottom fontWeight="medium" color="error">
+                              Pénalité
+                            </Typography>
+                            <Slider
+                              aria-labelledby="penalty-slider"
+                              value={parseFloat(penalty) || 0}
+                              onChange={(_, newValue) => {
+                                const newPenalty = newValue.toString();
+                                setPenalty(newPenalty);
                               }}
-                              sx={{ width: 120 }}
+                              min={0}
+                              max={14}
+                              step={0.5}
+                              valueLabelDisplay="auto"
+                              marks
+                              sx={{ 
+                                width: 180,
+                                color: 'error.main',
+                                '& .MuiSlider-thumb': {
+                                  height: 20,
+                                  width: 20,
+                                },
+                                '& .MuiSlider-rail': {
+                                  opacity: 0.5,
+                                }
+                              }}
                             />
-                          </div>
+                            <Typography variant="caption" color="text.secondary" align="center" sx={{ mt: 1 }}>
+                              {penalty || '0'} points
+                            </Typography>
+                          </Box>
                         )}
-                      </div>
-                      <div className="flex justify-center items-center border-t mt-2 pt-2">
-                        <Typography variant="body1" className="text-right">
-                          Total : {calculateTotalGrade().toFixed(1)} / {experimentalPoints + theoreticalPoints}
-                          {isPenaltyEnabled && penalty && (
-                            <>
-                              <span className="text-red-500 ml-2">- {penalty}</span>
-                              <span className="font-bold ml-2">= {calculateFinalGrade()} / {experimentalPoints + theoreticalPoints}</span>
-                            </>
-                          )}
-                        </Typography>
-                      </div>
-                    </div>
+                        </Box>
+                      </Box>
+                    
+                    
+                    {/* Total Grade Display */}
+                    <Box className="flex justify-center items-center mt-6 pt-4 border-t">
+                      <Box className="bg-gray-100 p-4 rounded-lg border border-gray-300 max-w-sm w-full">
+                        <Box className="flex justify-between items-center">
+                          <Typography variant="body1" fontWeight="medium">Total brut :</Typography>
+                          <Typography variant="h6" fontWeight="bold">
+                            {calculateTotalGrade().toFixed(1)} / {experimentalPoints + theoreticalPoints}
+                          </Typography>
+                        </Box>
+                        
+                        {isPenaltyEnabled && penalty && (
+                          <>
+                            <Box className="flex justify-between items-center text-red-600 mt-2">
+                              <Typography variant="body1">Pénalité :</Typography>
+                              <Typography variant="body1" fontWeight="medium">- {penalty}</Typography>
+                            </Box>
+                            <Divider sx={{ my: 1.5 }} />
+                            <Box className="flex justify-between items-center mt-1">
+                              <Typography variant="body1" fontWeight="bold">Note finale :</Typography>
+                              <Typography variant="h5" fontWeight="bold" color="primary">
+                                {calculateFinalGrade()} / {experimentalPoints + theoreticalPoints}
+                              </Typography>
+                            </Box>
+                          </>
+                        )}
+                      </Box>
+                    </Box>
                   </Paper>
                 </div>
                 
@@ -371,7 +448,10 @@ export default function DemoPage() {
                 <div className="w-full md:w-1/3">
                   <Paper className="p-4 shadow">
                     <div className="flex flex-col space-y-2 mb-4">
-                      <Typography variant="h6" className="mb-0">Fragments disponibles</Typography>
+                      <Typography variant="h6" className="mb-0 font-semibold border-b pb-2 flex items-center">
+                        <AddIcon className="mr-2 text-green-600" />
+                        Fragments disponibles
+                      </Typography>
                       
                       {/* Activity selector dropdown */}
                       <FormControl fullWidth size="small" margin="normal">
@@ -389,7 +469,7 @@ export default function DemoPage() {
                     </div>
 
                     {/* Fragments list */}
-                    <div className="space-y-3 max-h-[500px] overflow-y-auto p-1">
+                    <div className="space-y-3 max-h-[500px] overflow-y-auto p-2 bg-gray-50 rounded-md border mb-3">
                       {mockFragments.map((fragment, index) => (
                         <div key={fragment.id} className="relative">
                           <FragmentItemMock
@@ -402,23 +482,22 @@ export default function DemoPage() {
                     </div>
                     
                     {/* Add fragment section */}
-                    <Box className="flex flex-col space-y-4 my-4">
-                      <Box className="flex items-center justify-between">
-                        <Button
-                          color="primary"
-                          variant="text"
-                          size="small"
-                        >
-                          Nouveau
-                        </Button>
-                        <Button
-                          color="primary"
-                          variant="text"
-                          size="small"
-                        >
-                          Gérer les fragments
-                        </Button>
-                      </Box>
+                    <Box className="flex justify-between mt-4 pt-2 border-t">
+                      <Button
+                        color="primary"
+                        variant="outlined"
+                        size="small"
+                        startIcon={<AddIcon />}
+                      >
+                        Nouveau
+                      </Button>
+                      <Button
+                        color="primary"
+                        variant="text"
+                        size="small"
+                      >
+                        Gérer les fragments
+                      </Button>
                     </Box>
                   </Paper>
                 </div>

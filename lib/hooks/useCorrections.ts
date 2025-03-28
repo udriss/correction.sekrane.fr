@@ -10,8 +10,33 @@ interface ContentData {
   items: ContentItem[];
 }
 
+interface LocalCorrection extends Omit<Correction, 'activity_id'> {
+  studentName?: string;
+  firstName?: string;
+  lastName?: string;
+  activity_id: number;
+  deadline?: string;
+  submission_date?: string;
+  grade?: number;
+  experimental_points_earned?: number;
+  theoretical_points_earned?: number;
+  penalty?: number;
+  student_name?: string;
+  student_first_name?: string;
+  student_last_name?: string;
+  student_data?: {
+    id?: number;
+    first_name?: string;
+    last_name?: string;
+    email?: string;
+    created_at?: string;
+    updated_at?: string;
+    [key: string]: any; // Allow for additional properties
+  };
+}   
+
 export function useCorrections(correctionId: string) {
-  const [correction, setCorrection] = useState<Correction | null>(null);
+  const [correction, setCorrection] = useState<LocalCorrection | null>(null);
   const [contentItems, setContentItems] = useState<ContentItem[]>([]);
   const [history, setHistory] = useState<ContentItem[][]>([]);
   const [loading, setLoading] = useState(true);
@@ -20,9 +45,12 @@ export function useCorrections(correctionId: string) {
   const [error, setError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
   const [editedName, setEditedName] = useState('');
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
   const [isEditingName, setIsEditingName] = useState(false);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const router = useRouter();
+
 
   // Save current state to history
   const saveToHistory = useCallback(() => {
@@ -39,36 +67,47 @@ export function useCorrections(correctionId: string) {
   }, [history]);
 
   // Load the correction and its content
-  const fetchCorrectionData = useCallback(async (activityIdCallback: (id: number) => void) => {
+  const fetchCorrectionData = useCallback(async (onActivityIdCallback?: (activityId: number) => void) => {
     setLoading(true);
-    setError('');
-    
     try {
-      const correctionData = await correctionService.fetchCorrection(correctionId);
-      
-      // Ensure we have a valid id before setting the correction
-      if (correctionData && typeof correctionData.id === 'number') {
-        setCorrection(correctionData);
-        setEditedName(correctionData.student_name || '');
-        
-        // Set the initial selected activity ID by calling the callback
-        if (correctionData.activity_id) {
-          activityIdCallback(correctionData.activity_id);
-        }
-        
-        // Parse the content items
-        const items = correctionService.parseContentItems(correctionData);
-        setContentItems(items);
-      } else {
-        throw new Error('Invalid correction data received');
+      const response = await fetch(`/api/corrections/${correctionId}`);
+      if (!response.ok) {
+        throw new Error('Failed to fetch correction');
       }
-    } catch (err) {
-      console.error('Erreur:', err);
-      setError('Erreur lors du chargement de la correction');
+      const data = await response.json();
+      
+      setCorrection(data);
+      // Extract and set student data from the new structure
+      if (data.student_data) {
+        // Use the dedicated student_data object when available
+        setFirstName(data.student_data.first_name || '');
+        setLastName(data.student_data.last_name || '');
+        // Set the display name using student_data
+        const displayName = `${data.student_data.first_name || ''} ${data.student_data.last_name || ''}`.trim();
+        setEditedName(displayName || data.student_name || '');
+      } else {
+        // Fallback to direct properties in the correction object
+        setFirstName(data.student_first_name || '');
+        setLastName(data.student_last_name || '');
+        setEditedName(data.student_name || '');
+      }
+      
+      // Set content items if available
+      if (data.content_data && data.content_data.items) {
+        setContentItems(data.content_data.items);
+      }
+      
+      // Call the callback with the activity ID if provided
+      if (onActivityIdCallback && data.activity_id) {
+        onActivityIdCallback(data.activity_id);
+      }
+    } catch (error) {
+      console.error('Error fetching correction:', error);
+      setError('Failed to load correction data.');
     } finally {
       setLoading(false);
     }
-  }, [correctionId]);
+  }, [correctionId, setFirstName, setLastName, setEditedName, setContentItems, setCorrection, setError, setLoading]);
 
   // Save the correction
   const handleSaveCorrection = useCallback(async () => {
@@ -82,7 +121,7 @@ export function useCorrections(correctionId: string) {
       // Send current contentItems to the server but don't overwrite local state with response
       await correctionService.saveCorrection(
         correctionId,
-        correction.student_name || '', // Add empty string fallback for undefined
+        correction.studentName || '', // Add empty string fallback for undefined
         contentItems
       );
       
@@ -105,27 +144,75 @@ export function useCorrections(correctionId: string) {
     }
   }, [correction, contentItems, correctionId]);
 
-  // Save the student name
-  const handleSaveName = useCallback(async () => {
+  // Save the student name with more robust state handling
+  const handleSaveName = useCallback(async (overrideFirstName?: string, overrideLastName?: string) => {
     if (!correction) return;
+    
+    // Use override values if provided, otherwise use state values
+    const firstNameToSend = overrideFirstName !== undefined ? overrideFirstName : firstName;
+    const lastNameToSend = overrideLastName !== undefined ? overrideLastName : lastName;
+
+    // Validate before proceeding
+    if (!firstNameToSend && !lastNameToSend) {
+      setError('Le prénom ou le nom est requis');
+      return;
+    }
     
     setError('');
     setSaving(true);
     
     try {
-      const updatedData = await correctionService.updateCorrectionName(
-        correctionId,
-        editedName
-      );
+      // Direct API call
+      const response = await fetch(`/api/corrections/${correctionId}/name`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          student_first_name: firstNameToSend,
+          student_last_name: lastNameToSend
+        }),
+      });
       
-      // Fix the type issue by using functional state update pattern
+      if (!response.ok) {
+        const errorData = await response.json();
+        console.error('[useCorrections] API Error:', errorData);
+        throw new Error(errorData.error || 'Erreur lors de la mise à jour du nom');
+      }
+      
+      const updatedData = await response.json();
+
+      // IMPORTANT: First update local state with the values we just sent
+      // This ensures immediate consistency with what user entered
+      setFirstName(firstNameToSend);
+      setLastName(lastNameToSend);
+      
+      // Then update the correction object with API response data
       setCorrection(prev => {
         if (!prev) return null;
-        return {
+        
+        // Create an updated correction object that includes both local and API data
+        const updated = {
           ...prev,
-          student_name: updatedData.student_name || '' // Ensure it's never undefined
-        };
+          studentName: updatedData.student_name || `${firstNameToSend} ${lastNameToSend}`.trim(),
+          firstName: firstNameToSend, // Use our sent values to ensure consistency
+          lastName: lastNameToSend,   // Use our sent values to ensure consistency
+          student_name: updatedData.student_name || `${firstNameToSend} ${lastNameToSend}`.trim(),
+          student_first_name: firstNameToSend,
+          student_last_name: lastNameToSend,
+          // Update student_data if it exists
+          student_data: prev.student_data ? {
+            ...prev.student_data,
+            first_name: firstNameToSend,
+            last_name: lastNameToSend
+          } : undefined
+        };        
+        return updated;
       });
+      
+      // Set display name based on what we know for sure (our sent values)
+      const combinedName = `${firstNameToSend} ${lastNameToSend}`.trim();
+      setEditedName(combinedName);
       
       setIsEditingName(false);
       setSuccessMessage('Nom mis à jour avec succès');
@@ -134,12 +221,12 @@ export function useCorrections(correctionId: string) {
         setSuccessMessage('');
       }, 3000);
     } catch (err) {
-      console.error('Erreur:', err);
+      console.error('[useCorrections] Error in handleSaveName:', err);
       setError('Erreur lors de la mise à jour du nom');
     } finally {
       setSaving(false);
     }
-  }, [correction, editedName, correctionId]);
+  }, [correction, correctionId, firstName, lastName]);
 
   // Save the grade and penalty
   const saveGradeAndPenalty = useCallback(async (
@@ -159,13 +246,7 @@ export function useCorrections(correctionId: string) {
 
       // Calculate total grade
       const totalGrade = expGrade + theoGrade;
-      
-      console.log('Saving grades:', { 
-        experimental: expGrade, 
-        theoretical: theoGrade,
-        total: totalGrade,
-        penalty: penaltyValue
-      });
+
       
       const response = await fetch(`/api/corrections/${correctionId}/grade`, {
         method: 'PUT',
@@ -185,7 +266,6 @@ export function useCorrections(correctionId: string) {
       }
       
       const updatedData = await response.json();
-      console.log('Received updated data:', updatedData);
       
       // Use functional update to ensure proper typing
       setCorrection(prevCorrection => {
@@ -290,6 +370,13 @@ export function useCorrections(correctionId: string) {
     setConfirmingDelete(false);
   }, []);
 
+  // Update editedName when first or last name changes
+  const updateNameFromParts = useCallback((first: string, last: string) => {
+    setFirstName(first);
+    setLastName(last);
+    setEditedName(`${first} ${last}`.trim());
+  }, []);
+
   return {
     correction,
     contentItems,
@@ -300,12 +387,17 @@ export function useCorrections(correctionId: string) {
     error,
     successMessage,
     editedName,
+    firstName,        // Add the new state variables
+    lastName,
     isEditingName,
     confirmingDelete,
     setContentItems,
     setError,
     setSuccessMessage,
     setEditedName,
+    setFirstName,     // Add setters for new state variables
+    setLastName,
+    updateNameFromParts, // Add the new utility function
     setIsEditingName,
     saveToHistory,
     handleUndo,
@@ -315,6 +407,6 @@ export function useCorrections(correctionId: string) {
     handleDelete,
     handleCancelDelete,
     saveGradeAndPenalty,
-    saveDates, // Add the new method here
+    saveDates,
   };
 }
