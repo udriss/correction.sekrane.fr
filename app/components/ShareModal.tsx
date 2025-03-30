@@ -101,7 +101,7 @@ export default function ShareModal({ open, onClose, correctionId, onShareSuccess
       if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
         navigator.clipboard.writeText(shareUrl)
           .then(() => {
-            console.log('Copied using Clipboard API');
+            
             setCopied(true);
             setTimeout(() => setCopied(false), 2000);
           })
@@ -133,7 +133,7 @@ export default function ShareModal({ open, onClose, correctionId, onShareSuccess
         // Try to use document.execCommand
         const successful = document.execCommand('copy');
         if (successful) {
-          console.log('Copied using execCommand');
+          
           setCopied(true);
           setTimeout(() => setCopied(false), 2000);
           return;

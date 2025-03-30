@@ -162,6 +162,10 @@ export default function MainNavbar() {
             }}
           >
             <Toolbar sx={{ justifyContent: 'space-between' }}>
+              {/* ThemeSwitcher on the left */}
+              <Box  sx={{ marginLeft: 2 }}>
+              <ThemeSwitcher />
+              </Box>
               {/* Logo et titre de l'app */}
               <Typography 
                 variant="h5" 
@@ -238,20 +242,22 @@ export default function MainNavbar() {
                   </MenuItem>
                   
                   <Divider />
-                  
-                  <MenuItem component={Link} href="/activities?filter=recent">
-                    <ListItemIcon>
-                      <FilterListIcon fontSize="small" />
-                    </ListItemIcon>
-                    <ListItemText primary="Activités récentes" />
-                  </MenuItem>
-                  
+
                   <MenuItem component={Link} href="/corrections">
                     <ListItemIcon>
                       <AssignmentIcon fontSize="small" />
                     </ListItemIcon>
                     <ListItemText primary="Corrections" />
                   </MenuItem>
+
+                  <MenuItem component={Link} href="/corrections/new">
+                    <ListItemIcon>
+                      <AddIcon fontSize="small" />
+                    </ListItemIcon>
+                    <ListItemText primary="Nouvelle correction" />
+                  </MenuItem>
+
+                  <Divider />
                   
                   <MenuItem component={Link} href="/fragments">
                     <ListItemIcon>
@@ -260,7 +266,7 @@ export default function MainNavbar() {
                     <ListItemText primary="Fragments" />
                   </MenuItem>
                   
-                  <MenuItem component={Link} href="/activities/search">
+                  <MenuItem component={Link} href="/recherches">
                     <ListItemIcon>
                       <SearchIcon fontSize="small" />
                     </ListItemIcon>
@@ -322,29 +328,20 @@ export default function MainNavbar() {
                     </ListItemIcon>
                     <ListItemText primary="Gestion des étudiants" />
                   </MenuItem>
-                  
-                  <MenuItem component={Link} href="/classes?view=activities">
-                    <ListItemIcon>
-                      <MenuBookIcon fontSize="small" />
-                    </ListItemIcon>
-                    <ListItemText primary="Activités par classe" />
-                  </MenuItem>
                 </Menu>
               </Box>
               
               {/* Authentification */}
               {user ? (
                 <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                  <ThemeSwitcher />
                   <Button
-                    color="primary"
                     variant="outlined"
-                    onClick={handleMenuClick
-                    }
+                    onClick={handleMenuClick}
                     endIcon={<KeyboardArrowDown />}
                     startIcon={<AccountCircle />}
                     size="small"
                     sx={{ 
+                      color: 'success.main',
                       borderRadius: '24px',
                       textTransform: 'none',
                       fontWeight: 500,

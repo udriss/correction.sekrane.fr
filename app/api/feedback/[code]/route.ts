@@ -109,7 +109,7 @@ export async function POST(
     
     // Récupérer les données du corps de la requête
     const body = await request.json();
-    console.log("Données reçues à sauvegarder:", body);
+    
     
     // Utiliser withConnection pour s'assurer que les connexions sont libérées
     return await withConnection(async (connection) => {
@@ -181,7 +181,7 @@ export async function POST(
         correction.content_data = { fragments: [] };
       }
       
-      console.log("Correction mise à jour:", correction);
+      
       
       return NextResponse.json(correction);
     });

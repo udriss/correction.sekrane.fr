@@ -610,13 +610,14 @@ export default function EmailFeedback({
   return (
     <>
       <Button 
-        variant="contained" 
-        color="primary" 
+      
+        variant="outlined" 
+        color="success" 
         startIcon={<EmailIcon />} 
         onClick={handleOpen}
         disabled={loading}
       >
-        {loading ? 'Chargement...' : `Envoyer un courriel à ${fullStudentName}`}
+        {loading ? 'Chargement...' : `Envoyer la correction`}
       </Button>
       
       <Dialog open={open} onClose={handleClose} maxWidth="md" fullWidth>

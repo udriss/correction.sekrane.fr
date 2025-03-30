@@ -21,7 +21,7 @@ export async function GET(
       
     if (!userId) {
       return NextResponse.json(
-        { error: 'Authentification requise' },
+        { error: 'authentification requise' },
         { status: 401 }
       );
     }
@@ -150,7 +150,7 @@ export async function PUT(
     
     // Parse the request body
     const studentData = await req.json();
-    console.log('Student data from API:', studentData);
+    
     
     // Validate required fields - make these match your actual field names in the form
     if (!studentData.first_name || !studentData.last_name || !studentData.email) {
@@ -210,7 +210,7 @@ export async function PUT(
           );
 
           return NextResponse.json({ 
-            error: 'Email déjà utilisé',
+            error: 'adresse mail déjà utilisée',
             details: `L'adresse email "${studentData.email}" est déjà associée à un autre étudiant.`,
             code: 'DUPLICATE_EMAIL',
             existingStudent: existingStudent
@@ -219,9 +219,74 @@ export async function PUT(
         throw error;
       }
     }
+
+    console.log('Student updated successfully:', studentData);
     
-    // Handle class association
-    if (studentData.classId) {
+    // Handle class associations - updated to handle multiple classes
+    if (studentData.classes && Array.isArray(studentData.classes) && studentData.classes.length > 0) {
+      // Get current class associations
+      const currentAssociations = await query<any[]>(`
+        SELECT class_id, sub_class FROM class_students 
+        WHERE student_id = ?
+      `, [studentId]);
+      
+      const currentClassIds = currentAssociations.map(assoc => assoc.class_id);
+      
+      // Process each class in the array
+      for (const classItem of studentData.classes) {
+        const classId = classItem.id;
+        const groupValue = classItem.group || null;
+        
+        // Skip if classId is missing
+        if (!classId) continue;
+        
+        // Check if this association already exists
+        const existingAssocIndex = currentClassIds.indexOf(classId);
+        
+        if (existingAssocIndex !== -1) {
+          // Update existing association
+          await query(`
+            UPDATE class_students
+            SET sub_class = ?, updated_at = CURRENT_TIMESTAMP
+            WHERE student_id = ? AND class_id = ?
+          `, [groupValue, studentId, classId]);
+        } else {
+          // Create new association
+          await query(`
+            INSERT INTO class_students (student_id, class_id, sub_class, created_at, updated_at)
+            VALUES (?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+          `, [studentId, classId, groupValue]);
+        }
+      }
+      
+      // Remove associations that are no longer needed
+      const newClassIds = studentData.classes.map((cls: { id: number }) => cls.id);
+      const classIdsToRemove = currentClassIds.filter(id => !newClassIds.includes(id));
+      
+      if (classIdsToRemove.length > 0) {
+        // Use parameterized query with multiple placeholders
+        const placeholders = classIdsToRemove.map(() => '?').join(',');
+        await query(`
+          DELETE FROM class_students 
+          WHERE student_id = ? AND class_id IN (${placeholders})
+        `, [studentId, ...classIdsToRemove]);
+      }
+      
+      // Update primary class if provided
+      if (studentData.classId) {
+        // Make sure the primary class is in the selected classes
+        if (!newClassIds.includes(studentData.classId)) {
+          // If not, add it
+          const groupForPrimary = studentData.group || null;
+          await query(`
+            INSERT INTO class_students (student_id, class_id, sub_class, created_at, updated_at)
+            VALUES (?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+            ON DUPLICATE KEY UPDATE sub_class = ?, updated_at = CURRENT_TIMESTAMP
+          `, [studentId, studentData.classId, groupForPrimary, groupForPrimary]);
+        }
+      }
+    } else if (studentData.classId) {
+      // Backward compatibility: handle single class ID
       // Vérifier d'abord si l'association étudiant-classe existe déjà
       const existingAssociation = await query<any[]>(`
         SELECT * FROM class_students 
@@ -243,7 +308,7 @@ export async function PUT(
         `, [studentId, studentData.classId, studentData.group || null]);
       }
     } else {
-      // If no class ID is provided, remove class associations
+      // If no class data is provided, remove all class associations
       await query(`
         DELETE FROM class_students WHERE student_id = ?
       `, [studentId]);

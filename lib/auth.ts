@@ -93,9 +93,9 @@ export const authOptions: NextAuthOptions = {
 
           // Check if user exists
           const user = users[0];
-          console.log('User:', user);
+          
           if (!user) {
-            console.log('User not found:', credentials.username);
+            
             return null;
           }
 
@@ -106,11 +106,11 @@ export const authOptions: NextAuthOptions = {
           // const isValidPassword = user.password === credentials.password;
           
           if (!isValidPassword) {
-            console.log('Invalid password for user:', credentials.username);
+            
             return null;
           }
 
-          console.log('User authenticated:', user.username);
+          
           
           // Return user in the format NextAuth expects
           return {
@@ -149,7 +149,6 @@ export const authOptions: NextAuthOptions = {
     },
     // Fix the redirect callback to prevent forced redirects to signin
     async redirect({ url, baseUrl }) {
-      console.log(`[Auth] Redirect requested to: ${url}, baseUrl: ${baseUrl}`);
       
       // Don't redirect to signin page if there's an error, just go to home
       if (url.includes('/auth/signin')) {

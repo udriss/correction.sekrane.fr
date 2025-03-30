@@ -16,7 +16,7 @@ export default function LoginPage() {
 
   // Debug
   useEffect(() => {
-    console.log("Callback URL:", callbackUrl);
+    
   }, [callbackUrl]);
 
   const handleSubmit = async (e: FormEvent) => {
@@ -39,7 +39,7 @@ export default function LoginPage() {
         throw new Error(data.error || 'Authentification échouée');
       }
 
-      console.log("Login successful, redirecting to:", callbackUrl);
+      
       
       // Utilisez un timeout court pour s'assurer que le cookie est bien défini
       setTimeout(() => {

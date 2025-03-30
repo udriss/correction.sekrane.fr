@@ -209,20 +209,22 @@ const StudentEditDialog: React.FC<StudentEditDialogProps> = ({
             gap: 2
           }}
         >
-          <Avatar 
+            <Avatar 
             sx={{ 
               width: 56, 
               height: 56, 
-              bgcolor: 'secondary.main',
+              bgcolor: student.gender === 'M' ? 'info.main' : 
+                  student.gender === 'F' ? 'secondary.light' : 
+                  'grey.500',
               fontSize: '1.5rem',
               boxShadow: '0 4px 8px rgba(0,0,0,0.2)'
             }}
-          >
+            >
             {student.gender === 'M' ? <MaleIcon fontSize="large" /> : 
              student.gender === 'F' ? <FemaleIcon fontSize="large" /> : 
              student.gender === 'N' ? <GpsNotFixedIcon fontSize="large" /> : 
              <NotInterestedIcon fontSize="large" />}
-          </Avatar>
+            </Avatar>
           <Box>
             {/* Utilisation du composant H1Title standardisé */}
             <H1Title>

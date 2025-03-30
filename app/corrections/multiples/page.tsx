@@ -30,7 +30,7 @@ import MultipleCorrectionsForm from '@/components/MultipleCorrectionsForm';
 export default function MultipleCorrections() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const activityId = searchParams.get('activityId');
+  const activityId = searchParams?.get('activityId') || "0"; // Utiliser "0" comme valeur par défaut au lieu de null
   
   // Activity and points states
   const [activity, setActivity] = useState<Activity | null>(null);
@@ -48,18 +48,20 @@ export default function MultipleCorrections() {
   const [groupId, setGroupId] = useState<number | null>(null);
   const [selectedClassId, setSelectedClassId] = useState<string>(''); // Add state for selected class ID
 
-  useEffect(() => {
-    if (!activityId) {
-      setError("L'ID de l'activité est requis. Veuillez sélectionner une activité.");
-      setLoading(false);
-      return;
-    }
+  // Ajout d'un état pour l'activité générique
+  const [genericActivityId, setGenericActivityId] = useState<number | null>(null);
 
-    fetchActivity();
+  useEffect(() => {
+    // Si aucun activityId n'est fourni, chercher ou créer une activité générique
+    if (!activityId || activityId === "0") {
+      fetchOrCreateGenericActivity();
+    } else {
+      fetchActivity();
+    }
   }, [activityId]);
 
   const fetchActivity = async () => {
-    if (!activityId) return;
+    if (!activityId || activityId === "0") return;
     
     try {
       setLoading(true);
@@ -78,9 +80,55 @@ export default function MultipleCorrections() {
     }
   };
 
+  // Nouvelle fonction pour chercher ou créer une activité générique
+  const fetchOrCreateGenericActivity = async () => {
+    try {
+      setLoading(true);
+      // Chercher une activité générique existante
+      const response = await fetch('/api/activities/generic');
+      
+      if (response.ok) {
+        const activityData = await response.json();
+        setActivity(activityData);
+        setGenericActivityId(activityData.id);
+        setExperimentalPoints(activityData.experimental_points || 5);
+        setTheoreticalPoints(activityData.theoretical_points || 15);
+      } else {
+        // Si aucune activité générique n'existe, en créer une nouvelle
+        const createResponse = await fetch('/api/activities', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            name: 'Activité générique',
+            content: 'Activité pour les corrections sans activité spécifique',
+            experimental_points: 5,
+            theoretical_points: 15
+          }),
+        });
+        
+        if (createResponse.ok) {
+          const newActivity = await createResponse.json();
+          setActivity(newActivity);
+          setGenericActivityId(newActivity.id);
+          setExperimentalPoints(newActivity.experimental_points || 5);
+          setTheoreticalPoints(newActivity.theoretical_points || 15);
+        } else {
+          throw new Error("Erreur lors de la création d'une activité générique");
+        }
+      }
+    } catch (err) {
+      console.error('Erreur:', err);
+      setError("Erreur lors du chargement de l'activité générique");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // Handle form submission for creating a group
   const handleCreateGroup = async (createdCorrectionIds: string[]) => {
-    if (!activityId || createdCorrectionIds.length === 0 || !groupName.trim()) {
+    if (createdCorrectionIds.length === 0 || !groupName.trim()) {
       setError('Veuillez saisir un nom de groupe et créer des corrections');
       return;
     }
@@ -93,7 +141,7 @@ export default function MultipleCorrections() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          activity_id: activityId,
+          activity_id: activityId !== "0" ? activityId : genericActivityId, // Utiliser l'ID de l'activité générique si activityId est 0
           name: groupName,
           description: groupDescription
         }),
@@ -169,7 +217,8 @@ export default function MultipleCorrections() {
     );
   }
 
-  if (error && !activityId) {
+  // Modifier la condition d'affichage d'erreur pour ne pas bloquer si activityId est 0
+  if (error && (!activityId || (activityId !== "0" && !activity))) {
     return (
       <div className="container mx-auto px-4 py-8 flex justify-center">
         <div className="w-full max-w-lg animate-slide-in">
@@ -221,7 +270,9 @@ export default function MultipleCorrections() {
             <div>
               {activity && (
               <Typography variant="h4" component="h1" className="font-bold text-black mb-1">
-                  Activité : {activity.name}
+                  {activityId === "0" || activity.name === "Activité générique" 
+                    ? "Activité générique" 
+                    : `Activité : ${activity.name}`}
               </Typography>
               )}
             <Typography variant="subtitle1" className="text-blue-600">
@@ -232,7 +283,7 @@ export default function MultipleCorrections() {
             <div className="flex gap-3">
               <Button 
                 component={Link} 
-                href={activityId ? `/activities/${activityId}` : '/activities'}
+                href={activityId !== "0" ? `/activities/${activityId}` : (genericActivityId ? `/activities/${genericActivityId}` : '/activities')}
                 variant="outlined"
                 color='secondary'
                 startIcon={<ArrowBackIcon />}
@@ -240,13 +291,25 @@ export default function MultipleCorrections() {
                 Retour
               </Button>
               
-              {activityId && (
+              {activityId !== "0" && (
                 <Button
                   variant="outlined"
                   color="primary"
                   startIcon={<GroupsIcon />}
                   component={Link}
                   href={`/activities/${activityId}/groups`}
+                >
+                  Groupes
+                </Button>
+              )}
+              
+              {activityId === "0" && genericActivityId && (
+                <Button
+                  variant="outlined"
+                  color="primary"
+                  startIcon={<GroupsIcon />}
+                  component={Link}
+                  href={`/activities/${genericActivityId}/groups`}
                 >
                   Groupes
                 </Button>
@@ -275,7 +338,7 @@ export default function MultipleCorrections() {
           <div className="flex items-center gap-2">
             <BarChartIcon className="text-blue-600" fontSize="large" />
             <Typography variant="h5" className="font-bold">
-              Barème de notation
+              Barème de notation {activityId === "0" && "(modifiable)"}
             </Typography>
           </div>
         </div>
@@ -285,9 +348,21 @@ export default function MultipleCorrections() {
             <Typography variant="overline" color="textSecondary" className="mb-1">
               PARTIE EXPÉRIMENTALE
             </Typography>
-            <Typography variant="h3" className="font-bold text-blue-600 mb-1">
-              {activity?.experimental_points || 5}
-            </Typography>
+            {activityId === "0" ? (
+              <TextField
+                type="number"
+                value={experimentalPoints}
+                onChange={(e) => setExperimentalPoints(Number(e.target.value))}
+                variant="outlined"
+                size="small"
+                inputProps={{ min: 0, max: 20 }}
+                sx={{ mt: 1, width: '80px', textAlign: 'center' }}
+              />
+            ) : (
+              <Typography variant="h3" className="font-bold text-blue-600 mb-1">
+                {activity?.experimental_points || 5}
+              </Typography>
+            )}
             <Typography variant="body2" color="textSecondary">
               points
             </Typography>
@@ -297,9 +372,21 @@ export default function MultipleCorrections() {
             <Typography variant="overline" color="textSecondary" className="mb-1">
               PARTIE THÉORIQUE
             </Typography>
-            <Typography variant="h3" className="font-bold text-blue-600 mb-1">
-              {activity?.theoretical_points || 15}
-            </Typography>
+            {activityId === "0" ? (
+              <TextField
+                type="number"
+                value={theoreticalPoints}
+                onChange={(e) => setTheoreticalPoints(Number(e.target.value))}
+                variant="outlined"
+                size="small"
+                inputProps={{ min: 0, max: 20 }}
+                sx={{ mt: 1, width: '80px', textAlign: 'center' }}
+              />
+            ) : (
+              <Typography variant="h3" className="font-bold text-blue-600 mb-1">
+                {activity?.theoretical_points || 15}
+              </Typography>
+            )}
             <Typography variant="body2" color="textSecondary">
               points
             </Typography>
@@ -310,7 +397,7 @@ export default function MultipleCorrections() {
               TOTAL
             </Typography>
             <Typography variant="h3" className="font-bold text-blue-700 mb-1">
-              {(activity?.experimental_points || 5) + (activity?.theoretical_points || 15)}
+              {experimentalPoints + theoreticalPoints}
             </Typography>
             <Typography variant="body2" color="primary">
               points sur 20
@@ -374,7 +461,7 @@ export default function MultipleCorrections() {
       </Paper>
 
       <MultipleCorrectionsForm
-        activityId={activityId || ""}
+        activityId={activityId !== "0" ? activityId : (genericActivityId ? genericActivityId.toString() : "")}
         activity={activity}
         experimentalPoints={experimentalPoints}
         theoreticalPoints={theoreticalPoints}

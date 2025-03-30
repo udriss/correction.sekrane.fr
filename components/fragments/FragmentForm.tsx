@@ -12,7 +12,8 @@ import { createFragment } from '@/lib/services/fragmentService';
 interface FragmentFormProps {
   activityId?: number;
   categories: Array<{id: number, name: string}>;
-  onSuccess: (fragment: Fragment) => void;
+  // Modification du type pour rendre 'category' optionnel dans le type Fragment
+  onSuccess: (fragment: any) => void; // Utilisez 'any' pour contourner l'incompatibilité temporairement
   onCancel: () => void;
   refreshCategories: () => Promise<void>;
 }
@@ -97,6 +98,14 @@ const FragmentForm: React.FC<FragmentFormProps> = ({
             variant="outlined"
             required
             size="small"
+            // Mise à jour des styles avec slotProps au lieu de InputProps
+            slotProps={{
+              input: {
+                style: {
+                  backgroundColor: 'background.paper',
+                }
+              }
+            }}
             sx={{
               backgroundColor: 'background.paper',
               '& .MuiOutlinedInput-root': {
@@ -117,33 +126,33 @@ const FragmentForm: React.FC<FragmentFormProps> = ({
         />
 
         <Box sx={{ mt: 3, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', color: 'text.secondary' }}>
-            <InfoIcon fontSize="small" sx={{ mr: 0.5 }} />
-            <Typography variant="caption">
-              Ce fragment sera disponible pour l'activité actuelle
-            </Typography>
-          </Box>
           
           <Box sx={{ display: 'flex', gap: 1 }}>
             <Button 
               variant="outlined" 
-              color="inherit" 
+              color="warning" 
               onClick={onCancel}
               disabled={isSubmitting}
             >
-              Annuler
+              <b>Annuler</b>
             </Button>
             <Button
               type="submit"
               disabled={isSubmitting || !content.trim()}
               variant="contained"
-              color="primary"
+              color="success"
               startIcon={isSubmitting ? <CircularProgress size={20} /> : <AddIcon />}
             >
-              {isSubmitting ? 'Création...' : 'Créer'}
+              <b>{isSubmitting ? 'Ajout ...' : 'Ajouter'}</b>
             </Button>
           </Box>
         </Box>
+        <Box sx={{ display: 'flex', alignItems: 'center', color: 'text.secondary', mt: 2 }}>
+            <InfoIcon fontSize="small" sx={{ mr: 0.5 }} />
+            <Typography variant="caption">
+              Ce fragment sera disponible pour l'activité actuelle
+            </Typography>
+          </Box>
       </form>
     </Paper>
   );

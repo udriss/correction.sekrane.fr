@@ -30,8 +30,8 @@ export interface Fragment {
   content: string;
   tags?: string[] | string;
   categories?: Array<{id: number, name: string}> | number[];
-  category?: string;
-  category_id?: number;
+  category?: string; // Pour compatibilité avec l'ancien format
+  // Suppression de category_id qui n'existe plus
   activity_id?: number;
   user_id?: string;
   created_at: string;

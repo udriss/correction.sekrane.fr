@@ -20,7 +20,8 @@ import {
   useTheme,
   useMediaQuery,
   IconButton,
-  Tooltip
+  Tooltip,
+  alpha
 } from '@mui/material';
 import Grid from '@mui/material/Grid';
 import GradientBackground from '@/components/ui/GradientBackground';
@@ -99,9 +100,9 @@ export default function ClassesPage() {
       const response = await fetch('/api/students');
       if (response.ok) {
         const data = await response.json();
-        console.log('Total students:', data);
+        
         setTotalStudents(data.length);
-        console.log('Total students:', totalStudents);
+        
       } else {
         console.error('Error fetching total students');
       }
@@ -140,132 +141,143 @@ export default function ClassesPage() {
 
   return (
     <Container maxWidth="lg" className="py-8">
-      {/* Header with gradient and stats */}
+      {/* Header */}
       <Paper 
-  elevation={3} 
-  className="mb-8 rounded-lg overflow-hidden"
->
-  <GradientBackground variant="primary" sx={{ position: 'relative' }}>
-    <PatternBackground 
-      pattern="cross" 
-      opacity={0.75} 
-      color="5566AA" 
-      size={70}
-      sx={{ p: 4, borderRadius: 2 }}
-    >
-      <div className="relative">          
-        {/* Header content */}
-        <div className="relative z-10 flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6">
-          <div className="flex items-center gap-3 mb-4 sm:mb-0">
-            <SchoolIcon fontSize="large" className="text-blue-200" />
-            <div>
-              <Typography variant="h4" component="h1" className="font-bold text-white mb-1">
-                Gestion des classes
-              </Typography>
-              <Typography variant="subtitle1" className="text-blue-100">
-                Organisez vos cours et suivez les progrès des étudiants
-              </Typography>
-            </div>
-          </div>
-          
-          <div className="flex gap-2">
-            <Tooltip title="Afficher le tutoriel">
-              <IconButton 
-                color="info" 
-                onClick={() => setShowTutorial(!showTutorial)}
-                className="bg-white/20 hover:bg-white/30"
-              >
-                <HelpOutlineIcon />
-              </IconButton>
-            </Tooltip>
-            
-            <Button 
-              variant="contained" 
-              color="secondary" 
-              startIcon={<AddIcon />} 
-              component={Link} 
-              href="/classes/new"
-              className="bg-gradient-to-r from-amber-500 to-amber-600 shadow-lg"
-            >
-              Nouvelle classe
-            </Button>
-          </div>
-        </div>
+        elevation={3} 
+        sx={{ 
+          borderRadius: 3,
+          overflow: 'hidden',
+          mb: 4,
+        }}
+      >
+        <GradientBackground variant="primary" sx={{ p: 0 }}>
+          <PatternBackground 
+            pattern="dots" 
+            opacity={0.05} 
+            color="black" 
+            size={100}
+            sx={{ p: 4, borderRadius: 2 }}
+          >
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 2 }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                <Box 
+                  sx={{ 
+                    background: (theme) => `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.secondary.main} 100%)`,
+                    p: 1.5, 
+                    borderRadius: '50%',
+                    display: 'flex',
+                    boxShadow: '0 4px 20px rgba(0,0,0,0.2)'
+                  }}
+                >
+                  <SchoolIcon sx={{ fontSize: 36, color: (theme) => theme.palette.text.primary }} />
+                </Box>
+                
+                <Box>
+                  <Typography variant="h4" fontWeight={700} color="text.primary">Gestion des classes</Typography>
+                  <Typography variant="subtitle1" color="text.secondary" sx={{ opacity: 0.9 }}>
+                    Organisez vos cours et suivez les progrès de vos étudiants
+                  </Typography>
+                </Box>
+              </Box>
+              
+              <div className="flex gap-2">
+                <Tooltip title="Afficher le guide">
+                  <IconButton 
+                    color="info" 
+                    onClick={() => setShowTutorial(!showTutorial)}
+                    sx={{
+                      color: 'secondary.light',
+                      bgcolor: 'rgba(0, 0, 0, 0.3)',
+                      backdropFilter: 'blur(10px)',
+                      '&:hover': {
+                        bgcolor: 'rgba(0, 0, 0, 0.48)',
+                        color: 'secondary',
+                      }
+                    }}
+                  >
+                    <HelpOutlineIcon />
+                  </IconButton>
+                </Tooltip>
+              </div>
+            </Box>
+          </PatternBackground>
+        </GradientBackground>
         
-        {/* Stats cards grid */}
-        <Box sx={{ mt: 5 }}>
-          <Grid container spacing={2} justifyContent={'space-around'}>
-            <Grid size={{ xs: 12, sm: 4, md: 3, lg: 3 }}>
-              <Paper sx={{ 
-                p: 2, 
-                textAlign: 'center', 
-                height: '100%', 
-                bgcolor: 'rgba(182, 182, 182, 0.15)',
-                backdropFilter: 'blur(8px)',
-                borderRadius: 2,
-                color: 'white'
-              }}>
-                <Typography variant="overline" className="text-blue-100">Classes</Typography>
-                <Typography variant="h3" fontWeight="bold" className="text-white">
-                  {classes.length}
-                </Typography>
-                <Typography variant="body2" className="text-blue-100">
-                  {classes.length === 0 ? 'Aucune classe' : 
-                   classes.length === 1 ? 'classe créée' : 
-                   'classes créées'}
-                </Typography>
-              </Paper>
-            </Grid>
-            
-            <Grid  size={{ xs: 12, sm: 4, md: 3, lg: 3 }}>
+        {/* Stats summary */}
+        <Box sx={{ p: 2 }}>
+          <Grid container spacing={2} sx={{ display: 'flex', justifyContent: 'space-around' }}>
+            <Grid size={{ xs: 12, sm: 6, md: 2 }}>
               <Paper sx={{ 
                 p: 2, 
                 textAlign: 'center', 
                 height: '100%',
-                bgcolor: 'rgba(182, 182, 182, 0.15)',
-                backdropFilter: 'blur(8px)',
+                bgcolor: (theme) => alpha(theme.palette.myBoxes.primary, 0.5),
+                backdropFilter: 'blur(5px)',
                 borderRadius: 2,
-                color: 'white'
               }}>
-                <Typography variant="overline" className="text-blue-100">Étudiants</Typography>
-                <Typography variant="h3" fontWeight="bold" className="text-white">
-                  {totalStudents}
-                </Typography>
-                <Typography variant="body2" className="text-blue-100">
-                  {totalStudents === 0 ? 'Aucun étudiant' : 
-                   totalStudents === 1 ? 'étudiant inscrit' : 
-                   'étudiants inscrits'}
+                <Typography variant="overline" color="text.secondary">Total</Typography>
+                <Typography variant="h3" fontWeight="bold" color="text.primary">{classes.length}</Typography>
+                <Typography variant="overline" color="text.secondary">
+                  {classes.length === 1 ? 'classe' : 'classes'}
                 </Typography>
               </Paper>
             </Grid>
             
-            <Grid  size={{ xs: 12, sm: 4, md: 3, lg: 3 }}>
+            <Grid size={{ xs: 12, sm: 6, md: 2 }}>
               <Paper sx={{ 
                 p: 2, 
                 textAlign: 'center', 
                 height: '100%',
-                bgcolor: 'rgba(182, 182, 182, 0.15)',
-                backdropFilter: 'blur(8px)',
+                bgcolor: (theme) => alpha(theme.palette.myBoxes.primary, 0.5),
+                backdropFilter: 'blur(5px)',
                 borderRadius: 2,
-                color: 'white'
               }}>
-                <Typography variant="overline" className="text-blue-100">Activités</Typography>
-                <Typography variant="h3" fontWeight="bold" className="text-white">
-                  {totalActivities}
+                <Typography variant="overline" color="text.secondary">Étudiants</Typography>
+                <Typography variant="h3" fontWeight="bold" color="text.primary">{totalStudents}</Typography>
+                <Typography variant="overline" color="text.secondary">
+                  {totalStudents === 1 ? 'inscrit' : 'inscrits'}
                 </Typography>
-                <Typography variant="body2" className="text-blue-100">
-                  {totalActivities === 0 ? 'Aucune activité' : 
-                   totalActivities === 1 ? 'activité' : 
-                   'activités créées'}
+              </Paper>
+            </Grid>
+            
+            <Grid size={{ xs: 12, sm: 6, md: 2 }}>
+              <Paper sx={{ 
+                p: 2, 
+                textAlign: 'center', 
+                height: '100%',
+                bgcolor: (theme) => alpha(theme.palette.myBoxes.primary, 0.5),
+                backdropFilter: 'blur(5px)',
+                borderRadius: 2,
+              }}>
+                <Typography variant="overline" color="text.secondary">Activités</Typography>
+                <Typography variant="h3" fontWeight="bold" color="text.primary">{totalActivities}</Typography>
+                <Typography variant="overline" color="text.secondary">
+                  {totalActivities === 1 ? 'disponible' : 'disponibles'}
+                </Typography>
+              </Paper>
+            </Grid>
+            
+            <Grid size={{ xs: 12, sm: 6, md: 2 }}>
+              <Paper sx={{ 
+                p: 2, 
+                textAlign: 'center', 
+                height: '100%',
+                bgcolor: (theme) => alpha(theme.palette.myBoxes.primary, 0.5),
+                backdropFilter: 'blur(5px)',
+                borderRadius: 2,
+              }}>
+                <Typography variant="overline" color="text.secondary">Années</Typography>
+                <Typography variant="h3" fontWeight="bold" color="text.primary">
+                  {Array.from(new Set(classes.map(cls => cls.academic_year))).length}
+                </Typography>
+                <Typography variant="overline" color="text.secondary">
+                  {Array.from(new Set(classes.map(cls => cls.academic_year))).length === 1 ? 'académique' : 'académiques'}
                 </Typography>
               </Paper>
             </Grid>
           </Grid>
         </Box>
-      </div>
-    </PatternBackground>
-  </GradientBackground>
-</Paper>
+      </Paper>
 
       {error && (
         <Alert severity="error" className="mb-6">
@@ -359,7 +371,10 @@ export default function ClassesPage() {
       )}
 
       {/* Quick Actions Bar */}
-      <Paper className="mb-8 p-4" elevation={1}>
+      <Paper className="mb-8 p-4" elevation={1} sx={{ 
+        borderRadius: 2, display: 'flex', flexDirection: 'row', gap: 2,
+        justifyContent: 'space-between', alignItems: 'center',}}>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', flexDirection: 'column', alignItems: 'left' }}>
         <Typography variant="subtitle2" gutterBottom color="textSecondary">
           Actions rapides
         </Typography>
@@ -401,6 +416,19 @@ export default function ClassesPage() {
             Rapports
           </Button>
         </Box>
+        </Box>
+
+                        
+        <Button 
+          variant="contained" 
+          color="secondary" 
+          startIcon={<AddIcon />} 
+          component={Link} 
+          href="/classes/new"
+          className="bg-gradient-to-r from-amber-500 to-amber-600 shadow-lg"
+        >
+          Nouvelle classe
+        </Button>
       </Paper>
 
       {/* Classes Grid or Empty State */}

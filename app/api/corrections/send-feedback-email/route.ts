@@ -78,7 +78,7 @@ export async function POST(request: Request) {
     // Verify SMTP connection configuration
     try {
       await transporter.verify();
-      console.log('SMTP connection verified successfully');
+      
     } catch (verifyError) {
       console.error('SMTP verification failed:', verifyError);
       return NextResponse.json(
@@ -113,17 +113,17 @@ export async function POST(request: Request) {
       html: htmlMessage
     };
     
-    console.log('Sending email to:', email);
+    
     
     // Send email with better error handling
     try {
       const info = await transporter.sendMail(mailOptions);
-      console.log('Email sent successfully:', info.messageId);
+      
       return NextResponse.json({ message: 'Email envoyé avec succès' });
     } catch (sendError) {
       // console.error('Error in sendMail :', sendError);
       const errorMessage = sendError instanceof Error ? sendError.message : String(sendError);
-      console.log('Error message:', errorMessage);
+      
       return NextResponse.json(
         { message: `Erreur d'envoi : ${errorMessage}` },
         { status: 500 }

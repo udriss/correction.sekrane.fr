@@ -33,7 +33,7 @@ export default function NewFragmentPage() {
   useEffect(() => {
     // Only set an error state, don't redirect
     if (status === 'unauthenticated') {
-      console.log('User is not authenticated, but will remain on this page');
+      
       // Remove the redirect to signin
       // router.push('/api/auth/signin');
     }
@@ -106,7 +106,7 @@ export default function NewFragmentPage() {
       };
       
       // Log the request payload for debugging
-      console.log('Submitting fragment with data:', submissionData);
+      
       
       const response = await fetch('/api/fragments', {
         method: 'POST',

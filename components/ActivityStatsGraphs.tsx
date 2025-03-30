@@ -6,7 +6,7 @@ import {
   Card,
   CardContent,
   Typography,
-  Grid2 as Grid,
+  Grid,
   CircularProgress,
   Alert,
   ToggleButtonGroup,

@@ -30,7 +30,7 @@ const CorrectionCard: React.FC<CorrectionCardProps> = ({ correction, getGradeCol
       >
         <Box sx={{ 
           p: 1, 
-          bgcolor: `${getGradeColor(correction.grade)}.main`, 
+          bgcolor: `${getGradeColor(correction.grade)}.light`, 
           color: 'white',
           display: 'flex',
           justifyContent: 'center',

@@ -1,11 +1,30 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Container, Alert } from '@mui/material';
+import { 
+  Container, 
+  Alert, 
+  Paper, 
+  Typography, 
+  Box,
+  IconButton,
+  Button,
+  Tooltip,
+  alpha
+} from '@mui/material';
+import Grid from '@mui/material/Grid';
 import LoadingSpinner from '@/components/LoadingSpinner';
 import StudentsHeader from '@/components/students/StudentsHeader';
 import StudentsTutorial from '@/components/students/StudentsTutorial';
 import AllStudentsManager from '@/components/students/AllStudentsManager';
+import GradientBackground from '@/components/ui/GradientBackground';
+import PatternBackground from '@/components/ui/PatternBackground';
+import Link from 'next/link';
+import AddIcon from '@mui/icons-material/Add';
+import PeopleIcon from '@mui/icons-material/People';
+import HelpOutlineIcon from '@mui/icons-material/HelpOutline';
+import SchoolIcon from '@mui/icons-material/School';
+import AssignmentIcon from '@mui/icons-material/Assignment';
 
 export interface Class {
   id: number;
@@ -172,6 +191,7 @@ export default function StudentsPage() {
   const totalStudents = students.length;
   const totalWithCorrections = students.filter(s => s.corrections_count && s.corrections_count > 0).length;
   const uniqueClasses = new Set(students.map(s => s.classId).filter(Boolean)).size;
+  const studentsWithoutClass = students.filter(s => !s.classId).length;
 
   if (loading && students.length === 0) {
     return (
@@ -183,13 +203,141 @@ export default function StudentsPage() {
 
   return (
     <Container maxWidth="lg" className="py-8">
-      {/* En-tête */}
-      <StudentsHeader
-        totalStudents={totalStudents}
-        uniqueClasses={uniqueClasses}
-        totalWithCorrections={totalWithCorrections}
-        onShowTutorial={() => setShowTutorial(!showTutorial)}
-      />
+      {/* Header */}
+      <Paper 
+        elevation={3} 
+        sx={{ 
+          borderRadius: 3,
+          overflow: 'hidden',
+          mb: 4,
+        }}
+      >
+        <GradientBackground variant="primary" sx={{ p: 0 }}>
+          <PatternBackground 
+            pattern="dots" 
+            opacity={0.05} 
+            color="black" 
+            size={100}
+            sx={{ p: 4, borderRadius: 2 }}
+          >
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 2 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+              <Box 
+                sx={{ 
+                  background: (theme) => `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.secondary.main} 100%)`,
+                  p: 1.5, 
+                  borderRadius: '50%',
+                  display: 'flex',
+                  boxShadow: '0 4px 20px rgba(0,0,0,0.2)'
+                }}
+              >
+                <PeopleIcon sx={{ fontSize: 36, color: (theme) => theme.palette.text.primary }} />
+              </Box>
+                
+                <Box>
+                  <Typography variant="h4" fontWeight={700} color="text.primary">Gestion des étudiants</Typography>
+                  <Typography variant="subtitle1" color="text.secondary" sx={{ opacity: 0.9 }}>
+                    Gérez vos étudiants et suivez leurs performances
+                  </Typography>
+                </Box>
+              </Box>
+              
+              <div className="flex gap-2">
+                <Tooltip title="Afficher le guide">
+                  <IconButton 
+                    color="info" 
+                    onClick={() => setShowTutorial(!showTutorial)}
+                    sx={{
+                      color: 'secondary.light',
+                      bgcolor: 'rgba(0, 0, 0, 0.3)',
+                      backdropFilter: 'blur(10px)',
+                      '&:hover': {
+                        bgcolor: 'rgba(0, 0, 0, 0.48)',
+                        color: 'secondary',
+                      }
+                    }}
+                  >
+                    <HelpOutlineIcon />
+                  </IconButton>
+                </Tooltip>
+              </div>
+            </Box>
+          </PatternBackground>
+        </GradientBackground>
+        
+        {/* Stats summary */}
+        <Box sx={{ p: 2 }}>
+          <Grid container spacing={2} sx={{ display: 'flex', justifyContent: 'space-around' }}>
+            <Grid size={{ xs: 12, sm: 6, md: 2 }}>
+              <Paper sx={{ 
+                p: 2, 
+                textAlign: 'center', 
+                height: '100%',
+                bgcolor: (theme) => alpha(theme.palette.myBoxes.primary, 0.5),
+                backdropFilter: 'blur(5px)',
+                borderRadius: 2,
+              }}>
+                <Typography variant="overline" color="text.secondary">Total</Typography>
+                <Typography variant="h3" fontWeight="bold" color="text.primary">{totalStudents}</Typography>
+                <Typography variant="overline" color="text.secondary">
+                  {totalStudents === 1 ? 'étudiant' : 'étudiants'}
+                </Typography>
+              </Paper>
+            </Grid>
+            
+            <Grid size={{ xs: 12, sm: 6, md: 2 }}>
+              <Paper sx={{ 
+                p: 2, 
+                textAlign: 'center', 
+                height: '100%',
+                bgcolor: (theme) => alpha(theme.palette.myBoxes.primary, 0.5),
+                backdropFilter: 'blur(5px)',
+                borderRadius: 2,
+              }}>
+                <Typography variant="overline" color="text.secondary">Classes</Typography>
+                <Typography variant="h3" fontWeight="bold" color="text.primary">{uniqueClasses}</Typography>
+                <Typography variant="overline" color="text.secondary">
+                  {uniqueClasses === 1 ? 'associée' : 'associées'}
+                </Typography>
+              </Paper>
+            </Grid>
+            
+            <Grid size={{ xs: 12, sm: 6, md: 2 }}>
+              <Paper sx={{ 
+                p: 2, 
+                textAlign: 'center', 
+                height: '100%',
+                bgcolor: (theme) => alpha(theme.palette.myBoxes.primary, 0.5),
+                backdropFilter: 'blur(5px)',
+                borderRadius: 2,
+              }}>
+                <Typography variant="overline" color="text.secondary">Corrigés</Typography>
+                <Typography variant="h3" fontWeight="bold" color="text.primary">{totalWithCorrections}</Typography>
+                <Typography variant="overline" color="text.secondary">
+                  évalués
+                </Typography>
+              </Paper>
+            </Grid>
+            
+            <Grid size={{ xs: 12, sm: 6, md: 2 }}>
+              <Paper sx={{ 
+                p: 2, 
+                textAlign: 'center', 
+                height: '100%',
+                bgcolor: (theme) => alpha(theme.palette.myBoxes.primary, 0.5),
+                backdropFilter: 'blur(5px)',
+                borderRadius: 2,
+              }}>
+                <Typography variant="overline" color="text.secondary">Non assignés</Typography>
+                <Typography variant="h3" fontWeight="bold" color="text.primary">{studentsWithoutClass}</Typography>
+                <Typography variant="overline" color="text.secondary">
+                  sans classe
+                </Typography>
+              </Paper>
+            </Grid>
+          </Grid>
+        </Box>
+      </Paper>
 
       {error && (
         <Alert severity="error" className="mb-6" onClose={() => setError(null)}>

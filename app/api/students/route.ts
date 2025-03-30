@@ -24,7 +24,7 @@ export async function GET(request: NextRequest) {
       SELECT 
         s.*,
         cs.class_id AS classId,
-        cs.sub_class AS \`group\`,
+        cs.sub_class AS sub_class,
         c.name AS className
       FROM 
         students s
@@ -36,7 +36,7 @@ export async function GET(request: NextRequest) {
         s.last_name, s.first_name
     `);
     
-    console.log('Students fetched successfully:', students);
+    
     return NextResponse.json(students);
     
   } catch (error) {

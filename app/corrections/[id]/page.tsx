@@ -347,7 +347,7 @@ export default function CorrectionDetail({ params }: { params: Promise<{ id: str
     setAddingFragment(true);
     setError('');
     
-    console.log('Creating fragment with categories:', categories);
+    
     
     try {
       // Directly call the API to create the fragment

@@ -39,7 +39,7 @@ const faqData = [
       },
       {
         question: "Comment puis-je commencer à utiliser la plateforme ?",
-        answer: "Vous pouvez commencer immédiatement en créant une nouvelle activité depuis la page d'accueil. Vous pouvez également explorer la version de démonstration pour vous familiariser avec les fonctionnalités avant de créer votre propre contenu."
+        answer: "Vous pouvez commencer immédiatement en créant une nouvelle activité depuis la page d'accueil. Vous pouvez également explorer la version de démonstration pour vous familiariser avec les fonctionnalités avant d'ajouter votre propre contenu."
       },
       {
         question: "Existe-t-il des tutoriels ou des guides pour apprendre à utiliser la plateforme ?",

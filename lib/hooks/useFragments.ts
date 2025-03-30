@@ -24,7 +24,7 @@ export function useFragments(updateContentWithFragment?: (fragmentId: number, ne
     setLoadingFragments(true);
     try {
       const fragmentsData = await fragmentService.fetchFragmentsForActivity(activityId);
-      console.log('Fetched fragments:', fragmentsData);
+      
       setFragments(fragmentsData);
     } catch (err) {
       console.error('Erreur:', err);

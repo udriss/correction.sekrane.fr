@@ -8,10 +8,12 @@ import {deleteCategoryAssociations} from '@/lib/category';
 // DELETE: Delete a specific category by ID
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const categoryId = parseInt(params.id);
+    // Await the params
+    const { id } = await params;
+    const categoryId = parseInt(id);
     
     if (isNaN(categoryId)) {
       return NextResponse.json(

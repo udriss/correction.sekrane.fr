@@ -332,7 +332,7 @@ const AllStudentsManagerNEW: React.FC<AllStudentsManagerProps> = ({
         group: editingStudent.group || null,
       };
       
-      console.log('Data to send:', studentData);
+      
       
       // 1. Update student basic information
       const response = await fetch(`/api/students/${editingStudent.id}`, {
@@ -356,7 +356,7 @@ const AllStudentsManagerNEW: React.FC<AllStudentsManagerProps> = ({
       }
       
       const updatedStudent = await response.json();
-      console.log('Updated student:', updatedStudent);
+      
       
       // 2. Class association management - first update the main class
       if (studentData.classId) {
@@ -524,7 +524,7 @@ const AllStudentsManagerNEW: React.FC<AllStudentsManagerProps> = ({
             zIndex: 1 
           }}>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-              <PersonIcon fontSize="large" sx={{ color: 'white' }} />
+              <PersonIcon fontSize="large" color='primary' />
               <Box>
                 <Typography variant="h5" component="h2" color='textPrimary' sx={{ fontWeight: 'bold', }}>
                     {filterClass === 'all' 
@@ -616,7 +616,7 @@ const AllStudentsManagerNEW: React.FC<AllStudentsManagerProps> = ({
               onClick={handleResetFilters}
               startIcon={<CloseIcon />}
             >
-              Reset
+              Rétablir
             </Button>
           ) : null}
         </Box>
@@ -632,8 +632,8 @@ const AllStudentsManagerNEW: React.FC<AllStudentsManagerProps> = ({
       
       {/* Students table */}
       {loading ? (
-        <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
-          <LoadingSpinner size="md" text="Loading students" />
+        <Box sx={{ display: 'flex', justifyContent: 'center', py: 4, maxWidth: '400px', mx: 'auto' }}>
+          <LoadingSpinner size="md" text="Chargement des étudiants" />
         </Box>
       ) : filteredStudents.length === 0 ? (
         <Box sx={{ textAlign: 'center', py: 4 }}>
@@ -646,7 +646,7 @@ const AllStudentsManagerNEW: React.FC<AllStudentsManagerProps> = ({
             variant="outlined"
             sx={{ mt: 2 }}
           >
-            Reset filters
+            Rétablir filtres
           </Button>
         </Box>
       ) : (
@@ -697,14 +697,14 @@ const AllStudentsManagerNEW: React.FC<AllStudentsManagerProps> = ({
                         sx={{ 
                           width: 28, 
                           height: 28, 
-                          bgcolor: 'secondary.light',
+                          bgcolor: student.gender === 'M' ? 'info.main' : student.gender === 'F' ? 'secondary.main' : 'grey.500',
                           fontSize: '1.5rem',
                           boxShadow: '0 4px 8px rgba(0,0,0,0.2)'
                         }}
                         >
                         {student.gender === 'M' ? <MaleIcon fontSize="medium" /> : 
                           student.gender === 'F' ? <FemaleIcon fontSize="medium" /> : 
-                          student.gender === 'N' ? <GpsNotFixedIcon fontSize="medium" /> : 
+                          student.gender === 'N' ? <GpsNotFixedIcon fontSize="small" /> : 
                           <NotInterestedIcon fontSize="medium" />}
                         </Avatar>
                         <span>{student.last_name}</span>
@@ -718,9 +718,8 @@ const AllStudentsManagerNEW: React.FC<AllStudentsManagerProps> = ({
                           <Chip 
                             size="small" 
                             label={student.className} 
-                            color="primary" 
+                            sx={{ color: theme => theme.palette.primary.light, cursor: 'default' }}
                             variant="outlined"
-                            sx={{ cursor: 'default' }}
                           />
                         )}
                         {student.additionalClasses?.map((cls) => (
@@ -728,9 +727,8 @@ const AllStudentsManagerNEW: React.FC<AllStudentsManagerProps> = ({
                             key={cls.id}
                             size="small" 
                             label={cls.name} 
-                            color="secondary" 
                             variant="outlined"
-                            sx={{ cursor: 'default' }}
+                            sx={{ color: theme => theme.palette.primary.light, cursor: 'default' }}
                           />
                         ))}
                       </Box>
@@ -776,7 +774,7 @@ const AllStudentsManagerNEW: React.FC<AllStudentsManagerProps> = ({
                         <Tooltip title="Modifier étudiant">
                           <IconButton
                             size="small"
-                            color="primary"
+                            sx={{ color: theme => theme.palette.text.secondary }}
                             onClick={() => handleEditClick(student)}
                           >
                             <EditIcon fontSize="small" />
@@ -841,7 +839,7 @@ const AllStudentsManagerNEW: React.FC<AllStudentsManagerProps> = ({
             page={page}
             onPageChange={handleChangePage}
             onRowsPerPageChange={handleChangeRowsPerPage}
-            labelRowsPerPage="Rows per page:"
+            labelRowsPerPage="Lignes par page"
             labelDisplayedRows={({ from, to, count }) => `${from}-${to} of ${count}`}
           />
         </>

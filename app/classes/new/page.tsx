@@ -54,60 +54,28 @@ export default function NewClassPage() {
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
               <Box 
                 sx={{ 
-                  bgcolor: 'rgba(255,255,255,0.15)', 
+                  background: (theme) => `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.secondary.main} 100%)`,
                   p: 1.5, 
                   borderRadius: '50%',
                   display: 'flex',
                   boxShadow: '0 4px 20px rgba(0,0,0,0.2)'
                 }}
               >
-                <SchoolIcon 
-                  sx={{ 
-                    fontSize: 40, 
-                    color: 'white',
-                    filter: 'drop-shadow(0 2px 4px rgb(209, 209, 209))'
-                  }} 
-                />
+                <SchoolIcon sx={{ fontSize: 36, color: (theme) => theme.palette.text.primary }} />
               </Box>
               
               <Box>
                 {/* Utilisation du composant H1Title standardisé */}
-                <H1Title>
+                <Typography variant="h4" fontWeight={700} color="text.primary">
                   Nouvelle classe
-                </H1Title>
+                </Typography>
                 <Typography 
-                  variant="subtitle1" 
-                  sx={{ 
-                    maxWidth: '500px'
-                  }}
+                  variant="subtitle1" color="text.secondary" sx={{ opacity: 0.9 }}
                 >
                   Ajoutez une nouvelle classe et organisez vos activités pédagogiques pour vos étudiants
                 </Typography>
               </Box>
             </Box>
-            
-            <Button 
-              variant="contained" 
-              color="secondary" 
-              startIcon={<ArrowBackIcon />} 
-              component={Link} 
-              href="/classes"
-              sx={{ 
-                bgcolor: 'rgba(255,255,255,0.2)', 
-                color: 'white', 
-                backdropFilter: 'blur(10px)',
-                '&:hover': {
-                  bgcolor: 'rgba(255,255,255,0.3)',
-                },
-                fontWeight: 600,
-                py: 1,
-                px: 2,
-                borderRadius: 2,
-                boxShadow: '0 4px 15px rgba(0,0,0,0.15)'
-              }}
-            >
-              Retour aux classes
-            </Button>
           </Box>
         </GradientBackground>
         
@@ -133,7 +101,7 @@ export default function NewClassPage() {
           }}>
             <GroupsIcon color="primary" />
             <Typography variant="body2">
-              Organisation simplifiée des groupes d'étudiants
+              Organisation simplifiée des groupes
             </Typography>
           </Box>
           

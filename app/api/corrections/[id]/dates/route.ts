@@ -12,8 +12,8 @@ export async function PUT(
     
     // Parse request body
     const { deadline, submission_date } = await request.json();
-    console.log('Updating dates for correction ID:', correctionId);
-    console.log('Request payload:', { deadline, submission_date });
+    
+    
     
     // Update correction in the database
     const result = await query(

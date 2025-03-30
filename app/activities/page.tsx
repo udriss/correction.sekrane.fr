@@ -27,7 +27,8 @@ import {
   StepLabel,
   StepContent,
   useTheme,
-  useMediaQuery
+  useMediaQuery,
+  alpha
 } from '@mui/material';
 import Grid from '@mui/material/Grid';
 import GradientBackground from '@/components/ui/GradientBackground';
@@ -231,115 +232,151 @@ export default function ActivitiesPage() {
 
   return (
     <Container maxWidth="lg" className="py-8">
-      {/* Header with gradient and stats */}
+      {/* Header */}
       <Paper 
         elevation={3} 
-        className="mb-8 rounded-lg overflow-hidden"
         sx={{ 
-          p: 0,
+          borderRadius: 3,
+          overflow: 'hidden',
+          mb: 4,
         }}
       >
-        <GradientBackground variant="primary" >
-        <PatternBackground 
-        pattern="cross" 
-        opacity={0.75} 
-        color="5566AA" 
-        size={70}
-        sx={{ p: 4, borderRadius: 2 }}
-      >
-        <div className="p-6 relative">
-          {/* Decorative background pattern - white pattern on dark background */}
-          
-          
-          {/* Header content */}
-          <div className="relative z-10 flex flex-col sm:flex-row justify-between items-start sm:items-center mb:4">
-            <div className="flex items-center gap-3 mb-4 sm:mb-0">
-              <MenuBookIcon fontSize="large" />
-              <div>
-                <H1Title>
-                  Activités pédagogiques
-                </H1Title>
-                <Typography fontWeight="medium">
-                  Aoutez et gérez les activités d'évaluation
-                </Typography>
-              </div>
-            </div>
-            
-            <div className="flex gap-2">
-              <Tooltip title="Afficher le guide">
-                <IconButton 
-                  color="info" 
-                  onClick={() => setShowTutorial(!showTutorial)}
-                  className="bg-white/20 hover:bg-white/30"
+        <GradientBackground variant="primary" sx={{ p: 0 }}>
+          <PatternBackground 
+            pattern="dots" 
+            opacity={0.05} 
+            color="black" 
+            size={100}
+            sx={{ p: 4, borderRadius: 2 }}
+          >
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 2 }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                <Box
+                  sx={{
+                    bgcolor: 'rgba(255,255,255,0.15)',
+                    p: 1.5,
+                    borderRadius: '50%',
+                    display: 'flex',
+                    boxShadow: '0 4px 20px rgba(0,0,0,0.2)'
+                  }}
                 >
-                  <HelpOutlineIcon />
-                </IconButton>
-              </Tooltip>
+                  <MenuBookIcon sx={{ fontSize: 36, color: 'white' }} />
+                </Box>
+                
+                <Box>
+                  <Typography variant="h4" fontWeight={700} color="text.primary">Activités pédagogiques</Typography>
+                  <Typography variant="subtitle1" color="text.secondary" sx={{ opacity: 0.9 }}>
+                    Ajoutez et gérez les activités d'évaluation
+                  </Typography>
+                </Box>
+              </Box>
               
-              <Button 
-                variant="contained" 
-                color="secondary" 
-                startIcon={<AddIcon />} 
-                component={Link} 
-                href="/activities/new"
-                className="bg-gradient-to-r from-amber-500 to-amber-600 shadow-lg"
-              >
-                Nouvelle activité
-              </Button>
-            </div>
-          </div>
-          
-          {/* Stats bar */}
-          <div className="relative z-10 mt-4 justify-center flex gap-10 sm:gap-6">
-          <div className="flex justify-center sm:justify-start">
-            <Paper className="p-3 bg-white/20 backdrop-blur-sm rounded-lg flex items-center gap-3">
-              <MenuBookIcon className="text-blue-500" />
-              <Typography variant="body2" >
-                {totalActivities === 0 ? "Aucune activité" : 
-                 totalActivities === 1 ? "1 activité" : 
-                 `${totalActivities} activités`}
-              </Typography>
-            </Paper>
-            </div>
-
-            <div className="flex justify-center sm:justify-start">
-            <Paper className="p-3 bg-white/20 backdrop-blur-sm rounded-lg flex items-center gap-3">
-              <SchoolIcon className="text-blue-500" />
-              
-              <Typography variant="body2" >
-                {totalWithClasses === 0 ? "Aucune classe" : 
-                 totalWithClasses === 1 ? "1 classe" : 
-                 `${totalWithClasses} classes`}
-              </Typography>
-            </Paper>
-            </div>
-
-            <div className="flex justify-center sm:justify-start">
-            <Paper className="p-3 bg-white/20 backdrop-blur-sm rounded-lg flex items-center gap-3">
-              <RateReviewIcon className="text-blue-500" />
-              <Typography variant="body2" >
-                {totalWithCorrections === 0 ? "Aucune correction" : 
-                 totalWithCorrections === 1 ? "1 correction" : 
-                 `${totalWithCorrections} corrections`}
-              </Typography>
-            </Paper>
-            </div>
-
-            <div className="flex justify-center sm:justify-start">
-            <Paper className="p-3 bg-white/20 backdrop-blur-sm rounded-lg flex items-center gap-3">
-              <AssessmentIcon className="text-blue-500" />
-              
-              <Typography variant="body2" >
-                {totalPoints === 0 ? "Aucun point" : 
-                 totalPoints === 1 ? "1 point" : 
-                 `${totalPoints} points`}
-              </Typography>
-            </Paper>
-            </div>
-            </div>
-        </div>
-        </PatternBackground>
+              <div className="flex gap-2">
+                <Tooltip title="Afficher le guide">
+                  <IconButton 
+                    color="info" 
+                    onClick={() => setShowTutorial(!showTutorial)}
+                    sx={{
+                      color: 'secondary.light',
+                      bgcolor: 'rgba(0, 0, 0, 0.3)',
+                      backdropFilter: 'blur(10px)',
+                      '&:hover': {
+                        bgcolor: 'rgba(0, 0, 0, 0.48)',
+                        color: 'secondary',
+                      }
+                    }}
+                  >
+                    <HelpOutlineIcon />
+                  </IconButton>
+                </Tooltip>
+                
+                <Button 
+                  variant="contained" 
+                  color="secondary" 
+                  startIcon={<AddIcon />} 
+                  component={Link} 
+                  href="/activities/new"
+                  className="bg-gradient-to-r from-amber-500 to-amber-600 shadow-lg"
+                >
+                  Nouvelle activité
+                </Button>
+              </div>
+            </Box>
+          </PatternBackground>
         </GradientBackground>
+        
+        {/* Stats summary */}
+        <Box sx={{ p: 2 }}>
+          <Grid container spacing={2} sx={{ display: 'flex', justifyContent: 'space-around' }}>
+            <Grid size={{ xs: 12, sm: 6, md: 2 }}>
+              <Paper sx={{ 
+                p: 2, 
+                textAlign: 'center', 
+                height: '100%',
+                bgcolor: (theme) => alpha(theme.palette.myBoxes.primary, 0.5),
+                backdropFilter: 'blur(5px)',
+                borderRadius: 2,
+              }}>
+                <Typography variant="overline" color="text.secondary">Total</Typography>
+                <Typography variant="h3" fontWeight="bold" color="text.primary">{totalActivities}</Typography>
+                <Typography variant="overline" color="text.secondary">
+                  {totalActivities === 1 ? 'activité' : 'activités'}
+                </Typography>
+              </Paper>
+            </Grid>
+            
+            <Grid size={{ xs: 12, sm: 6, md: 2 }}>
+              <Paper sx={{ 
+                p: 2, 
+                textAlign: 'center', 
+                height: '100%',
+                bgcolor: (theme) => alpha(theme.palette.myBoxes.primary, 0.5),
+                backdropFilter: 'blur(5px)',
+                borderRadius: 2,
+              }}>
+                <Typography variant="overline" color="text.secondary">Classes</Typography>
+                <Typography variant="h3" fontWeight="bold" color="text.primary">{totalWithClasses}</Typography>
+                <Typography variant="overline" color="text.secondary">
+                  {totalWithClasses === 1 ? 'associée' : 'associées'}
+                </Typography>
+              </Paper>
+            </Grid>
+            
+            <Grid size={{ xs: 12, sm: 6, md: 2 }}>
+              <Paper sx={{ 
+                p: 2, 
+                textAlign: 'center', 
+                height: '100%',
+                bgcolor: (theme) => alpha(theme.palette.myBoxes.primary, 0.5),
+                backdropFilter: 'blur(5px)',
+                borderRadius: 2,
+              }}>
+                <Typography variant="overline" color="text.secondary">Corrections</Typography>
+                <Typography variant="h3" fontWeight="bold" color="text.primary">{totalWithCorrections}</Typography>
+                <Typography variant="overline" color="text.secondary">
+                  {totalWithCorrections === 1 ? 'enregistrée' : 'enregistrées'}
+                </Typography>
+              </Paper>
+            </Grid>
+            
+            <Grid size={{ xs: 12, sm: 6, md: 2 }}>
+              <Paper sx={{ 
+                p: 2, 
+                textAlign: 'center', 
+                height: '100%',
+                bgcolor: (theme) => alpha(theme.palette.myBoxes.primary, 0.5),
+                backdropFilter: 'blur(5px)',
+                borderRadius: 2,
+              }}>
+                <Typography variant="overline" color="text.secondary">Total points</Typography>
+                <Typography variant="h3" fontWeight="bold" color="text.primary">{totalPoints}</Typography>
+                <Typography variant="overline" color="text.secondary">
+                  {totalPoints === 1 ? 'point' : 'points'}
+                </Typography>
+              </Paper>
+            </Grid>
+          </Grid>
+        </Box>
       </Paper>
 
       {error && (

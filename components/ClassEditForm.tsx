@@ -236,19 +236,17 @@ export function ClassEditForm({ id, initialData, onCancel, onSuccess }: ClassEdi
                   }}
                   placeholder="Nombre de sous-classes"
                   disabled={isLoading}
-                  slotProps={{
-                    input: { 
-                      min: 0, 
-                      step: 1,
-                      onInput: (e: React.ChangeEvent<HTMLInputElement>) => {
-                        const value = parseInt(e.target.value, 10);
-                        if (value === 1) {
-                          e.target.value = '2';
-                          setFormData(prev => ({
-                            ...prev,
-                            nbre_subclasses: 2
-                          }));
-                        }
+                  inputProps={{ 
+                    min: 0, 
+                    step: 1,
+                    onInput: (e: React.ChangeEvent<HTMLInputElement>) => {
+                      const value = parseInt(e.target.value, 10);
+                      if (value === 1) {
+                        e.target.value = '2';
+                        setFormData(prev => ({
+                          ...prev,
+                          nbre_subclasses: 2
+                        }));
                       }
                     }
                   }}

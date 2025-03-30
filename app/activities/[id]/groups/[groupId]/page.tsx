@@ -182,7 +182,7 @@ export default function CorrectionGroupDetailPage() {
         }
         
         if (foundShareCodes > 0) {
-          console.log(`${foundShareCodes} codes de partage récupérés`);
+          
           setCorrections(updatedCorrections);
           setUpdatedCorrections(JSON.parse(JSON.stringify(updatedCorrections)));
         }

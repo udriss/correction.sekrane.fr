@@ -156,7 +156,7 @@ export function parseContentItems(correction: Correction): ContentItem[] {
       
       // If it's a string, try to parse it
       if (typeof correction.content_data === 'string') {
-        console.log('Parsing de content_data (string)');
+        
         try {
           const parsed = JSON.parse(correction.content_data);
           if (parsed && typeof parsed === 'object' && 'items' in parsed && Array.isArray(parsed.items)) {
@@ -172,6 +172,6 @@ export function parseContentItems(correction: Correction): ContentItem[] {
   }
   
   // Fallback: parser le HTML
-  console.log('Parsing du HTML content');
+  
   return parseHtmlToItems(correction.content || '');
 }

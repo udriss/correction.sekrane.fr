@@ -401,7 +401,9 @@ export default function MultipleCorrectionsForm({
       if (response.ok) {
         const data = await response.json();
         setClassStudents(data);
+
         
+
         // Filter by subclass if specified
         let studentsToUse = data;
         if (subClass) {
@@ -427,6 +429,8 @@ export default function MultipleCorrectionsForm({
       setLoadingClassStudents(false);
     }
   };
+
+  
 
   // Handle class selection change
   const handleClassChange = (event: SelectChangeEvent) => {
@@ -763,7 +767,7 @@ export default function MultipleCorrectionsForm({
           {/* Afficher un message d'avertissement si le nom de groupe est requis mais vide */}
           {requireGroupName && !groupName.trim() && students.length > 0 && (
             <Alert severity="warning" sx={{ mb: 3 }}>
-              Veuillez saisir un nom de groupe avant de créer les corrections
+              Veuillez saisir un nom de groupe avant d'ajouter les corrections
             </Alert>
           )}
 

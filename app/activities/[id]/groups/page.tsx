@@ -87,7 +87,6 @@ export default function ActivityGroupsPage() {
         const activityData = await activityResponse.json();
         setActivity(activityData);
 
-        console.log('activityData:', activityData);
         
         // Charger les groupes associés à cette activité
         const groupsResponse = await fetch(`/api/activities/${activityId}/groups`);
@@ -96,7 +95,6 @@ export default function ActivityGroupsPage() {
         }
         
         const groupsData = await groupsResponse.json();
-        console.log('Groups data received:', groupsData);
         
         // Handle both array and single object responses properly
         if (Array.isArray(groupsData)) {
@@ -104,7 +102,6 @@ export default function ActivityGroupsPage() {
         } else if (groupsData && typeof groupsData === 'object' && groupsData.id) {
           // If a single object with an id is returned, wrap it in an array
           setGroups([groupsData]);
-          console.log('Converted single group to array:', [groupsData]);
         } else {
           console.warn('API returned unexpected data format for groups:', groupsData);
           setGroups([]); // Default to empty array for any other case
@@ -170,7 +167,6 @@ export default function ActivityGroupsPage() {
   };
   
   // Add debug rendering to check what's happening with groups
-  console.log('Current groups state:', groups);
   
   if (loading) {
     return <div className="py-10 flex justify-center max-w-[400px] mx-auto">

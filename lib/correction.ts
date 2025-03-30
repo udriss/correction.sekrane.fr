@@ -9,18 +9,20 @@ export async function createCorrection(data: {
   student_id: number | null;
   content: string | null;
   group_id?: number; // Make group_id optional in the function parameters
+  class_id?: number | null; // Make class_id optional
 }) {
   return await withConnection(async (connection) => {
     // Add group_id to the insertion with default 0 if not provided
     const [result] = await connection.query(
       `INSERT INTO corrections 
-       (activity_id, student_id, content, group_id) 
-       VALUES (?, ?, ?, ?)`,
+       (activity_id, student_id, content, group_id, class_id) 
+       VALUES (?, ?, ?, ?, ?)`,
       [
         data.activity_id,
         data.student_id,
         data.content,
-        data.group_id || 0 // Default to 0 if not provided
+        data.group_id || 0, // Default to 0 if not provided
+        data.class_id || null // Use class_id if provided
       ]
     );
     

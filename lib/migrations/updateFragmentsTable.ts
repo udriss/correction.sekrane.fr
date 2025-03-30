@@ -2,7 +2,7 @@ import { query } from '@/lib/db';
 
 export async function updateFragmentsTable() {
   try {
-    console.log('Starting fragments table migration...');
+    
     
     // Check if category column exists
     const [categoryResult] = await query<any[]>(`
@@ -12,7 +12,7 @@ export async function updateFragmentsTable() {
     `);
     
     if (categoryResult && categoryResult[0].count === 0) {
-      console.log('Adding category column to fragments table');
+      
       await query(`
         ALTER TABLE fragments
         ADD COLUMN category VARCHAR(100) DEFAULT 'Général'
@@ -27,7 +27,7 @@ export async function updateFragmentsTable() {
     `);
     
     if (tagsResult && tagsResult[0].count === 0) {
-      console.log('Adding tags column to fragments table');
+      
       await query(`
         ALTER TABLE fragments
         ADD COLUMN tags JSON DEFAULT NULL
@@ -42,7 +42,7 @@ export async function updateFragmentsTable() {
     `);
     
     if (userIdResult && userIdResult[0].count === 0) {
-      console.log('Adding user_id column to fragments table');
+      
       await query(`
         ALTER TABLE fragments
         ADD COLUMN user_id VARCHAR(100) DEFAULT NULL
@@ -57,14 +57,14 @@ export async function updateFragmentsTable() {
     `);
     
     if (activityNullable && activityNullable[0].IS_NULLABLE === 'NO') {
-      console.log('Making activity_id column nullable in fragments table');
+      
       await query(`
         ALTER TABLE fragments
         MODIFY activity_id INT NULL
       `);
     }
     
-    console.log('Fragments table migration completed successfully');
+    
   } catch (error) {
     console.error('Error updating fragments table:', error);
     throw error;

@@ -73,7 +73,7 @@ export async function PUT(
     }
 
     const body = await request.json();
-    console.log('Updating correction with ID:', idNumber, 'Data:', body);
+    
     
     return await withConnection(async (connection) => {
       // Construire la requête SQL dynamiquement
@@ -92,7 +92,7 @@ export async function PUT(
         if (!isNaN(classId)) {
           updateFields.push('class_id = ?');
           updateValues.push(classId);
-          console.log(`Mise à jour de la classe associée: ${classId}`);
+          
         } else if (body.class_id === null) {
           // Permet de supprimer l'association avec une classe
           updateFields.push('class_id = NULL');
@@ -143,7 +143,7 @@ export async function PUT(
         const totalGrade = expGrade + theoGrade;
         updateFields.push('grade = ?');
         updateValues.push(totalGrade);
-        console.log(`Recalcul du grade total: ${expGrade} + ${theoGrade} = ${totalGrade}`);
+        
       }
       
       if (body.content !== undefined) {
@@ -191,8 +191,6 @@ export async function PUT(
         updateFields.push('content_data = ?');
         updateValues.push(JSON.stringify(contentData));
         
-        console.log('Mise à jour content_data avec:', 
-          JSON.stringify(contentData).substring(0, 100) + (JSON.stringify(contentData).length > 100 ? '...' : ''));
       }
       
       if (updateFields.length === 0) {
@@ -305,7 +303,7 @@ export async function PATCH(
     const { id } = await Promise.resolve(params);
     
     const body = await request.json();
-    console.log('Updating correction with ID:', id, 'Data:', body);
+    
 
     // Convertir explicitement les valeurs numériques si présentes
     if (body.experimental_points_earned !== undefined) {

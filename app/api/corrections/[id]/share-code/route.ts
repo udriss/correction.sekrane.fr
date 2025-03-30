@@ -1,8 +1,8 @@
-import { NextResponse } from 'next/server';
+import { NextResponse, NextRequest } from 'next/server';
 import { withConnection } from '@/lib/db';
 
 export async function GET(
-  req: NextResponse,
+  req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   return withConnection(async (connection) => {

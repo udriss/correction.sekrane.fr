@@ -43,7 +43,7 @@ export async function PUT(
     // Await the params
     const { id } = await params;
     const activityId = parseInt(id);
-    console.log('activityId:', activityId);
+    
     
     if (isNaN(activityId)) {
       return NextResponse.json({ error: 'ID invalide' }, { status: 400 });

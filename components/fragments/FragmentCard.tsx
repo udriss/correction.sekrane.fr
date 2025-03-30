@@ -75,10 +75,7 @@ const FragmentCard: React.FC<FragmentCardProps> = ({
         return fragment.categories as number[];
       }
     } 
-    // Case 3: fallback to legacy category_id if no categories array
-    else if (fragment.category_id) {
-      return [fragment.category_id];
-    }
+    // Suppression de la référence à category_id qui n'existe plus
     return [];
   };
 
@@ -315,14 +312,6 @@ const FragmentCard: React.FC<FragmentCardProps> = ({
         >
           {/* Date and category tag */}
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
-            <Typography 
-              variant="caption" 
-              color="text.secondary" 
-              sx={{ fontStyle: 'italic' }}
-            >
-              {new Date(fragment.created_at).toLocaleDateString('fr-FR')}
-              {fragment.isModified && ' (modifié)'}
-            </Typography>
             
             {!isEditing && (
               <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
@@ -452,8 +441,17 @@ const FragmentCard: React.FC<FragmentCardProps> = ({
               </Tooltip>
             </>
           ) : (
-            <>
-              {onAddToCorrection && (
+            <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+            <Typography 
+              variant="caption" 
+              color="text.secondary" 
+              sx={{ fontStyle: 'italic' }}
+            >
+              {new Date(fragment.created_at).toLocaleDateString('fr-FR')}
+              {fragment.isModified && ' (modifié)'}
+            </Typography>
+            <Box sx={{ display: 'flex', gap: 1, justifyContent: 'flex-end' }}>
+            {onAddToCorrection && (
                 <Tooltip title="Ajouter à la correction">
                   <IconButton 
                     size="small" 
@@ -501,7 +499,9 @@ const FragmentCard: React.FC<FragmentCardProps> = ({
                   <DeleteIcon fontSize="small" />
                 </IconButton>
               </Tooltip>
-            </>
+            </Box>
+
+            </Box>
           )}
         </CardActions>
       </Card>

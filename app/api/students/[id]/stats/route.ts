@@ -94,7 +94,7 @@ export async function GET(
     };
     
     // Log the data
-    // console.log('Student stats response:', responseData);
+    // 
     
     // Return the stats
     return NextResponse.json(responseData);

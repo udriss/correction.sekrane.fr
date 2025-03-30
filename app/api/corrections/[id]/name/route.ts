@@ -19,7 +19,7 @@ export async function PUT(
     // Use either auth system
     const userId = customUser?.id || session?.user?.id;
 
-    console.log('[API] Name update request received for ID:', userId);
+    
 
     
     if (!userId) {
@@ -36,13 +36,13 @@ export async function PUT(
 
     // Get the request body
     const body = await request.json();
-    console.log('[API] Request body:', body);
+    
     
     // Check if we have the necessary data
     const studentFirstName = body.student_first_name;
     const studentLastName = body.student_last_name;
     
-    console.log('[API] Student name data:', { studentFirstName, studentLastName });
+    
     
     if (!studentFirstName && !studentLastName) {
       return NextResponse.json({ error: 'Prénom ou nom requis' }, { status: 400 });
@@ -102,7 +102,7 @@ export async function PUT(
         student_name: `${updatedStudent.first_name || ''} ${updatedStudent.last_name || ''}`.trim()
       };
       
-      console.log('[API] Response data:', response);
+      
       return NextResponse.json(response);
     });
   } catch (error) {

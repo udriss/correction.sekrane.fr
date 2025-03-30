@@ -24,7 +24,7 @@ export async function createFragment(
   content: string, 
   categories: number[] = []
 ): Promise<Fragment> {
-  console.log('Creating fragment with categories:', categories);
+  
   
   const response = await fetch('/api/fragments', {
     method: 'POST',

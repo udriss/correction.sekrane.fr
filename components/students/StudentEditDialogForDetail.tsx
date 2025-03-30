@@ -25,6 +25,9 @@ import {
   ListItemIcon,
   Checkbox,
   Divider,
+  Alert,
+  AlertTitle,
+  IconButton,
 } from '@mui/material';
 import Grid from '@mui/material/Grid';
 import PersonIcon from '@mui/icons-material/Person';
@@ -87,8 +90,8 @@ interface StudentEditDialogForDetailProps {
 const StudentEditDialogForDetail: React.FC<StudentEditDialogForDetailProps> = ({
   open,
   student,
-  classes,
-  selectedClasses,
+  classes, // Maintenant contient toutes les classes disponibles
+  selectedClasses, // Contient seulement les classes auxquelles l'étudiant est inscrit
   availableSubgroups,
   loadingSubgroups,
   onClose,
@@ -98,6 +101,7 @@ const StudentEditDialogForDetail: React.FC<StudentEditDialogForDetailProps> = ({
   fetchClassSubgroups
 }) => {
   const [classSubgroups, setClassSubgroups] = useState<{[classId: number]: string}>({});
+  const [updateError, setUpdateError] = useState<string | null>(null);
   
   if (!student) return null;
   
@@ -159,6 +163,27 @@ const StudentEditDialogForDetail: React.FC<StudentEditDialogForDetailProps> = ({
     });
   };
 
+  // Handle closing the error alert
+  const handleCloseError = () => {
+    setUpdateError(null);
+  };
+
+  // Handle save with error handling
+  const handleSaveWithErrorHandling = async () => {
+    try {
+      // Clear any previous errors
+      setUpdateError(null);
+      // Call the provided onSave function
+      await onSave();
+    } catch (error) {
+      // Capture any errors that occur during save
+      const errorMessage = error instanceof Error 
+        ? `Erreur lors de la mise à jour de l'étudiant : ${error.message}` 
+        : "Erreur lors de la mise à jour de l'étudiant.";
+      setUpdateError(errorMessage);
+    }
+  };
+
   return (
     <Dialog 
       open={open} 
@@ -176,25 +201,29 @@ const StudentEditDialogForDetail: React.FC<StudentEditDialogForDetailProps> = ({
             gap: 2
           }}
         >
-          <Avatar 
+            <Avatar 
             sx={{ 
               width: 56, 
               height: 56, 
-              bgcolor: 'secondary.main',
+              background: student.gender === 'M'
+              ? (theme) => `linear-gradient(135deg, ${theme.palette.primary.light} 0%, ${theme.palette.primary.dark} 100%)`
+              : student.gender === 'F' 
+              ? (theme) => `linear-gradient(135deg, ${theme.palette.secondary.light} 0%, ${theme.palette.secondary.dark} 100%)`
+              : 'grey.500',
               fontSize: '1.5rem',
               boxShadow: '0 4px 8px rgba(0,0,0,0.2)'
             }}
-          >
-            {student.gender === 'M' ? <MaleIcon fontSize="large" /> : 
-             student.gender === 'F' ? <FemaleIcon fontSize="large" /> : 
-             student.gender === 'N' ? <GpsNotFixedIcon fontSize="large" /> : 
+            >
+            {student.gender === 'M' ? <MaleIcon sx={{color: 'text.primary'}} fontSize="large" /> : 
+             student.gender === 'F' ? <FemaleIcon sx={{color: 'text.primary'}}  fontSize="large" /> : 
+             student.gender === 'N' ? <GpsNotFixedIcon sx={{color: 'text.primary'}} fontSize="large" /> : 
              <NotInterestedIcon fontSize="large" />}
-          </Avatar>
+            </Avatar>
           <Box>
-            <H1Title>
-              Modifier l'étudiant
-            </H1Title>
-            <Typography variant="body2" sx={{ opacity: 0.9 }}>
+          <Typography color='text.primary' variant="h5" fontWeight="bold" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          Modifier l'étudiant
+            </Typography>
+            <Typography variant="body2" color='text.secondary' sx={{ opacity: 0.9 }}>
               {student.first_name} {student.last_name}
             </Typography>
           </Box>
@@ -242,6 +271,27 @@ const StudentEditDialogForDetail: React.FC<StudentEditDialogForDetailProps> = ({
       </DialogTitle>
 
       <DialogContent sx={{ pt: 3 }}>
+        {/* Afficher l'alerte d'erreur si elle existe */}
+        {updateError && (
+          <Alert 
+            severity="error"
+            action={
+              <IconButton
+                aria-label="close"
+                color="inherit"
+                size="small"
+                onClick={handleCloseError}
+              >
+                <CloseIcon fontSize="inherit" />
+              </IconButton>
+            }
+            sx={{ mb: 3 }}
+          >
+            <AlertTitle>Erreur</AlertTitle>
+            {updateError}
+          </Alert>
+        )}
+
         {/* Informations personnelles */}
         <Typography variant="subtitle1" fontWeight="bold" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
           <PersonIcon color="primary" fontSize="small" />
@@ -350,7 +400,8 @@ const StudentEditDialogForDetail: React.FC<StudentEditDialogForDetailProps> = ({
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                           <SchoolIcon fontSize="small" color={isPrimary ? "primary" : "action"} />
                           <Typography 
-                            variant="body1" 
+                            variant="body1"
+                            component={"div"} 
                             sx={{ 
                               fontWeight: isPrimary ? 600 : 400
                             }}
@@ -413,7 +464,7 @@ const StudentEditDialogForDetail: React.FC<StudentEditDialogForDetailProps> = ({
           Annuler
         </Button>
         <Button 
-          onClick={onSave} 
+          onClick={handleSaveWithErrorHandling} 
           color="primary"
           variant="outlined"
           startIcon={<SaveIcon />}

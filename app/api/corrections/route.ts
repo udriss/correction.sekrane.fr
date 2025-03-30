@@ -37,34 +37,40 @@ export async function GET(
 }
 
 export async function POST(request: Request) {
-  try {
-    const body = await request.json();
-    
-    // Validate basic required fields
-    if (!body.activity_id) {
-      return Response.json({ error: 'Activity ID is required' }, { status: 400 });
-    }
-    
-    return await withConnection(async (connection) => {
+  return await withConnection(async (connection) => {
+    try {
+      const data = await request.json();
+      
+      // Validate activity_id - allow "0" as a valid ID
+      const activity_id = data.activity_id || 0;
+      
+      // Ensure activity_id is a number in database queries
+      const numericActivityId = parseInt(activity_id.toString(), 10);
+      
+      // Validate basic required fields
+      if (!data.activity_id) {
+        return Response.json({ error: 'Activity ID is required' }, { status: 400 });
+      }
+      
       // Structure correction data according to the Correction interface
       const correctionData = {
-        activity_id: body.activity_id,
-        student_id: body.student_id || null,
-        content: body.content || '',
-        content_data: body.content_data ? JSON.stringify(body.content_data) : null,
+        activity_id: numericActivityId,
+        student_id: data.student_id || null,
+        content: data.content || '',
+        content_data: data.content_data ? JSON.stringify(data.content_data) : null,
         grade: null as number | null, // Will calculate below
-        penalty: body.penalty || null,
-        deadline: body.deadline || new Date().toISOString().split('T')[0],
-        submission_date: body.submission_date || new Date().toISOString().split('T')[0],
-        experimental_points_earned: parseFloat(body.experimental_points_earned) || 0,
-        theoretical_points_earned: parseFloat(body.theoretical_points_earned) || 0,
-        class_id: body.class_id ? parseInt(body.class_id) : null,
+        penalty: data.penalty || null,
+        deadline: data.deadline || new Date().toISOString().split('T')[0],
+        submission_date: data.submission_date || new Date().toISOString().split('T')[0],
+        experimental_points_earned: parseFloat(data.experimental_points_earned) || 0,
+        theoretical_points_earned: parseFloat(data.theoretical_points_earned) || 0,
+        class_id: data.class_id ? parseInt(data.class_id) : null,
         group_id: null as number | null
       };
       
       // Set default group_id = 0 if neither class_id nor group_id is provided
-      if (body.group_id !== undefined) {
-        correctionData.group_id = parseInt(body.group_id) || 0;
+      if (data.group_id !== undefined) {
+        correctionData.group_id = parseInt(data.group_id) || 0;
       } else if (!correctionData.class_id) {
         // If no class_id and no group_id is specified, set group_id = 0 as default
         correctionData.group_id = 0;
@@ -75,11 +81,11 @@ export async function POST(request: Request) {
       correctionData.grade = grade;
       
       // Check if student_id is valid before inserting
-      let studentId = body.student_id || null;
+      let studentId = data.student_id || null;
       
       // Explicitly check for negative IDs and set them to null
       if (studentId !== null && (studentId < 0 || typeof studentId !== 'number')) {
-        console.log(`Ignoring invalid student ID: ${studentId}`);
+        
         studentId = null;
       } else if (studentId !== null) {
         const [students] = await connection.query(
@@ -93,7 +99,7 @@ export async function POST(request: Request) {
         }
       }
       
-      // Insert correction with validated student_id
+      // Insert correction with validated student_id and numeric activity_id
       const [result] = await connection.query(
         `INSERT INTO corrections 
          (activity_id, student_id, content, content_data, grade, penalty, deadline, 
@@ -101,7 +107,7 @@ export async function POST(request: Request) {
           class_id, group_id, created_at, updated_at )
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
         [
-          correctionData.activity_id,
+          numericActivityId, // Use numeric value
           studentId, // Use the validated student ID
           correctionData.content,
           correctionData.content_data,
@@ -133,7 +139,7 @@ export async function POST(request: Request) {
               'INSERT INTO class_activities (class_id, activity_id, created_at) VALUES (?, ?, NOW())',
               [correctionData.class_id, correctionData.activity_id]
             );
-            console.log(`Associated activity ${correctionData.activity_id} with class ${correctionData.class_id}`);
+            
           }
         } catch (err) {
           // Log error but don't fail the request
@@ -157,10 +163,9 @@ export async function POST(request: Request) {
       }
       
       return Response.json(rows[0]);
-    });
-    
-  } catch (error) {
-    console.error('Error creating correction:', error);
-    return Response.json({ error: 'Server error', details: String(error) }, { status: 500 });
-  }
+    } catch (error) {
+      console.error('Error creating correction:', error);
+      return Response.json({ error: 'Server error', details: String(error) }, { status: 500 });
+    }
+  });
 }

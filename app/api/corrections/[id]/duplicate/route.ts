@@ -17,7 +17,7 @@ export async function POST(
       `SELECT * FROM corrections WHERE id = ?`,
       [correctionId]
     ) as any[];
-    console.log('Original Correction:', originalCorrection);
+    
 
     if (!originalCorrection) {
       return NextResponse.json({ error: 'Correction non trouvée' }, { status: 404 });

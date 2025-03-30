@@ -22,12 +22,7 @@ export async function PUT(
     const theoPoints = parseFloat(Number(theoretical_points_earned).toFixed(1));
     const penaltyValue = parseFloat(Number(penalty).toFixed(1));
     
-    console.log('Received values:', {
-      grade: gradeValue,
-      exp: expPoints,
-      theo: theoPoints,
-      penalty: penaltyValue
-    });
+
     
     return await withConnection(async (connection) => {
       await connection.query(

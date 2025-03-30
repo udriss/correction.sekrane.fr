@@ -121,6 +121,8 @@ export default function ClassStudentsManager({
       }
       
       const data = await response.json();
+
+      console.log('Fetched students:', data);
       
       // Add isEditing property to each student
       const formattedStudents = data.map((student: Student) => ({
@@ -279,6 +281,7 @@ export default function ClassStudentsManager({
           }),
         });
       }
+      
 
       setSuccess(`${batchStudents.length} étudiants ajoutés avec succès`);
       setBatchStudents([]);

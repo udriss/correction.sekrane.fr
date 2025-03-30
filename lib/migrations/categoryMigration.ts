@@ -2,7 +2,7 @@ import { query } from '@/lib/db';
 
 export async function migrateCategoryData() {
   try {
-    console.log('Starting category migration...');
+    
     
     // 1. Créer la table des catégories si elle n'existe pas déjà
     await query(`
@@ -13,7 +13,7 @@ export async function migrateCategoryData() {
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
       )
     `);
-    console.log('Categories table created or verified');
+    
     
     // 2. Créer la table de jonction si elle n'existe pas déjà
     await query(`
@@ -25,7 +25,7 @@ export async function migrateCategoryData() {
         FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE CASCADE
       )
     `);
-    console.log('Junction table created or verified');
+    
     
     // 3. Insérer les catégories uniques de la table fragments
     await query(`
@@ -33,7 +33,7 @@ export async function migrateCategoryData() {
       SELECT DISTINCT category FROM fragments 
       WHERE category IS NOT NULL AND category != ''
     `);
-    console.log('Unique categories inserted');
+    
     
     // 4. Créer les associations dans la table de jonction
     const fragmentsWithCategories = await query<any[]>(`
@@ -58,7 +58,7 @@ export async function migrateCategoryData() {
         `, [fragment.id, categoryId]);
       }
     }
-    console.log('Fragment-category associations created');
+    
     
     // 5. OPTIONNEL: Vous pouvez décider de garder ou non la colonne 'category' dans la table fragments
     // Si vous décidez de la supprimer, décommentez le code ci-dessous
@@ -66,10 +66,10 @@ export async function migrateCategoryData() {
     await query(`
       ALTER TABLE fragments DROP COLUMN category
     `);
-    console.log('Category column removed from fragments table');
+    
     */
     
-    console.log('Category migration completed successfully');
+    
     return true;
   } catch (error) {
     console.error('Error during category migration:', error);

@@ -260,7 +260,7 @@ const FragmentsSidebar: React.FC<FragmentsSidebarProps> = ({
             
             <Button
               component={Link}
-              href="/activities/fragments"
+              href="/fragments"
               color="secondary"
               variant="contained"
               size="small"

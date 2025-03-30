@@ -29,7 +29,8 @@ export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
   const userOnly = searchParams.get('userOnly') === 'true';
   const activityId = searchParams.get('activityId');
-  const categoryFilter = searchParams.get('category');
+  const categoryId = searchParams.get('categoryId'); 
+  const categoryName = searchParams.get('category'); 
   const search = searchParams.get('search');
   
   try {
@@ -71,23 +72,27 @@ export async function GET(request: NextRequest) {
         params.push(activityId);
       }
       
-      // If category filter is applied, update it to work with fragment_categories
-      if (categoryFilter && fragmentCategoriesTableExists) {
+      // Si categoryId est fourni, utiliser la nouvelle structure
+      if (categoryId && fragmentCategoriesTableExists) {
         query += " AND EXISTS (SELECT 1 FROM fragments_categories fc WHERE fc.fragment_id = f.id AND fc.category_id = ?)";
-        params.push(categoryFilter);
-      } else if (categoryFilter) {
-        // Fallback for old structure
+        params.push(categoryId);
+      } 
+      // Sinon, conserver la recherche par nom de catégorie pour compatibilité
+      else if (categoryName && categoryName !== 'all' && !fragmentCategoriesTableExists) {
         query += " AND f.category = ?";
-        params.push(categoryFilter);
+        params.push(categoryName);
       }
       
       if (search) {
-        query += " AND (f.content LIKE ? OR f.category LIKE ?)";
-        params.push(`%${search}%`, `%${search}%`);
+        // Améliorer la recherche pour chercher dans le contenu des fragments
+        query += " AND (f.content LIKE ?)";
+        params.push(`%${search}%`);
       }
       
       // Add sorting
       query += " ORDER BY f.created_at DESC";
+
+      
       
       // Execute the query
       try {
@@ -130,7 +135,7 @@ export async function GET(request: NextRequest) {
             processedFragment.isOwner = userIdStr === fragmentUserIdStr;
             
             if (userIdStr === fragmentUserIdStr) {
-              console.log(`Fragment ${row.id} is owned by current user`);
+              
             }
           } else {
             processedFragment.isOwner = false;
@@ -138,7 +143,8 @@ export async function GET(request: NextRequest) {
           
           return processedFragment;
         }) : [];
-        
+
+
         return NextResponse.json(fragments);
       } catch (sqlError: any) {
         // Handle SQL error and provide detailed error information
@@ -219,7 +225,7 @@ export async function POST(request: NextRequest) {
           activityId = null;
         }
       }
-      console.log('fragmentData ID:', fragmentData);
+      
 
       // Insert the new fragment - removing direct category field usage
       try {
@@ -259,7 +265,7 @@ export async function POST(request: NextRequest) {
                 [categoryValues]
               );
               
-              console.log(`Added ${categoryValues.length} categories to fragment ${insertId}`);
+              
             }
           } catch (categoryError) {
             console.error('Error adding category associations:', categoryError);
@@ -430,7 +436,7 @@ export async function PUT(request: NextRequest) {
       if (fragmentData.categories) {
         // Make sure we're accessing the categories correctly
         const categories = fragmentData.categories;
-        console.log('Categories in PUT request:', categories);
+        
         
         // Delete existing associations
         await connection.query(
@@ -449,7 +455,7 @@ export async function PUT(request: NextRequest) {
               `INSERT INTO fragments_categories (fragment_id, category_id) VALUES ?`,
               [categoryValues]
             );
-            console.log(`Added ${categoryValues.length} categories to fragment ${fragmentId}`);
+            
           }
         }
       }

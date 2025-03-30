@@ -5,16 +5,16 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import {
   Container, Paper, Typography, Box, Chip, Button, 
   IconButton, Menu, MenuItem, TextField, FormControl,
-  InputLabel, Select, Card, CardContent, Skeleton,
-  Tooltip, Badge, Divider, ListItemIcon, ListItemText,
-  SelectChangeEvent, InputAdornment, Tabs, Tab, Alert
+  InputLabel, Select, Badge, Divider, ListItemIcon, ListItemText,
+  SelectChangeEvent, InputAdornment, Tabs, Tab, 
 } from '@mui/material';
+import NavigateNextIcon from '@mui/icons-material/NavigateNext';
 import Grid from '@mui/material/Grid';
 
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import { LocalizationProvider, DatePicker } from '@mui/x-date-pickers';
+import { alpha } from '@mui/material/styles';
 import SortIcon from '@mui/icons-material/Sort';
-import FilterListIcon from '@mui/icons-material/FilterList';
 import AssignmentIcon from '@mui/icons-material/Assignment';
 import SchoolIcon from '@mui/icons-material/School';
 import PersonIcon from '@mui/icons-material/Person';
@@ -38,6 +38,8 @@ import CorrectionsList from '@/components/allCorrections/CorrectionsList';
 import ClassesList from '@/components/allCorrections/ClassesList';
 import StudentsList from '@/components/allCorrections/StudentsList';
 import ChronologyList from '@/components/allCorrections/ChronologyList';
+import HomeIcon from '@mui/icons-material/Home';
+
 
 // Composant principal qui utilise le provider
 export default function CorrectionsPage() {
@@ -227,7 +229,7 @@ function CorrectionsContent() {
     return 'error';
   };
 
-  console.log('Filtered Corrections:', filteredCorrections);
+  
   
   if (loading && !filteredCorrections.length) {
     return (
@@ -241,6 +243,8 @@ function CorrectionsContent() {
   
   return (
     <Container maxWidth="lg" sx={{ py: 4 }}>
+
+      
       {/* Header */}
       <Paper 
         elevation={3} 
@@ -248,39 +252,35 @@ function CorrectionsContent() {
           borderRadius: 3,
           overflow: 'hidden',
           mb: 4,
-          transform: 'translateY(0)',
-          transition: 'transform 0.3s ease, box-shadow 0.3s ease',
-          '&:hover': {
-            transform: 'translateY(-5px)',
-            boxShadow: (theme) => `0 15px 50px ${theme.palette.mode === 'dark' ? 'rgba(0,0,0,0.6)' : 'rgba(0,0,0,0.15)'}`,
-          }
         }}
       >
+
+
         <GradientBackground variant="primary" sx={{ p: 0 }}>
         <PatternBackground 
-        pattern="diagonal" 
-        opacity={0.75} 
-        color="5566AA" 
-        size={70}
+        pattern="dots" 
+        opacity={0.05} 
+        color="black" 
+        size={100}
         sx={{ p: 4, borderRadius: 2 }}
       >
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 2 }}>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-              <Box
+                <Box
                 sx={{
-                  bgcolor: 'rgba(255,255,255,0.15)',
+                  background: (theme) => `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.secondary.main} 100%)`,
                   p: 1.5,
                   borderRadius: '50%',
                   display: 'flex',
                   boxShadow: '0 4px 20px rgba(0,0,0,0.2)'
                 }}
-              >
-                <AssignmentIcon sx={{ fontSize: 36, color: 'white' }} />
-              </Box>
+                >
+                <AssignmentIcon sx={{ fontSize: 36, color: (theme) => theme.palette.text.primary }} />
+                </Box>
               
               <Box>
-                <H1Title>Corrections</H1Title>
-                <Typography variant="subtitle1" sx={{ opacity: 0.9 }}>
+                <Typography variant='h4' fontWeight={700} color='text.primary'>Corrections</Typography>
+                <Typography variant="subtitle1" color='text.secondary' sx={{ opacity: 0.9 }}>
                   Gérez et analysez toutes les corrections des activités
                 </Typography>
               </Box>
@@ -389,22 +389,36 @@ function CorrectionsContent() {
                   </PatternBackground>
                   </GradientBackground>
         {/* Stats summary */}
-        <Box sx={{ bgcolor: 'background.default', p: 3, borderTop: '1px solid', borderColor: 'divider' }}>
-          <Grid container spacing={2}>
-            <Grid size={{ xs: 12, sm:6, md: 3 }}>
-              <Paper sx={{ p: 2, textAlign: 'center', height: '100%' }}>
-                <Typography variant="overline" color="text.secondary">Total</Typography>
-                <Typography variant="h3" fontWeight="bold" color="primary">{filteredCorrections.length}</Typography>
-                <Typography variant="body2" color="text.secondary">
-                  {filteredCorrections.length === 1 ? 'correction' : 'corrections'}
-                </Typography>
+        <Box sx={{ p: 2 }}>
+          <Grid container spacing={2} sx={{ display: 'flex', justifyContent: 'space-around', }}>
+            <Grid size={{ xs: 12, sm:6, md: 2 }}>
+            <Paper sx={{ 
+              p: 2, 
+              textAlign: 'center', 
+              height: '100%',
+              bgcolor: (theme) => alpha(theme.palette.myBoxes.primary, 0.5),
+              backdropFilter: 'blur(5px)',
+              borderRadius: 2,
+              }}>
+              <Typography variant="overline" color="text.secondary">Total</Typography>
+              <Typography variant="h3" fontWeight="bold" color="text.primary">{filteredCorrections.length}</Typography>
+              <Typography variant="overline" color="text.secondary">
+              {filteredCorrections.length === 1 ? 'correction' : 'corrections'}
+              </Typography>
               </Paper>
             </Grid>
             
-            <Grid size={{ xs: 12, sm:6, md: 3 }}>
-              <Paper sx={{ p: 2, textAlign: 'center', height: '100%' }}>
+            <Grid size={{ xs: 12, sm:6, md: 2 }}>
+            <Paper sx={{ 
+              p: 2, 
+              textAlign: 'center', 
+              height: '100%',
+              bgcolor: (theme) => alpha(theme.palette.myBoxes.primary, 0.5),
+              backdropFilter: 'blur(5px)',
+              borderRadius: 2,
+              }}>
                 <Typography variant="overline" color="text.secondary">Moyenne</Typography>
-                <Typography variant="h3" fontWeight="bold" color="primary">
+                <Typography variant="h3" fontWeight="bold" color="text.primary">
                 {filteredCorrections.length 
                   ? (filteredCorrections.reduce((sum, c) => {
                       // Trouver l'activité correspondante pour obtenir le barème total
@@ -421,29 +435,43 @@ function CorrectionsContent() {
                     }, 0) / filteredCorrections.length).toFixed(1)
                   : '-'}
               </Typography>
-                <Typography variant="body2" color="text.secondary">/ 20</Typography>
+                <Typography variant="overline" color="text.secondary">/ 20</Typography>
               </Paper>
             </Grid>
             
-            <Grid size={{ xs: 12, sm:6, md: 3 }}>
-              <Paper sx={{ p: 2, textAlign: 'center', height: '100%' }}>
+            <Grid size={{ xs: 12, sm:6, md: 2 }}>
+            <Paper sx={{ 
+              p: 2, 
+              textAlign: 'center', 
+              height: '100%',
+              bgcolor: (theme) => alpha(theme.palette.myBoxes.primary, .5),
+              backdropFilter: 'blur(5px)',
+              borderRadius: 2,
+              }}>
                 <Typography variant="overline" color="text.secondary">Classes</Typography>
-                <Typography variant="h3" fontWeight="bold" color="primary">
+                <Typography variant="h3" fontWeight="bold" color="text.primary">
                   {new Set(filteredCorrections.map(c => c.class_id)).size}
                 </Typography>
-                <Typography variant="body2" color="text.secondary">
+                <Typography variant="overline" color="text.secondary" >
                   {new Set(filteredCorrections.map(c => c.class_id)).size <= 1 ? 'unique' : 'uniques'}
                 </Typography>
               </Paper>
             </Grid>
             
-            <Grid size={{ xs: 12, sm:6, md: 3 }}>
-              <Paper sx={{ p: 2, textAlign: 'center', height: '100%' }}>
+            <Grid size={{ xs: 12, sm:6, md: 2 }}>
+            <Paper sx={{ 
+              p: 2, 
+              textAlign: 'center', 
+              height: '100%',
+              bgcolor: (theme) => alpha(theme.palette.myBoxes.primary, 0.5),
+              backdropFilter: 'blur(5px)',
+              borderRadius: 2,
+              }}>
                 <Typography variant="overline" color="text.secondary">Étudiants</Typography>
-                <Typography variant="h3" fontWeight="bold" color="primary">
+                <Typography variant="h3" fontWeight="bold" color="text.primary">
                   {new Set(filteredCorrections.map(c => c.student_id)).size}
                 </Typography>
-                <Typography variant="body2" color="text.secondary">
+                <Typography variant="overline" color="text.secondary">
                   {new Set(filteredCorrections.map(c => c.student_id)).size <= 1 ? 'unique' : 'uniques'}
                 </Typography>
               </Paper>

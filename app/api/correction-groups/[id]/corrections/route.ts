@@ -75,7 +75,7 @@ export async function POST(
     }
     
     const body = await request.json();
-    console.log("Received body:", body); // Debug log
+    
     
     // Handle correction_ids format (from MultipleCorrectionsForm)
     if (body.correction_ids && Array.isArray(body.correction_ids)) {

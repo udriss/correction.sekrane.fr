@@ -65,7 +65,7 @@ export async function POST(request: NextRequest) {
         `);
         
         // Keep the column for now but it won't be used actively
-        console.log('Migrated category_id data to fragment_categories table');
+        
       }
     } catch (migrationError) {
       console.error('Error during migration:', migrationError);

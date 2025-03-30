@@ -78,8 +78,6 @@ export async function middleware(request: NextRequest) {
       url.searchParams.set('callbackUrl', fullPath);
     }
     
-    // Log pour déboguer
-    console.log('Redirecting to login with callback:', fullPath);
     
     return NextResponse.redirect(url);
   }

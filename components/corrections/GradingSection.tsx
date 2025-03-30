@@ -35,7 +35,7 @@ const GradingSection: React.FC<GradingSectionProps> = ({
   correction
 }) => {
   return (
-    <Paper sx={{ p: 3, mb: 4, boxShadow: 3 }}>
+    <>
       <Box sx={{ mb: 3 }}>
         <Typography variant="h6">
           Notation sur {experimentalPoints + theoreticalPoints} points
@@ -78,7 +78,7 @@ const GradingSection: React.FC<GradingSectionProps> = ({
               valueLabelDisplay="auto"
               marks
               sx={{ 
-                width: 180,
+                width: "90%",
                 color: 'primary.main',
                 '& .MuiSlider-thumb': {
                   height: 20,
@@ -130,7 +130,7 @@ const GradingSection: React.FC<GradingSectionProps> = ({
               valueLabelDisplay="auto"
               marks
               sx={{ 
-                width: 180,
+                width: "90%",
                 color: 'secondary.main', 
                 '& .MuiSlider-thumb': {
                   height: 20,
@@ -185,7 +185,7 @@ const GradingSection: React.FC<GradingSectionProps> = ({
                   valueLabelDisplay="auto"
                   marks
                   sx={{ 
-                    width: 180,
+                    width: "90%",
                     color: 'error.main',
                     '& .MuiSlider-thumb': {
                       height: 20,
@@ -242,7 +242,7 @@ const GradingSection: React.FC<GradingSectionProps> = ({
               </Typography>
             </Box>
       </Grid>
-    </Paper>
+    </>
   );
 };
 

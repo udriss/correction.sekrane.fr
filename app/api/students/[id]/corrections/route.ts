@@ -6,7 +6,7 @@ import { getUser } from '@/lib/auth';
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     // Authentication check
@@ -20,7 +20,10 @@ export async function GET(
       return NextResponse.json({ error: 'Utilisateur non authentifié' }, { status: 401 });
     }
 
-    const studentId = parseInt(params.id);
+    // Await the params
+    const { id } = await params;
+    const studentId = parseInt(id);
+    
     if (isNaN(studentId)) {
       return NextResponse.json({ error: 'ID étudiant invalide' }, { status: 400 });
     }
@@ -68,33 +71,51 @@ export async function GET(
         return NextResponse.json([]);
       }
 
-      // Formater les résultats pour le frontend
-      const formattedCorrections = (corrections as any[]).map(correction => ({
-        id: correction.id,
-        activity_id: correction.activity_id,
-        content: correction.content,
-        content_data: correction.content_data ? JSON.parse(correction.content_data) : null,
-        created_at: correction.created_at,
-        updated_at: correction.updated_at,
-        grade: correction.grade,
-        penalty: correction.penalty,
-        deadline: correction.deadline,
-        submission_date: correction.submission_date,
-        experimental_points_earned: correction.experimental_points_earned,
-        theoretical_points_earned: correction.theoretical_points_earned,
-        group_id: correction.group_id,
-        class_id: correction.class_id,
-        student_id: correction.student_id,
-        student_name: correction.student_name || 'Étudiant inconnu',
-        student_first_name: correction.student_first_name || '',
-        student_last_name: correction.student_last_name || '',
-        activity_name: correction.activity_name || 'Activité inconnue',
-        class_name: correction.class_name || 'Sans classe',
-        experimental_points: correction.experimental_points || 0,
-        theoretical_points: correction.theoretical_points || 0
-      }));
+      // Formater les résultats pour le frontend avec une gestion plus robuste du content_data
+      const formattedCorrections = (corrections as any[]).map(correction => {
+        // Gérer le parsing de content_data de manière sécurisée
+        let parsedContentData = null;
+        if (correction.content_data) {
+          try {
+            // Vérifier si content_data est déjà un objet
+            if (typeof correction.content_data === 'object') {
+              parsedContentData = correction.content_data;
+            } else {
+              parsedContentData = JSON.parse(correction.content_data);
+            }
+          } catch (error) {
+            console.error("Erreur de parsing JSON pour content_data:", error);
+            // En cas d'erreur, conserver la donnée brute
+            parsedContentData = { raw: correction.content_data };
+          }
+        }
 
-      console.log('[API] Corrections récupérées:', formattedCorrections);
+        return {
+          id: correction.id,
+          activity_id: correction.activity_id,
+          content: correction.content,
+          content_data: parsedContentData,
+          created_at: correction.created_at,
+          updated_at: correction.updated_at,
+          grade: correction.grade,
+          penalty: correction.penalty,
+          deadline: correction.deadline,
+          submission_date: correction.submission_date,
+          experimental_points_earned: correction.experimental_points_earned,
+          theoretical_points_earned: correction.theoretical_points_earned,
+          group_id: correction.group_id,
+          class_id: correction.class_id,
+          student_id: correction.student_id,
+          student_name: correction.student_name || 'Étudiant inconnu',
+          student_first_name: correction.student_first_name || '',
+          student_last_name: correction.student_last_name || '',
+          activity_name: correction.activity_name || 'Activité inconnue',
+          class_name: correction.class_name || 'Sans classe',
+          experimental_points: correction.experimental_points || 0,
+          theoretical_points: correction.theoretical_points || 0
+        };
+      });
+      
       return NextResponse.json(formattedCorrections);
     });
   } catch (error) {

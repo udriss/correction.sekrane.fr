@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getActivities, createActivity } from '@/lib/activity';
 import { getServerSession } from "next-auth/next";
 import authOptions from "@/lib/auth";
-import { getUser } from '@/lib/auth'; // Add import for custom auth
+import { getUser } from '@/lib/auth';
 
 export async function GET(req: NextRequest) {
   try {

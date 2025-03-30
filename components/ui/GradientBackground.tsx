@@ -5,7 +5,7 @@ import { Box, useTheme, SxProps, Theme } from '@mui/material';
 
 // Define gradient variants
 const gradientMap = {
-  primary: 'linear-gradient(45deg, #1976d2 30%, #42a5f5 90%)',
+  primary: 'linear-gradient(45deg,rgb(118, 25, 210) 30%, #42a5f5 90%)',
   secondary: 'linear-gradient(45deg, #9c27b0 30%, #d05ce3 90%)',
   success: 'linear-gradient(45deg, #2e7d32 30%, #4caf50 90%)',
   error: 'linear-gradient(45deg, #d32f2f 30%, #f44336 90%)',

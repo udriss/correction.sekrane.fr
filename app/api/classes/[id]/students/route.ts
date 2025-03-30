@@ -45,7 +45,7 @@ export async function GET(
       SELECT 
         s.*,
         cs.class_id AS classId,
-        cs.sub_class AS \`group\`,
+        cs.sub_class AS sub_class,
         COUNT(c.id) AS corrections_count
       FROM 
         students s
@@ -61,6 +61,7 @@ export async function GET(
         s.last_name, s.first_name
     `, [classId]);
 
+
     // Formatter la réponse
     const formattedStudents = students.map(student => ({
       id: student.id,
@@ -69,7 +70,7 @@ export async function GET(
       email: student.email,
       gender: student.gender,
       classId: student.classId,
-      group: student.group,
+      sub_class: student.sub_class,
       className: classData[0].name,
       corrections_count: student.corrections_count || 0
     }));

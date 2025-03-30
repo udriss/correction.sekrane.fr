@@ -21,7 +21,7 @@ export async function GET(
     // Await the params
     const { id } = await params;
     const activityId = parseInt(id);
-    console.log('Fetching fragments for activityId:', activityId);
+    
 
     if (isNaN(activityId)) {
       return NextResponse.json({ error: 'ID d\'activité invalide' }, { status: 400 });
@@ -33,7 +33,7 @@ export async function GET(
         `SELECT id, name FROM activities WHERE id = ?`, 
         [activityId]
       );
-      console.log(`Activity check result:`, activityCheck);
+      
 
       // Debug: Directly query all fragments to see what's available
       const allFragments = await query<any[]>(`
@@ -41,8 +41,8 @@ export async function GET(
         FROM fragments 
         LIMIT 20
       `);
-      console.log(`Total fragments in database (first 20):`, allFragments.length);
-      console.log('Sample fragments:', allFragments.slice(0, 7));
+      
+      
 
       // Update query to properly handle NULL values and be more explicit about the filter
       const fragments = await query<any[]>(`
@@ -51,13 +51,13 @@ export async function GET(
         ORDER BY position_order ASC, id ASC
       `, [activityId, activityId]);
 
-      console.log(`Found ${fragments.length} fragments for activity ${activityId}`);
+      
       
       // Pour chaque fragment, récupérer ses catégories
       const fragmentsWithCategories = await Promise.all(
         fragments.map(async (fragment) => {
           // Add debug info for each fragment
-          console.log(`Processing fragment ID ${fragment.id}, activity_id: ${fragment.activity_id}`);
+          
           
           try {
             const categories = await query<any[]>(`
@@ -81,7 +81,7 @@ export async function GET(
         })
       );
 
-      console.log(`Processed ${fragmentsWithCategories.length} fragments with categories`);
+      
       return NextResponse.json(fragmentsWithCategories);
     } catch (error) {
       console.error('SQL Error:', error);

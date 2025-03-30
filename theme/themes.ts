@@ -3,7 +3,7 @@ import { createTheme, ThemeOptions } from '@mui/material/styles';
 // Define gradient map with more harmonious color combinations for each theme
 const themeGradients = {
   light: {
-    primary: 'linear-gradient(135deg,rgba(64, 137, 209, 0.44),rgba(245, 147, 66, 0.3))',
+    primary: 'linear-gradient(135deg,rgba(173, 214, 255, 0.74),rgba(245, 147, 66, 0.3))',
     secondary: 'linear-gradient(135deg, #ff7800, #ff9d50)',
     success: 'linear-gradient(135deg, #2e7d32, #66bb6a)',
     warning: 'linear-gradient(135deg, #ed6c02, #ffa726)',
@@ -117,6 +117,13 @@ const commonSettings: Partial<ThemeOptions> = {
       }
     },
   },
+  palette: {
+    warning: {
+      light: '#FFC107', // Ambre clair
+      main: '#FF9800',  // Orange standard
+      dark: '#ED6C02',  // Orange foncé
+    }
+  },
 };
 
 // Default Material UI theme with some minimal tweaks
@@ -139,6 +146,17 @@ export const defaultTheme = createTheme({
           borderRadius: 8,
         } as any,
       },
+    },
+  },
+  palette: {
+    myBoxes: {
+      primary: 'rgb(33, 43, 54)', // Dark gray for better readability
+      secondary: 'rgb(99, 115, 129)',
+    },
+    warning: {
+      light: '#FFC107', // Ambre clair
+      main: '#FF9800',  // Orange standard
+      dark: '#ED6C02',  // Orange foncé
     },
   },
   gradients: themeGradients.default,
@@ -165,7 +183,7 @@ export const lightTheme = createTheme({
       900: 'rgb(8, 47, 87)',
     },
     secondary: {
-      main: 'rgb(255, 120, 0)',  // Orange - works well with blue
+      main: 'rgba(255, 119, 0, 0.39)',  // Orange - works well with blue
       light: 'rgb(255, 171, 64)', 
       dark: 'rgb(204, 96, 0)',   
       50: 'rgb(255, 243, 224)',
@@ -194,6 +212,21 @@ export const lightTheme = createTheme({
       800: 'rgb(27, 94, 32)',
       900: 'rgb(0, 77, 64)',
     },
+    warning: {
+      light: '#FFC107', // Ambre clair - pour les notes entre 10-12
+      main: '#FF9800',  // Orange standard - pour les notes entre 5-10
+      dark: '#ED6C02',  // Orange foncé
+      50: 'rgb(255, 243, 224)',
+      100: 'rgb(255, 224, 178)',
+      200: 'rgb(255, 204, 128)',
+      300: 'rgb(255, 183, 77)',
+      400: 'rgb(255, 167, 38)',
+      500: 'rgb(255, 151, 0)',
+      600: 'rgb(237, 108, 2)',
+      700: 'rgb(230, 81, 0)',
+      800: 'rgb(211, 47, 47)',
+      900: 'rgb(183, 28, 28)',
+    },
     background: {
       default: 'rgb(249, 250, 251)',
       paper: 'rgb(255, 255, 255)',
@@ -201,6 +234,10 @@ export const lightTheme = createTheme({
     text: {
       primary: 'rgb(33, 43, 54)', // Dark gray for better readability
       secondary: 'rgb(99, 115, 129)',
+    },
+    myBoxes: {
+      primary: 'rgba(200, 211, 221, 0.16)', // Dark gray for better readability
+      secondary: 'rgb(203, 220, 234)',
     },
     divider: 'rgba(0, 0, 0, 0.12)',
   },
@@ -257,6 +294,21 @@ export const darkTheme = createTheme({
       800: 'rgb(6, 95, 70)',
       900: 'rgb(6, 78, 59)',
     },
+    warning: {
+      light: '#FFD54F', // Plus clair pour le dark theme
+      main: '#FFC107',  // Ambre pour le dark theme
+      dark: '#FFA000',  // Ambre foncé pour le dark theme
+      50: 'rgb(255, 248, 225)',
+      100: 'rgb(255, 236, 179)',
+      200: 'rgb(255, 224, 130)',
+      300: 'rgb(255, 213, 79)',
+      400: 'rgb(255, 202, 40)',
+      500: 'rgb(255, 193, 7)',
+      600: 'rgb(255, 160, 0)',
+      700: 'rgb(255, 143, 0)',
+      800: 'rgb(255, 111, 0)',
+      900: 'rgb(255, 87, 34)',
+    },
     background: {
       default: 'rgb(22, 28, 36)', 
       paper: 'rgb(33, 43, 54)',
@@ -266,6 +318,10 @@ export const darkTheme = createTheme({
     text: {
       primary: 'rgb(255, 255, 255)',
       secondary: 'rgb(145, 158, 171)',
+    },
+    myBoxes: {
+      primary: 'rgb(28, 56, 84)',
+      secondary: 'rgb(28, 56, 84)',
     },
     divider: 'rgba(255, 255, 255, 0.12)',
   },
@@ -325,6 +381,21 @@ export const intermediateTheme = createTheme({
       800: 'rgb(91, 33, 182)',
       900: 'rgb(76, 29, 149)',
     },
+    warning: {
+      light: '#FDD835', // Jaune vif clair pour le thème intermédiaire
+      main: '#F59E0B', // Ambre/orange pour le thème intermédiaire
+      dark: '#D97706', // Ambre/orange foncé
+      50: 'rgb(255, 251, 235)',
+      100: 'rgb(254, 243, 199)',
+      200: 'rgb(253, 230, 138)',
+      300: 'rgb(252, 211, 77)',
+      400: 'rgb(251, 191, 36)',
+      500: 'rgb(245, 158, 11)',
+      600: 'rgb(217, 119, 6)',
+      700: 'rgb(180, 83, 9)',
+      800: 'rgb(146, 64, 14)',
+      900: 'rgb(120, 53, 15)',
+    },
     background: {
       default: 'rgb(249, 250, 252)',
       paper: 'rgb(255, 255, 255)',
@@ -332,6 +403,10 @@ export const intermediateTheme = createTheme({
     text: {
       primary: 'rgb(17, 24, 39)', // Better contrast than pure black
       secondary: 'rgb(67, 92, 143)',
+    },
+    myBoxes: {
+      primary: 'rgb(232, 232, 232)',
+      secondary: 'rgb(141, 194, 241)',
     },
     divider: 'rgba(0, 0, 0, 0.08)',
   },

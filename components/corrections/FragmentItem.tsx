@@ -69,13 +69,13 @@ const FragmentItem: React.FC<FragmentItemProps> = ({
       // If editedCategories are provided from parent, use those
       if (editedCategories.length > 0) {
         setSelectedCategories(editedCategories);
-        console.log('Using provided editedCategories:', editedCategories);
+        
       } else {
         // Otherwise extract from fragment
         const fragmentCategories = extractCategoriesFromFragment(fragment);
         setSelectedCategories(fragmentCategories);
         onCategoriesChange(fragmentCategories); // Update parent state
-        console.log('Extracted categories from fragment:', fragmentCategories);
+        
       }
       
       // Préremplir le contenu du fragment
@@ -119,7 +119,7 @@ const FragmentItem: React.FC<FragmentItemProps> = ({
     // Also update parent component state
     onCategoriesChange(newCategories);
     
-    console.log('Selected categories changed to:', newCategories);
+    
   };
 
   // Setup drag and drop

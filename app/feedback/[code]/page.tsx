@@ -215,7 +215,7 @@ export default function FeedbackViewer({ params }: { params: Promise<{ code: str
   const finalGrade = hasGrade ? 
     (hasPenalty ? correction.final_grade : correction.grade) : 
     null;
-  console.log('correction:', correction);
+  
   // Formater les dates
   const formatDate = (dateString: string | null) => {
     if (!dateString) return 'Non spécifiée';

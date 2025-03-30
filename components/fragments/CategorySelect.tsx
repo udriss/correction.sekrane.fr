@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   FormControl, InputLabel, Select, MenuItem, 
   Box, Chip, TextField, Dialog, DialogTitle, 
@@ -8,6 +8,8 @@ import {
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import CloseIcon from '@mui/icons-material/Close';
+import CheckIcon from '@mui/icons-material/Check';
+
 
 interface CategorySelectProps {
   selectedCategories: number[];
@@ -31,6 +33,21 @@ const CategorySelect: React.FC<CategorySelectProps> = ({
   const [showDeleteWarning, setShowDeleteWarning] = useState(false);
   const [categoryToDelete, setCategoryToDelete] = useState<{id: number, name: string} | null>(null);
   const [deleteSuccess, setDeleteSuccess] = useState(false);
+  // Add state to track newly added categories that may not be in availableCategories yet
+  const [newlyAddedCategories, setNewlyAddedCategories] = useState<Array<{id: number, name: string}>>([]);
+
+  // Create a combined list of categories to show correct names for newly added ones
+  const allCategories = [...availableCategories, ...newlyAddedCategories.filter(
+    newCat => !availableCategories.some(avCat => avCat.id === newCat.id)
+  )];
+
+  // Update newlyAddedCategories when availableCategories changes
+  useEffect(() => {
+    // Remove categories from newlyAddedCategories that are now in availableCategories
+    setNewlyAddedCategories(prev => 
+      prev.filter(newCat => !availableCategories.some(avCat => avCat.id === newCat.id && avCat.name === newCat.name))
+    );
+  }, [availableCategories]);
 
   // Handle category selection change
   const handleCategoryChange = (event: SelectChangeEvent<typeof selectedCategories>) => {
@@ -65,6 +82,9 @@ const CategorySelect: React.FC<CategorySelectProps> = ({
       
       // Add the new category to selected categories
       onChange([...selectedCategories, newCategory.id]);
+      
+      // Add the new category to our local tracking state
+      setNewlyAddedCategories(prev => [...prev, { id: newCategory.id, name: newCategoryName.trim() }]);
       
       // Refresh categories list
       await refreshCategories();
@@ -152,15 +172,15 @@ const CategorySelect: React.FC<CategorySelectProps> = ({
                 </Typography>
               ) : (
                 selected.map((value) => {
-                  const category = availableCategories.find(cat => cat.id === value);
-                  return (
+                  const category = allCategories.find(cat => cat.id === value);
+                  return category ? (
                     <Chip 
-                      key={value} 
-                      label={category ? category.name : `ID:${value}`} 
+                      key={value}
+                      label={category.name ? category.name : `ID : ${value}`} 
                       size="small" 
                     />
-                  );
-                })
+                  ) : null;
+                }).filter(Boolean)
               )}
             </Box>
           )}
@@ -168,10 +188,25 @@ const CategorySelect: React.FC<CategorySelectProps> = ({
             PaperProps: {
               style: {
                 maxHeight: 224,
-                width: 'auto',
-                minWidth: 250
+                minWidth: 250,
               },
+              sx: {
+                '& .MuiList-root.MuiMenu-list': {
+                  width: '100% !important', // Override the calculated width
+                },
+              }
             },
+            // Apply styles directly to the menu component
+            MenuListProps: {
+              sx: {
+                width: '100% !important', // This targets the ul directly
+              }
+            },
+            sx: {
+              '& .MuiMenu-list': {
+                width: '100% !important',
+              }
+            }
           }}
         >
           <MenuItem disabled divider>
@@ -194,9 +229,13 @@ const CategorySelect: React.FC<CategorySelectProps> = ({
                 sx={{ 
                   display: 'flex', 
                   justifyContent: 'space-between',
-                  pr: 1
+                  pr: 1,
+                  width: '300px',
+                  // Remove any custom width calculations
+                  '& .MuiMenuItem-root': { width: '100%' }
                 }}
               >
+                <Box sx={{ display: 'flex', alignItems: 'center' }}>
                 <Typography>{category.name}</Typography>
                 <IconButton
                   size="small"
@@ -213,6 +252,7 @@ const CategorySelect: React.FC<CategorySelectProps> = ({
                 >
                   <CloseIcon fontSize="small" />
                 </IconButton>
+                </Box>
               </MenuItem>
             ))
           )}
@@ -256,24 +296,33 @@ const CategorySelect: React.FC<CategorySelectProps> = ({
             value={newCategoryName}
             onChange={(e) => setNewCategoryName(e.target.value)}
             disabled={isAddingCategory}
+            // Ajouter un gestionnaire onKeyDown pour la soumission avec Enter
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !isAddingCategory && newCategoryName.trim()) {
+                e.preventDefault();
+                handleNewCategorySubmit();
+              }
+            }}
           />
         </DialogContent>
         <DialogActions>
-          <Button 
+            <IconButton 
             onClick={() => setShowNewCategoryDialog(false)} 
-            color="inherit"
+            color="error"
             disabled={isAddingCategory}
-          >
-            Annuler
-          </Button>
-          <Button 
+            aria-label="cancel"
+            >
+            <CloseIcon fontSize={'large'} />
+            </IconButton>
+            <IconButton 
             onClick={handleNewCategorySubmit} 
-            color="primary" 
+            color="success" 
             disabled={isAddingCategory || !newCategoryName.trim()}
-            startIcon={isAddingCategory ? <CircularProgress size={16} /> : null}
-          >
-            {isAddingCategory ? 'Création...' : 'Créer'}
-          </Button>
+            aria-label="add category"
+            sx={{ ml: 1 }}
+            >
+            {isAddingCategory ? <CircularProgress size={20} /> : <CheckIcon fontSize={'large'} />}
+            </IconButton>
         </DialogActions>
       </Dialog>
 

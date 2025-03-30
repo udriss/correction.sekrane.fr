@@ -63,6 +63,8 @@ export async function POST(
     }
 
     const activity = await getActivityById(activityId);
+
+
     if (!activity) {
       return NextResponse.json(
         { error: 'Activity not found' },
@@ -70,12 +72,14 @@ export async function POST(
       );
     }
 
-    const { student_id, content } = await request.json();
-
+    const { student_id, content, class_id } = await request.json();
+    console.log('Received data:', { student_id, content, class_id });
+    
     const correctionData = {
       activity_id: activityId,
       student_id: student_id || null,
       content: content || '',
+      class_id: class_id || null, 
       group_id: 0 // Add default group_id of 0 for isolated corrections
     };
 

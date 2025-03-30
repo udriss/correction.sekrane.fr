@@ -151,7 +151,10 @@ export async function GET(
 }
 
 // Update a fragment
-export async function PUT(request: NextRequest, { params }: { params: { id: string } }) {
+export async function PUT(
+  request: NextRequest, 
+  { params }: { params: Promise<{ id: string }> }
+) {
   try {
     // Await the params
     const { id } = await params;
@@ -230,7 +233,7 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
       if (fragmentCategoriesTableExists && fragmentData.categories) {
         // Make sure we're accessing the categories correctly
         const categories = fragmentData.categories;
-        console.log('Categories in PUT request:', categories);
+        
         
         // Delete existing associations
         await connection.query(
@@ -249,7 +252,7 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
               `INSERT INTO fragments_categories (fragment_id, category_id) VALUES ?`,
               [categoryValues]
             );
-            console.log(`Added ${categoryValues.length} categories to fragment ${fragmentId}`);
+            
           }
         }
       }
@@ -410,7 +413,7 @@ export async function DELETE(
       } catch (sqlError: any) {
         // Check if the error is about missing table or column
         if (sqlError.code === 'ER_NO_SUCH_TABLE' || sqlError.code === 'ER_BAD_FIELD_ERROR') {
-          console.log(`SQL Error: ${sqlError.sqlMessage}, treating as no usages`);
+          
           // Continue with deletion since there are no usages
         } else {
           // For other SQL errors, propagate them

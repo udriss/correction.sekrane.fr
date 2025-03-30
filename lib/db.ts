@@ -143,7 +143,7 @@ export async function initializeDatabase() {
         FOREIGN KEY (fragment_id) REFERENCES fragments(id)
       )
     `);
-    console.log('Created correction_fragments table if it didn\'t exist');
+    
 
     // Run migrations to update existing tables
     await updateFragmentsTable();
@@ -180,7 +180,7 @@ export async function initializeDatabase() {
           ADD COLUMN grade DECIMAL(4,2) DEFAULT NULL,
           ADD COLUMN penalty DECIMAL(4,2) DEFAULT NULL
         `);
-        console.log('Added grade and penalty columns to corrections table');
+        
       }
     });
 
@@ -299,7 +299,21 @@ export async function initializeDatabase() {
       }
     });
 
-    console.log('Base de données initialisée avec succès');
+    // Au lieu de créer une activité avec ID 0, nous allons supprimer cette partie
+    // et la remplacer par une vérification de l'existence d'une activité générique
+    const [genericActivityExists] = await query<{count: number}[]>(
+      "SELECT COUNT(*) as count FROM activities WHERE name = 'Activité générique'"
+    );
+    
+    if (!genericActivityExists || genericActivityExists.count === 0) {
+      console.log("Création d'une activité générique pour les corrections sans activité spécifique...");
+      await query(
+        `INSERT INTO activities 
+         (name, content, experimental_points, theoretical_points, created_at, updated_at)
+         VALUES ('Activité générique', 'Activité pour les corrections sans activité spécifique', 5, 15, NOW(), NOW())`
+      );
+    }
+    
   } catch (error) {
     console.error('Erreur lors de l\'initialisation de la base de données:', error);
     throw error;
