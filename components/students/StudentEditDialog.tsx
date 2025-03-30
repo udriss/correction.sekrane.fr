@@ -46,6 +46,7 @@ import NotInterestedIcon from '@mui/icons-material/NotInterested';
 import GpsNotFixedIcon from '@mui/icons-material/GpsNotFixed';
 import GradientBackground from '@/components/ui/GradientBackground';
 import H1Title from '@/components/ui/H1Title';
+import { text } from 'stream/consumers';
 
 interface StudentEditDialogProps {
   open: boolean;
@@ -200,8 +201,7 @@ const StudentEditDialog: React.FC<StudentEditDialogProps> = ({
     >
       <DialogTitle sx={{ p: 0 }}>
         <GradientBackground
-          variant="secondary"
-          
+          variant="primary"
           sx={{ 
             p: 3, 
             display: 'flex',
@@ -227,10 +227,10 @@ const StudentEditDialog: React.FC<StudentEditDialogProps> = ({
             </Avatar>
           <Box>
             {/* Utilisation du composant H1Title standardisé */}
-            <H1Title>
+            <Typography variant="h4" fontWeight={700} color="text.primary">           
               Modifier l'étudiant
-            </H1Title>
-            <Typography variant="body2" sx={{ opacity: 0.9 }}>
+            </Typography>
+            <Typography variant="h6" sx={{ color: 'text.secondary' }}>
               {student.first_name} {student.last_name}
             </Typography>
           </Box>
@@ -356,21 +356,51 @@ const StudentEditDialog: React.FC<StudentEditDialogProps> = ({
           <Grid size={{ xs: 12, sm: 6, md: 6, lg: 4 }}>
             <FormControl component="fieldset">
               <FormLabel component="legend">Genre</FormLabel>
-              <RadioGroup
-                row
-                value={student.gender || 'N'}
-                onChange={(e) => {
-                  const newGender = e.target.value as 'M' | 'F' | 'N';
-                  onStudentChange({ 
-                    ...student, 
-                    gender: newGender 
-                  });
+                <Box 
+                sx={{ 
+                  display: 'flex', 
+                  width: '100%', 
+                  borderRadius: 1,
+                  overflow: 'hidden',
+                  border: '1px solid rgba(0,0,0,0.12)',
+                  mt: 1
                 }}
-              >
-                <FormControlLabel value="M" control={<Radio size="small" />} label="Homme" />
-                <FormControlLabel value="F" control={<Radio size="small" />} label="Femme" />
-                <FormControlLabel value="N" control={<Radio size="small" />} label="Non spécifié" />
-              </RadioGroup>
+                >
+                {[
+                  { value: 'M', label: 'Homme', icon: <MaleIcon /> },
+                  { value: 'F', label: 'Femme', icon: <FemaleIcon /> },
+                  { value: 'N', label: 'Non spécifié', icon: <GpsNotFixedIcon /> }
+                ].map((option) => (
+                  <Box
+                  key={option.value}
+                  onClick={() => onStudentChange({ ...student, gender: option.value as 'M' | 'F' | 'N' })}
+                  sx={{
+                    flex: 1,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    minWidth: 130,
+                    py: 1.5,
+                    cursor: 'pointer',
+                    bgcolor: student.gender === option.value ? 'primary.light' : 'transparent',
+                    color: student.gender === option.value ? 'primary.contrastText' : 'text.primary',
+                    transition: 'all 0.2s ease',
+                    '&:hover': {
+                    bgcolor: student.gender === option.value 
+                      ? 'primary.main'
+                      : 'rgba(0,0,0,0.04)',
+                    },
+                    borderRight: option.value !== 'N' ? '1px solid rgba(0,0,0,0.12)' : 'none'
+                  }}
+                  >
+                  {option.icon}
+                  <Typography variant="body2" sx={{ mt: 0.5 }}>
+                    {option.label}
+                  </Typography>
+                  </Box>
+                ))}
+                </Box>
             </FormControl>
           </Grid>
         </Grid>
@@ -378,7 +408,7 @@ const StudentEditDialog: React.FC<StudentEditDialogProps> = ({
         {/* Affectation aux classes - Version simplifiée */}
         <Typography variant="subtitle1" fontWeight="bold" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
           <SchoolIcon color="primary" fontSize="small" />
-          Affectation aux classesclassesclassesclasses
+          Affectation aux classes
         </Typography>
         
         <Box sx={{ border: '1px solid rgba(0, 0, 0, 0.12)', borderRadius: 1, p: 2, mb: 2 }}>

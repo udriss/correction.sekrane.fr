@@ -139,7 +139,7 @@ export default function StudentEvolution({ corrections }: StudentEvolutionProps)
             {evolutionData.map((item) => (
               <Chip
                 key={`${item.id}`}
-                label={`${item.date}: ${item.activity}`}
+                label={`${item.date} : ${item.activity}`}
                 size="small"
                 variant="outlined"
                 color="primary"

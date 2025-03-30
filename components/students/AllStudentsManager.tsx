@@ -752,7 +752,7 @@ const AllStudentsManagerNEW: React.FC<AllStudentsManagerProps> = ({
                             label={student.corrections_count}
                             color="success"
                             component={Link}
-                            href={`/students/${student.id}/corrections`}
+                            href={`/students/${student.id}`}
                             clickable
                             sx={{ 
                               cursor: 'pointer',
@@ -769,7 +769,7 @@ const AllStudentsManagerNEW: React.FC<AllStudentsManagerProps> = ({
                         </Typography>
                       )}
                     </TableCell>
-                    <TableCell align="right">
+                    <TableCell align="center">
                       <Box sx={{ display: 'flex', gap: 0.5, justifyContent: 'flex-end' }}>
                         <Tooltip title="Modifier étudiant">
                           <IconButton

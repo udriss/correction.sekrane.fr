@@ -233,8 +233,8 @@ function CorrectionsContent() {
   
   if (loading && !filteredCorrections.length) {
     return (
-      <Container maxWidth="lg" sx={{ py: 4 }}>
-        <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', py: 8 }}>
+      <Container sx={{ py: 4 }}>
+        <Box className='max-w-[400px]' sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', py: 8 }}>
           <LoadingSpinner size="lg" text="Chargement des corrections" />
         </Box>
       </Container>

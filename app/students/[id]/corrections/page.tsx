@@ -500,8 +500,11 @@ Votre enseignant`;
   
   if (loading) {
     return (
-      <Container maxWidth="lg" className="py-8">
+      <Container>
+        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', maxWidth: '400px', mx: 'auto', mt: 8 }}>
         <LoadingSpinner size="lg" text="Chargement des corrections" />
+          </Box>
+        
       </Container>
     );
   }
@@ -796,7 +799,7 @@ Votre enseignant`;
                   </Box>
                   
                   <Typography variant="subtitle2" gutterBottom>
-                    Répartition des points:
+                    Répartition des points :
                   </Typography>
                   
                   <Grid container spacing={1} sx={{ mb: 1 }}>

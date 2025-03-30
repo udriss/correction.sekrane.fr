@@ -66,6 +66,13 @@ interface AllStudents {
   }
 }
 
+// Ajouter une interface pour les étudiants avec emails personnalisés
+interface StudentWithCustomEmail extends Student {
+  originalEmail: string;  // Pour stocker l'email original
+  customEmail: string;    // Pour stocker l'email personnalisé
+  isEmailModified: boolean; // Pour indiquer si l'email a été modifié
+}
+
 export default function EmailFeedback({ 
   correctionId,
   studentData 
@@ -83,7 +90,7 @@ export default function EmailFeedback({
   const [messageType, setMessageType] = useState<0 | 1>(MESSAGE_TYPES.PREDEFINED);
   const [customMessage, setCustomMessage] = useState('');
   const [showHTML, setShowHTML] = useState(false);
-  const [additionalStudents, setAdditionalStudents] = useState<Student[]>([]);
+  const [additionalStudents, setAdditionalStudents] = useState<StudentWithCustomEmail[]>([]);
   const [sendingStatuses, setSendingStatuses] = useState<SendingStatus[]>([]);
   const [showAddStudents, setShowAddStudents] = useState(false);
   const [studentsByClass, setStudentsByClass] = useState<StudentsByClass>({});
@@ -304,6 +311,16 @@ export default function EmailFeedback({
     setSending(true);
     setError('');
     
+    // Initialiser l'état des statuts d'envoi pour afficher la Timeline
+    // même pour un seul destinataire
+    if (student) {
+      const initialStatus: SendingStatus = { 
+        studentId: student.id, 
+        status: 'processing'
+      };
+      setSendingStatuses([initialStatus]);
+    }
+    
     try {
       const messageToSend = messageType === MESSAGE_TYPES.PREDEFINED 
         ? generateDefaultMessage(fullStudentName, shareUrl)
@@ -312,13 +329,18 @@ export default function EmailFeedback({
             html: customMessage
           };
 
+      // Assurons-nous d'utiliser l'adresse email saisie par l'utilisateur
+      const targetEmail = emailTo.trim();
+
+      console.log('Envoi du mail à:', targetEmail); // Debug
+
       const response = await fetch('/api/corrections/send-feedback-email', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          email: emailTo,
+          email: targetEmail,
           correctionId,
           studentName: student ? `${student.first_name || ''} ${student.last_name || ''}`.trim() : 'l\'étudiant',
           customMessage: messageToSend.text,
@@ -331,11 +353,19 @@ export default function EmailFeedback({
         const errorData = await response.json();
         const errorMessage = errorData.message || 'Erreur lors de l\'envoi de l\'email';
         if (errorData.details) {
-          // console.error('Détails de l\'erreur:', errorData.details);
           throw new Error(`${errorMessage} - Détails: ${errorData.details}`);
         } else {
           throw new Error(errorMessage);
         }
+      }
+      
+      // Mettre à jour le statut d'envoi pour l'afficher dans la Timeline
+      if (student) {
+        setSendingStatuses(prev => prev.map(s => 
+          s.studentId === student.id 
+            ? { ...s, status: 'success', correctionId } 
+            : s
+        ));
       }
       
       setSuccess(true);
@@ -343,6 +373,15 @@ export default function EmailFeedback({
     } catch (err) {
       console.error('Error sending email:', err);
       setError(err instanceof Error ? err.message : 'Une erreur est survenue');
+      
+      // Mettre à jour le statut d'erreur pour l'afficher dans la Timeline
+      if (student) {
+        setSendingStatuses(prev => prev.map(s => 
+          s.studentId === student.id 
+            ? { ...s, status: 'error', error: err instanceof Error ? err.message : 'Erreur inconnue' } 
+            : s
+        ));
+      }
     } finally {
       setSending(false);
     }
@@ -367,7 +406,7 @@ export default function EmailFeedback({
   };
 
   // Créer une fonction dédiée pour l'envoi d'email à un étudiant spécifique
-  const sendEmailToStudent = async (targetStudent: Student, targetCorrectionId: string) => {
+  const sendEmailToStudent = async (targetStudent: StudentWithCustomEmail | Student, targetCorrectionId: string) => {
     const studentName = `${targetStudent.first_name || ''} ${targetStudent.last_name || ''}`.trim();
     
     // Récupérer l'URL de feedback spécifique pour cette correction
@@ -380,13 +419,20 @@ export default function EmailFeedback({
           html: customMessage.replace(shareUrl, feedbackUrl) // Remplacer l'URL principale par l'URL spécifique
         };
 
+    // Utiliser l'email personnalisé si disponible
+    const targetEmail = 'customEmail' in targetStudent 
+      ? targetStudent.customEmail.trim() 
+      : targetStudent.email.trim();
+    
+    console.log('Envoi du mail à (multiple):', targetEmail); // Debug
+
     const response = await fetch('/api/corrections/send-feedback-email', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        email: targetStudent.email,
+        email: targetEmail,
         correctionId: targetCorrectionId,
         studentName: studentName,
         customMessage: messageToSend.text,
@@ -407,14 +453,22 @@ export default function EmailFeedback({
     }
   };
 
-  // Mettre à jour handleSendToAll pour utiliser la nouvelle fonction
+  // Mettre à jour handleSendToAll pour utiliser l'email personnalisé de l'étudiant principal
   const handleSendToAll = async () => {
+    // Vérifier si nous avons des destinataires
+    if (!student) {
+      setError('Destinataire principal non disponible');
+      return;
+    }
+
+    // Préparer les statuts initiaux pour tous les destinataires
     const initialStatuses: SendingStatus[] = [
-      { studentId: student!.id, status: 'pending' },
+      { studentId: student.id, status: 'pending' },
       ...additionalStudents.map(s => ({ studentId: s.id, status: 'pending' as const }))
     ];
     setSendingStatuses(initialStatuses);
-
+    setSending(true);
+    
     for (const status of initialStatuses) {
       setSendingStatuses(prev => 
         prev.map(s => s.studentId === status.studentId ? { ...s, status: 'processing' } : s)
@@ -422,22 +476,34 @@ export default function EmailFeedback({
 
       try {
         let targetCorrectionId = correctionId;
-        const targetStudent = status.studentId === student!.id
-          ? student!
-          : additionalStudents.find(s => s.id === status.studentId);
-
-        if (!targetStudent) {
-          throw new Error('Étudiant non trouvé');
-        }
-
-        // Si ce n'est pas l'étudiant principal, créer une copie
-        if (status.studentId !== student!.id) {
+        
+        // Préparer les informations de l'étudiant, qu'il soit principal ou additionnel
+        let targetStudent: StudentWithCustomEmail | Student;
+        
+        if (status.studentId === student.id) {
+          // Pour l'étudiant principal, créer un objet enrichi avec l'email personnalisé
+          targetStudent = {
+            ...student,
+            originalEmail: student.email,
+            customEmail: emailTo, // Utiliser l'email personnalisé du champ
+            isEmailModified: emailTo !== student.email
+          };
+        } else {
+          // Pour les étudiants additionnels, utiliser l'objet existant
+          const additionalStudent = additionalStudents.find(s => s.id === status.studentId);
+          if (!additionalStudent) {
+            throw new Error('Étudiant non trouvé');
+          }
+          targetStudent = additionalStudent;
+          
+          // Si ce n'est pas l'étudiant principal, créer une copie de la correction
           targetCorrectionId = await createCorrectionCopy(status.studentId);
         }
 
         // Envoyer l'email à cet étudiant spécifique
         await sendEmailToStudent(targetStudent, targetCorrectionId);
 
+        // Mettre à jour le statut de succès
         setSendingStatuses(prev => 
           prev.map(s => s.studentId === status.studentId 
             ? { ...s, status: 'success', correctionId: targetCorrectionId } 
@@ -445,6 +511,7 @@ export default function EmailFeedback({
           )
         );
       } catch (error) {
+        // Gérer l'erreur pour ce destinataire
         setSendingStatuses(prev => 
           prev.map(s => s.studentId === status.studentId 
             ? { ...s, status: 'error', error: error instanceof Error ? error.message : 'Erreur inconnue' } 
@@ -452,6 +519,14 @@ export default function EmailFeedback({
           )
         );
       }
+    }
+    
+    setSending(false);
+    
+    // Vérifier s'il y a eu des succès et afficher un message de réussite globale
+    const anySuccess = sendingStatuses.some(s => s.status === 'success');
+    if (anySuccess) {
+      setSuccess(true);
     }
   };
 
@@ -590,16 +665,38 @@ export default function EmailFeedback({
     updateDisplayedStudents(allStudents, newSelectedClasses);
   };
 
-  // Ajouter un étudiant à la liste
+  // Ajouter un étudiant à la liste avec support pour email personnalisé
   const handleAddStudent = (selectedStudent: Student) => {
     if (!additionalStudents.find(s => s.id === selectedStudent.id)) {
-      setAdditionalStudents([...additionalStudents, selectedStudent]);
+      setAdditionalStudents([...additionalStudents, {
+        ...selectedStudent,
+        originalEmail: selectedStudent.email,
+        customEmail: selectedStudent.email,
+        isEmailModified: false
+      }]);
     }
   };
 
   // Retirer un étudiant de la liste
   const handleRemoveStudent = (studentId: number) => {
     setAdditionalStudents(additionalStudents.filter(s => s.id !== studentId));
+  };
+
+  // Fonction pour gérer la modification d'un email
+  const handleEmailChange = (studentId: number, newEmail: string) => {
+    setAdditionalStudents(prev => 
+      prev.map(student => {
+        if (student.id === studentId) {
+          const isModified = newEmail !== student.originalEmail;
+          return {
+            ...student,
+            customEmail: newEmail,
+            isEmailModified: isModified
+          };
+        }
+        return student;
+      })
+    );
   };
 
   // Fonction pour générer une clé unique pour chaque étudiant
@@ -701,6 +798,8 @@ export default function EmailFeedback({
           )}
 
           {/* Ajouter la section pour les destinataires multiples */}
+
+          {/* Liste des destinataires modifiée pour inclure des champs de texte pour les emails */}
           <Box sx={{ mb: 2 }}>
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
               <Typography variant="subtitle1" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
@@ -719,56 +818,104 @@ export default function EmailFeedback({
               </Button>
             </Box>
 
-            {/* Liste des destinataires */}
-            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+            {/* Destinataire principal */}
+            <Box sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 2 }}>
               <Chip
                 label={`${student?.first_name} ${student?.last_name}`}
                 color="primary"
-                onDelete={undefined}  // Principal destinataire, pas supprimable
+                sx={{ minWidth: '150px' }}
               />
-              {additionalStudents.map((s) => (
+              <TextField
+                size="small"
+                value={emailTo}
+                onChange={(e) => setEmailTo(e.target.value)}
+                fullWidth
+                placeholder="Email du destinataire principal"
+                sx={{
+                  '& .MuiInputBase-input': {
+                    color: emailTo !== student?.email ? 'warning.main' : 'inherit'
+                  }
+                }}
+              />
+            </Box>
+
+            {/* Destinataires additionnels avec emails modifiables */}
+            {additionalStudents.map((s) => (
+              <Box key={s.id} sx={{ mb: 1, display: 'flex', alignItems: 'center', gap: 2 }}>
                 <Chip
-                  key={s.id}
                   label={`${s.first_name} ${s.last_name}`}
                   onDelete={() => handleRemoveStudent(s.id)}
+                  sx={{ minWidth: '150px' }}
                 />
-              ))}
-            </Box>
+                <TextField
+                  size="small"
+                  value={s.customEmail}
+                  onChange={(e) => handleEmailChange(s.id, e.target.value)}
+                  fullWidth
+                  placeholder="Email"
+                  sx={{
+                    '& .MuiInputBase-input': {
+                      color: s.isEmailModified ? 'warning.main' : 'inherit',
+                      fontWeight: s.isEmailModified ? 'medium' : 'normal',
+                    }
+                  }}
+                  InputProps={{
+                    endAdornment: s.isEmailModified && (
+                      <Box 
+                        component="span" 
+                        sx={{ 
+                          fontSize: '0.75rem', 
+                          color: 'warning.main',
+                          ml: 1
+                        }}
+                      >
+                        (modifié)
+                      </Box>
+                    )
+                  }}
+                />
+              </Box>
+            ))}
           </Box>
 
           {/* Timeline de progression */}
           {sendingStatuses.length > 0 && (
-            <Timeline position="right" sx={{ mb: 2 }}>
-              {sendingStatuses.map((status) => {
-                const studentInfo = status.studentId === student?.id 
-                  ? student 
-                  : additionalStudents.find(s => s.id === status.studentId);
+            <Box sx={{ mt: 3, mb: 2 }}>
+              <Typography variant="subtitle2" gutterBottom>
+                Statut d'envoi
+              </Typography>
+              <Timeline position="right">
+                {sendingStatuses.map((status) => {
+                  const studentInfo = status.studentId === student?.id 
+                    ? student 
+                    : additionalStudents.find(s => s.id === status.studentId);
 
-                return (
-                  <TimelineItem key={`${status.studentId}-${status.status}-timeline`}>
-                    <TimelineSeparator>
-                      <TimelineDot
-                        color={
-                          status.status === 'success' ? 'success' :
-                          status.status === 'error' ? 'error' :
-                          status.status === 'processing' ? 'primary' :
-                          'grey'
-                        }
-                      />
-                      <TimelineConnector />
-                    </TimelineSeparator>
-                    <TimelineContent>
-                      <Typography variant="body2">
-                        {studentInfo ? `${studentInfo.first_name} ${studentInfo.last_name}` : 'Étudiant inconnu'}
-                        {status.status === 'processing' && ' (en cours...)'}
-                        {status.status === 'success' && ' ✓'}
-                        {status.status === 'error' && ` - ${status.error}`}
-                      </Typography>
-                    </TimelineContent>
-                  </TimelineItem>
-                );
-              })}
-            </Timeline>
+                  return (
+                    <TimelineItem key={`${status.studentId}-${status.status}-timeline`}>
+                      <TimelineSeparator>
+                        <TimelineDot
+                          color={
+                            status.status === 'success' ? 'success' :
+                            status.status === 'error' ? 'error' :
+                            status.status === 'processing' ? 'primary' :
+                            'grey'
+                          }
+                        />
+                        <TimelineConnector />
+                      </TimelineSeparator>
+                      <TimelineContent>
+                        <Typography variant="body2">
+                          {studentInfo ? `${studentInfo.first_name} ${studentInfo.last_name}` : 'Étudiant inconnu'}
+                          {status.status === 'processing' && ' (en cours...)'}
+                          {status.status === 'success' && ' ✓'}
+                          {status.status === 'error' && ` - ${status.error}`}
+                        </Typography>
+                      </TimelineContent>
+                    </TimelineItem>
+                  );
+                })}
+              </Timeline>
+            </Box>
           )}
         </DialogContent>
 

@@ -45,6 +45,7 @@ import AssignmentIcon from '@mui/icons-material/Assignment';
 import FilterListIcon from '@mui/icons-material/FilterList';
 import ShareIcon from '@mui/icons-material/Share';
 import EmailIcon from '@mui/icons-material/Email';
+import RemoveCircleIcon from '@mui/icons-material/RemoveCircle';
 
 interface StudentCorrectionsProps {
   student: Student;
@@ -66,8 +67,6 @@ export default function StudentCorrections({ student, corrections }: StudentCorr
       year: 'numeric', 
       month: 'short', 
       day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
     };
     return new Date(dateString).toLocaleDateString('fr-FR', options);
   };
@@ -146,6 +145,7 @@ export default function StudentCorrections({ student, corrections }: StudentCorr
   };
 
   const filteredCorrections = getFilteredAndSortedCorrections();
+  console.log("filteredCorrections", filteredCorrections);
 
   return (
     <Paper elevation={2} sx={{ p: 3, borderRadius: 2 }}>
@@ -281,12 +281,23 @@ export default function StudentCorrections({ student, corrections }: StudentCorr
                         color="text.secondary"
                         sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}
                       >
-                        <CalendarTodayIcon fontSize="small" />
-                        {correction.submission_date 
+                        <CalendarTodayIcon fontSize="small" color="primary" />
+                        Envoyé le : {correction.submission_date 
                           ? formatDate(correction.submission_date)
                           : formatDate(correction.created_at)
                         }
                       </Typography>
+                      
+                      {correction.deadline && (
+                        <Typography 
+                          variant="body2" 
+                          color="text.secondary"
+                          sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}
+                        >
+                          <CalendarTodayIcon fontSize="small" color="error" />
+                          Date limite : {formatDate(correction.deadline)}
+                        </Typography>
+                      )}
                       
                       <Typography 
                         variant="body2" 
@@ -301,28 +312,38 @@ export default function StudentCorrections({ student, corrections }: StudentCorr
                     {(correction.experimental_points || correction.theoretical_points) && (
                       <>
                         <Typography variant="subtitle2" gutterBottom>
-                          Répartition des points:
+                          Répartition des points :
                         </Typography>
                         
                         <Grid container spacing={1} sx={{ mb: 1 }}>
                           {correction.experimental_points && (
-                            <Grid size={{ xs: 6 }}>
+                            <Grid size={{ xs: 4 }}>
                               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                                 <ScienceIcon color="primary" fontSize="small" />
                                 <Typography variant="body2" fontWeight="medium">
-                                  Expérimental: {correction.experimental_points} pts
+                                  Expérim : {correction.experimental_points} pts
                                 </Typography>
                               </Box>
                             </Grid>
                           )}
                           {correction.theoretical_points && (
-                            <Grid size={{ xs: 6 }}>
+                            <Grid size={{ xs: 4 }}>
                               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                                 <MenuBookIcon color="secondary" fontSize="small" />
                                 <Typography variant="body2" fontWeight="medium">
                                   Théorique: {correction.theoretical_points} pts
                                 </Typography>
                               </Box>
+                            </Grid>
+                          )}
+                          {correction.penalty && (
+                            <Grid size={{ xs: 4 }}>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                <RemoveCircleIcon color="error" fontSize="small" />
+                                <Typography variant="body2" fontWeight="medium">
+                                    Pénalité: {correction.penalty} pts
+                                </Typography>
+                            </Box>
                             </Grid>
                           )}
                         </Grid>

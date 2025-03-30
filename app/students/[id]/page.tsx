@@ -271,8 +271,11 @@ export default function StudentDetailPage() {
 
   if (loading) {
     return (
-      <Container sx={{ py: 4, minHeight: '80vh', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+      <Container sx={{ py: 4,display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+        <Box sx={{ maxWidth: 400, width: '100%', mx: 'auto', textAlign: 'center' }}>
         <LoadingSpinner size="lg" text="Chargement des données de l'étudiant" />
+          </Box>
+        
       </Container>
     );
   }
