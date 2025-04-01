@@ -1,68 +1,157 @@
-import { NextResponse } from 'next/server';
-import { query } from '@/lib/db';
+import { NextRequest, NextResponse } from 'next/server';
+import { query, withConnection } from '@/lib/db';
+import { getServerSession } from 'next-auth';
+import authOptions from '@/lib/auth';
+import { getUser } from '@/lib/auth';
 
 export async function POST(
-  request: Request,
+  req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    // Await the params
+    // Authentification
+    const session = await getServerSession(authOptions);
+    const customUser = await getUser(req);
+    const userId = customUser?.id || session?.user?.id;
+    
+    if (!userId) {
+      return NextResponse.json(
+        { error: 'Authentification requise' },
+        { status: 401 }
+      );
+    }
+    
+    // Récupérer l'ID de la correction à dupliquer
     const { id } = await params;
     const correctionId = parseInt(id);
-
-    const { studentId } = await request.json();
-
-    // Récupérer les données de la correction originale
-    const [originalCorrection] = await query(
-      `SELECT * FROM corrections WHERE id = ?`,
-      [correctionId]
-    ) as any[];
     
-
-    if (!originalCorrection) {
-      return NextResponse.json({ error: 'Correction non trouvée' }, { status: 404 });
+    if (isNaN(correctionId)) {
+      return NextResponse.json(
+        { error: 'ID de correction invalide' },
+        { status: 400 }
+      );
     }
-
-    // Créer une nouvelle correction avec les mêmes données mais un student_id différent
-    const result = await query(
-      `INSERT INTO corrections 
-       (activity_id, student_id, content, content_data, grade, 
-        experimental_points_earned, theoretical_points_earned, penalty,
-        deadline, submission_date, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())`,
-      [
-        originalCorrection.activity_id,
-        studentId,
-        originalCorrection.content,
-        typeof originalCorrection.content_data === 'string' 
-          ? originalCorrection.content_data 
-          : JSON.stringify(originalCorrection.content_data),
-        originalCorrection.grade,
-        originalCorrection.experimental_points_earned,
-        originalCorrection.theoretical_points_earned,
-        originalCorrection.penalty,
-        originalCorrection.deadline,
-        originalCorrection.submission_date
-      ]
-    ) as any;
-
-    // Après avoir créé la nouvelle correction, créer un nouveau code de partage
-    const shareCode = Math.random().toString(36).substring(2, 10);
-    await query(
-      `INSERT INTO share_codes (correction_id, code, created_at) 
-       VALUES (?, ?, NOW())`,
-      [result.insertId, shareCode]
-    );
-
-    return NextResponse.json({ 
-      correctionId: result.insertId,
-      message: 'Correction dupliquée avec succès' 
+    
+    // Récupérer les données de la requête
+    const body = await req.json();
+    const { studentId, classId, groupName } = body;
+    
+    if (!studentId) {
+      return NextResponse.json(
+        { error: 'ID étudiant requis' },
+        { status: 400 }
+      );
+    }
+    
+    // Utiliser une transaction pour gérer toutes les opérations
+    return await withConnection(async (connection) => {
+      // 1. Récupérer les données de la correction originale
+      const [correctionRows] = await connection.query(
+        `SELECT * FROM corrections WHERE id = ?`, 
+        [correctionId]
+      );
+      
+      if (!correctionRows || (correctionRows as any[]).length === 0) {
+        throw new Error('Correction non trouvée');
+      }
+      
+      const originalCorrection = (correctionRows as any[])[0];
+      
+      // 2. Créer la nouvelle correction avec les données de l'étudiant spécifié
+      const [insertResult] = await connection.query(
+        `INSERT INTO corrections (
+          activity_id, student_id, content, grade, penalty, 
+          created_at, updated_at, name, deadline, submission_date,
+          theoretical_points_earned, experimental_points_earned, 
+          feedback, status, teacher_id
+        ) 
+        VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          originalCorrection.activity_id,
+          studentId,
+          originalCorrection.content,
+          originalCorrection.grade,
+          originalCorrection.penalty,
+          originalCorrection.name,
+          originalCorrection.deadline,
+          originalCorrection.submission_date,
+          originalCorrection.theoretical_points_earned,
+          originalCorrection.experimental_points_earned,
+          originalCorrection.feedback,
+          originalCorrection.status,
+          userId
+        ]
+      );
+      
+      const newCorrectionId = (insertResult as any).insertId;
+      
+      // 3. Si une classe est spécifiée, associer l'étudiant à cette classe
+      if (classId) {
+        // Vérifier si l'association existe déjà
+        const [existingAssociation] = await connection.query(
+          `SELECT * FROM class_students WHERE student_id = ? AND class_id = ?`,
+          [studentId, classId]
+        );
+        
+        if ((existingAssociation as any[]).length === 0) {
+          // Créer l'association
+          await connection.query(
+            `INSERT INTO class_students (student_id, class_id, created_at, updated_at)
+            VALUES (?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
+            [studentId, classId]
+          );
+        }
+      }
+      
+      // 4. Si un groupe est spécifié, créer ou trouver le groupe et associer l'étudiant
+      if (groupName) {
+        // Vérifier si le groupe existe déjà
+        const [existingGroups] = await connection.query(
+          `SELECT id FROM groups WHERE name = ?`,
+          [groupName]
+        );
+        
+        let groupId;
+        
+        if ((existingGroups as any[]).length > 0) {
+          // Utiliser le groupe existant
+          groupId = (existingGroups as any[])[0].id;
+        } else {
+          // Créer un nouveau groupe
+          const [groupResult] = await connection.query(
+            `INSERT INTO groups (name, created_at, updated_at)
+            VALUES (?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
+            [groupName]
+          );
+          
+          groupId = (groupResult as any).insertId;
+        }
+        
+        // Associer l'étudiant au groupe
+        const [existingGroupAssociation] = await connection.query(
+          `SELECT * FROM group_students WHERE student_id = ? AND group_id = ?`,
+          [studentId, groupId]
+        );
+        
+        if ((existingGroupAssociation as any[]).length === 0) {
+          // Créer l'association
+          await connection.query(
+            `INSERT INTO group_students (student_id, group_id, created_at, updated_at)
+            VALUES (?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
+            [studentId, groupId]
+          );
+        }
+      }
+      
+      return NextResponse.json({
+        success: true,
+        correctionId: newCorrectionId
+      });
     });
-
   } catch (error) {
-    console.error('Erreur lors de la duplication:', error);
+    console.error('Erreur lors de la duplication de la correction:', error);
     return NextResponse.json(
-      { error: 'Erreur lors de la duplication de la correction' },
+      { error: error instanceof Error ? error.message : 'Erreur de duplication' },
       { status: 500 }
     );
   }

@@ -216,7 +216,7 @@ export default function CreateCorrectionsModal({
         email: "",
         first_name: s.firstName,
         last_name: s.lastName,
-        gender: "" // valeur par défaut
+        gender: undefined // valeur par défaut compatible avec le type Student
       }));
       
       setConvertedStudents(converted);

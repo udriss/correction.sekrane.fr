@@ -332,7 +332,7 @@ export default function EmailFeedback({
       // Assurons-nous d'utiliser l'adresse email saisie par l'utilisateur
       const targetEmail = emailTo.trim();
 
-      console.log('Envoi du mail à:', targetEmail); // Debug
+      
 
       const response = await fetch('/api/corrections/send-feedback-email', {
         method: 'POST',
@@ -424,7 +424,7 @@ export default function EmailFeedback({
       ? targetStudent.customEmail.trim() 
       : targetStudent.email.trim();
     
-    console.log('Envoi du mail à (multiple):', targetEmail); // Debug
+    
 
     const response = await fetch('/api/corrections/send-feedback-email', {
       method: 'POST',
@@ -540,7 +540,7 @@ export default function EmailFeedback({
     // Parcourir tous les étudiants dans l'objet uniqueStudents
     Object.values(students).forEach(student => {
       // Ne pas inclure l'étudiant actuel (corrigé) ni ceux déjà ajoutés
-      if (student && student.id === student.id || additionalStudents.some(s => s.id === student.id)) {
+      if (student.id === (student?.id) || additionalStudents.some(s => s.id === student.id)) {
         return;
       }
 
@@ -562,7 +562,7 @@ export default function EmailFeedback({
               email: student.email || '',
             });
           }
-          
+        } else {
           // Pour les étudiants avec classes
           student.classes.forEach((cls: Class) => {
             if (!grouped[cls.id]) {
@@ -620,27 +620,29 @@ export default function EmailFeedback({
       if (response.ok) {
         const students = await response.json();
         
-        // Créer un objet pour stocker tous les étudiants uniques avec leurs classes
+        // Les étudiants sont déjà uniques avec leurs classes dans allClasses
         const uniqueStudents: AllStudents = {};
         const classes = new Set<string>();
 
         students.forEach((s: any) => {
-          if (!uniqueStudents[s.id]) {
-            uniqueStudents[s.id] = {
-              id: s.id,
-              email: s.email,
-              first_name: s.first_name,
-              last_name: s.last_name,
-              classes: []
-            };
-          }
+          uniqueStudents[s.id] = {
+            id: s.id,
+            email: s.email,
+            first_name: s.first_name,
+            last_name: s.last_name,
+            classes: s.allClasses 
+              ? s.allClasses.map((cls: any) => ({
+                  id: cls.classId,
+                  name: cls.className
+                }))
+              : []
+          };
           
-          if (s.classId && s.className) {
-            uniqueStudents[s.id].classes.push({
-              id: s.classId,
-              name: s.className
+          // Ajouter les classes au Set pour éliminer les doublons
+          if (s.allClasses) {
+            s.allClasses.forEach((cls: any) => {
+              classes.add(JSON.stringify({ id: cls.classId, name: cls.className }));
             });
-            classes.add(JSON.stringify({ id: s.classId, name: s.className }));
           }
         });
 
@@ -648,7 +650,6 @@ export default function EmailFeedback({
         const uniqueClasses = Array.from(classes).map(c => JSON.parse(c));
         setAvailableClasses(uniqueClasses);
         setAllStudents(uniqueStudents);
-
 
         // Mettre à jour studentsByClass en fonction des filtres actuels
         updateDisplayedStudents(uniqueStudents, selectedClassIds);

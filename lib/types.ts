@@ -48,10 +48,12 @@ export interface CorrectionWithShareCode extends Correction {
 
 export interface Student {
   id: number;
-  email: string;
   first_name: string;
   last_name: string;
-  gender: string;
+  email: string;
+  gender?: 'M' | 'F' | 'N';
+  // New property to match the API response
+  allClasses?: { classId: number; className: string; sub_class?: number | null }[];
   created_at?: string;
   updated_at?: string;
 }

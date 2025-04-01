@@ -56,7 +56,8 @@ export default function ClassesPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [showTutorial, setShowTutorial] = useState(false);
-  const [totalStudents, setTotalStudents] = useState(0);
+  const [totalInscriptions, setTotalInscriptions] = useState(0);
+  const [totalStudents, setTotalStudents] = useState(0); // New state variable for unique students
   const [totalActivities, setTotalActivities] = useState(0);
   const router = useRouter();
   const theme = useTheme();
@@ -94,15 +95,20 @@ export default function ClassesPage() {
     }
   };
 
-  // New function to fetch total students
+  // Modified function to fetch total students
   const fetchTotalStudents = async () => {
     try {
       const response = await fetch('/api/students');
       if (response.ok) {
         const data = await response.json();
         
+        // Total unique students (data is now already deduplicated)
         setTotalStudents(data.length);
         
+        // Count total inscriptions from allClasses
+        const totalInscriptions = data.reduce((sum: number, student: { allClasses?: string[] | any[] }) => 
+          sum + (student.allClasses ? student.allClasses.length : 0), 0);
+        setTotalInscriptions(totalInscriptions);
       } else {
         console.error('Error fetching total students');
       }
@@ -206,7 +212,7 @@ export default function ClassesPage() {
         {/* Stats summary */}
         <Box sx={{ p: 2 }}>
           <Grid container spacing={2} sx={{ display: 'flex', justifyContent: 'space-around' }}>
-            <Grid size={{ xs: 12, sm: 6, md: 2 }}>
+            <Grid size={{ xs: 12, sm: 6,  md: 5, lg: 2}}>
               <Paper sx={{ 
                 p: 2, 
                 textAlign: 'center', 
@@ -214,16 +220,20 @@ export default function ClassesPage() {
                 bgcolor: (theme) => alpha(theme.palette.myBoxes.primary, 0.5),
                 backdropFilter: 'blur(5px)',
                 borderRadius: 2,
+                display: 'flex',
+                flexDirection: 'column',
+                justifyContent: 'center',
+                alignItems: 'center',
               }}>
-                <Typography variant="overline" color="text.secondary">Total</Typography>
+                <Typography variant="overline" color="text.secondary"></Typography>
                 <Typography variant="h3" fontWeight="bold" color="text.primary">{classes.length}</Typography>
                 <Typography variant="overline" color="text.secondary">
-                  {classes.length === 1 ? 'classe' : 'classes'}
+                  {classes.length === 1 ? 'classe' : 'classes'} au total
                 </Typography>
               </Paper>
             </Grid>
             
-            <Grid size={{ xs: 12, sm: 6, md: 2 }}>
+            <Grid size={{ xs: 12, sm: 6,  md: 5, lg: 2}}>
               <Paper sx={{ 
                 p: 2, 
                 textAlign: 'center', 
@@ -231,16 +241,22 @@ export default function ClassesPage() {
                 bgcolor: (theme) => alpha(theme.palette.myBoxes.primary, 0.5),
                 backdropFilter: 'blur(5px)',
                 borderRadius: 2,
+                display: 'flex',
+                flexDirection: 'column',
+                justifyContent: 'center',
+                alignItems: 'center',
               }}>
-                <Typography variant="overline" color="text.secondary">Étudiants</Typography>
                 <Typography variant="h3" fontWeight="bold" color="text.primary">{totalStudents}</Typography>
                 <Typography variant="overline" color="text.secondary">
-                  {totalStudents === 1 ? 'inscrit' : 'inscrits'}
+                  {totalStudents === 1 ? 'étudiant unique' : 'étudiants uniques'}
+                </Typography>
+                <Typography variant="caption" display="block" sx={{color:(theme) => theme.palette.primary.light, position: 'absolute', bottom:0, right: 0, left:0, mb: 1}}>
+                  {totalInscriptions}{totalInscriptions === 1 ? ' inscription' : ' inscriptions'}
                 </Typography>
               </Paper>
             </Grid>
             
-            <Grid size={{ xs: 12, sm: 6, md: 2 }}>
+            <Grid size={{ xs: 12, sm: 6, md: 5, lg: 2.4 }}>
               <Paper sx={{ 
                 p: 2, 
                 textAlign: 'center', 
@@ -248,16 +264,19 @@ export default function ClassesPage() {
                 bgcolor: (theme) => alpha(theme.palette.myBoxes.primary, 0.5),
                 backdropFilter: 'blur(5px)',
                 borderRadius: 2,
+                display: 'flex',
+                flexDirection: 'column',
+                justifyContent: 'center',
+                alignItems: 'center',
               }}>
-                <Typography variant="overline" color="text.secondary">Activités</Typography>
                 <Typography variant="h3" fontWeight="bold" color="text.primary">{totalActivities}</Typography>
                 <Typography variant="overline" color="text.secondary">
-                  {totalActivities === 1 ? 'disponible' : 'disponibles'}
+                  {totalActivities === 1 ? 'activité disponible' : 'activités disponibles'}
                 </Typography>
               </Paper>
             </Grid>
             
-            <Grid size={{ xs: 12, sm: 6, md: 2 }}>
+            <Grid size={{ xs: 12, sm: 6,  md: 5, lg: 2}}>
               <Paper sx={{ 
                 p: 2, 
                 textAlign: 'center', 
@@ -265,13 +284,16 @@ export default function ClassesPage() {
                 bgcolor: (theme) => alpha(theme.palette.myBoxes.primary, 0.5),
                 backdropFilter: 'blur(5px)',
                 borderRadius: 2,
+                display: 'flex',
+                flexDirection: 'column',
+                justifyContent: 'center',
+                alignItems: 'center',
               }}>
-                <Typography variant="overline" color="text.secondary">Années</Typography>
                 <Typography variant="h3" fontWeight="bold" color="text.primary">
                   {Array.from(new Set(classes.map(cls => cls.academic_year))).length}
                 </Typography>
                 <Typography variant="overline" color="text.secondary">
-                  {Array.from(new Set(classes.map(cls => cls.academic_year))).length === 1 ? 'académique' : 'académiques'}
+                  {Array.from(new Set(classes.map(cls => cls.academic_year))).length === 1 ? 'année académique' : 'années académiques'}
                 </Typography>
               </Paper>
             </Grid>
@@ -473,7 +495,7 @@ export default function ClassesPage() {
                 {classes
                   .filter(cls => cls.academic_year === year)
                   .map((cls) => (
-                  <Grid size={{ xs: 12, sm: 6, md: 4 }} key={cls.id}>
+                  <Grid size={{ xs: 12, sm: 6,  md: 5, lg: 4}} key={cls.id}>
                     <Card className="h-full flex flex-col hover:shadow-lg transition-shadow border border-gray-100">
                       <CardContent className="flex-grow">
                         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 1 }}>

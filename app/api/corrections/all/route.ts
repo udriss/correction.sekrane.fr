@@ -29,7 +29,9 @@ export async function GET(request: NextRequest) {
           s.last_name AS student_last_name,
           CONCAT(s.first_name, ' ', s.last_name) AS student_name,
           cl.name AS class_name,
-          cl.id AS class_id
+          cl.id AS class_id,
+          c.created_at,
+          c.updated_at
         FROM 
           corrections c
         LEFT JOIN 
@@ -69,6 +71,8 @@ export async function GET(request: NextRequest) {
         experimental_points: Number(correction.experimental_points) || 0,
         theoretical_points: Number(correction.theoretical_points) || 0,
         content: correction.content,
+        created_at: correction.created_at,
+        updated_at: correction.updated_at,
         content_data: (() => {
           try {
             if (!correction.content_data) return null;
@@ -79,7 +83,8 @@ export async function GET(request: NextRequest) {
             return null;
           }
         })(),
-        deadline: correction.deadline
+        deadline: correction.deadline,
+        sub_class: correction.sub_class || null
       }));
 
       return NextResponse.json(formattedCorrections);

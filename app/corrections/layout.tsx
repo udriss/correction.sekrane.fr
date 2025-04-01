@@ -29,14 +29,14 @@ export default function CorrectionsLayout({
     // Page de correction unique
     else if (pathname === '/corrections/unique') {
       extraItems = [
-        { label: 'Nouvelle correction', href: '/corrections/new' }
+        { label: 'Correction unique', href: '/corrections/new' }
       ];
       currentPageLabel = 'Correction unique';
     }
     // Page de corrections multiples
     else if (pathname === '/corrections/multiples') {
       extraItems = [
-        { label: 'Nouvelle correction', href: '/corrections/new' }
+        { label: 'Correction unique', href: '/corrections/new' }
       ];
       currentPageLabel = 'Corrections multiples';
     }

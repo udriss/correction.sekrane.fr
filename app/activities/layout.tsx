@@ -7,6 +7,8 @@ import { usePathname } from 'next/navigation';
 import BookIcon from '@mui/icons-material/Book';
 import GroupsIcon from '@mui/icons-material/Groups';
 import AssignmentIcon from '@mui/icons-material/Assignment';
+import PersonIcon from '@mui/icons-material/Person';
+import PeopleIcon from '@mui/icons-material/People';
 
 export default function ActivitiesLayout({
   children,
@@ -24,7 +26,7 @@ export default function ActivitiesLayout({
     
     // Configuration par défaut
     let currentPageLabel = '';
-    let extraItems: { label: string; href?: string; icon?: React.ReactNode }[] = [];
+    let extraItems: { label: string; href?: string; icon?: React.ReactNode; menu?: { label: string; href: string; icon?: React.ReactNode }[] }[] = [];
     
     // Page principale des activités
     if (pathname === '/activities') {
@@ -51,15 +53,59 @@ export default function ActivitiesLayout({
     else if (pathname.match(/^\/activities\/\d+\/corrections$/)) {
       const activityId = pathname.split('/')[2];
       extraItems = [
-        { label: `Activité #${activityId}`, href: `/activities/${activityId}`, icon: <BookIcon fontSize="small" /> }
+        { label: `Activité #${activityId}`, href: `/activities/${activityId}`, icon: <BookIcon fontSize="small" color='primary' /> }
       ];
+      
+      // Ajouter un menu pour les corrections
       currentPageLabel = 'Corrections';
+      extraItems.push({
+        label: 'Corrections',
+        icon: <AssignmentIcon fontSize="small" color='primary' />,
+        menu: [
+          { label: 'Correction unique', href: `/activities/${activityId}/corrections/new`, icon: <PersonIcon fontSize="small" color='primary'/> },
+          { label: 'Corrections multiples', href: `/activities/${activityId}/corrections/multiples`, icon: <PeopleIcon fontSize="small" color='primary'/> }
+        ]
+      });
+    }
+    // Page de correction unique pour une activité
+    else if (pathname.match(/^\/activities\/\d+\/corrections\/new$/)) {
+      const activityId = pathname.split('/')[2];
+      extraItems = [
+        { label: `Activité #${activityId}`, href: `/activities/${activityId}`, icon: <BookIcon fontSize="small" color='primary'/> },
+        { 
+          label: 'Corrections', 
+          href: `/activities/${activityId}/corrections`, 
+          icon: <AssignmentIcon fontSize="small" color='primary'/>,
+          menu: [
+            { label: 'Correction unique', href: `/activities/${activityId}/corrections/new`, icon: <PersonIcon fontSize="small" color='primary'/> },
+            { label: 'Corrections multiples', href: `/activities/${activityId}/corrections/multiples`, icon: <PeopleIcon fontSize="small" color='primary'/> }
+          ]
+        }
+      ];
+      currentPageLabel = 'Correction unique';
+    }
+    // Page de corrections multiples pour une activité
+    else if (pathname.match(/^\/activities\/\d+\/corrections\/multiples$/)) {
+      const activityId = pathname.split('/')[2];
+      extraItems = [
+        { label: `Activité #${activityId}`, href: `/activities/${activityId}`, icon: <BookIcon fontSize="small" color='primary' /> },
+        { 
+          label: 'Corrections', 
+          href: `/activities/${activityId}/corrections`, 
+          icon: <AssignmentIcon fontSize="small" color='primary'/>,
+          menu: [
+            { label: 'Correction unique', href: `/activities/${activityId}/corrections/new`, icon: <PersonIcon fontSize="small" color='primary' /> },
+            { label: 'Corrections multiples', href: `/activities/${activityId}/corrections/multiples`, icon: <PeopleIcon fontSize="small" color='primary'/> }
+          ]
+        }
+      ];
+      currentPageLabel = 'Corrections multiples';
     }
     // Page des groupes d'une activité
     else if (pathname.match(/^\/activities\/\d+\/groups$/)) {
       const activityId = pathname.split('/')[2];
       extraItems = [
-        { label: `Activité #${activityId}`, href: `/activities/${activityId}`, icon: <BookIcon fontSize="small" /> }
+        { label: `Activité #${activityId}`, href: `/activities/${activityId}`, icon: <BookIcon fontSize="small" color='primary'/> }
       ];
       currentPageLabel = 'Groupes de corrections';
     }
@@ -70,19 +116,10 @@ export default function ActivitiesLayout({
       const groupId = pathParts[4];
       
       extraItems = [
-        { label: `Activité #${activityId}`, href: `/activities/${activityId}`, icon: <BookIcon fontSize="small" /> },
-        { label: 'Groupes', href: `/activities/${activityId}/groups`, icon: <GroupsIcon fontSize="small" /> }
+        { label: `Activité #${activityId}`, href: `/activities/${activityId}`, icon: <BookIcon fontSize="small" color='primary'/> },
+        { label: 'Groupes', href: `/activities/${activityId}/groups`, icon: <GroupsIcon fontSize="small" color='primary'/> }
       ];
       currentPageLabel = `Groupe #${groupId}`;
-    }
-    // Page d'ajout de correction pour une activité
-    else if (pathname.match(/^\/activities\/\d+\/corrections\/new$/)) {
-      const activityId = pathname.split('/')[2];
-      extraItems = [
-        { label: `Activité #${activityId}`, href: `/activities/${activityId}`, icon: <BookIcon fontSize="small" /> },
-        { label: 'Corrections', href: `/activities/${activityId}/corrections`, icon: <AssignmentIcon fontSize="small" /> }
-      ];
-      currentPageLabel = 'Nouvelle correction';
     }
     
     return { currentPageLabel, extraItems };

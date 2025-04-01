@@ -47,6 +47,9 @@ import ShareIcon from '@mui/icons-material/Share';
 // Mock components
 import DraggableItemMock from './DraggableItemMock';
 import FragmentItemMock from './FragmentItemMock';
+// Import des composants mock pour EmailFeedback et DuplicateCorrection
+import EmailFeedbackMock from './EmailFeedbackMock';
+import DuplicateCorrectionMock from './DuplicateCorrectionMock';
 
 const inter = Inter({ subsets: ['latin'] });
 
@@ -170,7 +173,7 @@ export default function DemoPage() {
                     Activité : <span className="text-blue-600 hover:underline">TP-5 Synthèse d'esters</span>
                   </p>
                   <p className="text-gray-500 text-sm mt-1">
-                    Créée le 12 décembre 2023, 14:30
+                    Ajoutée le 12 mars 2025, 14:30
                   </p>
                 </div>
               </Paper>
@@ -216,6 +219,34 @@ export default function DemoPage() {
                 {/* Left column: correction editor */}
                 <div className="w-full md:w-2/3">
                   {/* Content editor */}
+
+                  {/* NOUVELLE SECTION: Options avancées */}
+                  <Paper className="p-6 shadow mb-6 bg-white">
+                    <div className="mb-4">
+                      <Typography variant="h6" className="font-semibold border-b pb-2 flex items-center">
+                        <ShareIcon className="mr-2 text-blue-600" /> 
+                        Options de partage et duplication
+                      </Typography>
+                    </div>
+                    
+                    <Box className="flex flex-col md:flex-row gap-4 justify-center">
+                      <Box className="flex flex-col items-center gap-2 p-3 border rounded-lg">
+                        <Typography variant="body2" fontWeight="medium" gutterBottom>
+                          Envoyer par email
+                        </Typography>
+                        <EmailFeedbackMock studentName="Ilyes Douhle" />
+                      </Box>
+                      
+                      <Box className="flex flex-col items-center gap-2 p-3 border rounded-lg">
+                        <Typography variant="body2" fontWeight="medium" gutterBottom>
+                          Dupliquer pour d'autres étudiants
+                        </Typography>
+                        <DuplicateCorrectionMock studentName="Ilyes Douhle" />
+                      </Box>
+                    </Box>
+                  </Paper>
+
+
                   <Paper className="p-4 shadow mb-6">
                     <Typography variant="h6" className="mb-3 font-semibold border-b pb-2 flex items-center">
                       <EditIcon className="mr-2 text-blue-600" /> 
@@ -440,6 +471,8 @@ export default function DemoPage() {
                       </Box>
                     </Box>
                   </Paper>
+
+
                 </div>
                 
                 {/* Right column: fragments */}
@@ -525,7 +558,7 @@ export default function DemoPage() {
                 <div className="flex items-center justify-center gap-3 mb-2">
                   <RuleIcon sx={{ fontSize: 32 }} />
                   <Typography variant="h4" className="font-bold">
-                    Correction de Jean Dupont
+                    Correction de Ilyes Douhle
                   </Typography>
                 </div>
                 
@@ -663,6 +696,7 @@ export default function DemoPage() {
 
                 {/* Contenu de la correction */}
                 <div className="mt-6">
+                  
                   <div className="flex items-center gap-2 mb-4 bg-gray-100 p-2 rounded-t-lg border-b-2 border-blue-500">
                     <Typography variant="h6" className="font-bold text-gray-800">
                       Contenu de la correction
@@ -704,7 +738,7 @@ export default function DemoPage() {
               
               <div className="bg-gray-100 p-4 text-right border-t">
                 <Typography variant="caption" className="text-gray-500">
-                  Correction créée le 19/12/2023
+                  Correction ajoutée le 19/12/2023
                 </Typography>
               </div>
             </Paper>

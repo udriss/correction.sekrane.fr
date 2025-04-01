@@ -41,6 +41,10 @@ const ThemeDependentBox = dynamic(
 export default function NewCorrectionPage() {
   const router = useRouter();
   const [componentsLoaded, setComponentsLoaded] = React.useState(false);
+  // Suppression des états non utilisés dans cette page qui avaient été ajoutés par erreur
+  // Ces états font partie de la page de création individuelle de correction
+  // const [isSubmitting, setIsSubmitting] = React.useState(false);
+  // const [error, setError] = React.useState('');
 
   React.useEffect(() => {
     setComponentsLoaded(true);
@@ -55,6 +59,9 @@ export default function NewCorrectionPage() {
     backgroundColor: '#f0f0f0',
   };
 
+  // Suppression de la fonction submitCorrection qui n'est pas pertinente pour cette page
+  // Cette page est juste une page de sélection du type de correction
+  
   return (
     <Container maxWidth="lg" className="py-8">
       {/* Header with modern design and gradient */}
@@ -81,7 +88,7 @@ export default function NewCorrectionPage() {
               Nouvelle correction
             </Typography>
             <Typography variant="subtitle1">
-            aissez le type de correction que vous souhaitez ajouter
+              Choisissez le type de correction que vous souhaitez ajouter
             </Typography>
           </Box>
         )}

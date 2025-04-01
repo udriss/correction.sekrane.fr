@@ -244,7 +244,7 @@ export default function ActivitiesPage() {
         <GradientBackground variant="primary" sx={{ p: 0 }}>
           <PatternBackground 
             pattern="dots" 
-            opacity={0.05} 
+            opacity={0.02} 
             color="black" 
             size={100}
             sx={{ p: 4, borderRadius: 2 }}
@@ -389,7 +389,7 @@ export default function ActivitiesPage() {
       {showTutorial && (
         <Paper className="mb-8 p-4 border-l-4 border-purple-500 bg-purple-50">
           <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-            <TipsAndUpdatesIcon color="secondary" sx={{ mr: 1 }} />
+            <TipsAndUpdatesIcon  sx={{ mr: 1, color: theme => theme.palette.secondary.dark }} />
             <Typography variant="h6" component="h2">
               Guide des activités
             </Typography>
@@ -441,7 +441,7 @@ export default function ActivitiesPage() {
             <Button
               size="small"
               onClick={() => setShowTutorial(false)}
-              color="secondary"
+              sx={{color: theme => theme.palette.primary.dark, bgcolor: alpha(theme.palette.secondary.main, 0.1), '&:hover': { bgcolor: alpha(theme.palette.secondary.main, 0.2) }}}
             >
               J'ai compris
             </Button>
@@ -613,16 +613,15 @@ export default function ActivitiesPage() {
                                     icon={<MenuBookIcon />}
                                     label={`${activity.theoretical_points} pts théo.`}
                                     size="small"
-                                    color="secondary"
                                     variant="outlined"
                                     component={Link}
                                     href={`/activities/${activity.id}`}
                                     clickable
                                     sx={{ 
                                       cursor: 'pointer',
-                                      '&:hover': { 
-                                        boxShadow: '0 1px 3px rgba(0,0,0,0.12)',
-                                        backgroundColor: 'rgba(156, 39, 176, 0.08)'
+                                      color: theme => theme.palette.secondary.dark, 
+                                      bgcolor: alpha(theme.palette.secondary.main, 0.02), 
+                                      '&:hover': { bgcolor: alpha(theme.palette.secondary.main, 0.2)
                                       }
                                     }}
                                   />
@@ -738,23 +737,29 @@ export default function ActivitiesPage() {
                           </Button>
                           <Button 
                             variant="outlined" 
-                            color="success" 
-                            href={`/activities/${activity.id}/corrections/new`} 
+                            color='primary'
+                            href={`/activities/${activity.id}/corrections/`} 
                             component={Link}
                             startIcon={<RateReviewIcon />}
                             size="small"
                             fullWidth
+                            sx={{color: theme => theme.palette.success.dark, 
+                              bgcolor: alpha(theme.palette.success.main, 0.02), 
+                              '&:hover': { bgcolor: alpha(theme.palette.success.main, 0.2) }}}
                           >
                             Nouvelle correction
                           </Button>
                           <Button 
                             variant="outlined" 
-                            color="success" 
-                            href={`/corrections/multiples?activityId=${activity.id}`} 
+                            color='success'
+                            href={`/activities/${activity.id}/corrections/multiples`} 
                             component={Link}
                             startIcon={<RateReviewIcon />}
                             size="small"
                             fullWidth
+                            sx={{color: theme => theme.palette.success.dark, 
+                              bgcolor: alpha(theme.palette.success.main, 0.02), 
+                              '&:hover': { bgcolor: alpha(theme.palette.success.main, 0.2) }}}
                           >
                             Corrections en lot
                           </Button>

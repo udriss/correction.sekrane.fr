@@ -593,7 +593,7 @@ export function SearchContextProvider({ children }: { children: React.ReactNode 
                       : 1
                     : 0
                 };
-                console.log('Updated fragment item:', newItem);
+                
                 return newItem;
               }
               return item;

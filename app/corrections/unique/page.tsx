@@ -1,499 +1,394 @@
 'use client';
 
-import React from 'react';
-import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
-import { Activity } from '@/lib/activity';
+import React, { useState, useEffect } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { 
-  Paper, 
-  Typography, 
-  Box, 
-  Alert, 
-  CircularProgress, 
-  TextField,
+  Typography,
+  Paper,
+  Box,
   Button,
-  IconButton,
+  Alert,
+  TextField,
   FormControl,
   InputLabel,
   Select,
   MenuItem,
   SelectChangeEvent,
-  ListItemIcon,
-  ListItemText,
 } from '@mui/material';
-import Link from 'next/link';
-import AssignmentIcon from '@mui/icons-material/Assignment';
+
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
-import PersonAddIcon from '@mui/icons-material/PersonAdd';
-import SchoolIcon from '@mui/icons-material/School';
-import SaveIcon from '@mui/icons-material/Save';
-import HomeIcon from '@mui/icons-material/Home';
-import HourglassEmptyIcon from '@mui/icons-material/HourglassEmpty';
-import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline';
-import InfoIcon from '@mui/icons-material/Info';
-import {Student} from '@/lib/types'
-import CheckIcon from '@mui/icons-material/Check';
-import CloseIcon from '@mui/icons-material/Close';
+import BarChartIcon from '@mui/icons-material/BarChart';
+import ArticleIcon from '@mui/icons-material/Article';
+import AddIcon from '@mui/icons-material/Add';
+import Link from 'next/link';
+
+import { Activity } from '@/lib/activity';
+import LoadingSpinner from '@/components/LoadingSpinner';
+// Fix the import to use the correct component name
+import SingleCorrectionForm from '@/components/SingleCorrectionForm';
 
 export default function UniqueCorrection() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const activityId = searchParams?.get('activityId') || "0";
   
-  // État pour le menu déroulant des corrections
-  const [menuAnchorEl, setMenuAnchorEl] = useState<null | HTMLElement>(null);
-  const menuOpen = Boolean(menuAnchorEl);
-  
-  const handleMenuClick = (event: React.MouseEvent<HTMLDivElement>) => {
-    setMenuAnchorEl(event.currentTarget);
-  };
-  
-  const handleMenuClose = () => {
-    setMenuAnchorEl(null);
-  };
-  
-  const navigateTo = (path: string) => {
-    handleMenuClose();
-    router.push(path);
-  };
-
-  const [studentId, setStudentId] = useState<number | null>(null);
-  const [students, setStudents] = useState<Student[]>([]);
+  // Activity and points states
   const [activity, setActivity] = useState<Activity | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [studentsLoading, setStudentsLoading] = useState(true);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [error, setError] = useState('');
-  const [classId, setClassId] = useState<number | null>(null);
-  const [activityClasses, setActivityClasses] = useState<any[]>([]);
-  const [filteredStudents, setFilteredStudents] = useState<Student[]>([]);
-  const [originalStudents, setOriginalStudents] = useState<Student[]>([]);
-  const [showConfirmation, setShowConfirmation] = useState(false);
-  const [warningMessages, setWarningMessages] = useState<string[]>([]);
+  const [experimentalPoints, setExperimentalPoints] = useState<number>(5);
+  const [theoreticalPoints, setTheoreticalPoints] = useState<number>(15);
+  
+  // UI states
+  const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string>('');
+  const [successMessage, setSuccessMessage] = useState<string>('');
+
+  // États pour les activités disponibles
+  const [allActivities, setAllActivities] = useState<Activity[]>([]);
+  const [genericActivities, setGenericActivities] = useState<Activity[]>([]);
+  const [selectedActivityId, setSelectedActivityId] = useState<string>(activityId);
+  
+  // Ajout d'un état pour l'activité générique
   const [genericActivityId, setGenericActivityId] = useState<number | null>(null);
 
   useEffect(() => {
-    // Chercher une activité générique existante
-    const fetchGenericActivity = async () => {
+    // Charger toutes les activités disponibles
+    fetchAllActivities();
+    
+    // Si aucun activityId n'est fourni, ne pas charger automatiquement une activité générique
+    if (activityId && activityId !== "0") {
+      fetchActivity();
+    } else {
+      setLoading(false); // Ne pas montrer le chargement si pas d'activité sélectionnée
+    }
+  }, [activityId]);
+
+  // Fetch all available activities for the dropdown
+  const fetchAllActivities = async () => {
+    try {
+      const response = await fetch('/api/activities');
+      if (!response.ok) throw new Error("Erreur lors du chargement des activités");
+      
+      const activitiesData = await response.json();
+      
+      // Séparer les activités génériques des activités normales
+      const generic = activitiesData.filter((act: Activity) => act.name.includes('Activité générique'));
+      const regular = activitiesData.filter((act: Activity) => !act.name.includes('Activité générique'));
+      
+      setAllActivities(regular);
+      setGenericActivities(generic);
+    } catch (err) {
+      console.error('Erreur:', err);
+      setError("Erreur lors du chargement des activités disponibles");
+    }
+  };
+
+  const fetchActivity = async () => {
+    if (!activityId || activityId === "0") return;
+    
+    try {
+      setLoading(true);
+      const response = await fetch(`/api/activities/${activityId}`);
+      if (!response.ok) throw new Error("Erreur lors du chargement de l'activité");
+      
+      const activityData: Activity = await response.json();
+      setActivity(activityData);
+      setExperimentalPoints(activityData.experimental_points !== undefined ? activityData.experimental_points : 5);
+      setTheoreticalPoints(activityData.theoretical_points !== undefined ? activityData.theoretical_points : 15);
+    } catch (err) {
+      console.error('Erreur:', err);
+      setError("Erreur lors du chargement de l'activité");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Handle activity selection change
+  const handleActivityChange = async (event: SelectChangeEvent<string>) => {
+    const newActivityId = event.target.value;
+    setSelectedActivityId(newActivityId);
+    
+    if (newActivityId === "0") {
+      setActivity(null);
+    } else {
       try {
         setLoading(true);
-        const response = await fetch('/api/activities/generic');
+        const response = await fetch(`/api/activities/${newActivityId}`);
+        if (!response.ok) throw new Error("Erreur lors du chargement de l'activité");
         
-        if (response.ok) {
-          const activityData = await response.json();
-          setActivity(activityData);
-          setGenericActivityId(activityData.id);
-        } else {
-          throw new Error("Erreur lors du chargement de l'activité générique");
-        }
+        const activityData = await response.json();
+        setActivity(activityData);
+        setExperimentalPoints(activityData.experimental_points || 5);
+        setTheoreticalPoints(activityData.theoretical_points || 15);
+        
+        // Update the URL without full refresh
+        router.push(`/corrections/unique?activityId=${newActivityId}`, { scroll: false });
       } catch (err) {
         console.error('Erreur:', err);
-        setError("Erreur lors du chargement de l'activité générique");
+        setError("Erreur lors du chargement de l'activité");
       } finally {
         setLoading(false);
       }
-    };
-    
-    fetchGenericActivity();
-  }, []);
-
-  useEffect(() => {
-    const fetchStudents = async () => {
-      try {
-        setStudentsLoading(true);
-        
-        // 1. Récupérer tous les étudiants avec leurs associations de classes
-        const response = await fetch('/api/students');
-        if (!response.ok) throw new Error('Erreur lors du chargement des étudiants');
-        const data = await response.json();
-        
-        // Stocker les données originales pour pouvoir récupérer toutes les classes
-        setOriginalStudents(data);
-        
-        // 2. Récupérer toutes les classes disponibles
-        const allClassesResponse = await fetch('/api/classes');
-        let classes: any[] = [];
-        
-        if (allClassesResponse.ok) {
-          classes = await allClassesResponse.json();
-          setActivityClasses(classes);
-        }
-        
-        // 3. Initialiser un Map pour éliminer les doublons d'étudiants
-        const uniqueStudents = new Map<number, any>();
-        
-        // 4. Traiter les données des étudiants pour éliminer les doublons
-        data.forEach((student: any) => {
-          if (!uniqueStudents.has(student.id)) {
-            // Créer un objet Student conforme au type attendu
-            const studentObj = {
-              id: student.id,
-              first_name: student.first_name,
-              last_name: student.last_name,
-              email: student.email,
-            } as Student;
-            
-            // Ajouter des propriétés additionnelles
-            (studentObj as any)._classId = student.classId;
-            (studentObj as any).class_name = student.class_name || '';
-            
-            uniqueStudents.set(student.id, studentObj);
-          }
-        });
-        
-        // Convertir le Map en tableau et trier par nom
-        const uniqueStudentsArray = Array.from(uniqueStudents.values())
-          .sort((a, b) => `${a.last_name} ${a.first_name}`.localeCompare(`${b.last_name} ${b.first_name}`));
-        
-        setStudents(uniqueStudentsArray);
-        setFilteredStudents(uniqueStudentsArray);
-      } catch (err) {
-        console.error('Erreur:', err);
-        // Ne pas définir d'erreur pour ne pas bloquer l'interface
-      } finally {
-        setStudentsLoading(false);
-      }
-    };
-
-    fetchStudents();
-  }, []);
-
-  // Ajouter un useEffect pour filtrer les étudiants lorsque classId change
-  useEffect(() => {
-    if (classId) {
-      // Filtrer les étudiants par classe sélectionnée
-      const filtered = originalStudents.filter(student => (student as any).classId === classId);
-      setFilteredStudents(filtered);
-    } else {
-      // Si aucune classe n'est sélectionnée, montrer tous les étudiants disponibles
-      setFilteredStudents(students);
     }
-  }, [classId, students, originalStudents]);
-
-  const handleStudentChange = (event: SelectChangeEvent<number>) => {
-    setStudentId(event.target.value as number);
   };
 
-  const handleClassChange = (event: SelectChangeEvent<number>) => {
-    setClassId(event.target.value as number);
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    // Vérifications préalables à la soumission
-    let warnings = [];
-    
-    // Toujours ajouter un avertissement sur l'utilisation d'une activité générique
-    warnings.push("Cette correction sera associée à une activité générique et ne sera pas liée à une activité spécifique.");
-    
-    if (activityClasses.length > 0 && !classId) {
-      warnings.push("Aucune classe n'est sélectionnée. La correction sera ajoutée sans association à une classe.");
-    }
-    
-    if (!studentId) {
-      warnings.push("Aucun étudiant n'est sélectionné. La correction sera anonyme.");
-    }
-    
-    // Si des avertissements sont présents, les afficher avec Material UI Alert
-    if (warnings.length > 0) {
-      setWarningMessages(warnings);
-      setShowConfirmation(true);
-      return; // Attendre confirmation avant de continuer
-    }
-    
-    // Si pas d'avertissements, procéder à la soumission
-    await submitCorrection();
-  };
-
-  const submitCorrection = async () => {
-    if (!genericActivityId) {
-      setError("Erreur: impossible de créer une correction sans activité générique");
-      return;
-    }
-
-    setIsSubmitting(true);
-    setError('');
-
+  // Fonction pour chercher ou créer une activité générique
+  const fetchOrCreateGenericActivity = async () => {
     try {
-      // Ajouter un délai de 1 seconde avant l'envoi
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      setLoading(true);
+      // Chercher une activité générique existante
+      const response = await fetch('/api/activities/generic');
       
-      const response = await fetch(`/api/activities/${genericActivityId}/corrections`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ 
-          student_id: studentId,
-          class_id: classId,
-          content: '' 
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error('Erreur lors de la création de la correction');
+      if (response.ok) {
+        const activityData = await response.json();
+        setActivity(activityData);
+        setGenericActivityId(activityData.id);
+        setExperimentalPoints(activityData.experimental_points || 5);
+        setTheoreticalPoints(activityData.theoretical_points || 15);
+        setSelectedActivityId(activityData.id.toString());
+        
+        // Update the URL without full refresh
+        router.push(`/corrections/unique?activityId=${activityData.id}`, { scroll: false });
+      } else {
+        throw new Error("Erreur lors de la création d'une activité générique");
       }
-
-      const data = await response.json();
-      router.push(`/corrections/${data.id}`);
     } catch (err) {
       console.error('Erreur:', err);
-      setError('Erreur lors de la création de la correction');
+      setError("Erreur lors du chargement de l'activité générique");
     } finally {
-      setIsSubmitting(false);
+      setLoading(false);
     }
   };
 
-  const handleConfirmSubmit = () => {
-    setShowConfirmation(false);
-    submitCorrection();
-  };
-
-  const handleCancelSubmit = () => {
-    setShowConfirmation(false);
+  // Handle successful correction creation
+  const handleSuccessfulCreateCorrection = (createdCorrectionId: string) => {
+    if (createdCorrectionId) {
+      setSuccessMessage(`Correction créée avec succès`);
+      
+      // Redirect to the correction page after successful creation
+      setTimeout(() => {
+        router.push(`/corrections/${createdCorrectionId}`);
+      }, 2000);
+    }
   };
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
-        <div className="max-w-4xl w-full flex justify-center py-16">
-          <CircularProgress size={40} />
-        </div>
-      </div>
-    );
-  }
-
-  if (!activity) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4 py-8">
-        <div className="max-w-4xl w-full">
-          <Paper 
-            elevation={2} 
-            sx={{ p: 4, borderRadius: 2 }}
-            className="border-l-4 border-yellow-500"
-          >
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 3 }}>
-              <ErrorOutlineIcon color="warning" fontSize="large" />
-              <Typography variant="h5" color="warning.main" className="font-bold">
-                Activité générique non trouvée
-              </Typography>
-            </Box>
-            <Alert severity="warning" sx={{ mb: 3 }}>
-              L'activité générique nécessaire n'a pas pu être chargée.
-            </Alert>
-            <Button
-              variant="outlined"
-              color="primary"
-              startIcon={<ArrowBackIcon />}
-              component={Link}
-              href="/corrections/new"
-            >
-              Retour au choix du type de correction
-            </Button>
-          </Paper>
-        </div>
+      <div className="container max-w-[400px] mx-auto px-4 py-8 flex justify-center">
+        <LoadingSpinner size="lg" text="Chargement des données " />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 py-10">
-      <div className="max-w-4xl mx-auto px-4">
-        {/* Le fil d'Ariane est maintenant géré par le layout */}
-        
-        <div className="mb-8 text-center">
-          <Typography variant="h4" component="h1" className="font-bold text-blue-800 mb-2">
-            Nouvelle correction unique
-          </Typography>
-          <Typography variant="subtitle1" className="text-gray-600">
-            Création d'une correction individuelle
+    <div className="max-w-4xl mx-auto px-4 py-8">
+      {/* Header with modern design and gradient */}
+      <Paper 
+        elevation={3}
+        className="mb-8 rounded-lg overflow-hidden bg-gradient-to-r from-blue-700 to-indigo-800"
+      >
+        <div className="p-6 text-white relative">
+          {/* Decorative background pattern */}
+          <div className="absolute inset-0 opacity-10" 
+               style={{backgroundImage: 'url("data:image/svg+xml,%3Csvg width=\'60\' height=\'60\' viewBox=\'0 0 60 60\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cg fill=\'none\' fill-rule=\'evenodd\'%3E%3Cg fill=\'%23ffffff\' fill-opacity=\'1\'%3E%3Cpath d=\'M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z\'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")'}}
+          ></div>
+          
+          {/* Header content */}
+          <div className="relative z-10 flex justify-between items-center">
+            <div>
+              <Typography variant="h4" component="h1" className="font-bold text-black mb-1">
+                  Création d'une correction
+              </Typography>
+              <Typography variant="subtitle1" className="text-blue-600">
+                Sélectionnez une activité ou créez-en une nouvelle
+              </Typography>
+            </div>
+            
+            <div className="flex gap-3">
+              <Button 
+                component={Link} 
+                href="/activities"
+                variant="outlined"
+                color='secondary'
+                startIcon={<ArrowBackIcon />}
+              >
+                Retour
+              </Button>
+            </div>
+          </div>
+        </div>
+      </Paper>
+
+      {/* Activity Selection Section */}
+      <Paper className="p-6 rounded-lg mb-6 shadow-md border-t-4 border-green-600">
+        <div className="flex items-center gap-2 mb-4">
+          <ArticleIcon className="text-green-600" fontSize="large" />
+          <Typography variant="h5" className="font-bold">
+            Sélection d'activité
           </Typography>
         </div>
         
-        <Alert severity="info" className="mb-6" variant="outlined" icon={<InfoIcon />}>
-          <Typography variant="subtitle2" fontWeight="bold">
-            Correction sans activité spécifique
-          </Typography>
-          <Typography variant="body2">
-            Cette correction sera associée à l'activité générique et n'est pas liée à une activité particulière.
-            Si vous souhaitez la lier à une activité, veuillez créer la correction depuis la page de l'activité concernée.
-          </Typography>
-        </Alert>
-        
-        <Paper 
-          elevation={2} 
-          className="rounded-lg overflow-hidden shadow-md"
-        >
-          {/* En-tête du formulaire */}
-          <Box className="bg-purple-600 p-4 text-white flex justify-between items-center">
-            <div className="flex items-center gap-2">
-              <AssignmentIcon />
-              <Typography variant="h6">
-                Ajouter une correction unique
-              </Typography>
-            </div>
-            <IconButton 
-              component={Link}
-              href="/corrections/new"
-              size="small"
-              className="text-white"
-              aria-label="retour au choix"
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+          <FormControl fullWidth variant="outlined">
+            <InputLabel id="activity-select-label">Activités existantes</InputLabel>
+            <Select
+              labelId="activity-select-label"
+              id="activity-select"
+              value={selectedActivityId}
+              onChange={handleActivityChange}
+              label="Activités existantes"
             >
-              <ArrowBackIcon />
-            </IconButton>
-          </Box>
+              <MenuItem value="0">Aucune activité sélectionnée</MenuItem>
+              <MenuItem disabled style={{ opacity: 0.7 }}>-- Activités régulières --</MenuItem>
+              {allActivities.map((act) => (
+                <MenuItem key={act.id?.toString() || 'unknown'} value={act.id?.toString() || '0'}>
+                  {act.name}
+                </MenuItem>
+              ))}
+              <MenuItem disabled style={{ opacity: 0.7 }}>-- Activités génériques --</MenuItem>
+              {genericActivities.map((act) => (
+                <MenuItem key={act.id?.toString() || 'unknown'} value={act.id?.toString() || '0'}>
+                  {act.name}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
           
-          <Box className="p-6">
-            {error && (
-              <Alert severity="error" className="mb-6" variant="outlined">
-                {error}
-              </Alert>
-            )}
+          <div className="flex gap-2 items-center">
+            <Button
+              variant="contained"
+              color="success"
+              startIcon={<AddIcon />}
+              component={Link}
+              href="/activities/new"
+              fullWidth
+            >
+              Créer une nouvelle activité
+            </Button>
             
-            {showConfirmation && (
-              <Alert 
-                severity="warning" 
-                className="mb-6"
-                action={
-                  <Box sx={{ display: 'flex', gap: 1 }}>
-                    <IconButton
-                      color="error"
-                      size="large"
-                      onClick={handleCancelSubmit}
-                      aria-label="annuler"
-                    >
-                      <CloseIcon fontSize="large" />
-                    </IconButton>
-                    <IconButton
-                      color="success"
-                      size="large"
-                      onClick={handleConfirmSubmit}
-                      aria-label="confirmer"
-                    >
-                      <CheckIcon fontSize="large" />
-                    </IconButton>
-                  </Box>
-                }
-              >
-                <Typography variant="subtitle2" fontWeight="bold" gutterBottom>
-                  Attention
+            <Button
+              variant="outlined"
+              color="primary"
+              onClick={fetchOrCreateGenericActivity}
+              disabled={!!activity}
+            >
+              Utiliser activité générique
+            </Button>
+          </div>
+        </div>
+        
+        {error && (
+          <Alert severity="error" className="mb-6 animate-fadeIn">
+            {error}
+          </Alert>
+        )}
+        
+        {!activity && !error && (
+          <Alert severity="info" className="my-4">
+            Veuillez sélectionner une activité existante, créer une nouvelle activité, ou utiliser une activité générique.
+          </Alert>
+        )}
+      </Paper>
+
+      {/* Conditionally show the rest of the form only if an activity is selected */}
+      {activity && (
+        <>
+          {/* Success messages */}
+          {successMessage && (
+            <Alert severity="success" className="mb-6 animate-fadeIn">
+              {successMessage}
+            </Alert>
+          )}
+
+          {/* Activity title banner */}
+          <Paper className="p-4 mb-6 bg-blue-50 border-l-4 border-blue-500">
+            <Typography variant="h6" className="font-bold">
+              Activité sélectionnée: {activity.name}
+            </Typography>
+          </Paper>
+
+          {/* Grading scale section with improved design */}
+          <Paper className="p-6 rounded-lg mb-6 shadow-md border-t-4 border-blue-600">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <BarChartIcon className="text-blue-600" fontSize="large" />
+                <Typography variant="h5" className="font-bold">
+                  Barème de notation {activityId === "0" && "(modifiable)"}
                 </Typography>
-                {warningMessages.map((message, index) => (
-                  <Typography key={index} variant="body2">
-                    • {message}
-                  </Typography>
-                ))}
-                <Typography variant="body2" className="mt-2 font-medium">
-                  Voulez-vous continuer ?
-                </Typography>
-              </Alert>
-            )}
-            
-            <form onSubmit={handleSubmit}>
-              {/* Sélection de classe */}
-              <div className="mb-6">
-                <FormControl fullWidth>
-                  <InputLabel id="class-select-label">Classe</InputLabel>
-                  <Select
-                    labelId="class-select-label"
-                    id="class-select"
-                    value={classId || ''}
-                    onChange={handleClassChange}
-                    label="Classe"
-                    startAdornment={<SchoolIcon className="mr-2 text-gray-400" />}
-                    disabled={studentsLoading}
-                  >
-                    <MenuItem value="">
-                      <em>Toutes les classes</em>
-                    </MenuItem>
-                    {activityClasses.map((cls) => (
-                      <MenuItem key={cls.id} value={cls.id}>
-                        {cls.name}
-                      </MenuItem>
-                    ))}
-                  </Select>
-                  <Typography variant="caption" className="text-gray-500 mt-1 block">
-                    Sélectionnez une classe pour filtrer les étudiants
-                  </Typography>
-                </FormControl>
               </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <Paper className="p-4 border shadow-sm transition-all hover:shadow-md flex flex-col items-center text-center">
+                <Typography variant="overline" color="textSecondary" className="mb-1">
+                  PARTIE EXPÉRIMENTALE
+                </Typography>
+                {activityId === "0" ? (
+                  <TextField
+                    type="number"
+                    value={experimentalPoints}
+                    onChange={(e) => setExperimentalPoints(Number(e.target.value))}
+                    variant="outlined"
+                    size="small"
+                    inputProps={{ min: 0, max: 20 }}
+                    sx={{ mt: 1, width: '80px', textAlign: 'center' }}
+                  />
+                ) : (
+                  <Typography variant="h3" className="font-bold text-blue-600 mb-1">
+                    {activity?.experimental_points || 5}
+                  </Typography>
+                )}
+                <Typography variant="body2" color="textSecondary">
+                  points
+                </Typography>
+              </Paper>
               
-              {/* Sélection d'étudiant */}
-              <div className="mb-6">
-                <FormControl fullWidth>
-                  <InputLabel id="student-select-label">Étudiant</InputLabel>
-                  <Select
-                    labelId="student-select-label"
-                    id="student-select"
-                    value={studentId || ''}
-                    onChange={handleStudentChange}
-                    label="Étudiant"
-                    startAdornment={<PersonAddIcon className="mr-2 text-gray-400" />}
-                    disabled={studentsLoading}
-                  >
-                    <MenuItem value="">
-                      <em>Aucun étudiant sélectionné</em>
-                    </MenuItem>
-                  
-                    {filteredStudents.map((student) => {
-                      // Trouver toutes les classes auxquelles cet étudiant appartient
-                      const studentClasses: string[] = originalStudents
-                        .filter(s => s.id === student.id)
-                        .map(s => (s as any).className)
-                        .filter((name): name is string => Boolean(name));
-                        
-                      // Créer une liste unique des noms de classe
-                      const uniqueClassNames = Array.from(new Set(studentClasses)).join(' | ');
-                      return (
-                        <MenuItem key={student.id} value={student.id}>
-                          {student.first_name} {student.last_name}
-                          {uniqueClassNames && (
-                            <span className="text-gray-500 ml-2">
-                              {uniqueClassNames}
-                            </span>
-                          )}
-                        </MenuItem>
-                      );
-                    })}
-                  </Select>
-                  <Typography variant="caption" className="text-gray-500 mt-1 block">
-                    Sélectionnez un étudiant pour cette correction ou laissez vide
-                  </Typography>
-                </FormControl>
-              </div>
-
-              <div className="bg-blue-50 p-4 rounded-lg mb-6 border border-blue-100">
-                <Typography variant="body2" >
-                  <strong>Information :</strong> Après avoir ajouté la correction, vous pourrez ajouter le contenu détaillé, les notes et les dates de rendu.
+              <Paper className="p-4 border shadow-sm transition-all hover:shadow-md flex flex-col items-center text-center">
+                <Typography variant="overline" color="textSecondary" className="mb-1">
+                  PARTIE THÉORIQUE
                 </Typography>
-              </div>
+                {activityId === "0" ? (
+                  <TextField
+                    type="number"
+                    value={theoreticalPoints}
+                    onChange={(e) => setTheoreticalPoints(Number(e.target.value))}
+                    variant="outlined"
+                    size="small"
+                    inputProps={{ min: 0, max: 20 }}
+                    sx={{ mt: 1, width: '80px', textAlign: 'center' }}
+                  />
+                ) : (
+                  <Typography variant="h3" className="font-bold text-blue-600 mb-1">
+                    {activity?.theoretical_points || 15}
+                  </Typography>
+                )}
+                <Typography variant="body2" color="textSecondary">
+                  points
+                </Typography>
+              </Paper>
+              
+              <Paper className="p-4 border-2 border-blue-600 bg-blue-50 shadow-sm transition-all hover:shadow-md flex flex-col items-center text-center">
+                <Typography variant="overline" color="primary" className="mb-1 font-medium">
+                  TOTAL
+                </Typography>
+                <Typography variant="h3" className="font-bold text-blue-700 mb-1">
+                  {experimentalPoints + theoreticalPoints}
+                </Typography>
+                <Typography variant="body2" color="primary">
+                  points sur 20
+                </Typography>
+              </Paper>
+            </div>
+          </Paper>
 
-              <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mt-8">
-                <Button
-                  variant="text"
-                  color="inherit"
-                  startIcon={<ArrowBackIcon />}
-                  component={Link}
-                  href="/corrections/new"
-                  className="text-gray-600 hover:text-purple-600"
-                >
-                  Retour au choix
-                </Button>
-                
-                <IconButton
-                  color="success"
-                  type="submit"
-                  disabled={isSubmitting}
-                  className="bg-purple-500 hover:bg-purple-600 text-white p-3"
-                  aria-label="enregistrer la correction"
-                  sx={{ borderRadius: '8px' }}
-                >
-                  {isSubmitting ? <HourglassEmptyIcon className="animate-spin" fontSize='large' /> : <SaveIcon fontSize='large'/>}
-                </IconButton>
-              </div>
-            </form>
-          </Box>
-        </Paper>
-      </div>
+          <SingleCorrectionForm
+            activityId={activity.id?.toString() || "0"}
+            activity={activity}
+            experimentalPoints={experimentalPoints}
+            theoreticalPoints={theoreticalPoints}
+            onSuccess={handleSuccessfulCreateCorrection}
+          />
+        </>
+      )}
     </div>
   );
 }

@@ -6,7 +6,7 @@ import {
 import CancelIcon from '@mui/icons-material/Cancel';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import SchoolIcon from '@mui/icons-material/School';
-import CorrectionCard from './CorrectionCard';
+import CorrectionCard from '@/components/allCorrections/CorrectionCard';
 import Grid from '@mui/material/Grid';
 import { Correction as ProviderCorrection } from '@/app/components/CorrectionsDataProvider';
 
@@ -98,7 +98,7 @@ const ClassesList: React.FC<ClassesListProps> = ({
                     sx={{ ml: 2 }}
                   />
                   <Typography variant="body2" sx={{ ml: 'auto' }}>
-                    Moyenne: {(correctionsByClass[classId].corrections.reduce((sum, c) => sum + c.grade, 0) / 
+                    Moyenne : {(correctionsByClass[classId].corrections.reduce((sum, c) => sum + c.grade, 0) / 
                     correctionsByClass[classId].corrections.length).toFixed(1)} / 20
                   </Typography>
                 </Box>
@@ -106,12 +106,15 @@ const ClassesList: React.FC<ClassesListProps> = ({
               <AccordionDetails>
                 <Divider sx={{ mb: 2 }} />
                 <Grid container spacing={3}>
+                
                   {correctionsByClass[classId].corrections.map(correction => (
+                    <Grid size={{ xs: 12, sm: 6, md: 4 }} key={correction.id}>
                     <CorrectionCard 
                       key={correction.id} 
                       correction={correction} 
                       getGradeColor={getGradeColor} 
                     />
+                    </Grid>
                   ))}
                 </Grid>
               </AccordionDetails>

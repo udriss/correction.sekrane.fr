@@ -1,26 +1,10 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { query } from '@/lib/db';
-import { getServerSession } from 'next-auth';
-import { getUser } from '@/lib/auth';
-import authOptions from '@/lib/auth';
 
-// Get all students
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
-    // Authentication check
-    const session = await getServerSession(authOptions);
-    const customUser = await getUser(request);
-    const userId = customUser?.id || session?.user?.id;
-    
-    if (!userId) {
-      return NextResponse.json(
-        { error: 'Authentification requise' },
-        { status: 401 }
-      );
-    }
-    
-    // Get students with class information in a single query
-    const students = await query(`
+    // First, get all students with their class associations
+    const studentsWithClasses = await query<any[]>(`
       SELECT 
         s.*,
         cs.class_id AS classId,
@@ -36,49 +20,56 @@ export async function GET(request: NextRequest) {
         s.last_name, s.first_name
     `);
     
+    // Create a map to consolidate students
+    const studentMap = new Map();
     
-    return NextResponse.json(students);
+    // Process each row to consolidate students and their classes
+    studentsWithClasses.forEach(student => {
+      // If we haven't seen this student before, create a new entry
+      if (!studentMap.has(student.id)) {
+        // Create a new student object with base properties
+        studentMap.set(student.id, {
+          id: student.id,
+          first_name: student.first_name,
+          last_name: student.last_name,
+          email: student.email,
+          gender: student.gender,
+          created_at: student.created_at,
+          updated_at: student.updated_at,
+          // Initialize the allClasses array
+          allClasses: []
+        });
+      }
+      
+      // Add class info to the student's allClasses array if a class exists
+      if (student.classId) {
+        const currentStudent = studentMap.get(student.id);
+        
+        // Add class info to allClasses
+        currentStudent.allClasses.push({
+          classId: student.classId,
+          className: student.className,
+          sub_class: student.sub_class
+        });
+        
+        // If this is the first class, also add it as the primary class
+        if (!currentStudent.classId) {
+          currentStudent.classId = student.classId;
+          currentStudent.className = student.className;
+          currentStudent.sub_class = student.sub_class;
+        }
+      }
+    });
     
+    // Convert the map to an array
+    const consolidatedStudents = Array.from(studentMap.values());
+    
+    return NextResponse.json(consolidatedStudents);
   } catch (error) {
-    console.error('Error fetching students:', error);
+    console.error('Database error:', error);
     return NextResponse.json(
-      { error: 'Erreur lors de la récupération des étudiants' }, 
+      { error: 'Failed to fetch students' },
       { status: 500 }
     );
-  }
-}
-
-// Create a new student
-export async function POST(request: NextRequest) {
-  try {
-    const data = await request.json();
-    let { email, first_name, last_name, gender } = data;
-    
-    if (!first_name || !last_name || !gender) {
-      return NextResponse.json({
-        error: 'First name, last name, and gender are required'
-      }, { status: 400 });
-    }
-    
-    // Traiter l'email vide comme NULL
-    if (!email || email.trim() === '') {
-      email = null;
-    }
-    
-    // Créer l'étudiant avec email NULL si vide
-    const result = await query(
-      'INSERT INTO students (email, first_name, last_name, gender) VALUES (?, ?, ?, ?)',
-      [email, first_name, last_name, gender]
-    );
-    
-    const studentId = (result as any).insertId;
-    
-    // Récupérer et retourner l'étudiant créé
-    const newStudent = await query('SELECT * FROM students WHERE id = ?', [studentId]);
-    
-    return NextResponse.json((newStudent as any[])[0], { status: 201 });
-  } catch (error) {
-    console.error('Error creating student:', error);
-    return NextResponse.json({ error: 'Failed to create student' }, { status: 500 });
   }
 }

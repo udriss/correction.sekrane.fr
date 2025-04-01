@@ -115,7 +115,7 @@ export default function CorrectionGroupDetailPage() {
           }
         }
 
-        // Récupérer les étudiants
+        // Récupérer les étudiants avec la nouvelle structure
         const studentsResponse = await fetch('/api/students');
         if (studentsResponse.ok) {
           const studentsData = await studentsResponse.json();

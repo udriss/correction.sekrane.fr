@@ -15,6 +15,7 @@ import PersonIcon from '@mui/icons-material/Person';
 import Link from 'next/link';
 import dayjs from 'dayjs';
 import { Correction as ProviderCorrection } from '@/app/components/CorrectionsDataProvider';
+import { alpha } from '@mui/material/styles';
 
 interface ChronologyListProps {
   filteredCorrections: ProviderCorrection[];
@@ -22,6 +23,8 @@ interface ChronologyListProps {
   activeFilters: string[];
   handleClearAllFilters: () => void;
   getGradeColor: (grade: number) => string;
+  highlightedIds?: string[];
+  recentFilter?: boolean; // Nouvel ajout pour supporter le filtre recent
 }
 
 const ChronologyList: React.FC<ChronologyListProps> = ({
@@ -29,7 +32,9 @@ const ChronologyList: React.FC<ChronologyListProps> = ({
   error,
   activeFilters,
   handleClearAllFilters,
-  getGradeColor
+  getGradeColor,
+  highlightedIds = [],
+  recentFilter = false // Valeur par défaut false
 }) => {
   // Trier les corrections par date (plus récent en premier)
   const sortedCorrections = [...filteredCorrections].sort((a, b) => 
@@ -50,6 +55,23 @@ const ChronologyList: React.FC<ChronologyListProps> = ({
     
     groupedByMonth[monthKey].push(correction);
   });
+
+  // Fonction pour déterminer si une correction doit être mise en évidence
+  const shouldHighlight = (correction: ProviderCorrection) => {
+    // Si l'ID est explicitement dans la liste des IDs à mettre en évidence
+    if (highlightedIds.includes(correction.id.toString())) {
+      return true;
+    }
+    
+    // Si le filtre "recent" est actif, vérifier si c'est une correction récente (24h)
+    if (recentFilter) {
+      const recentDate = dayjs().subtract(24, 'hour');
+      const correctionDate = dayjs(correction.created_at || correction.submission_date);
+      return correctionDate.isAfter(recentDate);
+    }
+    
+    return false;
+  };
 
   return (
     <Box>
@@ -93,53 +115,85 @@ const ChronologyList: React.FC<ChronologyListProps> = ({
                 {dayjs(monthKey).locale('fr').format('MMMM YYYY')}
               </Typography>
               <Timeline position="alternate" sx={{ p: 0 }}>
-                {monthCorrections.map(correction => (
-                  <TimelineItem key={correction.id}>
-                    <TimelineOppositeContent sx={{ color: 'text.secondary' }}>
-                      {dayjs(correction.submission_date).locale('fr').format('DD MMM YYYY - HH:mm')}
-                    </TimelineOppositeContent>
-                    <TimelineSeparator>
-                      <TimelineDot color={getGradeColor(correction.grade) as "success" | "error" | "info" | "warning" | "primary" | "secondary" | "grey" | undefined}>
-                        <AssignmentIcon />
-                      </TimelineDot>
-                      <TimelineConnector />
-                    </TimelineSeparator>
-                    <TimelineContent>
-                      <Card variant="outlined" sx={{ mt: 1, mb: 3 }}>
-                        <CardContent>
-                          <Link href={`/corrections/${correction.id}`} style={{ textDecoration: 'none', color: 'inherit' }}>
-                            <Typography variant="h6" component="div">
-                              {correction.activity_name}
-                            </Typography>
-                          </Link>
-                          <Divider sx={{ my: 1 }} />
-                          <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
-                            <PersonIcon fontSize="small" sx={{ mr: 0.5, color: 'text.secondary' }} />
-                            <Typography variant="body2" color="text.secondary">
-                              {correction.student_name}
-                            </Typography>
-                          </Box>
-                          <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
-                            <SchoolIcon fontSize="small" sx={{ mr: 0.5, color: 'text.secondary' }} />
-                            <Typography variant="body2" color="text.secondary">
-                              {correction.class_name}
-                            </Typography>
-                          </Box>
-                          <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 2 }}>
-                            <Chip 
-                              size="small" 
-                              color={getGradeColor(correction.grade) as "success" | "error" | "info" | "warning" | "primary" | "secondary" | "default"} 
-                              label={`${correction.grade} / 20`}
+                {monthCorrections.map(correction => {
+                  // Vérifier si cette correction doit être mise en évidence
+                  const isHighlighted = shouldHighlight(correction);
+                  
+                  return (
+                    <TimelineItem key={correction.id}>
+                      <TimelineOppositeContent sx={{ color: 'text.secondary' }}>
+                        {dayjs(correction.submission_date).locale('fr').format('DD MMM YYYY - HH:mm')}
+                      </TimelineOppositeContent>
+                      <TimelineSeparator>
+                        <TimelineDot color={getGradeColor(correction.grade) as "success" | "error" | "info" | "warning" | "primary" | "secondary" | "grey" | undefined}>
+                          <AssignmentIcon />
+                        </TimelineDot>
+                        <TimelineConnector />
+                      </TimelineSeparator>
+                      <TimelineContent>
+                        <Card 
+                          variant="outlined" 
+                          sx={{ 
+                            mt: 1, 
+                            mb: 3,
+                            // Styles spécifiques pour les corrections mises en évidence
+                            border: isHighlighted ? '2px solid' : '1px solid',
+                            borderColor: isHighlighted ? 'secondary.main' : 'divider',
+                            boxShadow: isHighlighted ? (theme) => `0 0 15px ${alpha(theme.palette.secondary.main, 0.5)}` : 'none',
+                            position: 'relative'
+                          }}
+                        >
+                          {/* Badge "Nouveau" pour les corrections mises en évidence */}
+                          {isHighlighted && (
+                            <Chip
+                              label="Nouveau"
+                              color="secondary"
+                              size="small"
+                              sx={{
+                                position: 'absolute',
+                                top: 10,
+                                right: 10,
+                                zIndex: 1,
+                                fontWeight: 'bold'
+                              }}
                             />
-                            <Typography variant="caption" color="text.secondary">
-                              Corrigé le {dayjs(correction.updated_at).locale('fr').format('DD/MM/YYYY')}
-                            </Typography>
-                          </Box>
-                        </CardContent>
-                      </Card>
-                    </TimelineContent>
-                  </TimelineItem>
-                ))}
+                          )}
+                          
+                          <CardContent>
+                            <Link href={`/corrections/${correction.id}`} style={{ textDecoration: 'none', color: 'inherit' }}>
+                              <Typography variant="h6" component="div">
+                                {correction.activity_name}
+                              </Typography>
+                            </Link>
+                            <Divider sx={{ my: 1 }} />
+                            <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+                              <PersonIcon fontSize="small" sx={{ mr: 0.5, color: 'text.secondary' }} />
+                              <Typography variant="body2" color="text.secondary">
+                                {correction.student_name}
+                              </Typography>
+                            </Box>
+                            <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+                              <SchoolIcon fontSize="small" sx={{ mr: 0.5, color: 'text.secondary' }} />
+                              <Typography variant="body2" color="text.secondary">
+                                {correction.class_name}
+                              </Typography>
+                            </Box>
+                            <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 2 }}>
+                              <Chip 
+                                size="small" 
+                                color={getGradeColor(correction.grade) as "success" | "error" | "info" | "warning" | "primary" | "secondary" | "default"} 
+                                label={`${correction.grade} / 20`}
+                              />
+                              <Typography variant="caption" color="text.secondary">
+                                Corrigé le {dayjs(correction.updated_at).locale('fr').format('DD/MM/YYYY')}
+                              </Typography>
+                            </Box>
+                          </CardContent>
+                        </Card>
+                      </TimelineContent>
+                    </TimelineItem>
+                  );
+                })}
               </Timeline>
             </Box>
           ))}

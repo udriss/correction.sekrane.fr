@@ -49,7 +49,7 @@ export async function GET(request: NextRequest) {
         c.id
     `);
 
-    // Création d'un Map pour accéder facilement aux stats de classe
+    // Map pour accéder facilement aux stats de classe
     const classStatsMap: Record<number, { student_count: number }> = {};
     // @ts-ignore - Ignorer l'erreur de type car nous savons que classStats est un tableau
     classStats.forEach((stat: any) => {

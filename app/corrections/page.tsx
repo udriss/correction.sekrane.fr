@@ -8,7 +8,6 @@ import {
   InputLabel, Select, Badge, Divider, ListItemIcon, ListItemText,
   SelectChangeEvent, InputAdornment, Tabs, Tab, 
 } from '@mui/material';
-import NavigateNextIcon from '@mui/icons-material/NavigateNext';
 import Grid from '@mui/material/Grid';
 
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
@@ -26,19 +25,15 @@ import SearchIcon from '@mui/icons-material/Search';
 import GradeIcon from '@mui/icons-material/Grade';
 import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward';
 import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward';
-import CancelIcon from '@mui/icons-material/Cancel';
 import dayjs from 'dayjs';
 import LoadingSpinner from '@/components/LoadingSpinner';
 import GradientBackground from '@/components/ui/GradientBackground';
 import PatternBackground from '@/components/ui/PatternBackground';
-import H1Title from '@/components/ui/H1Title';
-import Link from 'next/link';
 import CorrectionsProvider, { useCorrections } from '@/app/components/CorrectionsDataProvider';
 import CorrectionsList from '@/components/allCorrections/CorrectionsList';
 import ClassesList from '@/components/allCorrections/ClassesList';
 import StudentsList from '@/components/allCorrections/StudentsList';
 import ChronologyList from '@/components/allCorrections/ChronologyList';
-import HomeIcon from '@mui/icons-material/Home';
 
 
 // Composant principal qui utilise le provider
@@ -52,6 +47,9 @@ export default function CorrectionsPage() {
     classId: searchParams?.get('classId') || '',
     studentId: searchParams?.get('studentId') || '',
     activityId: searchParams?.get('activityId') || '',
+    recent: searchParams?.get('recent') === 'true',
+    highlight: searchParams?.get('highlight') || '',
+    correctionId: searchParams?.get('correctionId') || ''
   };
   
   const initialSort = {
@@ -100,6 +98,8 @@ function CorrectionsContent() {
     if (searchParams?.get('classId')) newActiveFilters.push('classId');
     if (searchParams?.get('studentId')) newActiveFilters.push('studentId');
     if (searchParams?.get('activityId')) newActiveFilters.push('activityId');
+    if (searchParams?.get('recent') === 'true') newActiveFilters.push('recent');
+    if (searchParams?.get('correctionId')) newActiveFilters.push('correctionId');
     
     setActiveFilters(newActiveFilters);
   }, [searchParams, setActiveFilters]);
@@ -164,8 +164,12 @@ function CorrectionsContent() {
     handleFilterClose();
     
     // Update URL for certain filters
-    if (['classId', 'studentId', 'activityId', 'search'].includes(filterName)) {
-      updateQueryParams({ [filterName]: filters[filterName as keyof typeof filters] as string });
+    if (['classId', 'studentId', 'activityId', 'search', 'recent', 'correctionId'].includes(filterName)) {
+      if (filterName === 'recent') {
+        updateQueryParams({ recent: 'true' });
+      } else {
+        updateQueryParams({ [filterName]: filters[filterName as keyof typeof filters] as string });
+      }
     }
   };
   
@@ -174,7 +178,7 @@ function CorrectionsContent() {
     removeFilter(filterName);
     
     // Remove from URL
-    if (['classId', 'studentId', 'activityId', 'search'].includes(filterName)) {
+    if (['classId', 'studentId', 'activityId', 'search', 'correctionId', 'recent'].includes(filterName)) {
       const newParams = new URLSearchParams(searchParams?.toString());
       newParams.delete(filterName);
       router.push(`/corrections?${newParams.toString()}`);
@@ -229,12 +233,10 @@ function CorrectionsContent() {
     return 'error';
   };
 
-  
-  
   if (loading && !filteredCorrections.length) {
     return (
       <Container sx={{ py: 4 }}>
-        <Box className='max-w-[400px]' sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', py: 8 }}>
+        <Box className='max-w-[400px]' sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', py: 8, mx: 'auto' }}>
           <LoadingSpinner size="lg" text="Chargement des corrections" />
         </Box>
       </Container>
@@ -243,8 +245,6 @@ function CorrectionsContent() {
   
   return (
     <Container maxWidth="lg" sx={{ py: 4 }}>
-
-      
       {/* Header */}
       <Paper 
         elevation={3} 
@@ -254,199 +254,354 @@ function CorrectionsContent() {
           mb: 4,
         }}
       >
-
-
         <GradientBackground variant="primary" sx={{ p: 0 }}>
-        <PatternBackground 
-        pattern="dots" 
-        opacity={0.05} 
-        color="black" 
-        size={100}
-        sx={{ p: 4, borderRadius: 2 }}
-      >
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 2 }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+          <PatternBackground 
+            pattern="dots" 
+            opacity={0.05} 
+            color="black" 
+            size={100}
+            sx={{ p: 4, borderRadius: 2 }}
+          >
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 2 }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
                 <Box
-                sx={{
-                  background: (theme) => `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.secondary.main} 100%)`,
-                  p: 1.5,
-                  borderRadius: '50%',
-                  display: 'flex',
-                  boxShadow: '0 4px 20px rgba(0,0,0,0.2)'
-                }}
+                  sx={{
+                    background: (theme) => `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.secondary.main} 100%)`,
+                    p: 1.5,
+                    borderRadius: '50%',
+                    display: 'flex',
+                    boxShadow: '0 4px 20px rgba(0,0,0,0.2)'
+                  }}
                 >
-                <AssignmentIcon sx={{ fontSize: 36, color: (theme) => theme.palette.text.primary }} />
+                  <AssignmentIcon sx={{ fontSize: 36, color: (theme) => theme.palette.text.primary }} />
                 </Box>
-              
-              <Box>
-                <Typography variant='h4' fontWeight={700} color='text.primary'>Corrections</Typography>
-                <Typography variant="subtitle1" color='text.secondary' sx={{ opacity: 0.9 }}>
-                  Gérez et analysez toutes les corrections des activités
-                </Typography>
+                
+                <Box>
+                  <Typography variant='h4' fontWeight={700} color='text.primary'>Corrections</Typography>
+                  <Typography variant="subtitle1" color='text.secondary' sx={{ opacity: 0.9 }}>
+                    Gérez et analysez toutes les corrections des activités
+                  </Typography>
+                </Box>
               </Box>
             </Box>
-            
+          
+            {/* Filters display */}
+            {activeFilters.length > 0 && (
+<Box sx={{ 
+  bgcolor: (theme) => alpha(theme.palette.background.paper,1),
+  borderRadius: 2,
+  boxShadow: 3,
+  mt: 2,
+  p: 2,
+  border: '1px solid',
+  borderColor: (theme) => alpha(theme.palette.primary.main, 0.2),
+  position: 'relative',
+  overflow: 'hidden'
+}}>
 
-          </Box>
+  <Box sx={{ 
+    display: 'flex', 
+    alignItems: 'center', 
+    mb: 2,
+    pl: 1
+  }}>
+    <FilterAltIcon sx={{ mr: 1, color: 'primary.main' }} />
+    <Typography 
+      variant="subtitle1" 
+      sx={{ 
+        fontWeight: 600,
+        color: 'text.primary'
+      }}
+    >
+      Filtres actifs ({activeFilters.length})
+    </Typography>
+    <Button 
+      size="small" 
+      onClick={handleClearAllFilters}
+      variant="outlined"
+      startIcon={<CloseIcon />}
+      sx={{ 
+        ml: 'auto',
+        borderRadius: 4,
+        textTransform: 'none',
+        px: 2
+      }}
+    >
+      Tout effacer
+    </Button>
+  </Box>
+  
+  <Box sx={{ 
+    display: 'flex', 
+    flexWrap: 'wrap', 
+    gap: 1.2,
+    pl: 1
+  }}>
+    {activeFilters.includes('search') && (
+      <Chip 
+        label={`Recherche: ${filters.search}`} 
+        onDelete={() => handleRemoveFilter('search')}
+        color="primary"
+        variant="outlined"
+        sx={{ 
+          borderRadius: 3, 
+          '& .MuiChip-deleteIcon': { 
+            color: 'primary.light',
+            '&:hover': { color: 'error.main' } 
+          },
+          py: 0.5,
+          fontWeight: 500,
+          borderWidth: 1.5
+        }}
+      />
+    )}
+    
+    {activeFilters.includes('classId') && (
+      <Chip 
+        icon={<SchoolIcon />}
+        label={`Classe: ${metaData.classes.find(c => c.id.toString() === filters.classId)?.name || 'Inconnue'}`}
+        onDelete={() => handleRemoveFilter('classId')}
+        color="primary"
+        variant="outlined"
+        sx={{ 
+          borderRadius: 3, 
+          '& .MuiChip-deleteIcon': { 
+            color: 'primary.light',
+            '&:hover': { color: 'error.main' } 
+          },
+          py: 0.5,
+          fontWeight: 500,
+          borderWidth: 1.5
+        }}
+      />
+    )}
+    
+    {activeFilters.includes('studentId') && (
+      <Chip 
+        icon={<PersonIcon />}
+        label={`Étudiant: ${metaData.students.find(s => s.id.toString() === filters.studentId)?.name || 'Inconnu'}`}
+        onDelete={() => handleRemoveFilter('studentId')}
+        color="primary"
+        variant="outlined"
+        sx={{ 
+          borderRadius: 3, 
+          '& .MuiChip-deleteIcon': { 
+            color: 'primary.light',
+            '&:hover': { color: 'error.main' } 
+          },
+          py: 0.5,
+          fontWeight: 500,
+          borderWidth: 1.5
+        }}
+      />
+    )}
+    
+    {activeFilters.includes('activityId') && (
+      <Chip 
+        icon={<AssignmentIcon sx={{color: 'secondary.dark'}} />}
+        label={`Activité: ${metaData.activities.find(a => a.id.toString() === filters.activityId)?.name || 'Inconnue'}`}
+        onDelete={() => handleRemoveFilter('activityId')}
+        color="primary"
+        variant="outlined"
+        sx={{ 
+          borderRadius: 3, 
+          '& .MuiChip-deleteIcon': { 
+            color: 'primary.light',
+            '&:hover': { color: 'error.main' } 
+          },
+          py: 0.5,
+          fontWeight: 500,
+          borderWidth: 1.5
+        }}
+      />
+    )}
+    
+    {activeFilters.includes('recent') && (
+      <Chip 
+        icon={<CalendarIcon sx={{color: 'secondary.dark'}} />}
+        label="Dernières 24h"
+        onDelete={() => handleRemoveFilter('recent')}
+        color="secondary"
+        variant="outlined"
+        sx={{ 
+          color:"text.primary",
+          borderRadius: 3, 
+          '& .MuiChip-deleteIcon': { 
+            color: 'secondary.dark',
+            '&:hover': { color: 'error.main' } 
+          },
+          py: 0.5,
+          fontWeight: 500,
+          borderWidth: 1.5
+        }}
+      />
+    )}
+    
+    {activeFilters.includes('dateFrom') && (
+      <Chip 
+        icon={<CalendarIcon sx={{color: 'secondary.dark'}} />}
+        label={`Depuis: ${dayjs(filters.dateFrom).format('DD/MM/YYYY')}`}
+        onDelete={() => handleRemoveFilter('dateFrom')}
+        variant="outlined"
+        sx={{ 
+          borderRadius: 3, 
+          color:"text.primary",
+          '& .MuiChip-deleteIcon': { 
+            color: 'secondary.dark',
+            '&:hover': { color: 'error.main' } 
+          },
+          py: 0.5,
+          fontWeight: 500,
+          borderWidth: 1.5
+        }}
+      />
+    )}
+    
+    {activeFilters.includes('dateTo') && (
+      <Chip 
+        icon={<CalendarIcon sx={{color: 'secondary.dark'}} />}
+        label={`Jusqu'à: ${dayjs(filters.dateTo).format('DD/MM/YYYY')}`}
+        onDelete={() => handleRemoveFilter('dateTo')}
+        color="secondary"
+        variant="outlined"
+        sx={{ 
+          color:"text.primary",
+          borderRadius: 3, 
+          '& .MuiChip-deleteIcon': { 
+            color: 'secondary.dark',
+            '&:hover': { color: 'error.main' } 
+          },
+          py: 0.5,
+          fontWeight: 500,
+          borderWidth: 1.5
+        }}
+      />
+    )}
+    
+    {activeFilters.includes('minGrade') && (
+      <Chip 
+        icon={<GradeIcon sx={{color: 'secondary.dark'}} />}
+        label={`Note min: ${filters.minGrade}`}
+        onDelete={() => handleRemoveFilter('minGrade')}
+        color="info"
+        variant="outlined"
+        sx={{ 
+          borderRadius: 3, 
+          '& .MuiChip-deleteIcon': { 
+            color: 'info.dark',
+            '&:hover': { color: 'error.main' } 
+          },
+          py: 0.5,
+          fontWeight: 500,
+          borderWidth: 1.5
+        }}
+      />
+    )}
+    
+    {activeFilters.includes('maxGrade') && (
+      <Chip 
+        icon={<GradeIcon sx={{color: 'secondary.dark'}} />}
+        label={`Note max: ${filters.maxGrade}`}
+        onDelete={() => handleRemoveFilter('maxGrade')}
+        color="info"
+        variant="outlined"
+        sx={{ 
+          borderRadius: 3, 
+          '& .MuiChip-deleteIcon': { 
+            color: 'info.dark',
+            '&:hover': { color: 'error.main' } 
+          },
+          py: 0.5,
+          fontWeight: 500,
+          borderWidth: 1.5
+        }}
+      />
+    )}
+    
+    {activeFilters.includes('correctionId') && (
+      <Chip 
+        icon={<AssignmentIcon />}
+        label={`ID: ${filters.correctionId}`}
+        onDelete={() => handleRemoveFilter('correctionId')}
+        color="warning"
+        variant="outlined"
+        sx={{ 
+          borderRadius: 3, 
+          '& .MuiChip-deleteIcon': { 
+            color: 'warning.dark',
+            '&:hover': { color: 'error.main' } 
+          },
+          py: 0.5,
+          fontWeight: 500,
+          borderWidth: 1.5
+        }}
+      />
+    )}
+  </Box>
+</Box>
+            )}
+          </PatternBackground>
+        </GradientBackground>
         
-        {/* Filters display */}
-        {activeFilters.length > 0 && (
-          <Box sx={{ bgcolor: 'background.paper', p: 2 }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
-              <Typography variant="subtitle2" sx={{ mr: 2 }}>Filtres actifs :</Typography>
-              <Button 
-                size="small" 
-                onClick={handleClearAllFilters}
-                startIcon={<CloseIcon />}
-                sx={{ ml: 'auto' }}
-              >
-                Tout effacer
-              </Button>
-            </Box>
-            
-            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
-              {activeFilters.includes('search') && (
-                <Chip 
-                  label={`Recherche: ${filters.search}`} 
-                  onDelete={() => handleRemoveFilter('search')}
-                  color="primary"
-                  variant="filled"
-                />
-              )}
-              
-              {activeFilters.includes('classId') && (
-                <Chip 
-                  icon={<SchoolIcon />}
-                  label={`Classe: ${metaData.classes.find(c => c.id.toString() === filters.classId)?.name || 'Inconnue'}`}
-                  onDelete={() => handleRemoveFilter('classId')}
-                  color="primary"
-                  variant="filled"
-                />
-              )}
-              
-              {activeFilters.includes('studentId') && (
-                <Chip 
-                  icon={<PersonIcon />}
-                  label={`Étudiant: ${metaData.students.find(s => s.id.toString() === filters.studentId)?.name || 'Inconnu'}`}
-                  onDelete={() => handleRemoveFilter('studentId')}
-                  color="primary"
-                  variant="filled"
-                />
-              )}
-              
-              {activeFilters.includes('activityId') && (
-                <Chip 
-                  icon={<AssignmentIcon />}
-                  label={`Activité: ${metaData.activities.find(a => a.id.toString() === filters.activityId)?.name || 'Inconnue'}`}
-                  onDelete={() => handleRemoveFilter('activityId')}
-                  color="primary"
-                  variant="filled"
-                />
-              )}
-              
-              {activeFilters.includes('dateFrom') && (
-                <Chip 
-                  icon={<CalendarIcon />}
-                  label={`Depuis: ${dayjs(filters.dateFrom).format('DD/MM/YYYY')}`}
-                  onDelete={() => handleRemoveFilter('dateFrom')}
-                  color="primary"
-                  variant="filled"
-                />
-              )}
-              
-              {activeFilters.includes('dateTo') && (
-                <Chip 
-                  icon={<CalendarIcon />}
-                  label={`Jusqu'à: ${dayjs(filters.dateTo).format('DD/MM/YYYY')}`}
-                  onDelete={() => handleRemoveFilter('dateTo')}
-                  color="primary"
-                  variant="filled"
-                />
-              )}
-              
-              {activeFilters.includes('minGrade') && (
-                <Chip 
-                  icon={<GradeIcon />}
-                  label={`Note min: ${filters.minGrade}`}
-                  onDelete={() => handleRemoveFilter('minGrade')}
-                  color="primary"
-                  variant="filled"
-                />
-              )}
-              
-              {activeFilters.includes('maxGrade') && (
-                <Chip 
-                  icon={<GradeIcon />}
-                  label={`Note max: ${filters.maxGrade}`}
-                  onDelete={() => handleRemoveFilter('maxGrade')}
-                  color="primary"
-                  variant="filled"
-                />
-              )}
-            </Box>
-          </Box>
-        )}
-                  </PatternBackground>
-                  </GradientBackground>
         {/* Stats summary */}
         <Box sx={{ p: 2 }}>
           <Grid container spacing={2} sx={{ display: 'flex', justifyContent: 'space-around', }}>
             <Grid size={{ xs: 12, sm:6, md: 2 }}>
-            <Paper sx={{ 
-              p: 2, 
-              textAlign: 'center', 
-              height: '100%',
-              bgcolor: (theme) => alpha(theme.palette.myBoxes.primary, 0.5),
-              backdropFilter: 'blur(5px)',
-              borderRadius: 2,
+              <Paper sx={{ 
+                p: 2, 
+                textAlign: 'center', 
+                height: '100%',
+                bgcolor: (theme) => alpha(theme.palette.myBoxes.primary, 0.5),
+                backdropFilter: 'blur(5px)',
+                borderRadius: 2,
               }}>
-              <Typography variant="overline" color="text.secondary">Total</Typography>
-              <Typography variant="h3" fontWeight="bold" color="text.primary">{filteredCorrections.length}</Typography>
-              <Typography variant="overline" color="text.secondary">
-              {filteredCorrections.length === 1 ? 'correction' : 'corrections'}
-              </Typography>
+                <Typography variant="overline" color="text.secondary">Total</Typography>
+                <Typography variant="h3" fontWeight="bold" color="text.primary">{filteredCorrections.length}</Typography>
+                <Typography variant="overline" color="text.secondary">
+                  {filteredCorrections.length === 1 ? 'correction' : 'corrections'}
+                </Typography>
               </Paper>
             </Grid>
             
             <Grid size={{ xs: 12, sm:6, md: 2 }}>
-            <Paper sx={{ 
-              p: 2, 
-              textAlign: 'center', 
-              height: '100%',
-              bgcolor: (theme) => alpha(theme.palette.myBoxes.primary, 0.5),
-              backdropFilter: 'blur(5px)',
-              borderRadius: 2,
+              <Paper sx={{ 
+                p: 2, 
+                textAlign: 'center', 
+                height: '100%',
+                bgcolor: (theme) => alpha(theme.palette.myBoxes.primary, 0.5),
+                backdropFilter: 'blur(5px)',
+                borderRadius: 2,
               }}>
                 <Typography variant="overline" color="text.secondary">Moyenne</Typography>
                 <Typography variant="h3" fontWeight="bold" color="text.primary">
-                {filteredCorrections.length 
-                  ? (filteredCorrections.reduce((sum, c) => {
-                      // Trouver l'activité correspondante pour obtenir le barème total
-                      const activity = metaData.activities.find(a => a.id === c.activity_id);
-                          const totalPoints = activity 
+                  {filteredCorrections.length 
+                    ? (filteredCorrections.reduce((sum, c) => {
+                        // Trouver l'activité correspondante pour obtenir le barème total
+                        const activity = metaData.activities.find(a => a.id === c.activity_id);
+                        const totalPoints = activity 
                           ? ((activity as Activity).experimental_points || 0) + ((activity as Activity).theoretical_points || 0) 
                           : 20;
-                      
-                      // Normaliser la note sur 20 points
-                      const grade = typeof c.grade === 'string' ? parseFloat(c.grade) : c.grade;
-                      const normalizedGrade = totalPoints > 0 ? (grade / totalPoints) * 20 : grade;
-                      
-                      return sum + normalizedGrade;
-                    }, 0) / filteredCorrections.length).toFixed(1)
-                  : '-'}
-              </Typography>
+                        
+                        // Normaliser la note sur 20 points
+                        const grade = typeof c.grade === 'string' ? parseFloat(c.grade) : c.grade;
+                        const normalizedGrade = totalPoints > 0 ? (grade / totalPoints) * 20 : grade;
+                        
+                        return sum + normalizedGrade;
+                      }, 0) / filteredCorrections.length).toFixed(1)
+                    : '-'}
+                </Typography>
                 <Typography variant="overline" color="text.secondary">/ 20</Typography>
               </Paper>
             </Grid>
             
             <Grid size={{ xs: 12, sm:6, md: 2 }}>
-            <Paper sx={{ 
-              p: 2, 
-              textAlign: 'center', 
-              height: '100%',
-              bgcolor: (theme) => alpha(theme.palette.myBoxes.primary, .5),
-              backdropFilter: 'blur(5px)',
-              borderRadius: 2,
+              <Paper sx={{ 
+                p: 2, 
+                textAlign: 'center', 
+                height: '100%',
+                bgcolor: (theme) => alpha(theme.palette.myBoxes.primary, .5),
+                backdropFilter: 'blur(5px)',
+                borderRadius: 2,
               }}>
                 <Typography variant="overline" color="text.secondary">Classes</Typography>
                 <Typography variant="h3" fontWeight="bold" color="text.primary">
@@ -459,13 +614,13 @@ function CorrectionsContent() {
             </Grid>
             
             <Grid size={{ xs: 12, sm:6, md: 2 }}>
-            <Paper sx={{ 
-              p: 2, 
-              textAlign: 'center', 
-              height: '100%',
-              bgcolor: (theme) => alpha(theme.palette.myBoxes.primary, 0.5),
-              backdropFilter: 'blur(5px)',
-              borderRadius: 2,
+              <Paper sx={{ 
+                p: 2, 
+                textAlign: 'center', 
+                height: '100%',
+                bgcolor: (theme) => alpha(theme.palette.myBoxes.primary, 0.5),
+                backdropFilter: 'blur(5px)',
+                borderRadius: 2,
               }}>
                 <Typography variant="overline" color="text.secondary">Étudiants</Typography>
                 <Typography variant="h3" fontWeight="bold" color="text.primary">
@@ -551,6 +706,8 @@ function CorrectionsContent() {
           activeFilters={activeFilters}
           handleClearAllFilters={handleClearAllFilters}
           getGradeColor={getGradeColor}
+          highlightedIds={searchParams?.get('highlight')?.split(',').filter(Boolean) || []}
+          recentFilter={activeFilters.includes('recent')}
         />
       )}
       
@@ -571,6 +728,8 @@ function CorrectionsContent() {
           activeFilters={activeFilters}
           handleClearAllFilters={handleClearAllFilters}
           getGradeColor={getGradeColor}
+          highlightedIds={searchParams?.get('highlight')?.split(',').filter(Boolean) || []}
+          recentFilter={activeFilters.includes('recent')}
         />
       )}
       
@@ -581,6 +740,8 @@ function CorrectionsContent() {
           activeFilters={activeFilters}
           handleClearAllFilters={handleClearAllFilters}
           getGradeColor={getGradeColor}
+          highlightedIds={searchParams?.get('highlight')?.split(',').filter(Boolean) || []}
+          recentFilter={activeFilters.includes('recent')}
         />
       )}
       
@@ -913,6 +1074,47 @@ function CorrectionsContent() {
               <CheckIcon fontSize="small" />
             </Button>
           </Box>
+        </Box>
+        
+        <Box sx={{ mb: 2 }}>
+          <TextField
+            name="correctionId"
+            label="ID de correction"
+            fullWidth
+            size="small"
+            value={filters.correctionId}
+            onChange={handleFilterChange}
+            InputProps={{
+              startAdornment: (
+                <InputAdornment position="start">
+                  <AssignmentIcon fontSize="small" />
+                </InputAdornment>
+              ),
+            }}
+          />
+          <Button 
+            variant="text" 
+            size="small" 
+            onClick={() => handleApplyFilter('correctionId')}
+            disabled={!filters.correctionId}
+            sx={{ mt: 0.5 }}
+          >
+            Appliquer
+          </Button>
+        </Box>
+        
+        <Box sx={{ mb: 2 }}>
+          <Button
+            fullWidth
+            variant="outlined"
+            sx={{ color: theme => theme.palette.text.primary, 
+              bgcolor: theme => alpha(theme.palette.secondary.main, 0.1),
+              borderColor: theme => theme.palette.secondary.dark }}
+            onClick={() => handleApplyFilter('recent')}
+            startIcon={<CalendarIcon />}
+          >
+            Corrections des dernières 24h
+          </Button>
         </Box>
         
         <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 2 }}>

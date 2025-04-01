@@ -45,6 +45,21 @@ declare module '@mui/material/styles' {
     gradients?: typeof themeGradients.light;
   }
   
+  // Define the myBoxes interface
+  interface MyBoxesColorOptions {
+    primary: string;
+    secondary: string;
+  }
+  
+  // Extend the Palette and PaletteOptions interfaces to include myBoxes
+  interface Palette {
+    myBoxes: MyBoxesColorOptions;
+  }
+  
+  interface PaletteOptions {
+    myBoxes?: Partial<MyBoxesColorOptions>;
+  }
+  
   // Étendre l'interface PaletteColor pour inclure plus de nuances
   interface PaletteColor {
     50?: string;

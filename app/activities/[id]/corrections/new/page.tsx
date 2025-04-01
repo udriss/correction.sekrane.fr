@@ -17,7 +17,10 @@ import {
   InputLabel,
   Select,
   MenuItem,
-  SelectChangeEvent
+  SelectChangeEvent,
+  FormHelperText,
+  Tabs,
+  Tab
 } from '@mui/material';
 import Link from 'next/link';
 import AssignmentIcon from '@mui/icons-material/Assignment';
@@ -28,9 +31,11 @@ import SaveIcon from '@mui/icons-material/Save';
 import HomeIcon from '@mui/icons-material/Home';
 import HourglassEmptyIcon from '@mui/icons-material/HourglassEmpty';
 import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline';
-import {Student} from '@/lib/types'
+import {Student} from '@/lib/types';
 import CheckIcon from '@mui/icons-material/Check';
 import CloseIcon from '@mui/icons-material/Close';
+import GroupIcon from '@mui/icons-material/Group';
+import { addRecentCorrection } from '@/lib/recentCorrections';
 
 export default function NewCorrection({ params }: { params: Promise<{ id: string }> }) {
   // Unwrap the Promise for params using React.use
@@ -47,10 +52,19 @@ export default function NewCorrection({ params }: { params: Promise<{ id: string
   const router = useRouter();
   const [classId, setClassId] = useState<number | null>(null);
   const [activityClasses, setActivityClasses] = useState<any[]>([]);
+  const [unassociatedClasses, setUnassociatedClasses] = useState<any[]>([]);
   const [filteredStudents, setFilteredStudents] = useState<Student[]>([]);
   const [originalStudents, setOriginalStudents] = useState<Student[]>([]);
   const [showConfirmation, setShowConfirmation] = useState(false);
   const [warningMessages, setWarningMessages] = useState<string[]>([]);
+  
+  // Nouveaux états pour les sous-classes et le système d'onglets
+  const [subClassOptions, setSubClassOptions] = useState<string[]>([]);
+  const [selectedSubClass, setSelectedSubClass] = useState<string | null>(null);
+  const [subClassLoading, setSubClassLoading] = useState(false);
+  const [classesLoading, setClassesLoading] = useState(false);
+  const [hasSubClasses, setHasSubClasses] = useState(false);
+  const [classTabValue, setClassTabValue] = useState(0); // 0 = associated, 1 = unassociated
 
   useEffect(() => {
     const fetchActivity = async () => {
@@ -70,98 +84,50 @@ export default function NewCorrection({ params }: { params: Promise<{ id: string
     const fetchStudents = async () => {
       try {
         setStudentsLoading(true);
+        setClassesLoading(true);
         
-        // 1. Récupérer tous les étudiants avec leurs associations de classes
+        // Récupérer tous les étudiants - maintenant avec structure consolidée
         const response = await fetch('/api/students');
         if (!response.ok) throw new Error('Erreur lors du chargement des étudiants');
         const data = await response.json();
         
-        // Stocker les données originales pour pouvoir récupérer toutes les classes
+        // Stocker les données originales
         setOriginalStudents(data);
         
-        // 2. Récupérer les classes associées à cette activité
-        const classesResponse = await fetch(`/api/activities/${activityId}/classes`);
-        let classes: any[] = [];
+        // 1. Récupérer les classes associées à cette activité
+        const associatedClassesResponse = await fetch(`/api/activities/${activityId}/classes`);
+        let associatedClasses: any[] = [];
         
-        if (classesResponse.ok) {
-          classes = await classesResponse.json();
-          setActivityClasses(classes);
+        if (associatedClassesResponse.ok) {
+          associatedClasses = await associatedClassesResponse.json();
+          setActivityClasses(associatedClasses);
         }
         
-        // 3. Initialiser un Map pour éliminer les doublons d'étudiants
-        const uniqueStudents = new Map<number, any>();
+        // 2. Récupérer toutes les classes pour trouver celles qui ne sont pas associées
+        const allClassesResponse = await fetch('/api/classes');
         
-        // 4. Traiter les données des étudiants
-        if (classes.length > 0) {
-          // Si l'activité est associée à des classes, on ne garde que les étudiants de ces classes
-          const classIds = classes.map(cls => cls.id);
+        if (allClassesResponse.ok) {
+          const allClasses = await allClassesResponse.json();
           
-          // Créer une map des classes pour un accès rapide au nom de la classe
-          const classMap = new Map<number, string>();
-          classes.forEach(cls => {
-            classMap.set(cls.id, cls.name);
-          });
+          // Identifier les classes non associées
+          const associatedIds = new Set(associatedClasses.map(c => c.id));
+          const unassociated = allClasses.filter((c: any) => !associatedIds.has(c.id));
           
-          data.forEach((student: any) => {
-            // Ne conserver que les étudiants associés à l'une des classes de l'activité
-            if (student.classId && classIds.includes(student.classId)) {
-              // Stocker dans le Map en utilisant l'ID de l'étudiant comme clé
-              if (!uniqueStudents.has(student.id)) {
-                // Créer un objet Student conforme au type attendu
-                const studentObj = {
-                  id: student.id,
-                  first_name: student.first_name,
-                  last_name: student.last_name,
-                  email: student.email,
-                } as Student;
-                
-                // Ajouter des propriétés additionnelles
-                (studentObj as any)._classId = student.classId;
-                // Utiliser le nom de la classe de notre map classMap si disponible, sinon utiliser celui du student
-                (studentObj as any).class_name = classMap.get(student.classId) || student.class_name || '';
-                
-                uniqueStudents.set(student.id, studentObj);
-              }
-            }
-          });
-          
-          // S'il y a exactement une classe, la sélectionner par défaut
-          if (classes.length === 1) {
-            setClassId(classes[0].id);
-          }
-        } else {
-          // Si aucune classe n'est associée, on garde tous les étudiants sans doublon
-          data.forEach((student: any) => {
-            if (!uniqueStudents.has(student.id)) {
-              // Créer un objet Student conforme au type attendu
-              const studentObj = {
-                id: student.id,
-                first_name: student.first_name,
-                last_name: student.last_name,
-                email: student.email,
-              } as Student;
-              
-              // Ajouter des propriétés additionnelles
-              (studentObj as any)._classId = student.classId;
-              // S'assurer qu'on a bien le nom de la classe
-              (studentObj as any).class_name = student.class_name || '';
-              
-              uniqueStudents.set(student.id, studentObj);
-            }
-          });
+          setUnassociatedClasses(unassociated);
         }
         
-        // Convertir le Map en tableau et trier par nom
-        const uniqueStudentsArray = Array.from(uniqueStudents.values())
-          .sort((a, b) => `${a.last_name} ${a.first_name}`.localeCompare(`${b.last_name} ${b.first_name}`));
+        // Les données sont déjà dédupliquées, juste besoin de trier
+        const sortedStudents = [...data].sort((a, b) => 
+          `${a.last_name} ${a.first_name}`.localeCompare(`${b.last_name} ${b.first_name}`)
+        );
         
-        setStudents(uniqueStudentsArray);
-        setFilteredStudents(uniqueStudentsArray);
+        setStudents(sortedStudents);
+        setFilteredStudents(sortedStudents);
       } catch (err) {
         console.error('Erreur:', err);
-        // Ne pas définir d'erreur pour ne pas bloquer l'interface
       } finally {
         setStudentsLoading(false);
+        setClassesLoading(false);
       }
     };
 
@@ -169,24 +135,96 @@ export default function NewCorrection({ params }: { params: Promise<{ id: string
     fetchStudents();
   }, [activityId]);
 
-  // Ajouter un useEffect pour filtrer les étudiants lorsque classId change
+  // Cette fonction récupère les sous-classes disponibles pour une classe donnée
+  const fetchSubClasses = async (selectedClassId: number) => {
+    setSubClassLoading(true);
+    setHasSubClasses(false);
+    setSelectedSubClass(null);
+    
+    try {
+      const response = await fetch(`/api/classes/${selectedClassId}`);
+      if (!response.ok) throw new Error('Erreur lors du chargement des sous-classes');
+      
+      const classData = await response.json();
+      
+      if (classData.nbre_subclasses && classData.nbre_subclasses > 0) {
+        // Créer un tableau de sous-classes basé sur nbre_subclasses
+        const subClasses = Array.from({ length: classData.nbre_subclasses }, (_, i) => (i + 1).toString());
+        setSubClassOptions(subClasses);
+        setHasSubClasses(true);
+      } else {
+        setSubClassOptions([]);
+        setHasSubClasses(false);
+      }
+    } catch (err) {
+      console.error('Erreur lors du chargement des sous-classes:', err);
+      setSubClassOptions([]);
+      setHasSubClasses(false);
+    } finally {
+      setSubClassLoading(false);
+    }
+  };
+
+  // Gestionnaire pour le changement d'onglet des classes
+  const handleClassTabChange = (event: React.SyntheticEvent, newValue: number) => {
+    setClassTabValue(newValue);
+    setClassId(null); // Réinitialiser la sélection de classe
+    setSelectedSubClass(null); // Réinitialiser la sous-classe
+    setHasSubClasses(false);
+  };
+
+  // Cette fonction permet d'obtenir les classes à afficher selon l'onglet actif
+  const getDisplayedClasses = () => {
+    return classTabValue === 0 ? activityClasses : unassociatedClasses;
+  };
+
+  // Effet pour filtrer les étudiants en fonction de la classe et sous-classe sélectionnées
   useEffect(() => {
     if (classId) {
-      // Filtrer les étudiants par classe sélectionnée
-      const filtered = originalStudents.filter(student => (student as any).classId === classId);
-      setFilteredStudents(filtered);
+      // Filtrer les étudiants par classe sélectionnée puis par sous-classe si applicable
+      const studentsInClass = originalStudents.filter(student => 
+        student.allClasses && student.allClasses.some(cls => cls.classId === classId)
+      );
+      
+      if (selectedSubClass) {
+        const studentsInSubClass = studentsInClass.filter(student => 
+          student.allClasses && student.allClasses.some(cls => 
+            cls.classId === classId && cls.sub_class?.toString() === selectedSubClass
+          )
+        );
+        setFilteredStudents(studentsInSubClass);
+      } else {
+        setFilteredStudents(studentsInClass);
+      }
     } else {
       // Si aucune classe n'est sélectionnée, montrer tous les étudiants disponibles
       setFilteredStudents(students);
     }
-  }, [classId, students, originalStudents]);
+  }, [classId, selectedSubClass, originalStudents, students]);
 
   const handleStudentChange = (event: SelectChangeEvent<number>) => {
     setStudentId(event.target.value as number);
   };
 
   const handleClassChange = (event: SelectChangeEvent<number>) => {
-    setClassId(event.target.value as number);
+    const newClassId = event.target.value as number;
+    setClassId(newClassId);
+    
+    // Réinitialiser la sous-classe lorsqu'une nouvelle classe est sélectionnée
+    setSelectedSubClass(null);
+    
+    // Charger les sous-classes pour cette classe
+    if (newClassId) {
+      fetchSubClasses(newClassId);
+    } else {
+      setSubClassOptions([]);
+      setHasSubClasses(false);
+    }
+  };
+
+  // Nouveau gestionnaire pour le changement de sous-classe
+  const handleSubClassChange = (event: SelectChangeEvent<string>) => {
+    setSelectedSubClass(event.target.value);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -194,8 +232,12 @@ export default function NewCorrection({ params }: { params: Promise<{ id: string
     
     // Vérifications préalables à la soumission
     let warnings = [];
-    if (activityClasses.length > 0 && !classId) {
+    
+    if (!classId) {
       warnings.push("Aucune classe n'est sélectionnée. La correction sera ajoutée sans association à une classe.");
+    } else if (classTabValue === 1) {
+      // Avertissement pour les classes non associées
+      warnings.push("Vous avez sélectionné une classe qui n'est pas encore associée à cette activité. Elle sera automatiquement associée.");
     }
     
     if (!studentId) {
@@ -218,23 +260,58 @@ export default function NewCorrection({ params }: { params: Promise<{ id: string
     setError('');
 
     try {
+      // Si une classe est sélectionnée et que nous sommes dans l'onglet des classes non associées,
+      // l'associer à l'activité
+      if (classId && classTabValue === 1) {
+        try {
+          const associationResponse = await fetch(`/api/activities/${activityId}/classes`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              class_id: classId
+            }),
+          });
+          
+          if (!associationResponse.ok) {
+            // Extraction du message d'erreur contextualisé
+            const errorData = await associationResponse.json();
+            console.warn(`Problème lors de l'association de classe : ${errorData.message || "Problème lors de l'association de classe."}`);
+            
+            // Si l'erreur n'est pas que l'association existe déjà, on arrête le processus
+            if (!errorData.exists) {
+              throw new Error(`Impossible d'associer la classe à l'activité : ${errorData.message}` || "Impossible d'associer la classe à l'activité.");
+            }
+          }
+        } catch (error) {
+          if (error instanceof Error) {
+            throw error; // Propager l'erreur avec son message contextualisé
+          }
+        }
+      }
+
       // Ajouter un délai de 1 seconde avant l'envoi
       await new Promise(resolve => setTimeout(resolve, 1000));
       
-      console.log('Submitting correction with data:',
-        studentId,
-        classId)
-        
+      // Inclure la sous-classe dans la requête si elle est définie
+      const requestData: any = { 
+        student_id: studentId,
+        class_id: classId,
+        content: '' 
+      };
+      
+      // Ajouter l'information de sous-classe si disponible
+      if (selectedSubClass) {
+        requestData.sub_class = selectedSubClass;
+      }
+
       const response = await fetch(`/api/activities/${activityId}/corrections`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ 
-          student_id: studentId,
-          class_id: classId,
-          content: '' 
-        }),
+        body: JSON.stringify(requestData),
       });
 
       if (!response.ok) {
@@ -242,10 +319,16 @@ export default function NewCorrection({ params }: { params: Promise<{ id: string
       }
 
       const data = await response.json();
-      router.push(`/corrections/${data.id}`);
+      
+      // Stocker l'ID de la correction dans sessionStorage pour le suivi
+      addRecentCorrection(data.id);
+      
+      // Rediriger vers la page de la correction individuelle ou une vue filtrée
+      router.push(`/corrections?activity=${activityId}&highlight=${data.id}`);
     } catch (err) {
       console.error('Erreur:', err);
-      setError('Erreur lors de la création de la correction');
+      // Afficher le message d'erreur contextualisé
+      setError(err instanceof Error ? err.message : 'Erreur lors de la création de la correction');
     } finally {
       setIsSubmitting(false);
     }
@@ -307,10 +390,10 @@ export default function NewCorrection({ params }: { params: Promise<{ id: string
     <div className="min-h-screen bg-gray-50 py-10">
       <div className="max-w-4xl mx-auto px-4">
         <div className="mb-8 text-center">
-          <Typography variant="h4" component="h1" className="font-bold text-blue-800 mb-2">
-            Nouvelle correction
+          <Typography variant="h4" component="h1" sx={{ color: 'text.primary', fontWeight: 700 }}>
+            Correction unique
           </Typography>
-          <Typography variant="subtitle1" className="text-gray-600">
+          <Typography variant="subtitle1" component="h5" sx={{ color: 'text.secondary' }}>
             {activity.name}
           </Typography>
         </div>
@@ -385,32 +468,95 @@ export default function NewCorrection({ params }: { params: Promise<{ id: string
             )}
             
             <form onSubmit={handleSubmit}>
-              {/* Ajout du select pour choisir la classe si plusieurs classes sont disponibles */}
-              {activityClasses.length > 1 && (
+              {/* Tabs pour choisir entre classes associées et non associées */}
+              <Box sx={{ mb: 2, borderBottom: 1, borderColor: 'divider' }}>
+                <Tabs 
+                  value={classTabValue} 
+                  onChange={handleClassTabChange}
+                  aria-label="class selection tabs"
+                >
+                  <Tab label={`Classes associées (${activityClasses.length})`} />
+                  <Tab label={`Autres classes (${unassociatedClasses.length})`} />
+                </Tabs>
+              </Box>
+              
+              {/* Sélection de classe */}
+              <div className="mb-6">
+                <FormControl fullWidth disabled={classesLoading}>
+                  <InputLabel id="class-select-label">
+                    {classTabValue === 0 ? "Classe associée" : "Autre classe"}
+                  </InputLabel>
+                  <Select
+                    labelId="class-select-label"
+                    id="class-select"
+                    value={classId || ''}
+                    onChange={handleClassChange}
+                    label={classTabValue === 0 ? "Classe associée" : "Autre classe"}
+                    startAdornment={
+                      classesLoading ? (
+                        <CircularProgress size={20} className="mr-2" />
+                      ) : (
+                        <SchoolIcon className="mr-2 text-gray-400" />
+                      )
+                    }
+                  >
+                    <MenuItem value="">
+                      <em>Aucune classe</em>
+                    </MenuItem>
+                    {getDisplayedClasses().map((cls) => (
+                      <MenuItem key={cls.id} value={cls.id}>
+                        {cls.name}
+                      </MenuItem>
+                    ))}
+                  </Select>
+                  <FormHelperText>
+                    {classesLoading 
+                      ? "Chargement des classes..." 
+                      : getDisplayedClasses().length === 0
+                        ? classTabValue === 0
+                          ? "Aucune classe n'est associée à cette activité"
+                          : "Toutes les classes sont déjà associées à cette activité"
+                        : classTabValue === 0
+                          ? "Sélectionnez une classe associée à cette activité"
+                          : "Sélectionnez une classe à associer à cette activité"
+                    }
+                  </FormHelperText>
+                </FormControl>
+              </div>
+              
+              {/* Nouveau sélecteur de sous-classe (affiché conditionnellement) */}
+              {hasSubClasses && (
                 <div className="mb-6">
-                  <FormControl fullWidth>
-                    <InputLabel id="class-select-label">Classe</InputLabel>
+                  <FormControl fullWidth disabled={subClassLoading}>
+                    <InputLabel id="subclass-select-label">Sous-classe / Groupe</InputLabel>
                     <Select
-                      labelId="class-select-label"
-                      id="class-select"
-                      value={classId || ''}
-                      onChange={handleClassChange}
-                      label="Classe"
-                      startAdornment={<SchoolIcon className="mr-2 text-gray-400" />}
-                      disabled={studentsLoading}
+                      labelId="subclass-select-label"
+                      id="subclass-select"
+                      value={selectedSubClass || ''}
+                      onChange={handleSubClassChange}
+                      label="Sous-classe / Groupe"
+                      startAdornment={
+                        subClassLoading ? (
+                          <CircularProgress size={20} className="mr-2" />
+                        ) : (
+                          <GroupIcon className="mr-2 text-gray-400" />
+                        )
+                      }
                     >
                       <MenuItem value="">
-                        <em>Toutes les classes</em>
+                        <em>Tous les groupes</em>
                       </MenuItem>
-                      {activityClasses.map((cls) => (
-                        <MenuItem key={cls.id} value={cls.id}>
-                          {cls.name}
+                      {subClassOptions.map((subClass) => (
+                        <MenuItem key={subClass} value={subClass}>
+                          Groupe {subClass}
                         </MenuItem>
                       ))}
                     </Select>
-                    <Typography variant="caption" className="text-gray-500 mt-1 block">
-                      Sélectionnez une classe pour filtrer les étudiants
-                    </Typography>
+                    <FormHelperText>
+                      {subClassLoading 
+                        ? "Chargement des groupes..." 
+                        : "Sélectionnez un groupe pour filtrer davantage les étudiants"}
+                    </FormHelperText>
                   </FormControl>
                 </div>
               )}
@@ -424,7 +570,13 @@ export default function NewCorrection({ params }: { params: Promise<{ id: string
                     value={studentId || ''}
                     onChange={handleStudentChange}
                     label="Étudiant"
-                    startAdornment={<PersonAddIcon className="mr-2 text-gray-400" />}
+                    startAdornment={
+                      studentsLoading ? (
+                        <CircularProgress size={20} className="mr-2" />
+                      ) : (
+                        <PersonAddIcon className="mr-2 text-gray-400" />
+                      )
+                    }
                     disabled={studentsLoading}
                   >
                     <MenuItem value="">
@@ -432,60 +584,67 @@ export default function NewCorrection({ params }: { params: Promise<{ id: string
                     </MenuItem>
                   
                     {filteredStudents.map((student) => {
-                      // Trouver toutes les classes auxquelles cet étudiant appartient
-                      const studentClasses: string[] = originalStudents
-                        .filter(s => s.id === student.id)
-                        .map(s => (s as any).className)
-                        .filter((name): name is string => Boolean(name)); // Type guard to ensure non-null values
+                      // Obtenir tous les noms de classe pour cet étudiant à partir de allClasses
+                      const studentClasses = student.allClasses 
+                        ? student.allClasses.map(cls => cls.className)
+                        : [];
                         
                       // Créer une liste unique des noms de classe
                       const uniqueClassNames = Array.from(new Set(studentClasses)).join(' | ');
+                      
+                      // Obtenir la sous-classe si elle existe
+                      let subClassInfo = '';
+                      if (classId && student.allClasses) {
+                        const classAssignment = student.allClasses.find(cls => cls.classId === classId);
+                        if (classAssignment && classAssignment.sub_class) {
+                          subClassInfo = ` (Groupe ${classAssignment.sub_class})`;
+                        }
+                      }
+                      
                       return (
                         <MenuItem key={student.id} value={student.id}>
                           {student.first_name} {student.last_name}
                           {uniqueClassNames && (
                             <span className="text-gray-500 ml-2">
-                              {uniqueClassNames}
+                              {uniqueClassNames}{subClassInfo}
                             </span>
                           )}
                         </MenuItem>
                       );
                     })}
                   </Select>
-                  <Typography variant="caption" className="text-gray-500 mt-1 block">
-                    Sélectionnez un étudiant pour cette correction ou laissez vide
-                  </Typography>
+                  <FormHelperText>
+                    {studentsLoading 
+                      ? "Chargement des étudiants..." 
+                      : filteredStudents.length === 0
+                        ? "Aucun étudiant ne correspond à vos critères"
+                        : `${filteredStudents.length} étudiant(s) disponible(s)`}
+                  </FormHelperText>
                 </FormControl>
               </div>
 
               <div className="bg-blue-50 p-4 rounded-lg mb-6 border border-blue-100">
-                <Typography variant="body2" >
+                <Typography component={'div'} variant="body2">
                   <strong>Information :</strong> Après avoir ajouté la correction, vous pourrez ajouter le contenu détaillé, les notes et les dates de rendu.
+                  {classTabValue === 1 && classId && (
+                    <Box sx={{ mt: 1 }}>
+                      <strong>Note :</strong> La classe sélectionnée sera automatiquement associée à cette activité.
+                    </Box>
+                  )}
                 </Typography>
               </div>
 
-              <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mt-8">
+              <div className="flex justify-center">
                 <Button
-                  variant="text"
-                  color="inherit"
-                  startIcon={<ArrowBackIcon />}
-                  component={Link}
-                  href={`/activities/${activityId}`}
-                  className="text-gray-600 hover:text-purple-600"
-                >
-                  Retour à l'activité
-                </Button>
-                
-                <IconButton
-                  color="success"
                   type="submit"
+                  variant="contained"
+                  color="primary"
+                  size="large"
                   disabled={isSubmitting}
-                  className="bg-purple-500 hover:bg-purple-600 text-white p-3"
-                  aria-label="enregistrer la correction"
-                  sx={{ borderRadius: '8px' }}
+                  startIcon={isSubmitting ? <HourglassEmptyIcon className="animate-spin" /> : <SaveIcon />}
                 >
-                    {isSubmitting ? <HourglassEmptyIcon className="animate-spin" fontSize='large' /> : <SaveIcon fontSize='large'/>}
-                </IconButton>
+                  {isSubmitting ? "Création en cours..." : "Créer la correction"}
+                </Button>
               </div>
             </form>
           </Box>

@@ -2,28 +2,66 @@ import { NextResponse } from 'next/server';
 import { withConnection } from '@/lib/db';
 
 export async function GET(
-  request: Request,
-  { params }: { params: Promise<{ id: string }> }
+  request: Request
 ) {
   try {
-    // Attendre la résolution des paramètres
-    const { id } = await params;
+    // Get query parameters from the URL
+    const url = new URL(request.url);
+    const searchParams = url.searchParams;
     
-    // Vérifier que l'ID est un nombre valide
-    const activityId = parseInt(id, 10);
-    if (isNaN(activityId)) {
-      return NextResponse.json({ error: 'ID d\'activité invalide' }, { status: 400 });
+    // Parse specific IDs if provided (for recent or batch corrections)
+    const idsParam = searchParams.get('ids');
+    let specificIds: number[] = [];
+    
+    if (idsParam) {
+      specificIds = idsParam.split(',')
+        .map(id => parseInt(id.trim(), 10))
+        .filter(id => !isNaN(id));
+    }
+    
+    // Parse activity ID if provided
+    const activityIdParam = searchParams.get('activity_id');
+    let activityId: number | null = null;
+    
+    if (activityIdParam) {
+      activityId = parseInt(activityIdParam, 10);
+      if (isNaN(activityId)) {
+        return NextResponse.json({ error: 'ID d\'activité invalide' }, { status: 400 });
+      }
     }
 
-    // Récupérer toutes les corrections pour cette activité
+    // Build query based on parameters
     return await withConnection(async (connection) => {
-      const [rows] = await connection.query(
-        `SELECT c.*, CONCAT(s.first_name, ' ', s.last_name) as student_name 
-         FROM corrections c
-         LEFT JOIN students s ON c.student_id = s.id
-         WHERE c.activity_id = ? ORDER BY c.created_at DESC`,
-        [activityId]
-      );
+      let query = `
+        SELECT c.*, 
+               CONCAT(s.first_name, ' ', s.last_name) as student_name,
+               a.name as activity_name,
+               cl.name as class_name
+        FROM corrections c
+        LEFT JOIN students s ON c.student_id = s.id
+        LEFT JOIN activities a ON c.activity_id = a.id
+        LEFT JOIN classes cl ON c.class_id = cl.id
+        WHERE 1=1
+      `;
+      
+      const params: any[] = [];
+      
+      // Add activity filter if needed
+      if (activityId) {
+        query += " AND c.activity_id = ?";
+        params.push(activityId);
+      }
+      
+      // Add specific IDs filter if needed
+      if (specificIds.length > 0) {
+        query += ` AND c.id IN (${specificIds.map(() => '?').join(',')})`;
+        params.push(...specificIds);
+      }
+      
+      // Add order by
+      query += " ORDER BY c.submission_date DESC";
+      
+      const [rows] = await connection.query(query, params);
       
       return NextResponse.json(rows);
     });
@@ -85,7 +123,6 @@ export async function POST(request: Request) {
       
       // Explicitly check for negative IDs and set them to null
       if (studentId !== null && (studentId < 0 || typeof studentId !== 'number')) {
-        
         studentId = null;
       } else if (studentId !== null) {
         const [students] = await connection.query(
@@ -139,7 +176,6 @@ export async function POST(request: Request) {
               'INSERT INTO class_activities (class_id, activity_id, created_at) VALUES (?, ?, NOW())',
               [correctionData.class_id, correctionData.activity_id]
             );
-            
           }
         } catch (err) {
           // Log error but don't fail the request

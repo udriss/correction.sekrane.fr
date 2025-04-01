@@ -73,7 +73,7 @@ export async function POST(
     }
 
     const { student_id, content, class_id } = await request.json();
-    console.log('Received data:', { student_id, content, class_id });
+    
     
     const correctionData = {
       activity_id: activityId,

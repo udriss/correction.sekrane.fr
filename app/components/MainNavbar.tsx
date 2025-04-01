@@ -247,7 +247,7 @@ export default function MainNavbar() {
                     <ListItemIcon>
                       <AssignmentIcon fontSize="small" />
                     </ListItemIcon>
-                    <ListItemText primary="Corrections" />
+                    <ListItemText primary="Liste des corrections" />
                   </MenuItem>
 
                   <MenuItem component={Link} href="/corrections/new">

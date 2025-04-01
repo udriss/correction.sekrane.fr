@@ -136,10 +136,8 @@ export default function NewActivity() {
                 </Box>
                 
                 <Box sx={{ flexGrow: 1 }}>
-                  <H1Title sx={{ mb: 1 }}>
-                    Nouvelle activité
-                  </H1Title>
-                  <Typography variant="subtitle1" sx={{ opacity: 0.9, mb: 1 }}>
+                <Typography variant="h4" fontWeight={700} color="text.primary">Nouvelle activité</Typography>
+                  <Typography color='text.secondary' variant="subtitle1" sx={{ opacity: 0.9, mb: 1 }}>
                     Ajoutez une nouvelle activité à corriger pour vos élèves
                   </Typography>
                 </Box>
@@ -152,7 +150,7 @@ export default function NewActivity() {
                   startIcon={<ArrowBackIcon />}
                   sx={{ 
                     bgcolor: 'rgba(255,255,255,0.2)', 
-                    color: 'white', 
+                    color: theme => theme.palette.text.primary,
                     backdropFilter: 'blur(10px)',
                     '&:hover': {
                       bgcolor: 'rgba(255,255,255,0.3)',

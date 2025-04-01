@@ -415,7 +415,7 @@ export default function ActivityDetail({ params }: { params: Promise<{ id: strin
                     className="mt-4"
                     component={Link}
                     href="/activities"
-                    startIcon={<ArrowBackIcon />}
+                    startIcon={<ArrowBackIcon sx={{color: "primary"}}/>}
                     >
                     Retour aux activités
                     </Button>
@@ -457,12 +457,13 @@ export default function ActivityDetail({ params }: { params: Promise<{ id: strin
           {isEditing ? (
             <div className="flex items-center w-full">
             <IconButton
+              color='primary'
               component={Link}
               href={`/activities`}
               className="mr-2 bg-white/20 hover:bg-white/30"
               sx={{ transform: 'translateX(-10px)' }}
             >
-              <ArrowBackIcon sx={{ fontSize: 30, padding: 0, color: "secondary.light" }} />
+              <ArrowBackIcon sx={{ fontSize: 30, padding: 0, color: "primary" }} />
             </IconButton>
               <TextField
                 value={name}
@@ -499,14 +500,15 @@ export default function ActivityDetail({ params }: { params: Promise<{ id: strin
           ) : (
             <div className="flex items-center w-full">
             <IconButton
+            color='primary'
             component={Link}
             href={`/activities`}
             className="mr-2 bg-white/20 hover:bg-white/30"
             sx={{ transform: 'translateX(-10px)' }}
           >
-            <ArrowBackIcon sx={{ fontSize: 30, padding: 0, color: "secondary.light" }} />
+            <ArrowBackIcon sx={{ fontSize: 30, padding: 0, color: "primary" }} />
           </IconButton>
-            <H1Title className="font-bold" sx={{ transform: 'translateX(-10px)' }}>
+            <Typography variant="h5" fontWeight={700} color="text.primary" className="font-bold" sx={{ transform: 'translateX(-10px)' }}>
               {activity.name}
               <IconButton
                 onClick={handleEditClick}
@@ -545,7 +547,7 @@ export default function ActivityDetail({ params }: { params: Promise<{ id: strin
                         <DeleteIcon />
                       </IconButton>
                     )}
-            </H1Title>
+            </Typography>
             </div>
           )}
         </GradientBackground>

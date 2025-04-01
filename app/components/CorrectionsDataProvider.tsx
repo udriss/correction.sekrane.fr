@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, createContext, useContext, ReactNode } from 'react';
+import React, { useState, useEffect, createContext, useContext, ReactNode, useCallback } from 'react';
 import dayjs from 'dayjs';
 
 // Types
@@ -19,7 +19,9 @@ export interface Correction {
   status: string;
   experimental_points?: number;
   theoretical_points?: number;
-  updated_at?: Date | string;
+  created_at: string; // Correction de "crated_at" à "created_at"
+  updated_at: string;
+  sub_class?: string | null; // Ajout de la propriété sub_class
 }
 
 interface FilterState {
@@ -31,6 +33,8 @@ interface FilterState {
   dateTo: dayjs.Dayjs | null;
   minGrade: string;
   maxGrade: string;
+  recent: boolean;
+  correctionId: string; // Nouvel ajout pour filtrer par ID de correction
 }
 
 interface SortOption {
@@ -109,7 +113,9 @@ export const CorrectionsProvider: React.FC<CorrectionsProviderProps> = ({
     dateFrom: initialFilters.dateFrom || null,
     dateTo: initialFilters.dateTo || null,
     minGrade: initialFilters.minGrade || '',
-    maxGrade: initialFilters.maxGrade || ''
+    maxGrade: initialFilters.maxGrade || '',
+    recent: initialFilters.recent || false,
+    correctionId: initialFilters.correctionId || '' // Initialiser avec la valeur fournie ou vide
   });
   
   const [sortOptions, setSortOptions] = useState<SortOption>({
@@ -181,6 +187,37 @@ export const CorrectionsProvider: React.FC<CorrectionsProviderProps> = ({
         correction.grade <= parseFloat(filters.maxGrade)
       );
     }
+
+    // Filtre par ID de correction
+    if (filters.correctionId && activeFilters.includes('correctionId')) {
+      // Si l'ID contient des virgules, c'est une liste d'IDs
+      if (filters.correctionId.includes(',')) {
+        const ids = filters.correctionId.split(',').map(id => id.trim());
+        filtered = filtered.filter(correction => 
+          ids.includes(correction.id.toString())
+        );
+      } else {
+        filtered = filtered.filter(correction => 
+          correction.id.toString() === filters.correctionId
+        );
+      }
+    }
+    
+    // Filtre des corrections récentes
+    if (activeFilters.includes('recent')) {
+      // Obtenir la date de maintenant et soustraire 24 heures
+      const recentDate = new Date();
+      recentDate.setHours(recentDate.getHours() - 24);
+      
+      filtered = filtered.filter(correction => {
+        // Si la correction a une date de création/soumission
+        if (correction.created_at || correction.submission_date) {
+          const correctionDate = new Date(correction.created_at || correction.submission_date);
+          return correctionDate >= recentDate;
+        }
+        return false;
+      });
+    }
     
     // Appliquer le tri
     filtered.sort((a, b) => {
@@ -240,7 +277,9 @@ export const CorrectionsProvider: React.FC<CorrectionsProviderProps> = ({
       dateFrom: null,
       dateTo: null,
       minGrade: '',
-      maxGrade: ''
+      maxGrade: '',
+      recent: false,
+      correctionId: ''
     });
   };
   

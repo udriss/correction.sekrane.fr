@@ -63,7 +63,7 @@ function EditFragmentForm({ fragment, categories, onSuccess, onCancel }: EditFra
             categoryIds = [data.category_id];
           }
           
-          console.log('Loaded fragment categories:', categoryIds);
+          
           setSelectedCategories(categoryIds);
         } else {
           // Fallback handling

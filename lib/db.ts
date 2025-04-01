@@ -302,15 +302,15 @@ export async function initializeDatabase() {
     // Au lieu de créer une activité avec ID 0, nous allons supprimer cette partie
     // et la remplacer par une vérification de l'existence d'une activité générique
     const [genericActivityExists] = await query<{count: number}[]>(
-      "SELECT COUNT(*) as count FROM activities WHERE name = 'Activité générique'"
+      "SELECT COUNT(*) as count FROM activities WHERE name LIKE 'Activité générique%'"
     );
     
     if (!genericActivityExists || genericActivityExists.count === 0) {
-      console.log("Création d'une activité générique pour les corrections sans activité spécifique...");
+      
       await query(
         `INSERT INTO activities 
          (name, content, experimental_points, theoretical_points, created_at, updated_at)
-         VALUES ('Activité générique', 'Activité pour les corrections sans activité spécifique', 5, 15, NOW(), NOW())`
+         VALUES ('Activité générique N° 1', 'Activité pour les corrections sans activité spécifique', 5, 15, NOW(), NOW())`
       );
     }
     

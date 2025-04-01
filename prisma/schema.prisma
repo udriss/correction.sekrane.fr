@@ -37,3 +37,30 @@ model FragmentsOnCategories {
   @@id([fragmentId, categoryId])
   @@map("fragments_categories")
 }
+
+model Correction {
+  id                      Int       @id @default(autoincrement())
+  content                 String?   @db.Text
+  student_id              Int?
+  class_id                Int?
+  activity_id             Int
+  teacher_id              Int
+  grade                   Float?
+  experimental_points_earned Float?
+  theoretical_points_earned Float?
+  status                  String?   @default("pending")
+  submission_date         DateTime?
+  sub_class               String?
+  created_at              DateTime  @default(now())
+  updated_at              DateTime  @updatedAt
+  
+  student                 Student?  @relation(fields: [student_id], references: [id])
+  class                   Class?    @relation(fields: [class_id], references: [id])
+  activity                Activity  @relation(fields: [activity_id], references: [id])
+  teacher                 User      @relation(fields: [teacher_id], references: [id])
+  
+  @@index([student_id])
+  @@index([class_id])
+  @@index([activity_id])
+  @@index([teacher_id])
+}

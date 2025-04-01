@@ -99,6 +99,8 @@ const AllStudentsManagerNEW: React.FC<AllStudentsManagerProps> = ({
 
   const router = useRouter();
 
+
+
   // Filter students based on criteria
   const filteredStudents = students
     .filter(student => {
@@ -117,9 +119,13 @@ const AllStudentsManagerNEW: React.FC<AllStudentsManagerProps> = ({
         return false; // "Without Correction" tab
       }
 
-      // Filter by class
-      if (filterClass !== 'all' && student.classId !== filterClass) {
-        return false;
+      // Filter by class - check in allClasses array if available, otherwise fallback to classId
+      if (filterClass !== 'all') {
+        if (student.allClasses) {
+          return student.allClasses.some((cls: {classId: number}) => cls.classId === filterClass);
+        } else {
+          return student.classId === filterClass;
+        }
       }
       
       return true;
@@ -239,6 +245,7 @@ const AllStudentsManagerNEW: React.FC<AllStudentsManagerProps> = ({
       }
       
       const classData = await response.json();
+
       
       // If the class has a defined number of subclasses
       if (classData.nbre_subclasses) {

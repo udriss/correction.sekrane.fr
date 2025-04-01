@@ -145,7 +145,7 @@ export default function StudentCorrections({ student, corrections }: StudentCorr
   };
 
   const filteredCorrections = getFilteredAndSortedCorrections();
-  console.log("filteredCorrections", filteredCorrections);
+  
 
   return (
     <Paper elevation={2} sx={{ p: 3, borderRadius: 2 }}>

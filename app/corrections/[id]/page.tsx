@@ -43,6 +43,9 @@ import FormatQuoteIcon from '@mui/icons-material/FormatQuote';
 // Import the new combined fragment component
 import { FragmentsSidebar } from '@/components/fragments';
 
+// Importez le composant DuplicateCorrection
+import DuplicateCorrection from '@/components/corrections/DuplicateCorrection';
+
 export default function CorrectionDetail({ params }: { params: Promise<{ id: string }> }) {
   // Unwrap the Promise for params using React.use in client components
   const { id } = React.use(params);
@@ -666,10 +669,10 @@ export default function CorrectionDetail({ params }: { params: Promise<{ id: str
                   </Typography>
                 
                   {/* Email feedback button */}
-                  <EmailFeedback 
-                    correctionId={correctionId}
-                    studentData={correction?.student_data}
-                  />
+                  <Box sx={{ display: 'flex', gap: 2, mb: 3 }}>
+                    <EmailFeedback correctionId={correctionId} studentData={correction.student_data} />
+                    <DuplicateCorrection correctionId={correctionId} />
+                  </Box>
                   
                   {/* Content editor component */}
                   <Card sx={{ 

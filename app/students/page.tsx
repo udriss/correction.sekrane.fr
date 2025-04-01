@@ -16,7 +16,7 @@ import Grid from '@mui/material/Grid';
 import LoadingSpinner from '@/components/LoadingSpinner';
 import StudentsHeader from '@/components/students/StudentsHeader';
 import StudentsTutorial from '@/components/students/StudentsTutorial';
-import AllStudentsManager from '@/components/students/AllStudentsManager';
+import AllStudentsManagerNEW from '@/components/students/AllStudentsManager';
 import GradientBackground from '@/components/ui/GradientBackground';
 import PatternBackground from '@/components/ui/PatternBackground';
 import Link from 'next/link';
@@ -44,6 +44,8 @@ export interface Student {
   className?: string;
   corrections_count?: number;
   additionalClasses?: {id: number, name: string}[];
+  // New property to match the API response
+  allClasses?: { classId: number; className: string; sub_class?: string | null }[];
 }
 
 // Additional types for student statistics
@@ -93,31 +95,12 @@ export default function StudentsPage() {
       const classesData = await classesResponse.json();
       setClasses(classesData);
       
-      // Récupérer toutes les affectations étudiant-classe en un seul appel
-      const studentClassesResponse = await fetch('/api/students/classes');
-      if (!studentClassesResponse.ok) {
-        throw new Error('Erreur lors du chargement des affectations des classes');
-      }
-      const studentClassesData = await studentClassesResponse.json();
-      
       // Récupérer toutes les statistiques des étudiants en un seul appel
       const statsResponse = await fetch('/api/students/stats');
       if (!statsResponse.ok) {
         throw new Error('Erreur lors du chargement des statistiques');
       }
       const statsData = await statsResponse.json();
-      
-      // Organiser les données de classe par étudiant pour un accès plus facile
-      const studentClassesMap: Record<number, { id: number, name: string }[]> = {};
-      studentClassesData.forEach((item: { student_id: number, class_id: number, class_name: string }) => {
-        if (!studentClassesMap[item.student_id]) {
-          studentClassesMap[item.student_id] = [];
-        }
-        studentClassesMap[item.student_id].push({ 
-          id: item.class_id, 
-          name: item.class_name 
-        });
-      });
       
       // Organiser les statistiques par étudiant
       const statsMap: Record<number, { total_corrections: number, average_score: number }> = {};
@@ -129,37 +112,30 @@ export default function StudentsPage() {
       });
       
       // Construire les enhanced students avec toutes les données
-      const enhancedStudents = studentsData.map((student: Student) => {
-        const studentClasses = studentClassesMap[student.id!] || [];
-        const stats = statsMap[student.id!] || { total_corrections: 0, average_score: 0 };
+      const enhancedStudents = studentsData.map((student: any) => {
+        const stats = statsMap[student.id] || { total_corrections: 0, average_score: 0 };
         
-        // Trouver la classe principale (celle qui correspond à classId)
-        const primaryClass = student.classId ? 
-          classesData.find((c: Class) => c.id === student.classId) : 
-          null;
+        // Définir l'interface pour les éléments de allClasses
+        interface ClassAssignment {
+          classId: number;
+          className: string;
+        }
         
-        // Filtrer les classes additionnelles (exclure la classe principale)
-        const additionalClasses = studentClasses
-          .filter(cls => cls.id !== student.classId)
-          .map(cls => ({ id: cls.id, name: cls.name }));
+        // Convertir allClasses en additionalClasses pour maintenir la compatibilité
+        const additionalClasses = student.allClasses
+          ? student.allClasses
+              .filter((cls: ClassAssignment) => cls.classId !== student.classId)
+              .map((cls: ClassAssignment) => ({ id: cls.classId, name: cls.className }))
+          : [];
         
         return {
           ...student,
-          className: primaryClass ? primaryClass.name : 'Non assigné',
           corrections_count: stats.total_corrections,
           additionalClasses: additionalClasses
         };
       });
       
-      // Dédupliquer les étudiants par ID au cas où
-      const uniqueStudentsMap = new Map<number, Student>();
-      enhancedStudents.forEach((student: Student) => {
-        if (student.id) {
-          uniqueStudentsMap.set(student.id, student);
-        }
-      });
-      
-      setStudents(Array.from(uniqueStudentsMap.values()));
+      setStudents(enhancedStudents);
       
     } catch (err) {
       console.error('Erreur:', err);
@@ -190,8 +166,13 @@ export default function StudentsPage() {
   // Stats pour l'en-tête
   const totalStudents = students.length;
   const totalWithCorrections = students.filter(s => s.corrections_count && s.corrections_count > 0).length;
-  const uniqueClasses = new Set(students.map(s => s.classId).filter(Boolean)).size;
-  const studentsWithoutClass = students.filter(s => !s.classId).length;
+  
+  // Updated class counting logic to use allClasses
+  const uniqueClasses = new Set(
+    students.flatMap(s => s.allClasses ? s.allClasses.map(cls => cls.classId) : [])
+  ).size;
+  
+  const studentsWithoutClass = students.filter(s => !s.allClasses || s.allClasses.length === 0).length;
 
   if (loading && students.length === 0) {
     return (
@@ -352,7 +333,7 @@ export default function StudentsPage() {
       />
 
       {/* Gestionnaire des étudiants */}
-      <AllStudentsManager
+      <AllStudentsManagerNEW
         students={students}
         classes={classes}
         loading={loading}

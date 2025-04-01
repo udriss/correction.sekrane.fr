@@ -9,7 +9,8 @@ import {
   Box, 
   Card,
   CardContent,
-  Divider
+  Divider,
+  Paper
 } from '@mui/material';
 import Grid from '@mui/material/Grid';
 import AssignmentTurnedIn from '@mui/icons-material/AssignmentTurnedIn';
@@ -27,6 +28,14 @@ import Devices from '@mui/icons-material/Devices';
 import DataSaverOn from '@mui/icons-material/DataSaverOn';
 import PieChart from '@mui/icons-material/PieChart';
 import School from '@mui/icons-material/School';
+import CategoryIcon from '@mui/icons-material/Category';
+import MergeTypeIcon from '@mui/icons-material/MergeType';
+import AccountTreeIcon from '@mui/icons-material/AccountTree';
+import FormatQuoteIcon from '@mui/icons-material/FormatQuote';
+import PeopleAltIcon from '@mui/icons-material/PeopleAlt';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import InsightsIcon from '@mui/icons-material/Insights';
+import TimelineIcon from '@mui/icons-material/Timeline';
 
 export default function LandingPage() {
   return (
@@ -42,17 +51,17 @@ export default function LandingPage() {
         }}
       >
         <Container maxWidth="lg">
-            <Grid container spacing={4} alignItems="center">
+          <Grid container spacing={4} alignItems="center">
             <Grid size={{ xs: 12, md: 8 }}>
               <Typography 
-              variant="h3" 
-              component="h1" 
-              className="text-4xl md:text-5xl font-extrabold mb-4"
+                variant="h3" 
+                component="h1" 
+                className="text-4xl md:text-5xl font-extrabold mb-4"
               >
-              Évaluez et analysez vos activités pédagogiques
+                Plateforme complète d'évaluation pédagogique
               </Typography>
               <Typography variant="h6" className="mb-8 text-blue-100">
-                Plateforme complète pour ajouter, gérer et partager des évaluations individuelles ou collectives
+                Créez, gérez et analysez vos corrections avec un système complet d'évaluation basé sur des points expérimentaux et théoriques
               </Typography>
               <Box className="flex mt-4 flex-wrap gap-4">
               <Button 
@@ -124,12 +133,12 @@ export default function LandingPage() {
             Une plateforme complète d'évaluation
           </Typography>
           <Typography variant="h6" className="text-gray-600 mx-auto max-w-3xl">
-            Découvrez comment notre outil peut transformer votre façon d'évaluer et d'analyser les performances
+            Optimisez votre processus d'évaluation avec un système complet d'analyse de performance
           </Typography>
         </Box>
 
         <Grid container spacing={4}>
-          {/* Feature 1 - Corrections personnalisées */}
+          {/* Feature 1 - Système de points dual */}
           <Grid size={{ xs: 12, md: 4 }}>
             <Card className="h-full hover:shadow-lg transition-shadow">
               <CardContent className="p-6">
@@ -137,33 +146,33 @@ export default function LandingPage() {
                   <AssignmentTurnedIn fontSize="large" className="text-blue-600" />
                 </Box>
                 <Typography variant="h5" className="font-bold mb-2 text-center">
-                  Corrections personnalisées
+                  Système de points dual
                 </Typography>
                 <Typography variant="body1" color="text.secondary" className="text-center">
-                  Évaluations structurées avec points expérimentaux et théoriques, commentaires détaillés et grilles adaptables
+                  Évaluez avec précision grâce à la distinction entre points expérimentaux et théoriques
                 </Typography>
               </CardContent>
             </Card>
           </Grid>
 
-          {/* Feature 2 - Gestion de groupes */}
+          {/* Feature 2 - Bibliothèque de fragments */}
           <Grid size={{ xs: 12, md: 4 }}>
             <Card className="h-full hover:shadow-lg transition-shadow">
               <CardContent className="p-6">
                 <Box className="flex justify-center mb-4">
-                  <Groups fontSize="large" className="text-green-600" />
+                  <CategoryIcon fontSize="large" className="text-green-600" />
                 </Box>
                 <Typography variant="h5" className="font-bold mb-2 text-center">
-                  Gestion de groupes
+                  Bibliothèque de fragments
                 </Typography>
                 <Typography variant="body1" color="text.secondary" className="text-center">
-                  Organisez vos corrections par groupes, classes ou thématiques avec annotations et statistiques collectives
+                  Créez et réutilisez des commentaires organisés par catégories pour gagner du temps
                 </Typography>
               </CardContent>
             </Card>
           </Grid>
 
-          {/* Feature 3 - Analyse des performances */}
+          {/* Feature 3 - Analyse statistique */}
           <Grid size={{ xs: 12, md: 4 }}>
             <Card className="h-full hover:shadow-lg transition-shadow">
               <CardContent className="p-6">
@@ -171,10 +180,10 @@ export default function LandingPage() {
                   <Analytics fontSize="large" className="text-purple-600" />
                 </Box>
                 <Typography variant="h5" className="font-bold mb-2 text-center">
-                  Analyse des performances
+                  Analyse statistique
                 </Typography>
                 <Typography variant="body1" color="text.secondary" className="text-center">
-                  Visualisez les tendances individuelles et collectives avec graphiques interactifs et rapports détaillés
+                  Obtenez des insights précis sur les performances individuelles et de groupe
                 </Typography>
               </CardContent>
             </Card>
@@ -182,24 +191,102 @@ export default function LandingPage() {
         </Grid>
       </Container>
 
-      {/* Extended Features Grid */}
+      {/* Student and Class Management */}
       <Box className="py-16 bg-white">
         <Container maxWidth="lg">
+          <Grid container spacing={6} alignItems="center">
+            <Grid size={{ xs: 12, md: 6 }}>
+              <Box className="p-3">
+                <Typography variant="h4" className="font-bold mb-4 text-gray-800">
+                  Gestion complète des étudiants et des classes
+                </Typography>
+                <Typography variant="body1" className="mb-6 text-gray-600">
+                  Structurez vos groupes d'élèves et obtenez des analyses détaillées de leurs performances.
+                </Typography>
+                
+                <Box className="space-y-3">
+                  <Paper elevation={0} className="p-3 flex items-center bg-blue-50">
+                    <PeopleAltIcon className="text-blue-600 mr-3" />
+                    <Typography>Organisation des étudiants par classe et sous-groupes</Typography>
+                  </Paper>
+                  
+                  <Paper elevation={0} className="p-3 flex items-center bg-blue-50">
+                    <AccountTreeIcon className="text-blue-600 mr-3" />
+                    <Typography>Association des activités à des classes spécifiques</Typography>
+                  </Paper>
+                  
+                  <Paper elevation={0} className="p-3 flex items-center bg-blue-50">
+                    <TimelineIcon className="text-blue-600 mr-3" />
+                    <Typography>Statistiques détaillées sur les performances des classes</Typography>
+                  </Paper>
+                  
+                  <Paper elevation={0} className="p-3 flex items-center bg-blue-50">
+                    <InsightsIcon className="text-blue-600 mr-3" />
+                    <Typography>Suivi de progression individuelle des étudiants</Typography>
+                  </Paper>
+                </Box>
+              </Box>
+            </Grid>
+            
+            <Grid size={{ xs: 12, md: 6 }}>
+              <Box 
+                className="rounded-lg shadow-xl overflow-hidden"
+                sx={{ 
+                  position: 'relative', 
+                  height: {xs: '300px', md: '400px'}, 
+                  background: 'linear-gradient(135deg, #2a4365 0%, #4299e1 100%)' 
+                }}
+              >
+                <Groups 
+                  sx={{ 
+                    position: 'absolute', 
+                    top: '50%', 
+                    left: '50%', 
+                    transform: 'translate(-50%, -50%)', 
+                    fontSize: 180, 
+                    color: 'white', 
+                    opacity: 0.2 
+                  }} 
+                />
+                <Box sx={{ position: 'relative', zIndex: 1, p: 4, height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                  <Box>
+                    <Typography variant="h5" className="text-white font-bold">
+                      Structure hiérarchique
+                    </Typography>
+                    <Typography className="text-blue-100 mt-2">
+                      Classes → Sous-groupes → Étudiants
+                    </Typography>
+                  </Box>
+                  
+                  <Box className="bg-white/10 p-3 rounded-lg backdrop-blur-sm">
+                    <Typography className="text-white">
+                      "Une organisation claire et flexible qui s'adapte à tous les contextes d'enseignement"
+                    </Typography>
+                  </Box>
+                </Box>
+              </Box>
+            </Grid>
+          </Grid>
+        </Container>
+      </Box>
+
+      {/* Extended Features Grid */}
+      <Box className="py-16 bg-gray-50">
+        <Container maxWidth="lg">
           <Typography variant="h4" component="h3" className="text-center font-bold mb-12">
-            Fonctionnalités avancées pour les enseignants
+            Caractéristiques principales
           </Typography>
-          <Box sx={{ height: '40px' }} />
 
           <Grid container spacing={5}>
             <Grid size={{ xs: 12, sm: 6, md: 4 }} className="mb-1">
               <Box className="flex items-start">
-                <AutoGraph className="text-blue-600 mr-3 mt-1" fontSize="medium" />
+                <MergeTypeIcon className="text-blue-600 mr-3 mt-1" fontSize="medium" />
                 <div>
                   <Typography variant="h6" className="font-semibold mb-1">
-                    Statistiques comparatives
+                    Corrections avec fragments
                   </Typography>
                   <Typography variant="body2" color="text.secondary">
-                    Comparez les résultats entre différents groupes, périodes ou critères d'évaluation
+                    Créez des retours détaillés en utilisant des fragments réutilisables classés par catégories
                   </Typography>
                 </div>
               </Box>
@@ -207,13 +294,13 @@ export default function LandingPage() {
 
             <Grid size={{ xs: 12, sm: 6, md: 4 }} className="mb-1">
               <Box className="flex items-start">
-                <PersonSearch className="text-indigo-600 mr-3 mt-1" fontSize="medium" />
+                <AutoGraph className="text-indigo-600 mr-3 mt-1" fontSize="medium" />
                 <div>
                   <Typography variant="h6" className="font-semibold mb-1">
-                    Suivi des progrès individuels
+                    Statistiques comparatives
                   </Typography>
                   <Typography variant="body2" color="text.secondary">
-                    Suivez l'évolution des performances de chaque élève à travers les différentes évaluations
+                    Comparez les résultats entre différents groupes avec ventilation par critères d'évaluation
                   </Typography>
                 </div>
               </Box>
@@ -224,10 +311,10 @@ export default function LandingPage() {
                 <Share className="text-green-600 mr-3 mt-1" fontSize="medium" />
                 <div>
                   <Typography variant="h6" className="font-semibold mb-1">
-                    Partage de résultats
+                    Partage sécurisé
                   </Typography>
                   <Typography variant="body2" color="text.secondary">
-                    Générez des liens sécurisés ou exportez les résultats pour les partager avec les élèves et collègues
+                    Générez des liens uniques pour partager les corrections avec les étudiants
                   </Typography>
                 </div>
               </Box>
@@ -235,13 +322,13 @@ export default function LandingPage() {
 
             <Grid size={{ xs: 12, sm: 6, md: 4 }} className="mb-1">
               <Box className="flex items-start">
-                <Equalizer className="text-amber-600 mr-3 mt-1" fontSize="medium" />
+                <PersonSearch className="text-amber-600 mr-3 mt-1" fontSize="medium" />
                 <div>
                   <Typography variant="h6" className="font-semibold mb-1">
-                    Modèles d'évaluation
+                    Recherche avancée
                   </Typography>
                   <Typography variant="body2" color="text.secondary">
-                    Ajoutez et réutilisez des modèles personnalisés adaptés à vos besoins pédagogiques spécifiques
+                    Retrouvez rapidement des étudiants, activités, classes ou fragments avec la fonction de recherche
                   </Typography>
                 </div>
               </Box>
@@ -249,13 +336,13 @@ export default function LandingPage() {
 
             <Grid size={{ xs: 12, sm: 6, md: 4 }} className="mb-6">
               <Box className="flex items-start">
-                <CloudDownload className="text-purple-600 mr-3 mt-1" fontSize="medium" />
+                <DataSaverOn className="text-purple-600 mr-3 mt-1" fontSize="medium" />
                 <div>
                   <Typography variant="h6" className="font-semibold mb-1">
-                    Exportation de données
+                    Analyses détaillées
                   </Typography>
                   <Typography variant="body2" color="text.secondary">
-                    Exportez les résultats en PDF, CSV ou Excel pour une utilisation dans d'autres systèmes
+                    Visualisez les points forts et faibles des étudiants avec séparation des critères
                   </Typography>
                 </div>
               </Box>
@@ -266,10 +353,10 @@ export default function LandingPage() {
                 <Devices className="text-cyan-600 mr-3 mt-1" fontSize="medium" />
                 <div>
                   <Typography variant="h6" className="font-semibold mb-1">
-                    Compatible tous supports
+                    Interface adaptative
                   </Typography>
                   <Typography variant="body2" color="text.secondary">
-                    Accédez à vos corrections depuis n'importe quel appareil avec une interface adaptative
+                    Travaillez efficacement sur tous les appareils grâce à une conception responsive
                   </Typography>
                 </div>
               </Box>
@@ -278,63 +365,148 @@ export default function LandingPage() {
         </Container>
       </Box>
 
-      {/* Group Analysis Feature Section */}
+      {/* Fragments System Feature Focus */}
+      <Box className="py-16 bg-white">
+        <Container maxWidth="lg">
+          <Grid container spacing={6} alignItems="center">
+            <Grid size={{ xs: 12, md: 5 }}>
+              <Box className="relative rounded-lg overflow-hidden shadow-xl" sx={{ height: '400px' }}>
+                <div className="bg-gradient-to-br from-purple-500 to-indigo-700 p-8 h-full flex items-center justify-center">
+                  <CategoryIcon
+                    sx={{
+                      position: 'absolute',
+                      top: 0,
+                      left: 0,
+                      width: '100%',
+                      height: '100%',
+                      opacity: 0.2,
+                      color:'white',
+                    }}
+                  />
+                  <div className="relative text-center">
+                    <FormatQuoteIcon sx={{ fontSize: 80, color: 'white', opacity: 0.9 }} />
+                    <Typography variant="h5" className="text-white mt-4 font-bold">
+                      Bibliothèque de fragments intelligente
+                    </Typography>
+                  </div>
+                </div>
+              </Box>
+            </Grid>
+
+            <Grid size={{ xs: 12, md: 7 }}>
+              <Typography variant="h4" className="font-bold mb-4 text-gray-800">
+                Système de fragments catégorisés
+              </Typography>
+              <Typography variant="body1" sx={{marginBottom: '10px'}} className="text-gray-600">
+                Optimisez votre flux de travail avec notre système unique de fragments :
+              </Typography>
+              
+              <Box className="space-y-4 mt-6">
+                <Box className="flex items-start">
+                  <CheckCircleIcon className="text-green-600 mr-3 mt-1" />
+                  <Typography variant="body1">
+                    <strong>Fragments réutilisables</strong> - Créez une bibliothèque de commentaires que vous pouvez utiliser dans toutes vos corrections
+                  </Typography>
+                </Box>
+                <Box className="flex items-start">
+                  <CheckCircleIcon className="text-green-600 mr-3 mt-1" />
+                  <Typography variant="body1">
+                    <strong>Organisation par catégories</strong> - Classez vos fragments pour un accès rapide et efficace
+                  </Typography>
+                </Box>
+                <Box className="flex items-start">
+                  <CheckCircleIcon className="text-green-600 mr-3 mt-1" />
+                  <Typography variant="body1">
+                    <strong>Association à des activités</strong> - Créez des fragments spécifiques pour certains types d'activités
+                  </Typography>
+                </Box>
+                <Box className="flex items-start">
+                  <CheckCircleIcon className="text-green-600 mr-3 mt-1" />
+                  <Typography variant="body1">
+                    <strong>Recherche intelligente</strong> - Retrouvez rapidement les fragments dont vous avez besoin grâce à notre moteur de recherche
+                  </Typography>
+                </Box>
+                <Box className="flex items-start">
+                  <CheckCircleIcon className="text-green-600 mr-3 mt-1" />
+                  <Typography variant="body1">
+                    <strong>Système d'étiquettes</strong> - Ajoutez des tags à vos fragments pour une organisation encore plus flexible
+                  </Typography>
+                </Box>
+              </Box>
+
+              <Button 
+                variant="outlined" 
+                color="primary" 
+                size="large" 
+                component={Link}
+                href="/fragments"
+                sx={{ mt: 4 }}
+                className="text-md font-medium"
+              >
+                Explorer les fragments
+              </Button>
+            </Grid>
+          </Grid>
+        </Container>
+      </Box>
+
+      {/* Analysis Feature Section */}
       <Box className="py-16 bg-gray-50">
         <Container maxWidth="lg">
           <Grid container spacing={6} alignItems="center">
-          <Typography variant="h4" className="font-bold mb-4 text-gray-800">
-                Nouvelle fonctionnalité : analyse de groupes avancée
+            <Grid size={{ xs: 12, md: 7 }}>
+              <Typography variant="h4" className="font-bold mb-4 text-gray-800">
+                Analyses statistiques avancées
               </Typography> 
-            <Grid size={{ xs: 12, md: 8 }}>
               <Typography variant="body1" sx={{marginTop: '20px', marginBottom: '10px'}} className="text-gray-600">
-                Un système d'évaluation de groupe qui offre des fonctionnalités puissantes :
+                Obtenez des insights précieux sur les performances avec nos outils d'analyse :
               </Typography>
               
               <Box className="space-y-4">
                 <Box className="flex items-start">
                   <PieChart className="text-blue-600 mr-3 mt-1" />
                   <Typography variant="body1">
-                    <strong>Distribution des notes</strong> - Visualisez la répartition des notes dans un groupe et identifiez les tendances
-                  </Typography>
-                </Box>
-                <Box className="flex items-start">
-                  <Speed className="text-blue-600 mr-3 mt-1" />
-                  <Typography variant="body1">
-                    <strong>Comparaison inter-groupes</strong> - Analysez les performances entre différents groupes ou au sein d'un même groupe
+                    <strong>Statistiques individuelles</strong> - Suivez la progression de chaque étudiant avec des métriques détaillées
                   </Typography>
                 </Box>
                 <Box className="flex items-start">
                   <BarChart className="text-blue-600 mr-3 mt-1" />
                   <Typography variant="body1">
-                    <strong>Statistiques détaillées</strong> - Explorez les métriques avancées avec ventilation par points expérimentaux et théoriques
+                    <strong>Analyses de groupe</strong> - Comparez les performances entre différentes classes et sous-groupes
                   </Typography>
                 </Box>
                 <Box className="flex items-start">
-                  <DataSaverOn className="text-blue-600 mr-3 mt-1" />
+                  <Speed className="text-blue-600 mr-3 mt-1" />
                   <Typography variant="body1">
-                    <strong>Identification des points critiques</strong> - Repérez les concepts difficiles et adaptez votre enseignement
+                    <strong>Ventilation des points</strong> - Distinguez les performances sur les aspects expérimentaux et théoriques
+                  </Typography>
+                </Box>
+                <Box className="flex items-start">
+                  <Equalizer className="text-blue-600 mr-3 mt-1" />
+                  <Typography variant="body1">
+                    <strong>Évaluation des tendances</strong> - Identifiez les points forts et les axes d'amélioration
                   </Typography>
                 </Box>
               </Box>
             </Grid>
-            <Grid size={{ xs: 12, md: 4 }}>
+            <Grid size={{ xs: 12, md: 5 }}>
               <Box className="relative rounded-lg overflow-hidden shadow-xl">
-                <div className="bg-gradient-to-br from-indigo-500 to-purple-700 p-8 h-80 flex items-center justify-center">
-                <BarChart
-                      sx={{
-                        position: 'absolute',
-                        top: 0,
-                        left: 0,
-                        width: '100%',
-                        height: '100%',
-                        opacity: 0.2,
-                        color:'darkblue',
-                      }}
-                    />
+                <div className="bg-gradient-to-br from-blue-500 to-cyan-700 p-8 h-80 flex items-center justify-center">
+                  <BarChart
+                    sx={{
+                      position: 'absolute',
+                      top: 0,
+                      left: 0,
+                      width: '100%',
+                      height: '100%',
+                      opacity: 0.2,
+                      color:'white',
+                    }}
+                  />
                   <div className="relative text-center">
-                    <Groups sx={{ fontSize: 120, color: 'white', opacity: 0.9 }} />
+                    <Analytics sx={{ fontSize: 100, color: 'white', opacity: 0.9 }} />
                     <Typography variant="h5" className="text-white mt-4 font-bold">
-                      Analyse de performances de groupe
+                      Visualisation des performances
                     </Typography>
                   </div>
                 </div>
@@ -348,10 +520,10 @@ export default function LandingPage() {
       <Box className="py-16 text-white" style={{ backgroundColor: 'rgba(7, 31, 97, 1)' }}>
         <Container maxWidth="md" className="text-center">
           <Typography variant="h4" className="font-bold mb-4">
-            Prêt à améliorer votre processus d'évaluation ?
+            Commencez dès aujourd'hui
           </Typography>
-          <Typography variant="body1"  sx={{ mb: 8 }}>
-            Rejoignez les enseignants qui utilisent notre plateforme pour économiser du temps et fournir des analyses approfondies.
+          <Typography variant="body1" sx={{ mb: 8 }}>
+            Rejoignez les enseignants qui optimisent leur processus d'évaluation et fournissent des retours de qualité à leurs étudiants.
           </Typography>
           <Box className="flex flex-wrap justify-center gap-4">
             <Button 

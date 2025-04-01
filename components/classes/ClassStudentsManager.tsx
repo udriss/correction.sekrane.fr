@@ -45,6 +45,9 @@ import SaveIcon from '@mui/icons-material/Save';
 import FilterListIcon from '@mui/icons-material/FilterList';
 import LayersIcon from '@mui/icons-material/Layers';
 import LoadingSpinner from '@/components/LoadingSpinner';
+import { parseCSVContent } from '@/lib/utils/parse-csv';
+import UploadFileIcon from '@mui/icons-material/UploadFile';
+import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 
 interface Student {
   id: number;
@@ -61,6 +64,7 @@ interface StudentBatch {
   email?: string;
   gender: string;
   sub_class?: number | null;
+  markedForDeletion?: boolean; // Nouvelle propriété
 }
 
 interface ClassData {
@@ -108,6 +112,7 @@ export default function ClassStudentsManager({
   const [csvContent, setCsvContent] = useState<string>('');
   const [savingBatch, setSavingBatch] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isDragging, setIsDragging] = useState<boolean>(false);
 
   const fetchStudents = useCallback(async () => {
     if (!classId) return;
@@ -122,7 +127,7 @@ export default function ClassStudentsManager({
       
       const data = await response.json();
 
-      console.log('Fetched students:', data);
+      
       
       // Add isEditing property to each student
       const formattedStudents = data.map((student: Student) => ({
@@ -177,65 +182,7 @@ export default function ClassStudentsManager({
   const handleCsvUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-
-    setLoading(true);
-    setError('');
-    
-    try {
-      // Use FormData to send the file to our API
-      const formData = new FormData();
-      formData.append('csvFile', file);
-      
-      const response = await fetch('/api/utils/parse-csv', {
-        method: 'POST',
-        body: formData
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "Erreur lors du traitement du fichier CSV");
-      }
-      
-      const data = await response.json();
-      setCsvContent(file.name); // Store the file name
-      
-      if (data.students && data.students.length > 0) {
-        // Format students with default gender
-        const parsedStudents = data.students.map((student: any) => {
-          // Extract first name and last name from student.name
-          let first_name = '';
-          let last_name = '';
-          
-          if (student.name) {
-            const nameParts = student.name.split(' ');
-            if (nameParts.length === 1) {
-              first_name = nameParts[0];
-            } else {
-              // Assume last word is last name, rest is first name
-              last_name = nameParts.pop() || '';
-              first_name = nameParts.join(' ');
-            }
-          }
-          
-          return {
-            first_name: first_name || 'Sans prénom',
-            last_name: last_name || '',
-            email: student.email || '', // Email is optional
-            gender: 'N',  // Default gender
-            sub_class: currentFilter
-          };
-        });
-        
-        setBatchStudents(parsedStudents);
-      } else {
-        setError("Aucun étudiant trouvé dans le fichier CSV");
-      }
-    } catch (err) {
-      console.error("Erreur lors de l'importation du CSV:", err);
-      setError(err instanceof Error ? err.message : "Erreur lors de l'importation du fichier");
-    } finally {
-      setLoading(false);
-    }
+    processFile(file);
   };
 
   const handleClickUploadButton = () => {
@@ -250,9 +197,37 @@ export default function ClassStudentsManager({
     });
   };
 
+  // Modifier pour marquer au lieu de supprimer
+  const handleRemoveStudentFromBatch = (index: number) => {
+    setBatchStudents(prevStudents => {
+      const updatedStudents = [...prevStudents];
+      updatedStudents[index] = {
+        ...updatedStudents[index],
+        markedForDeletion: true
+      };
+      return updatedStudents;
+    });
+  };
+  
+  // Ajouter une fonction pour restaurer
+  const handleRestoreStudentToBatch = (index: number) => {
+    setBatchStudents(prevStudents => {
+      const updatedStudents = [...prevStudents];
+      updatedStudents[index] = {
+        ...updatedStudents[index],
+        markedForDeletion: false
+      };
+      return updatedStudents;
+    });
+  };
+  
+  // Modifier pour filtrer les étudiants marqués pour suppression
   const handleAddBatchStudents = async () => {
-    if (batchStudents.length === 0) {
-      setError('Aucun étudiant à ajouter');
+    // Filtrer les étudiants marqués pour suppression
+    const studentsToAdd = batchStudents.filter(student => !student.markedForDeletion);
+    
+    if (studentsToAdd.length === 0) {
+      setError('Aucun étudiant à ajouter (tous sont marqués pour suppression)');
       return;
     }
 
@@ -261,7 +236,7 @@ export default function ClassStudentsManager({
 
     try {
       // Process each student in the batch
-      for (const student of batchStudents) {
+      for (const student of studentsToAdd) {
         // Email and last name are optional in our modified version
         if (!student.first_name || !student.gender) {
           continue; // Skip incomplete students
@@ -283,7 +258,7 @@ export default function ClassStudentsManager({
       }
       
 
-      setSuccess(`${batchStudents.length} étudiants ajoutés avec succès`);
+      setSuccess(`${studentsToAdd.length} étudiants ajoutés avec succès`);
       setBatchStudents([]);
       setShowBatchForm(false);
       fetchStudents();
@@ -455,6 +430,79 @@ export default function ClassStudentsManager({
       setError(err instanceof Error ? err.message : 'Une erreur est survenue');
     } finally {
       handleCloseDeleteDialog();
+    }
+  };
+
+  // Gestionnaires d'événements pour le glisser-déposer
+  const handleDragEnter = useCallback((e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(true);
+  }, []);
+
+  const handleDragLeave = useCallback((e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+  }, []);
+
+  const handleDragOver = useCallback((e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.dataTransfer) {
+      e.dataTransfer.dropEffect = 'copy';
+    }
+  }, []);
+
+  const handleDrop = useCallback((e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+    
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      const file = e.dataTransfer.files[0];
+      // Vérifier si c'est un fichier CSV ou TXT
+      if (file.type === 'text/csv' || file.type === 'text/plain' || file.name.endsWith('.csv') || file.name.endsWith('.txt')) {
+        processFile(file);
+      } else {
+        setError('Seuls les fichiers CSV ou TXT sont acceptés');
+      }
+    }
+  }, []);
+
+  // Fonction pour traiter le fichier (utilisée à la fois pour le glisser-déposer et l'input file)
+  const processFile = async (file: File) => {
+    setLoading(true);
+    setError('');
+    
+    try {
+      const text = await file.text();
+    
+      // Utiliser l'utilitaire parseCSVContent
+      const parsedData = parseCSVContent(text);
+      
+      // Transformer les données au format attendu
+      const parsedStudents = parsedData.map(data => ({
+        first_name: data.firstName,
+        last_name: data.lastName,
+        email: data.email || `${data.firstName.toLowerCase()}.${data.lastName.toLowerCase()}@exemple.fr`,
+        gender: 'N' as const,
+        sub_class: currentFilter
+      }));
+      
+      setCsvContent(file.name); // Store the file name
+      
+      if (parsedStudents && parsedStudents.length > 0) {
+        // Format students with default gender
+        setBatchStudents(parsedStudents);
+      } else {
+        setError("Aucun étudiant trouvé dans le fichier CSV");
+      }
+    } catch (err) {
+      console.error("Erreur lors de l'importation du CSV:", err);
+      setError(err instanceof Error ? err.message : "Erreur lors de l'importation du fichier");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -732,33 +780,33 @@ export default function ClassStudentsManager({
                   <Typography variant="subtitle2" component="div" sx={{ mb: 2, fontWeight: 'bold', color: '#1E40AF' }}>
                     Format de fichier accepté :
                   </Typography>
-                  <div className="space-y-3">
-                    <div className="flex justify-start align-center gap-2">
-                      <CheckIcon fontSize="small" className="text-blue-700" />
+                  <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                      <CheckIcon fontSize="small" color="primary" />
                       <Typography variant="body2">
-                        CSV ou TXT avec des noms d'étudiants
+                        CSV ou TXT avec séparateur point-virgule (;)
                       </Typography>
-                    </div>
-                    <div className="flex items-start gap-2">
-                      <CheckIcon fontSize="small" className="text-blue-700" />
+                    </Box>
+                    <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1.5 }}>
+                      <CheckIcon fontSize="small" color="primary" />
                       <Typography variant="body2">
-                        Email optionnel comme seconde colonne
+                        Format: <strong>NOM;Prénom;Email</strong> (email optionnel)
                       </Typography>
-                    </div>
-                    <div className="flex items-start gap-2">
-                      <CheckIcon fontSize="small" className="text-blue-700" />
+                    </Box>
+                    <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1.5 }}>
+                      <CheckIcon fontSize="small" color="primary" />
                       <Typography variant="body2">
-                        Reconnaît "NOM Prénom", "Prénom NOM", etc.
+                        Une ligne par étudiant, première colonne = NOM, deuxième = Prénom
                       </Typography>
-                    </div>
-                  </div>
+                    </Box>
+                  </Box>
                   
                   <Box mt={2} p={2} bgcolor="white" borderRadius={1} border="1px solid" borderColor="divider">
                     <Typography variant="caption" component="div" fontFamily="monospace" whiteSpace="pre-line">
-                      DUPONT Jean<br />
-                      Marie MARTIN<br />
-                      LEGRAND Amélie;amelie@example.com<br />
-                      "PETIT, Sophie";sophie.petit@example.com
+                      DUPONT;Jean;jean.dupont@exemple.fr<br />
+                      MARTIN;Marie;marie.martin@exemple.fr<br />
+                      LEGRAND;Amélie;amelie.legrand@exemple.fr<br />
+                      PETIT;Sophie;sophie.petit@exemple.fr
                     </Typography>
                   </Box>
                 </Paper>
@@ -771,14 +819,44 @@ export default function ClassStudentsManager({
                   style={{ display: 'none' }}
                 />
                 
-                <Box textAlign="center" mt={4}>
+                {/* Zone de dépôt pour le glisser-déposer */}
+                <Box 
+                  sx={{ 
+                    my: 4,
+                    p: 4,
+                    border: '2px dashed',
+                    borderColor: isDragging ? 'primary.main' : 'divider',
+                    borderRadius: 2,
+                    backgroundColor: isDragging ? 'primary.50' : 'background.paper',
+                    textAlign: 'center',
+                    transition: 'all 0.3s ease',
+                    cursor: 'pointer',
+                    minHeight: '200px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: 2
+                  }}
+                  onClick={handleClickUploadButton}
+                  onDragEnter={handleDragEnter}
+                  onDragOver={handleDragOver}
+                  onDragLeave={handleDragLeave}
+                  onDrop={handleDrop}
+                >
+                  <UploadFileIcon sx={{ fontSize: 60, color: isDragging ? 'primary.main' : 'text.secondary', opacity: 0.7 }} />
+                  <Typography variant="h6" color="text.secondary">
+                    {isDragging ? 'Déposez le fichier ici' : 'Glissez et déposez un fichier CSV ou TXT ici'}
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    ou
+                  </Typography>
                   <Button
                     variant="contained"
                     color="primary"
                     onClick={handleClickUploadButton}
                     startIcon={loading ? <CircularProgress size={20} color="inherit" /> : <UploadIcon />}
                     disabled={loading}
-                    size="large"
                   >
                     {loading ? 'Traitement...' : 'Importer CSV'}
                   </Button>
@@ -799,6 +877,16 @@ export default function ClassStudentsManager({
                   <div className="mt-6">
                     <Typography variant="subtitle1" gutterBottom>
                       Vérifiez et complétez les informations
+                      {batchStudents.some(s => s.markedForDeletion) && (
+                        <Typography 
+                          component="span" 
+                          variant="body2" 
+                          color="text.secondary" 
+                          sx={{ ml: 1, fontStyle: 'italic' }}
+                        >
+                          ({batchStudents.filter(s => !s.markedForDeletion).length} actifs, {batchStudents.filter(s => s.markedForDeletion).length} ignorés)
+                        </Typography>
+                      )}
                     </Typography>
                     <TableContainer component={Paper} variant="outlined">
                       <Table size="small">
@@ -811,11 +899,22 @@ export default function ClassStudentsManager({
                             {classData?.nbre_subclasses && classData?.nbre_subclasses > 0 && (
                               <TableCell>Groupe</TableCell>
                             )}
+                            <TableCell width="50px" align="center">Actions</TableCell>
                           </TableRow>
                         </TableHead>
                         <TableBody>
                           {batchStudents.map((student, index) => (
-                            <TableRow key={index}>
+                            <TableRow 
+                              key={index}
+                              sx={{ 
+                                opacity: student.markedForDeletion ? 0.5 : 1,
+                                bgcolor: student.markedForDeletion ? 'action.disabledBackground' : 'inherit',
+                                textDecoration: student.markedForDeletion ? 'line-through' : 'none',
+                                '& .MuiTableCell-root': {
+                                  color: student.markedForDeletion ? 'text.disabled' : 'inherit'
+                                }
+                              }}
+                            >
                               <TableCell>
                                 <TextField
                                   size="small"
@@ -823,6 +922,10 @@ export default function ClassStudentsManager({
                                   value={student.first_name}
                                   onChange={(e) => handleBatchStudentFieldChange(index, 'first_name', e.target.value)}
                                   required
+                                  disabled={student.markedForDeletion}
+                                  InputProps={{
+                                    sx: { opacity: student.markedForDeletion ? 0.7 : 1 }
+                                  }}
                                 />
                               </TableCell>
                               <TableCell>
@@ -831,6 +934,10 @@ export default function ClassStudentsManager({
                                   fullWidth
                                   value={student.last_name}
                                   onChange={(e) => handleBatchStudentFieldChange(index, 'last_name', e.target.value)}
+                                  disabled={student.markedForDeletion}
+                                  InputProps={{
+                                    sx: { opacity: student.markedForDeletion ? 0.7 : 1 }
+                                  }}
                                 />
                               </TableCell>
                               <TableCell>
@@ -840,6 +947,10 @@ export default function ClassStudentsManager({
                                   value={student.email || ''}
                                   onChange={(e) => handleBatchStudentFieldChange(index, 'email', e.target.value)}
                                   placeholder="Optionnel"
+                                  disabled={student.markedForDeletion}
+                                  InputProps={{
+                                    sx: { opacity: student.markedForDeletion ? 0.7 : 1 }
+                                  }}
                                 />
                               </TableCell>
                               <TableCell>
@@ -847,6 +958,8 @@ export default function ClassStudentsManager({
                                   <Select
                                     value={student.gender || 'N'}
                                     onChange={(e) => handleBatchStudentFieldChange(index, 'gender', e.target.value)}
+                                    disabled={student.markedForDeletion}
+                                    sx={{ opacity: student.markedForDeletion ? 0.7 : 1 }}
                                   >
                                     <MenuItem value="M">Garçon</MenuItem>
                                     <MenuItem value="F">Fille</MenuItem>
@@ -864,6 +977,8 @@ export default function ClassStudentsManager({
                                         'sub_class', 
                                         e.target.value === '' ? null : Number(e.target.value)
                                       )}
+                                      disabled={student.markedForDeletion}
+                                      sx={{ opacity: student.markedForDeletion ? 0.7 : 1 }}
                                     >
                                       <MenuItem value="">
                                         <em>Non assigné</em>
@@ -875,21 +990,54 @@ export default function ClassStudentsManager({
                                   </FormControl>
                                 </TableCell>
                               )}
+                              <TableCell align="center">
+                                {student.markedForDeletion ? (
+                                  <Tooltip title="Restaurer">
+                                    <IconButton 
+                                      size="small" 
+                                      color="primary" 
+                                      onClick={() => handleRestoreStudentToBatch(index)}
+                                    >
+                                      <CheckIcon fontSize="small" />
+                                    </IconButton>
+                                  </Tooltip>
+                                ) : (
+                                  <Tooltip title="Ignorer">
+                                    <IconButton 
+                                      size="small" 
+                                      color="error" 
+                                      onClick={() => handleRemoveStudentFromBatch(index)}
+                                    >
+                                      <DeleteOutlineIcon fontSize="small" />
+                                    </IconButton>
+                                  </Tooltip>
+                                )}
+                              </TableCell>
                             </TableRow>
                           ))}
                         </TableBody>
                       </Table>
                     </TableContainer>
                     
+                    {/* Afficher un message si toutes les lignes sont marquées pour suppression */}
+                    {batchStudents.length > 0 && batchStudents.every(s => s.markedForDeletion) && (
+                      <Alert 
+                        severity="warning" 
+                        sx={{ mt: 2, mb: 2 }}
+                      >
+                        Tous les étudiants sont marqués pour suppression. Restaurez au moins un étudiant ou importez un nouveau fichier.
+                      </Alert>
+                    )}
+                            
                     <Box mt={3} display="flex" justifyContent="flex-end">
                       <Button
                         variant="contained"
                         color="primary"
                         onClick={handleAddBatchStudents}
-                        disabled={savingBatch}
+                        disabled={savingBatch || batchStudents.filter(s => !s.markedForDeletion).length === 0}
                         startIcon={savingBatch ? <CircularProgress size={20} /> : <PersonAddIcon />}
                       >
-                        {savingBatch ? 'Enregistrement...' : 'Ajouter les étudiants'}
+                        {savingBatch ? 'Enregistrement...' : `Ajouter ${batchStudents.filter(s => !s.markedForDeletion).length} étudiant(s)`}
                       </Button>
                     </Box>
                   </div>

@@ -12,6 +12,11 @@ import {
   IconButton,
   TextField,
   Divider,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
+  SelectChangeEvent,
 } from '@mui/material';
 import Grid from '@mui/material/Grid';
 
@@ -21,6 +26,7 @@ import BarChartIcon from '@mui/icons-material/BarChart';
 import PeopleAltIcon from '@mui/icons-material/PeopleAlt';
 import ArticleIcon from '@mui/icons-material/Article';
 import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline';
+import AddIcon from '@mui/icons-material/Add';
 import Link from 'next/link';
 
 import { Activity } from '@/lib/activity';
@@ -50,15 +56,43 @@ export default function MultipleCorrections() {
 
   // Ajout d'un état pour l'activité générique
   const [genericActivityId, setGenericActivityId] = useState<number | null>(null);
+  
+  // États pour les activités disponibles
+  const [allActivities, setAllActivities] = useState<Activity[]>([]);
+  const [genericActivities, setGenericActivities] = useState<Activity[]>([]);
+  const [selectedActivityId, setSelectedActivityId] = useState<string>(activityId);
 
   useEffect(() => {
-    // Si aucun activityId n'est fourni, chercher ou créer une activité générique
-    if (!activityId || activityId === "0") {
-      fetchOrCreateGenericActivity();
-    } else {
+    // Charger toutes les activités disponibles
+    fetchAllActivities();
+    
+    // Si aucun activityId n'est fourni, ne pas charger automatiquement une activité générique
+    if (activityId && activityId !== "0") {
       fetchActivity();
+    } else {
+      setLoading(false); // Ne pas montrer le chargement si pas d'activité sélectionnée
     }
   }, [activityId]);
+
+  // Fetch all available activities for the dropdown
+  const fetchAllActivities = async () => {
+    try {
+      const response = await fetch('/api/activities');
+      if (!response.ok) throw new Error("Erreur lors du chargement des activités");
+      
+      const activitiesData = await response.json();
+      
+      // Séparer les activités génériques des activités normales
+      const generic = activitiesData.filter((act: Activity) => act.name.includes('Activité générique'));
+      const regular = activitiesData.filter((act: Activity) => !act.name.includes('Activité générique'));
+      
+      setAllActivities(regular);
+      setGenericActivities(generic);
+    } catch (err) {
+      console.error('Erreur:', err);
+      setError("Erreur lors du chargement des activités disponibles");
+    }
+  };
 
   const fetchActivity = async () => {
     if (!activityId || activityId === "0") return;
@@ -80,6 +114,20 @@ export default function MultipleCorrections() {
     }
   };
 
+  // Fonction pour chercher des activités génériques
+  const fetchGenericActivities = async () => {
+    try {
+      const response = await fetch('/api/activities/generic/list');
+      if (!response.ok) throw new Error("Erreur lors du chargement des activités génériques");
+      
+      const genericActivitiesData = await response.json();
+      setGenericActivities(genericActivitiesData);
+    } catch (err) {
+      console.error('Erreur:', err);
+      setError("Erreur lors du chargement des activités génériques");
+    }
+  };
+
   // Nouvelle fonction pour chercher ou créer une activité générique
   const fetchOrCreateGenericActivity = async () => {
     try {
@@ -94,7 +142,7 @@ export default function MultipleCorrections() {
         setExperimentalPoints(activityData.experimental_points || 5);
         setTheoreticalPoints(activityData.theoretical_points || 15);
       } else {
-        // Si aucune activité générique n'existe, en créer une nouvelle
+        // Si aucune activité générique n'existe, en ajouter une nouvelle
         const createResponse = await fetch('/api/activities', {
           method: 'POST',
           headers: {
@@ -123,6 +171,35 @@ export default function MultipleCorrections() {
       setError("Erreur lors du chargement de l'activité générique");
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Handle activity selection change
+  const handleActivityChange = async (event: SelectChangeEvent<string>) => {
+    const newActivityId = event.target.value;
+    setSelectedActivityId(newActivityId);
+    
+    if (newActivityId === "0") {
+      setActivity(null);
+    } else {
+      try {
+        setLoading(true);
+        const response = await fetch(`/api/activities/${newActivityId}`);
+        if (!response.ok) throw new Error("Erreur lors du chargement de l'activité");
+        
+        const activityData = await response.json();
+        setActivity(activityData);
+        setExperimentalPoints(activityData.experimental_points || 5);
+        setTheoreticalPoints(activityData.theoretical_points || 15);
+        
+        // Update the URL without full refresh
+        router.push(`/corrections/multiples?activityId=${newActivityId}`, { scroll: false });
+      } catch (err) {
+        console.error('Erreur:', err);
+        setError("Erreur lors du chargement de l'activité");
+      } finally {
+        setLoading(false);
+      }
     }
   };
 
@@ -194,9 +271,20 @@ export default function MultipleCorrections() {
       if (!selectedClassId && groupName.trim()) {
         handleCreateGroup(createdCorrectionIds);
       } else if (selectedClassId) {
-        // For class-based corrections, just show success message and redirect to class view
+        // Pour les corrections basées sur une classe, montrer un message de succès
+        // et rediriger vers une vue filtrée des corrections au lieu de la vue de classe
         setTimeout(() => {
-          router.push(`/classes/${selectedClassId}`);
+          const highlightParam = createdCorrectionIds.join(',');
+          // Rediriger vers la page des corrections avec des filtres appropriés
+          // Ajouter correctionId pour filtrer spécifiquement ces corrections
+          router.push(`/corrections?classId=${selectedClassId}&highlight=${highlightParam}&correctionId=${highlightParam}&activityId=${activityId !== "0" ? activityId : genericActivityId}`);
+        }, 2000);
+      } else {
+        // Si aucune classe n'est sélectionnée et pas de groupe, rediriger vers les corrections
+        setTimeout(() => {
+          const highlightParam = createdCorrectionIds.join(',');
+          // Ajouter correctionId pour filtrer spécifiquement ces corrections
+          router.push(`/corrections?highlight=${highlightParam}&correctionId=${highlightParam}&activityId=${activityId !== "0" ? activityId : genericActivityId}`);
         }, 2000);
       }
     }
@@ -217,41 +305,6 @@ export default function MultipleCorrections() {
     );
   }
 
-  // Modifier la condition d'affichage d'erreur pour ne pas bloquer si activityId est 0
-  if (error && (!activityId || (activityId !== "0" && !activity))) {
-    return (
-      <div className="container mx-auto px-4 py-8 flex justify-center">
-        <div className="w-full max-w-lg animate-slide-in">
-          <Paper className="p-6 overflow-hidden relative" elevation={3}>
-            <div className="flex items-start gap-4">
-              <div className="text-red-500 animate-once">
-                <ErrorOutlineIcon fontSize="large" />
-              </div>
-              <div className="flex-1">
-                <Typography variant="h6" className="text-red-600 font-semibold mb-2">
-                  {error}
-                </Typography>
-                <div className="flex justify-around items-center mt-4">
-                  <Button 
-                    variant="outlined" 
-                    size="small"
-                    color="primary"
-                    className="mt-4"
-                    component={Link}
-                    href="/activities"
-                    startIcon={<ArrowBackIcon />}
-                  >
-                    Sélectionner une activité
-                  </Button>
-                </div>
-              </div>
-            </div>
-          </Paper>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="max-w-4xl mx-auto px-4 py-8">
       {/* Header with modern design and gradient */}
@@ -268,208 +321,257 @@ export default function MultipleCorrections() {
           {/* Header content */}
           <div className="relative z-10 flex justify-between items-center">
             <div>
-              {activity && (
               <Typography variant="h4" component="h1" className="font-bold text-black mb-1">
-                  {activityId === "0" || activity.name === "Activité générique" 
-                    ? "Activité générique" 
-                    : `Activité : ${activity.name}`}
+                  Création de corrections multiples
               </Typography>
-              )}
-            <Typography variant="subtitle1" className="text-blue-600">
-            Corrections multiples
+              <Typography variant="subtitle1" className="text-blue-600">
+                Sélectionnez une activité ou créez-en une nouvelle
               </Typography>
             </div>
             
             <div className="flex gap-3">
               <Button 
                 component={Link} 
-                href={activityId !== "0" ? `/activities/${activityId}` : (genericActivityId ? `/activities/${genericActivityId}` : '/activities')}
+                href="/activities"
                 variant="outlined"
                 color='secondary'
                 startIcon={<ArrowBackIcon />}
               >
                 Retour
               </Button>
-              
-              {activityId !== "0" && (
-                <Button
-                  variant="outlined"
-                  color="primary"
-                  startIcon={<GroupsIcon />}
-                  component={Link}
-                  href={`/activities/${activityId}/groups`}
-                >
-                  Groupes
-                </Button>
-              )}
-              
-              {activityId === "0" && genericActivityId && (
-                <Button
-                  variant="outlined"
-                  color="primary"
-                  startIcon={<GroupsIcon />}
-                  component={Link}
-                  href={`/activities/${genericActivityId}/groups`}
-                >
-                  Groupes
-                </Button>
-              )}
             </div>
           </div>
         </div>
       </Paper>
 
-      {/* Success messages */}
-      {successMessage && (
-        <Alert severity="success" className="mb-6 animate-fadeIn">
-          {successMessage}
-        </Alert>
-      )}
-
-      {error && (
-        <Alert severity="error" className="mb-6 animate-fadeIn">
-          {error}
-        </Alert>
-      )}
-
-      {/* Grading scale section with improved design */}
-      <Paper className="p-6 rounded-lg mb-6 shadow-md border-t-4 border-blue-600">
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-2">
-            <BarChartIcon className="text-blue-600" fontSize="large" />
-            <Typography variant="h5" className="font-bold">
-              Barème de notation {activityId === "0" && "(modifiable)"}
-            </Typography>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <Paper className="p-4 border shadow-sm transition-all hover:shadow-md flex flex-col items-center text-center">
-            <Typography variant="overline" color="textSecondary" className="mb-1">
-              PARTIE EXPÉRIMENTALE
-            </Typography>
-            {activityId === "0" ? (
-              <TextField
-                type="number"
-                value={experimentalPoints}
-                onChange={(e) => setExperimentalPoints(Number(e.target.value))}
-                variant="outlined"
-                size="small"
-                inputProps={{ min: 0, max: 20 }}
-                sx={{ mt: 1, width: '80px', textAlign: 'center' }}
-              />
-            ) : (
-              <Typography variant="h3" className="font-bold text-blue-600 mb-1">
-                {activity?.experimental_points || 5}
-              </Typography>
-            )}
-            <Typography variant="body2" color="textSecondary">
-              points
-            </Typography>
-          </Paper>
-          
-          <Paper className="p-4 border shadow-sm transition-all hover:shadow-md flex flex-col items-center text-center">
-            <Typography variant="overline" color="textSecondary" className="mb-1">
-              PARTIE THÉORIQUE
-            </Typography>
-            {activityId === "0" ? (
-              <TextField
-                type="number"
-                value={theoreticalPoints}
-                onChange={(e) => setTheoreticalPoints(Number(e.target.value))}
-                variant="outlined"
-                size="small"
-                inputProps={{ min: 0, max: 20 }}
-                sx={{ mt: 1, width: '80px', textAlign: 'center' }}
-              />
-            ) : (
-              <Typography variant="h3" className="font-bold text-blue-600 mb-1">
-                {activity?.theoretical_points || 15}
-              </Typography>
-            )}
-            <Typography variant="body2" color="textSecondary">
-              points
-            </Typography>
-          </Paper>
-          
-          <Paper className="p-4 border-2 border-blue-600 bg-blue-50 shadow-sm transition-all hover:shadow-md flex flex-col items-center text-center">
-            <Typography variant="overline" color="primary" className="mb-1 font-medium">
-              TOTAL
-            </Typography>
-            <Typography variant="h3" className="font-bold text-blue-700 mb-1">
-              {experimentalPoints + theoreticalPoints}
-            </Typography>
-            <Typography variant="body2" color="primary">
-              points sur 20
-            </Typography>
-          </Paper>
-        </div>
-      </Paper>
-
-      {/* Group Information Section */}
-      <Paper className="p-6 rounded-lg mb-6 shadow-md border-t-4 border-purple-600">
+      {/* Activity Selection Section */}
+      <Paper className="p-6 rounded-lg mb-6 shadow-md border-t-4 border-green-600">
         <div className="flex items-center gap-2 mb-4">
-          <GroupsIcon className="text-purple-600" fontSize="large" />
+          <ArticleIcon className="text-green-600" fontSize="large" />
           <Typography variant="h5" className="font-bold">
-            Informations du groupe
+            Sélection d'activité
           </Typography>
         </div>
         
-        <Grid container spacing={3}>
-          <Grid size={{ xs: 12, sm: 6 }}>
-          <TextField
-            label="Nom du groupe"
-            value={groupName}
-            onChange={(e) => setGroupName(e.target.value)}
-            variant="outlined"
-            fullWidth
-            className="mb-4"
-            placeholder="Ex: TP1 - Groupe B - Session Automne 2024"
-            slotProps={{
-              input: {
-                startAdornment: (
-                  <Box sx={{ color: 'action.active', mr: 1 }}>
-                    <PeopleAltIcon />
-                  </Box>
-                ),
-              }
-            }}
-          />
-          </Grid>
-          <Grid size={{ xs: 12, sm: 6 }}>
-          <TextField
-            label="Description (optionnelle)"
-            value={groupDescription}
-            onChange={(e) => setGroupDescription(e.target.value)}
-            variant="outlined"
-            fullWidth
-            multiline
-            rows={3}
-            placeholder="Informations additionnelles sur ce groupe de corrections"
-            slotProps={{
-              input: {
-                startAdornment: (
-                  <Box sx={{ color: 'action.active', mr: 1, alignSelf: 'flex-start', mt: 1.5 }}>
-                    <ArticleIcon />
-                  </Box>
-                ),
-              }
-            }}
-          />
-          </Grid>
-        </Grid>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+          <FormControl fullWidth variant="outlined">
+            <InputLabel id="activity-select-label">Activités existantes</InputLabel>
+            <Select
+              labelId="activity-select-label"
+              id="activity-select"
+              value={selectedActivityId}
+              onChange={handleActivityChange}
+              label="Activités existantes"
+            >
+              <MenuItem value="0">Aucune activité sélectionnée</MenuItem>
+              <MenuItem disabled style={{ opacity: 0.7 }}>-- Activités régulières --</MenuItem>
+              {allActivities.map((act) => (
+                <MenuItem key={act.id?.toString()} value={act.id?.toString() || ""}>
+                  {act.name}
+                </MenuItem>
+              ))}
+              <MenuItem disabled style={{ opacity: 0.7 }}>-- Activités génériques --</MenuItem>
+              {genericActivities.map((act) => (
+                <MenuItem key={act.id?.toString()} value={act.id?.toString() || ""}>
+                  {act.name}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+          
+          <div className="flex gap-2 items-center">
+            <Button
+              variant="contained"
+              color="success"
+              startIcon={<AddIcon />}
+              component={Link}
+              href="/activities/new"
+              fullWidth
+            >
+              Créer une nouvelle activité
+            </Button>
+            
+            <Button
+              variant="outlined"
+              color="primary"
+              onClick={fetchOrCreateGenericActivity}
+              disabled={!!activity}
+            >
+              Utiliser activité générique
+            </Button>
+          </div>
+        </div>
+        
+        {error && (
+          <Alert severity="error" className="mb-6 animate-fadeIn">
+            {error}
+          </Alert>
+        )}
+        
+        {!activity && !error && (
+          <Alert severity="info" className="my-4">
+            Veuillez sélectionner une activité existante, créer une nouvelle activité, ou utiliser une activité générique.
+          </Alert>
+        )}
       </Paper>
 
-      <MultipleCorrectionsForm
-        activityId={activityId !== "0" ? activityId : (genericActivityId ? genericActivityId.toString() : "")}
-        activity={activity}
-        experimentalPoints={experimentalPoints}
-        theoreticalPoints={theoreticalPoints}
-        onSuccess={handleSuccessfulCreateCorrections}
-        groupName={groupName}
-        requireGroupName={true} // Exiger un nom de groupe
-        onClassSelect={handleClassSelect} // Add the new prop
-      />
+      {/* Conditionally show the rest of the form only if an activity is selected */}
+      {activity && (
+        <>
+          {/* Success messages */}
+          {successMessage && (
+            <Alert severity="success" className="mb-6 animate-fadeIn">
+              {successMessage}
+            </Alert>
+          )}
+
+          {/* Activity title banner */}
+          <Paper className="p-4 mb-6 bg-blue-50 border-l-4 border-blue-500">
+            <Typography variant="h6" className="font-bold">
+              Activité sélectionnée: {activity.name}
+            </Typography>
+          </Paper>
+
+          {/* Grading scale section with improved design */}
+          <Paper className="p-6 rounded-lg mb-6 shadow-md border-t-4 border-blue-600">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <BarChartIcon className="text-blue-600" fontSize="large" />
+                <Typography variant="h5" className="font-bold">
+                  Barème de notation {activityId === "0" && "(modifiable)"}
+                </Typography>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <Paper className="p-4 border shadow-sm transition-all hover:shadow-md flex flex-col items-center text-center">
+                <Typography variant="overline" color="textSecondary" className="mb-1">
+                  PARTIE EXPÉRIMENTALE
+                </Typography>
+                {activityId === "0" ? (
+                  <TextField
+                    type="number"
+                    value={experimentalPoints}
+                    onChange={(e) => setExperimentalPoints(Number(e.target.value))}
+                    variant="outlined"
+                    size="small"
+                    inputProps={{ min: 0, max: 20 }}
+                    sx={{ mt: 1, width: '80px', textAlign: 'center' }}
+                  />
+                ) : (
+                  <Typography variant="h3" className="font-bold text-blue-600 mb-1">
+                    {activity?.experimental_points || 5}
+                  </Typography>
+                )}
+                <Typography variant="body2" color="textSecondary">
+                  points
+                </Typography>
+              </Paper>
+              
+              <Paper className="p-4 border shadow-sm transition-all hover:shadow-md flex flex-col items-center text-center">
+                <Typography variant="overline" color="textSecondary" className="mb-1">
+                  PARTIE THÉORIQUE
+                </Typography>
+                {activityId === "0" ? (
+                  <TextField
+                    type="number"
+                    value={theoreticalPoints}
+                    onChange={(e) => setTheoreticalPoints(Number(e.target.value))}
+                    variant="outlined"
+                    size="small"
+                    inputProps={{ min: 0, max: 20 }}
+                    sx={{ mt: 1, width: '80px', textAlign: 'center' }}
+                  />
+                ) : (
+                  <Typography variant="h3" className="font-bold text-blue-600 mb-1">
+                    {activity?.theoretical_points || 15}
+                  </Typography>
+                )}
+                <Typography variant="body2" color="textSecondary">
+                  points
+                </Typography>
+              </Paper>
+              
+              <Paper className="p-4 border-2 border-blue-600 bg-blue-50 shadow-sm transition-all hover:shadow-md flex flex-col items-center text-center">
+                <Typography variant="overline" color="primary" className="mb-1 font-medium">
+                  TOTAL
+                </Typography>
+                <Typography variant="h3" className="font-bold text-blue-700 mb-1">
+                  {experimentalPoints + theoreticalPoints}
+                </Typography>
+                <Typography variant="body2" color="primary">
+                  points sur 20
+                </Typography>
+              </Paper>
+            </div>
+          </Paper>
+
+          {/* Group Information Section */}
+          <Paper className="p-6 rounded-lg mb-6 shadow-md border-t-4 border-purple-600">
+            <div className="flex items-center gap-2 mb-4">
+              <GroupsIcon className="text-purple-600" fontSize="large" />
+              <Typography variant="h5" className="font-bold">
+                Informations du groupe
+              </Typography>
+            </div>
+            
+            <Grid container spacing={3}>
+              <Grid size={{ xs: 12, sm: 6 }}>
+              <TextField
+                label="Nom du groupe"
+                value={groupName}
+                onChange={(e) => setGroupName(e.target.value)}
+                variant="outlined"
+                fullWidth
+                className="mb-4"
+                placeholder="Ex: TP1 - Groupe B - Session Automne 2024"
+                slotProps={{
+                  input: {
+                    startAdornment: (
+                      <Box sx={{ color: 'action.active', mr: 1 }}>
+                        <PeopleAltIcon />
+                      </Box>
+                    ),
+                  }
+                }}
+              />
+              </Grid>
+              <Grid size={{ xs: 12, sm: 6 }}>
+              <TextField
+                label="Description (optionnelle)"
+                value={groupDescription}
+                onChange={(e) => setGroupDescription(e.target.value)}
+                variant="outlined"
+                fullWidth
+                multiline
+                rows={3}
+                placeholder="Informations additionnelles sur ce groupe de corrections"
+                slotProps={{
+                  input: {
+                    startAdornment: (
+                      <Box sx={{ color: 'action.active', mr: 1, alignSelf: 'flex-start', mt: 1.5 }}>
+                        <ArticleIcon />
+                      </Box>
+                    ),
+                  }
+                }}
+              />
+              </Grid>
+            </Grid>
+          </Paper>
+
+          <MultipleCorrectionsForm
+            activityId={activity.id?.toString() || "0"}
+            activity={activity}
+            experimentalPoints={experimentalPoints}
+            theoreticalPoints={theoreticalPoints}
+            onSuccess={handleSuccessfulCreateCorrections}
+            groupName={groupName}
+            requireGroupName={true} // Exiger un nom de groupe
+            onClassSelect={handleClassSelect}
+          />
+        </>
+      )}
     </div>
   );
 }

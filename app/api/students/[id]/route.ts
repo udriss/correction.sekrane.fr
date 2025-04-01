@@ -220,7 +220,7 @@ export async function PUT(
       }
     }
 
-    console.log('Student updated successfully:', studentData);
+    
     
     // Handle class associations - updated to handle multiple classes
     if (studentData.classes && Array.isArray(studentData.classes) && studentData.classes.length > 0) {

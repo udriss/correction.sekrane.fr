@@ -20,15 +20,6 @@ export default function AllResultsTab() {
   // Filter out empty categories
   const nonEmptyCategories = results.filter(category => category.count > 0);
   
-  // Debug: Log a sample item from each category to examine available data
-  useEffect(() => {
-    console.log('Search results by category:');
-    nonEmptyCategories.forEach(category => {
-      if (category.items.length > 0) {
-        console.log(`${category.table} sample:`, category.items[0]);
-      }
-    });
-  }, [nonEmptyCategories]);
 
   return (
     <Box>
