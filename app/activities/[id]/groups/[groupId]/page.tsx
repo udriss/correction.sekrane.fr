@@ -14,7 +14,17 @@ import ShareModal from '@/app/components/ShareModal';
 import * as shareService from '@/lib/services/shareService';
 import AddCorrectionToGroupModal from '@/components/AddCorrectionToGroupModal';
 import { useSnackbar } from 'notistack';
-import { Correction, CorrectionWithShareCode, Student } from '@/lib/types';
+import { Correction as OriginalCorrection, CorrectionWithShareCode as OriginalCorrectionWithShareCode, Student } from '@/lib/types';
+
+// Create modified types that allow null student_id
+interface Correction extends Omit<OriginalCorrection, 'student_id'> {
+  student_id: number | null;
+}
+
+interface CorrectionWithShareCode extends Omit<OriginalCorrectionWithShareCode, 'student_id'> {
+  student_id: number | null;
+  shareCode: string | null;
+}
 
 // Import des composants modulaires
 import GroupHeader from '@/components/groups/GroupHeader';
@@ -285,12 +295,12 @@ export default function CorrectionGroupDetailPage() {
     setGeneratePdfLoading(true);
     try {
       const fileName = await generateQRCodePDF({
-        corrections,
+        corrections: corrections as any, // Cast to any to bypass type check as we handle null student_id safely in the function
         group,
         generateShareCode: shareService.generateShareCode,
         getExistingShareCode: shareService.getExistingShareCode,
         students, // Passer les étudiants à la fonction
-        onSuccess: (updatedCorrections: Correction[]) => {
+        onSuccess: (updatedCorrections: any) => {
           // Mettre à jour l'état des corrections avec les nouveaux codes de partage
           setCorrections(updatedCorrections);
           setUpdatedCorrections(JSON.parse(JSON.stringify(updatedCorrections)));

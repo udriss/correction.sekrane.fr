@@ -1,6 +1,6 @@
 export interface Correction {
   id: number;
-  student_id: number;
+  student_id: number | null;
   activity_id: number;
   grade?: number;
   experimental_points_earned?: number;
