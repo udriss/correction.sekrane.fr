@@ -959,7 +959,7 @@ export default function ClassDetailPage({ params }: { params: Promise<{ id: stri
               }}
               onClick={() => handleChipClick(1)}>
                 <PeopleIcon color="primary" fontSize="large" sx={{ mb: 1 }} />
-                <Typography variant="h3" fontWeight="bold" color="primary">
+                <Typography variant="h3" fontWeight="bold" color="text.primary">
                   {classData.student_count}
                 </Typography>
                 <Typography variant="overline" color="text.secondary">étudiants</Typography>
@@ -981,7 +981,7 @@ export default function ClassDetailPage({ params }: { params: Promise<{ id: stri
                 }}
                 onClick={() => handleChipClick(1)}>
                   <RecentActorsIcon color="info" fontSize="large" sx={{ mb: 1 }} />
-                  <Typography variant="h3" fontWeight="bold" color="info.main">
+                  <Typography variant="h3" fontWeight="bold" color="text.primary">
                     {classData.nbre_subclasses}
                   </Typography>
                   <Typography color="text.secondary" variant="overline">sous-classes</Typography>
@@ -1003,7 +1003,7 @@ export default function ClassDetailPage({ params }: { params: Promise<{ id: stri
               }}
               onClick={() => handleChipClick(0)}>
                 <MenuBookIcon color="secondary" fontSize="large" sx={{ mb: 1 }} />
-                <Typography variant="h3" fontWeight="bold" color="secondary">
+                <Typography variant="h3" fontWeight="bold" color="text.primary">
                   {classData.activity_count}
                 </Typography>
                 <Typography variant="overline" color="text.secondary">activités</Typography>
@@ -1024,7 +1024,7 @@ export default function ClassDetailPage({ params }: { params: Promise<{ id: stri
               }}
               onClick={() => handleChipClick(2)}>
                 <AssignmentTurnedInIcon color="success" fontSize="large" sx={{ mb: 1 }} />
-                <Typography variant="h3" fontWeight="bold" color="success.main">
+                <Typography variant="h3" fontWeight="bold" color="text.primary">
                   {corrections.length}
                 </Typography>
                 <Typography variant="overline" color="text.secondary">corrections</Typography>
