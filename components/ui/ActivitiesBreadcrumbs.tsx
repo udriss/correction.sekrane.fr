@@ -1,145 +1,179 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Breadcrumbs, Link, Typography, Box, Menu, MenuItem, IconButton } from '@mui/material';
+import { useRouter, usePathname } from 'next/navigation';
+import {
+  Box,
+  Breadcrumbs,
+  Typography,
+  Menu,
+  MenuItem,
+  ListItemIcon,
+  ListItemText
+} from '@mui/material';
+import Link from 'next/link';
 import HomeIcon from '@mui/icons-material/Home';
 import MenuBookIcon from '@mui/icons-material/MenuBook';
-import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
-import NextLink from 'next/link';
+import NavigateNextIcon from '@mui/icons-material/NavigateNext';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import AddIcon from '@mui/icons-material/Add';
+import ListIcon from '@mui/icons-material/List';
+import AnalyticsIcon from '@mui/icons-material/Analytics';
+import AssignmentIcon from '@mui/icons-material/Assignment';
 
+// Type pour les items du fil d'Ariane supplémentaires
 interface BreadcrumbItem {
   label: string;
   href?: string;
   icon?: React.ReactNode;
-  menu?: {
-    label: string;
-    href: string;
-    icon?: React.ReactNode;
-  }[];
 }
 
 interface ActivitiesBreadcrumbsProps {
   extraItems?: BreadcrumbItem[];
-  currentPageLabel: string;
+  currentPageLabel?: string;
 }
 
-const ActivitiesBreadcrumbs: React.FC<ActivitiesBreadcrumbsProps> = ({ extraItems = [], currentPageLabel }) => {
-  // État pour gérer l'ouverture des menus de chaque item
-  const [menuAnchorEl, setMenuAnchorEl] = useState<{ [key: number]: HTMLElement | null }>({});
-
-  const handleMenuClick = (event: React.MouseEvent<HTMLButtonElement>, index: number) => {
-    setMenuAnchorEl(prev => ({
-      ...prev,
-      [index]: event.currentTarget
-    }));
+export default function ActivitiesBreadcrumbs({ 
+  extraItems = [], 
+  currentPageLabel 
+}: ActivitiesBreadcrumbsProps) {
+  const router = useRouter();
+  const pathname = usePathname();
+  
+  // État pour le menu déroulant des activités
+  const [menuAnchorEl, setMenuAnchorEl] = useState<null | HTMLElement>(null);
+  const menuOpen = Boolean(menuAnchorEl);
+  
+  const handleMenuClick = (event: React.MouseEvent<HTMLDivElement>) => {
+    setMenuAnchorEl(event.currentTarget);
+  };
+  
+  const handleMenuClose = () => {
+    setMenuAnchorEl(null);
+  };
+  
+  const navigateTo = (path: string) => {
+    handleMenuClose();
+    router.push(path);
   };
 
-  const handleMenuClose = (index: number) => {
-    setMenuAnchorEl(prev => ({
-      ...prev,
-      [index]: null
-    }));
-  };
+  // Déterminer si une page est active
+  const isActive = (path: string) => pathname === path;
 
-  return (
-    <Box sx={{ mb: 3 }}>
-      <Breadcrumbs aria-label="breadcrumb">
-        <Link
-          component={NextLink}
-          href="/"
-          underline="hover"
-          sx={{ display: 'flex', alignItems: 'center' }}
-          
-        >
-          <HomeIcon sx={{ mr: 0.5, color:"primary" }} fontSize="inherit" />
-          <Typography color="text.primary">Accueil</Typography>
-        </Link>
-
-        <Link
-          component={NextLink}
-          href="/activities"
-          underline="hover"
-          sx={{ display: 'flex', alignItems: 'center' }}
-        >
-          <MenuBookIcon sx={{ mr: 0.5, color:"primary" }} fontSize="inherit"/>
-          <Typography color="text.primary">Activités</Typography>
-        </Link>
-
-        {extraItems.map((item, index) => (
-          <Box key={index} sx={{ display: 'flex', alignItems: 'center' }}>
-            {item.href ? (
-              <Link
-                component={NextLink}
-                href={item.href}
-                underline="hover"
-                sx={{ display: 'flex', alignItems: 'center' }}
-                color="inherit"
-              >
-                {item.icon && <Box sx={{ mr: 0.5, display: 'flex', alignItems: 'center', color:"primary" }}>{item.icon}</Box>}
-                {item.label}
-              </Link>
-            ) : (
-              <Box sx={{ display: 'flex', alignItems: 'center', color:"primary"}} >
-                {item.icon && <Box sx={{ mr: 0.5, display: 'flex', alignItems: 'center', color:"primary" }}>{item.icon}</Box>}
-                {item.label}
-              </Box>
-            )}
-            
-            {/* Afficher un menu déroulant si item.menu existe */}
-            {item.menu && (
-              <>
-                <IconButton
-                  size="small"
-                  onClick={(e) => handleMenuClick(e, index)}
-                  aria-controls={menuAnchorEl[index] ? `breadcrumb-menu-${index}` : undefined}
-                  aria-haspopup="true"
-                  aria-expanded={menuAnchorEl[index] ? 'true' : undefined}
-                  sx={{ ml: 0.5, p: 0.3 }}
-                >
-                  <KeyboardArrowDownIcon fontSize="small" sx={{color:"primary"}} />
-                </IconButton>
-                <Menu
-                  id={`breadcrumb-menu-${index}`}
-                  anchorEl={menuAnchorEl[index]}
-                  open={Boolean(menuAnchorEl[index])}
-                  onClose={() => handleMenuClose(index)}
-                  PaperProps={{
-                    elevation: 3,
-                    sx: { minWidth: 180 }
-                  }}
-                  anchorOrigin={{
-                    vertical: 'bottom',
-                    horizontal: 'left',
-                  }}
-                  transformOrigin={{
-                    vertical: 'top',
-                    horizontal: 'left',
-                  }}
-                >
-                  {item.menu.map((menuItem, menuIndex) => (
-                    <MenuItem 
-                      key={menuIndex} 
-                      onClick={() => handleMenuClose(index)}
-                      component={NextLink}
-                      href={menuItem.href}
-                      sx={{ display: 'flex', alignItems: 'center', gap: 1 }}
-                    >
-                      {menuItem.icon}
-                      {menuItem.label}
-                    </MenuItem>
-                  ))}
-                </Menu>
-              </>
-            )}
-          </Box>
-        ))}
-
-        <Typography sx={{ display: 'flex', alignItems: 'center' }} color="primary">
-          {currentPageLabel}
-        </Typography>
-      </Breadcrumbs>
+  // Construction manuelle des éléments du fil d'Ariane
+  const breadcrumbItems = [];
+  
+  // Ajout de l'élément Accueil
+  breadcrumbItems.push(
+    <Link key="home" href="/" className="flex items-center gap-1">
+      <HomeIcon fontSize="small" color='primary' />
+      <Typography color="text.primary">
+      Accueil
+      </Typography>
+    </Link>
+  );
+  
+  // Ajout de l'élément Activités avec le menu déroulant
+  breadcrumbItems.push(
+    <Box 
+      key="activities"
+      onClick={handleMenuClick}
+      className="hover:underline flex items-center gap-1 cursor-pointer"
+      aria-controls={menuOpen ? 'activities-menu' : undefined}
+      aria-haspopup="true"
+      aria-expanded={menuOpen ? 'true' : undefined}
+    >
+      <MenuBookIcon fontSize="small" color='primary' />
+      <Typography color="text.primary">
+      Activités
+      </Typography>
+      <ExpandMoreIcon fontSize="small" color='primary' />
     </Box>
   );
-};
+  
+  // Ajout des éléments supplémentaires s'ils existent
+  if (extraItems.length > 0) {
+    extraItems.forEach((item, index) => {
+      breadcrumbItems.push(
+        item.href ? (
+          <Link 
+            key={`extra-${index}`} 
+            href={item.href} 
+            className="hover:underline flex items-center gap-1"
+          >
+            {item.icon}
+            <span>{item.label}</span>
+          </Link>
+        ) : (
+          <Typography key={`extra-${index}`} color="text.primary" className="flex items-center gap-1">
+            {item.icon}
+            <span>{item.label}</span>
+          </Typography>
+        )
+      );
+    });
+  }
+  
+  // Ajout de la page courante si elle existe
+  if (currentPageLabel) {
+    breadcrumbItems.push(
+      <Typography sx={{ display: 'flex', alignItems: 'center', fontWeight: 700 }} color="primary">
+          {currentPageLabel}
+      </Typography>
+    );
+  }
 
-export default ActivitiesBreadcrumbs;
+  return (
+    <Box mb={4}>
+      <Breadcrumbs separator={<NavigateNextIcon fontSize="small" />}>
+        {breadcrumbItems}
+      </Breadcrumbs>
+
+      <Menu
+        id="activities-menu"
+        anchorEl={menuAnchorEl}
+        open={menuOpen}
+        onClose={handleMenuClose}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }}
+        transformOrigin={{ vertical: 'top', horizontal: 'left' }}
+        slotProps={{
+          paper: {
+            elevation: 3,
+            sx: { width: 'auto', mt: 0.5, borderRadius: 1 }
+          }
+        }}
+      >
+        <MenuItem 
+          onClick={() => navigateTo('/activities')}
+          selected={isActive('/activities')}
+        >
+          <ListItemIcon><ListIcon fontSize="small" /></ListItemIcon>
+          <ListItemText>Toutes les activités</ListItemText>
+        </MenuItem>
+        
+        <MenuItem 
+          onClick={() => navigateTo('/activities/new')}
+          selected={isActive('/activities/new')}
+        >
+          <ListItemIcon><AddIcon fontSize="small" /></ListItemIcon>
+          <ListItemText>Nouvelle activité</ListItemText>
+        </MenuItem>
+        
+        <MenuItem 
+          onClick={() => navigateTo('/stats')}
+          selected={isActive('/stats')}
+        >
+          <ListItemIcon><AnalyticsIcon fontSize="small" /></ListItemIcon>
+          <ListItemText>Statistiques</ListItemText>
+        </MenuItem>
+        
+        <MenuItem 
+          onClick={() => navigateTo('/corrections/new')}
+        >
+          <ListItemIcon><AssignmentIcon fontSize="small" /></ListItemIcon>
+          <ListItemText>Nouvelle correction</ListItemText>
+        </MenuItem>
+      </Menu>
+    </Box>
+  );
+}

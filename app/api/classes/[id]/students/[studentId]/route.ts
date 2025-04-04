@@ -175,6 +175,80 @@ export async function DELETE(
   }
 }
 
+// POST: Create an association between a student and a class
+export async function POST(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string, studentId: string }> }
+) {
+  try {
+    // Await the params
+    const { id, studentId } = await params;
+    
+    const classId = parseInt(id);
+    const studId = parseInt(studentId);
+    
+    if (isNaN(classId) || isNaN(studId)) {
+      return NextResponse.json({ error: 'Invalid class ID or student ID' }, { status: 400 });
+    }
+    
+    const body = await req.json();
+    console.log('POST request body:', body);
+    
+    // Extract sub_class from the request body
+    const subClass = body.sub_class !== undefined ? body.sub_class : null;
+    
+    // Check if the association already exists
+    const classStudentRows = await query(
+      `
+      SELECT *
+      FROM class_students
+      WHERE class_id = ? AND student_id = ?
+      `,
+      [classId, studId]
+    );
+    
+    // If association already exists, update the sub_class instead of returning conflict
+    if ((classStudentRows as any[]).length > 0) {
+      // Update the existing association with the new sub_class
+      await query(
+        `
+        UPDATE class_students
+        SET sub_class = ?, updated_at = CURRENT_TIMESTAMP
+        WHERE class_id = ? AND student_id = ?
+        `,
+        [subClass, classId, studId]
+      );
+      
+      return NextResponse.json({ 
+        message: 'Student association updated with new sub_class',
+        studentId: studId,
+        classId,
+        sub_class: subClass
+      });
+    }
+    
+    // Create the association between student and class with the sub_class
+    await query(
+      `
+      INSERT INTO class_students (class_id, student_id, sub_class, created_at, updated_at)
+      VALUES (?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+      `,
+      [classId, studId, subClass]
+    );
+    
+    return NextResponse.json({ 
+      message: 'Student successfully associated with class',
+      studentId: studId,
+      classId,
+      sub_class: subClass
+    });
+    
+  } catch (error) {
+    console.error('Error associating student with class:', error);
+    return NextResponse.json({ error: 'Error associating student with class' }, { status: 500 });
+  }
+}
+
 export async function PATCH(
   request: Request,
   { params }: { params: Promise<{ id: string; studentId: string }> }

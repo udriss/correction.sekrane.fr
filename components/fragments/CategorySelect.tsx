@@ -1,10 +1,12 @@
+'use client';
+
 import React, { useState, useEffect } from 'react';
 import { 
   FormControl, InputLabel, Select, MenuItem, 
   Box, Chip, TextField, Dialog, DialogTitle, 
   DialogContent, DialogActions, Button, IconButton, 
   Typography, alpha, useTheme, CircularProgress,
-  SelectChangeEvent, Alert
+  SelectChangeEvent, Alert, OutlinedInput
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import CloseIcon from '@mui/icons-material/Close';
@@ -164,6 +166,7 @@ const CategorySelect: React.FC<CategorySelectProps> = ({
           multiple
           value={selectedCategories}
           onChange={handleCategoryChange}
+          input={<OutlinedInput label="Catégories" />}
           renderValue={(selected) => (
             <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
               {selected.length === 0 ? (

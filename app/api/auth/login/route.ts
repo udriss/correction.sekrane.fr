@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { compare } from 'bcrypt';
-import { SignJWT } from 'jose';
+import jwt from 'jsonwebtoken';
 import { withConnection } from '@/lib/db';
 import { cookies } from 'next/headers';
 
@@ -47,20 +47,21 @@ export async function POST(req: NextRequest) {
         [user.id]
       );
 
-      // Generate JWT token
-      const secret = new TextEncoder().encode(
-        process.env.JWT_SECRET || 'changeme'
-      );
+      // Generate JWT token using jsonwebtoken instead of jose
+      const jwtSecret = process.env.JWT_SECRET || 'changeme';
       
-      const token = await new SignJWT({
-        id: user.id,
-        username: user.username,
-        name: user.name
-      })
-        .setProtectedHeader({ alg: 'HS256' })
-        .setIssuedAt()
-        .setExpirationTime('24h')
-        .sign(secret);
+      const token = jwt.sign(
+        {
+          id: user.id,
+          username: user.username,
+          name: user.name
+        }, 
+        jwtSecret,
+        { 
+          algorithm: 'HS256',
+          expiresIn: '24h'
+        }
+      );
 
       // Set cookie with SameSite=None pour permettre l'accès entre domaines si nécessaire
       const cookieStore = await cookies();

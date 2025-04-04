@@ -23,32 +23,14 @@ import Link from 'next/link';
 import AddIcon from '@mui/icons-material/Add';
 import PeopleIcon from '@mui/icons-material/People';
 import HelpOutlineIcon from '@mui/icons-material/HelpOutline';
+import RecentActorsIcon from '@mui/icons-material/RecentActors';
 import SchoolIcon from '@mui/icons-material/School';
 import AssignmentIcon from '@mui/icons-material/Assignment';
+import { Student, Class } from '@/lib/types';
+import MenuBookIcon from '@mui/icons-material/MenuBook';
+import BrowserNotSupportedIcon from '@mui/icons-material/BrowserNotSupported';
 
-export interface Class {
-  id: number;
-  name: string;
-  year: string;
-}
-
-export interface Student {
-  id?: number;
-  first_name: string;
-  last_name: string;
-  email: string;
-  gender?: 'M' | 'F' | 'N';
-  classId?: number | null;
-  group?: string;
-  // Added properties from enhancement
-  className?: string;
-  corrections_count?: number;
-  additionalClasses?: {id: number, name: string}[];
-  // New property to match the API response
-  allClasses?: { classId: number; className: string; sub_class?: string | null }[];
-}
-
-// Additional types for student statistics
+// Types additionnels spécifiques à cette page
 export interface StudentStats {
   total_corrections: number;
   average_grade: number | null;
@@ -65,6 +47,7 @@ export interface StudentStats {
     submission_date: string;
   }[];
 }
+
 
 export default function StudentsPage() {
   const [students, setStudents] = useState<Student[]>([]);
@@ -212,7 +195,7 @@ export default function StudentsPage() {
                   boxShadow: '0 4px 20px rgba(0,0,0,0.2)'
                 }}
               >
-                <PeopleIcon sx={{ fontSize: 36, color: (theme) => theme.palette.text.primary }} />
+                <PeopleIcon sx={{ fontSize: 50, color: (theme) => theme.palette.text.primary }} />
               </Box>
                 
                 <Box>
@@ -258,7 +241,7 @@ export default function StudentsPage() {
                 backdropFilter: 'blur(5px)',
                 borderRadius: 2,
               }}>
-                <Typography variant="overline" color="text.secondary">Total</Typography>
+                <PeopleIcon color="primary" fontSize="large" sx={{ mb: 1 }} />
                 <Typography variant="h3" fontWeight="bold" color="text.primary">{totalStudents}</Typography>
                 <Typography variant="overline" color="text.secondary">
                   {totalStudents === 1 ? 'étudiant' : 'étudiants'}
@@ -275,10 +258,10 @@ export default function StudentsPage() {
                 backdropFilter: 'blur(5px)',
                 borderRadius: 2,
               }}>
-                <Typography variant="overline" color="text.secondary">Classes</Typography>
+                <RecentActorsIcon color="info" fontSize="large" sx={{ mb: 1 }} />
                 <Typography variant="h3" fontWeight="bold" color="text.primary">{uniqueClasses}</Typography>
                 <Typography variant="overline" color="text.secondary">
-                  {uniqueClasses === 1 ? 'associée' : 'associées'}
+                  {uniqueClasses === 1 ? 'classe associée' : 'classes associées'}
                 </Typography>
               </Paper>
             </Grid>
@@ -292,7 +275,7 @@ export default function StudentsPage() {
                 backdropFilter: 'blur(5px)',
                 borderRadius: 2,
               }}>
-                <Typography variant="overline" color="text.secondary">Corrigés</Typography>
+                <MenuBookIcon color="success" fontSize="large" sx={{ mb: 1 }} />
                 <Typography variant="h3" fontWeight="bold" color="text.primary">{totalWithCorrections}</Typography>
                 <Typography variant="overline" color="text.secondary">
                   évalués
@@ -309,7 +292,7 @@ export default function StudentsPage() {
                 backdropFilter: 'blur(5px)',
                 borderRadius: 2,
               }}>
-                <Typography variant="overline" color="text.secondary">Non assignés</Typography>
+                <BrowserNotSupportedIcon color="error" fontSize="large" sx={{ mb: 1 }} />
                 <Typography variant="h3" fontWeight="bold" color="text.primary">{studentsWithoutClass}</Typography>
                 <Typography variant="overline" color="text.secondary">
                   sans classe

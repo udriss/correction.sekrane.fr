@@ -272,6 +272,12 @@ export default function MainNavbar() {
                     </ListItemIcon>
                     <ListItemText primary="Recherche avancée" />
                   </MenuItem>
+                  <MenuItem component={Link} href="/stats">
+                    <ListItemIcon>
+                      <FilterListIcon fontSize="small" />
+                    </ListItemIcon>
+                    <ListItemText primary="Statistiques" />
+                  </MenuItem>
                 </Menu>
                 
                 {/* Nouveau bouton pour la gestion des classes */}

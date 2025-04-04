@@ -173,8 +173,8 @@ export default function StudentsBreadcrumbs({
         </MenuItem>
         
         <MenuItem 
-          onClick={() => navigateTo('/students/analytics')}
-          selected={isActive('/students/analytics')}
+          onClick={() => navigateTo('/stats')}
+          selected={isActive('/stats')}
         >
           <ListItemIcon><AnalyticsIcon fontSize="small" /></ListItemIcon>
           <ListItemText>Statistiques</ListItemText>

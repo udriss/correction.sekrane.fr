@@ -193,7 +193,7 @@ const StudentEditDialogForDetail: React.FC<StudentEditDialogForDetailProps> = ({
     >
       <DialogTitle sx={{ p: 0 }}>
         <GradientBackground
-          variant="secondary"
+          variant="primary"
           sx={{ 
             p: 3, 
             display: 'flex',

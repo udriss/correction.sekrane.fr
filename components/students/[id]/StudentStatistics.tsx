@@ -109,9 +109,19 @@ export default function StudentStatistics({ corrections, stats }: StudentStatist
               </Table>
             </TableContainer>
           ) : (
-            <Alert severity="info">
-              Aucune activité disponible pour afficher les détails.
-            </Alert>
+        <Alert 
+          severity="info" 
+          sx={{ 
+            mt: 3,
+            border: 1,
+            borderColor: 'info.main',
+            '& .MuiAlert-icon': {
+              color: 'info.main'
+            }
+          }}
+        >
+          Aucune activité disponible pour afficher les détails.
+        </Alert>
           )}
         </Paper>
       </Grid>

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   Dialog,
@@ -39,7 +39,7 @@ import SchoolIcon from '@mui/icons-material/School';
 import SaveIcon from '@mui/icons-material/Save';
 import CloseIcon from '@mui/icons-material/Close';
 import GroupsIcon from '@mui/icons-material/Groups';
-import { Student, Class } from '@/app/students/page';
+import { Student, Class } from '@/lib/types';
 import MaleIcon from '@mui/icons-material/Male';
 import FemaleIcon from '@mui/icons-material/Female';
 import NotInterestedIcon from '@mui/icons-material/NotInterested';
@@ -48,10 +48,23 @@ import GradientBackground from '@/components/ui/GradientBackground';
 import H1Title from '@/components/ui/H1Title';
 import { text } from 'stream/consumers';
 
+interface ExtendedClassEntry {
+  classId: number;
+  className: string;
+  sub_class?: string | null;
+  nbre_subclasses?: number;
+}
+
+// Extend the Student type to include the extended allClasses
+interface ExtendedStudent extends Omit<Student, 'allClasses'> {
+  allClasses?: ExtendedClassEntry[];
+}
+
 interface StudentEditDialogProps {
   open: boolean;
   student: Student | null;
-  classes: Class[];
+  // Change this to accept partial Class objects:
+  classes: (Class | Partial<Class> & { id: number; name: string; year: string })[];
   selectedClasses: { id: number, name: string }[];
   availableSubgroups: string[];
   loadingSubgroups: boolean;
@@ -60,6 +73,9 @@ interface StudentEditDialogProps {
   onStudentChange: (student: Student | null) => void;
   onSelectedClassesChange: (classes: { id: number, name: string }[]) => void;
   fetchClassSubgroups: (classId: number) => void;
+  // Ajout des propriétés manquantes
+  classGroupsMapping?: {[classId: number]: string[]};
+  onClassSelectionChange?: (classId: number, isSelected: boolean) => void;
 }
 
 interface ValidationError {
@@ -84,12 +100,81 @@ const StudentEditDialog: React.FC<StudentEditDialogProps> = ({
   onSave,
   onStudentChange,
   onSelectedClassesChange,
-  fetchClassSubgroups
+  fetchClassSubgroups,
+  classGroupsMapping,
+  onClassSelectionChange
 }) => {
   const router = useRouter();
   const [classSubgroups, setClassSubgroups] = useState<{[classId: number]: string}>({});
   const [validationErrors, setValidationErrors] = useState<ValidationError>({});
   const [existingStudent, setExistingStudent] = useState<Student | null>(null);
+  
+  // Déplacer le useEffect ici, avant le retour conditionnel
+  useEffect(() => {
+    if (student && student.allClasses && student.allClasses.length > 0) {
+      // Parcourir allClasses pour initialiser les sous-classes pour chaque classe
+      const initialSubgroups: {[classId: number]: string} = {};
+      
+      student.allClasses.forEach(cls => {
+        if (cls.sub_class) {
+          initialSubgroups[cls.classId] = cls.sub_class.toString();
+        }
+      });
+      
+      setClassSubgroups(initialSubgroups);
+      
+      // Si la classe principale a une sous-classe, s'assurer que group est défini
+      if (student.classId) {
+        const mainClass = student.allClasses.find(cls => cls.classId === student.classId);
+        if (mainClass && mainClass.sub_class && !student.group) {
+          onStudentChange({
+            ...student,
+            group: mainClass.sub_class.toString()
+          });
+        }
+      }
+    }
+  }, [student]);
+
+  // Add this to useEffect to properly initialize allClasses if it's missing
+  useEffect(() => {
+    if (student && !student.allClasses && student.classId !== undefined && student.classId !== null) {
+      // Fetch class details to get nbre_subclasses
+      fetch(`/api/classes/${student.classId}`)
+        .then(response => response.json())
+        .then(classData => {
+          // If allClasses is missing but we have a classId, create an initial allClasses array
+          const initialAllClasses: ExtendedClassEntry[] = [{
+            classId: student.classId as number,
+            className: classes.find(c => c.id === student.classId)?.name || 'Current Class',
+            sub_class: student.sub_class ? String(student.sub_class) : null,
+            nbre_subclasses: classData.nbre_subclasses || null
+          }];
+          
+          // Update the student with the initialized allClasses
+          onStudentChange({
+            ...student,
+            allClasses: initialAllClasses
+          });
+          
+          console.log('Initialized allClasses with nbre_subclasses:', initialAllClasses);
+        })
+        .catch(error => {
+          console.error('Error fetching class details:', error);
+          // Fallback to initialize without nbre_subclasses
+          const initialAllClasses: ExtendedClassEntry[] = [{
+            classId: student.classId as number,
+            className: classes.find(c => c.id === student.classId)?.name || 'Current Class',
+            sub_class: student.sub_class ? String(student.sub_class) : null
+          }];
+          
+          onStudentChange({
+            ...student,
+            allClasses: initialAllClasses
+          });
+        });
+    }
+  }, [student, classes, onStudentChange]);
   
   if (!student) return null;
   
@@ -97,7 +182,7 @@ const StudentEditDialog: React.FC<StudentEditDialogProps> = ({
   const selectedClassIds = selectedClasses.map(cls => cls.id);
 
   // Handle class selection/deselection
-  const handleClassToggle = (cls: Class) => {
+  const handleClassToggle = (cls: Class | (Partial<Class> & { id: number; name: string; year: string })) => {
     const currentIndex = selectedClassIds.indexOf(cls.id);
     const newSelectedClasses = [...selectedClasses];
     
@@ -105,29 +190,87 @@ const StudentEditDialog: React.FC<StudentEditDialogProps> = ({
       // Add class
       newSelectedClasses.push({ id: cls.id, name: cls.name });
       
-      // If this is the first or only class, set it as primary and fetch subgroups
-      if (newSelectedClasses.length === 1) {
-        onStudentChange({ ...student, classId: cls.id });
+      // Fetch the class details to get nbre_subclasses
+      fetch(`/api/classes/${cls.id}`)
+        .then(response => response.json())
+        .then(classData => {
+          if (classData && classData.nbre_subclasses) {
+            // Generate available subgroups for this class
+            const groups = Array.from(
+              { length: classData.nbre_subclasses },
+              (_, i) => (i + 1).toString()
+            );
+            
+            // Update the classGroupsMapping if onClassSelectionChange is available
+            if (onClassSelectionChange) {
+              onClassSelectionChange(cls.id, true);
+            }
+            
+            // Optionally update allClasses with nbre_subclasses
+            let updatedAllClasses: ExtendedClassEntry[] = student.allClasses ? 
+              [...student.allClasses as ExtendedClassEntry[]] : [];
+            
+            const classIndex = updatedAllClasses.findIndex(c => c.classId === cls.id);
+            
+            if (classIndex >= 0) {
+              updatedAllClasses[classIndex] = {
+                ...updatedAllClasses[classIndex],
+                nbre_subclasses: classData.nbre_subclasses
+              };
+            } else {
+              updatedAllClasses.push({
+                classId: cls.id,
+                className: cls.name,
+                sub_class: null,
+                nbre_subclasses: classData.nbre_subclasses
+              });
+            }
+            
+            onStudentChange({
+              ...student,
+              allClasses: updatedAllClasses
+            } as ExtendedStudent);
+          }
+        })
+        .catch(error => {
+          console.error(`Error fetching class ${cls.id} details:`, error);
+        });
+      
+      // Update allClasses when adding a class
+      const updatedAllClasses: ExtendedClassEntry[] = student.allClasses ? 
+        [...student.allClasses as ExtendedClassEntry[]] : [];
+      
+      const existingClassIndex = updatedAllClasses.findIndex(c => c.classId === cls.id);
+      
+      if (existingClassIndex === -1) {
+        // Add the class if it doesn't exist yet
+        updatedAllClasses.push({
+          classId: cls.id,
+          className: cls.name,
+          sub_class: null
+        });
+        
+        onStudentChange({
+          ...student,
+          allClasses: updatedAllClasses
+        } as ExtendedStudent);
+        
+        // Fetch subgroups for this class
         fetchClassSubgroups(cls.id);
       }
     } else {
       // Remove class
       newSelectedClasses.splice(currentIndex, 1);
       
-      // If we removed the primary class, update
-      if (student.classId === cls.id) {
-        if (newSelectedClasses.length > 0) {
-          // Set the first remaining class as primary
-          onStudentChange({ 
-            ...student, 
-            classId: newSelectedClasses[0].id,
-            group: undefined 
-          });
-          fetchClassSubgroups(newSelectedClasses[0].id);
-        } else {
-          // No classes left
-          onStudentChange({ ...student, classId: undefined, group: undefined });
-        }
+      // Also remove the class from allClasses
+      if (student.allClasses) {
+        const updatedAllClasses = student.allClasses.filter(c => c.classId !== cls.id);
+        
+        // Update the student with the modified allClasses
+        onStudentChange({
+          ...student,
+          allClasses: updatedAllClasses
+        } as ExtendedStudent);
       }
     }
     
@@ -136,15 +279,70 @@ const StudentEditDialog: React.FC<StudentEditDialogProps> = ({
 
   // Handle subgroup change for a specific class
   const handleSubgroupChange = (classId: number, value: string) => {
-    // Only update if it's the primary class
-    if (classId === student.classId) {
-      onStudentChange({
-        ...student,
-        group: value
-      });
+    // Create a copy of allClasses or initialize a new array if it doesn't exist
+    let updatedAllClasses: ExtendedClassEntry[] = student.allClasses ? 
+      [...student.allClasses as ExtendedClassEntry[]] : [];
+    
+    // Find the class in allClasses
+    const classIndex = updatedAllClasses.findIndex(cls => cls.classId === classId);
+    const existingClass = classIndex >= 0 ? updatedAllClasses[classIndex] : null;
+    
+    if (existingClass) {
+      // Update the existing class entry - ensure sub_class is string | null
+      // Preserve the nbre_subclasses property if it exists
+      updatedAllClasses[classIndex] = {
+        ...existingClass,
+        sub_class: value === '' ? null : String(value)
+      };
+    } else if (value) {
+      // Add a new class entry if it doesn't exist
+      const className = classes.find(c => c.id === classId)?.name || 'Classe';
+      
+      // Fetch class details to get nbre_subclasses
+      fetch(`/api/classes/${classId}`)
+        .then(response => response.json())
+        .then(classData => {
+          const updatedAllClasses = student.allClasses ? [...student.allClasses as ExtendedClassEntry[]] : [];
+          
+          updatedAllClasses.push({
+            classId,
+            className,
+            sub_class: value === '' ? null : String(value),
+            nbre_subclasses: classData.nbre_subclasses || null
+          });
+          
+          onStudentChange({
+            ...student,
+            allClasses: updatedAllClasses
+          } as ExtendedStudent);
+        })
+        .catch(error => {
+          console.error('Error fetching class details:', error);
+          // Fallback to add without nbre_subclasses
+          const updatedAllClasses = student.allClasses ? [...student.allClasses as ExtendedClassEntry[]] : [];
+          
+          updatedAllClasses.push({
+            classId,
+            className,
+            sub_class: value === '' ? null : String(value)
+          });
+          
+          onStudentChange({
+            ...student,
+            allClasses: updatedAllClasses
+          } as ExtendedStudent);
+        });
+      
+      return; // Return early since we'll update through the async fetch
     }
     
-    // Also track the subgroup association for this class
+    // Update the student with the new allClasses array
+    onStudentChange({
+      ...student,
+      allClasses: updatedAllClasses
+    } as ExtendedStudent);
+    
+    // Track the subgroup association for this class
     setClassSubgroups({
       ...classSubgroups,
       [classId]: value
@@ -415,15 +613,13 @@ const StudentEditDialog: React.FC<StudentEditDialogProps> = ({
           <List sx={{ width: '100%', maxHeight: '300px', overflow: 'auto' }}>
             {classes.map((cls) => {
               const isSelected = selectedClassIds.includes(cls.id);
-              const isPrimary = student.classId === cls.id;
               
               return (
                 <React.Fragment key={cls.id}>
                   <ListItem 
                     sx={{ 
                       py: 1,
-                      bgcolor: isPrimary ? 'rgba(25, 118, 210, 0.08)' : 'transparent',
-                      '&:hover': { bgcolor: isPrimary ? 'rgba(25, 118, 210, 0.12)' : 'rgba(0, 0, 0, 0.04)' }
+                      '&:hover': { bgcolor: 'rgba(25, 118, 210, 0.12)' }
                     }}
                   >
                     <ListItemIcon>
@@ -431,45 +627,51 @@ const StudentEditDialog: React.FC<StudentEditDialogProps> = ({
                         edge="start"
                         checked={isSelected}
                         onChange={() => handleClassToggle(cls)}
-                        color={isPrimary ? "primary" : "default"}
+                        color='default'
                       />
                     </ListItemIcon>
                     <ListItemText 
                       primary={
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                          <SchoolIcon fontSize="small" color={isPrimary ? "primary" : "action"} />
-                          {/* Change Typography component from 'p' to 'div' */}
+                          <SchoolIcon fontSize="small" color={isSelected ? "primary" : "action"} />
                           <Typography 
                             component="div" 
                             variant="body1" 
                             sx={{ 
-                              fontWeight: isPrimary ? 600 : 400,
+                              fontWeight: isSelected ? 600 : 400,
                               display: 'flex',
                               alignItems: 'center',
                               gap: 1
                             }}
                           >
                             {cls.name}
-                            {isPrimary && 
-                              <Chip 
-                                size="small" 
-                                label="Classe principale" 
-                                color="primary" 
-                                sx={{ height: 20 }} 
-                              />
-                            }
                           </Typography>
                         </Box>
                       }
                     />
                     
-                    {/* Si la classe est sélectionnée, montrer la sélection de sous-groupe sur la même ligne */}
-                    {isSelected && isPrimary && (
+                    {/* Montrer la sélection de sous-groupe sur la même ligne pour chaque classe sélectionnée */}
+                    {isSelected && (
                       <FormControl sx={{ minWidth: 120, ml: 2 }}>
                         <Select
                           size="small"
                           displayEmpty
-                          value={student.group || ''}
+                          // Utilise les groupes spécifiques à cette classe si disponibles
+                          value={(() => {
+                            // If we have allClasses, get the sub_class for this specific class
+                            if (student.allClasses && Array.isArray(student.allClasses)) {
+                              const classEntry = student.allClasses.find(c => c.classId === cls.id);
+                              if (classEntry) {
+                                // Handle sub_class properly - convert to string if not null, or return empty string
+                                return classEntry.sub_class !== null && classEntry.sub_class !== undefined 
+                                  ? String(classEntry.sub_class) 
+                                  : '';
+                              }
+                            }
+                            
+                            // Return empty string if no match found
+                            return '';
+                          })()}
                           onChange={(e) => handleSubgroupChange(cls.id, e.target.value)}
                           disabled={loadingSubgroups}
                           startAdornment={
@@ -482,9 +684,36 @@ const StudentEditDialog: React.FC<StudentEditDialogProps> = ({
                           <MenuItem value="">
                             <em>Non assigné</em>
                           </MenuItem>
-                          {availableSubgroups.map((group) => (
-                            <MenuItem key={group} value={group}>Groupe {group}</MenuItem>
-                          ))}
+                          {/* Get subgroups from the class-specific mapping or from the global available subgroups */}
+                          {(() => {
+                            // Look for nbre_subclasses in the student's allClasses entry for this class
+                            if (student.allClasses && Array.isArray(student.allClasses)) {
+                              const classEntry = student.allClasses.find(c => c.classId === cls.id);
+                              // Type cast classEntry to ExtendedClassEntry to access nbre_subclasses
+                              const typedClassEntry = classEntry as ExtendedClassEntry;
+                              if (typedClassEntry && typedClassEntry.nbre_subclasses) {
+                                // If we have nbre_subclasses directly in allClasses, use it
+                                return Array.from(
+                                  { length: typedClassEntry.nbre_subclasses },
+                                  (_, i) => (i + 1).toString()
+                                ).map((group) => (
+                                  <MenuItem key={group} value={group}>Groupe {group}</MenuItem>
+                                ));
+                              }
+                            }
+                            
+                            // If no nbre_subclasses found in allClasses, try classGroupsMapping
+                            if (classGroupsMapping && classGroupsMapping[cls.id]) {
+                              return classGroupsMapping[cls.id].map((group) => (
+                                <MenuItem key={group} value={group}>Groupe {group}</MenuItem>
+                              ));
+                            }
+                            
+                            // Fallback to global availableSubgroups
+                            return availableSubgroups.map((group) => (
+                              <MenuItem key={group} value={group}>Groupe {group}</MenuItem>
+                            ));
+                          })()}
                         </Select>
                         {loadingSubgroups && (
                           <CircularProgress 

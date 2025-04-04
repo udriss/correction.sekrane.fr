@@ -54,11 +54,9 @@ export async function GET(
       
       
       // Pour chaque fragment, récupérer ses catégories
+      // Add the isOwner flag to each fragment during processing
       const fragmentsWithCategories = await Promise.all(
         fragments.map(async (fragment) => {
-          // Add debug info for each fragment
-          
-          
           try {
             const categories = await query<any[]>(`
               SELECT c.id, c.name 
@@ -67,15 +65,53 @@ export async function GET(
               WHERE fc.fragment_id = ?
             `, [fragment.id]);
 
+            // Add isOwner flag by comparing the current user's ID with the fragment's user_id
+            const isOwner = userId ? String(userId) === String(fragment.user_id) : false;
+            
+            // Parse tags if they exist
+            let parsedTags: string[] = [];
+            if (fragment.tags) {
+              if (typeof fragment.tags === 'string') {
+                try {
+                  parsedTags = JSON.parse(fragment.tags);
+                } catch (e) {
+                  console.error(`Error parsing tags for fragment ${fragment.id}:`, e);
+                  parsedTags = [];
+                }
+              } else if (Array.isArray(fragment.tags)) {
+                parsedTags = fragment.tags;
+              }
+            }
+
             return {
               ...fragment,
-              categories
+              tags: parsedTags,
+              categories,
+              isOwner
             };
           } catch (categoryError) {
             console.error(`Error fetching categories for fragment ${fragment.id}:`, categoryError);
+            
+            // Parse tags even in error case
+            let parsedTags: string[] = [];
+            if (fragment.tags) {
+              if (typeof fragment.tags === 'string') {
+                try {
+                  parsedTags = JSON.parse(fragment.tags);
+                } catch (e) {
+                  console.error(`Error parsing tags for fragment ${fragment.id}:`, e);
+                  parsedTags = [];
+                }
+              } else if (Array.isArray(fragment.tags)) {
+                parsedTags = fragment.tags;
+              }
+            }
+            
             return {
               ...fragment,
-              categories: []
+              tags: parsedTags,
+              categories: [],
+              isOwner: userId ? String(userId) === String(fragment.user_id) : false
             };
           }
         })
@@ -174,9 +210,12 @@ export async function POST(
     `, [fragmentId]);
 
     // Construire la réponse
+    // Also add isOwner flag to newly created fragments in the POST method
+    // After creating the fragment and getting its categories
     const newFragment = {
       ...fragment[0],
-      categories: fragmentCategories
+      categories: fragmentCategories,
+      isOwner: true  // The creator is always the owner
     };
 
     return NextResponse.json(newFragment, { status: 201 });

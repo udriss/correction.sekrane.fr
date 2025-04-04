@@ -91,19 +91,10 @@ export default function NewActivity() {
   };
   return (
     <Container maxWidth="md" className="py-10">
-      <Zoom in={true} timeout={500}>
         <Paper 
           elevation={3} 
           sx={{ 
             borderRadius: 3,
-            overflow: 'hidden',
-            boxShadow: (theme) => `0 10px 40px ${theme.palette.mode === 'dark' ? 'rgba(0,0,0,0.5)' : 'rgba(0,0,0,0.1)'}`,
-            transform: 'translateY(0)',
-            transition: 'transform 0.3s ease, box-shadow 0.3s ease',
-            '&:hover': {
-              transform: 'translateY(-5px)',
-              boxShadow: (theme) => `0 15px 50px ${theme.palette.mode === 'dark' ? 'rgba(0,0,0,0.6)' : 'rgba(0,0,0,0.15)'}`,
-            }
           }}>
             
           {/* En-tête avec dégradé et motif */}
@@ -132,7 +123,7 @@ export default function NewActivity() {
                     boxShadow: '0 4px 20px rgba(0,0,0,0.2)'
                   }}
                 >
-                  <AddCircleIcon sx={{ fontSize: 36, color: (theme) => theme.palette.text.primary }} />
+                  <AddCircleIcon sx={{ fontSize: 50, color: (theme) => theme.palette.text.primary }} />
                 </Box>
                 
                 <Box sx={{ flexGrow: 1 }}>
@@ -462,7 +453,6 @@ export default function NewActivity() {
             </form>
           </Box>
         </Paper>
-      </Zoom>
     </Container>
   );
 }

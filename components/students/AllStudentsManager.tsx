@@ -42,14 +42,18 @@ import Link from 'next/link';
 import LoadingSpinner from '@/components/LoadingSpinner';
 import StudentEditDialog from './StudentEditDialog';
 import BatchStudentForm from './BatchStudentForm';
-import { Student, Class } from '@/app/students/page';
+import { Student, Class } from '@/lib/types';
 import MaleIcon from '@mui/icons-material/Male';
 import FemaleIcon from '@mui/icons-material/Female';
 import NotInterestedIcon from '@mui/icons-material/NotInterested';
 import GpsNotFixedIcon from '@mui/icons-material/GpsNotFixed';
 import GradientBackground from '@/components/ui/GradientBackground';
-
-
+import RecentActorsIcon from '@mui/icons-material/RecentActors';
+import LinkOffIcon from '@mui/icons-material/LinkOff';
+import OpenInNewIcon from '@mui/icons-material/OpenInNew';
+import VisibilityIcon from '@mui/icons-material/Visibility';
+import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
+import EmailIcon from '@mui/icons-material/Email';
 
 interface AllStudentsManagerProps {
   students: Student[];
@@ -59,7 +63,7 @@ interface AllStudentsManagerProps {
   onError: (message: string) => void;
 }
 
-// Interface for BatchStudent that matches the one in BatchStudentForm
+// Interface pour BatchStudent
 interface BatchStudent {
   first_name: string;
   last_name: string;
@@ -79,11 +83,14 @@ const AllStudentsManagerNEW: React.FC<AllStudentsManagerProps> = ({
   const [searchTerm, setSearchTerm] = useState('');
   const [filterTab, setFilterTab] = useState(0);
   const [filterClass, setFilterClass] = useState<number | 'all'>('all');
+  const [filterGender, setFilterGender] = useState<'all' | 'M' | 'F' | 'N'>('all'); // Add gender filter state
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [orderBy, setOrderBy] = useState<keyof Student>('last_name');
   const [order, setOrder] = useState<'asc' | 'desc'>('asc');
-  
+  const [showEmailColumn, setShowEmailColumn] = useState(false);
+  const [showNameColumn, setShowNameColumn] = useState(false);
+
   // States for student management
   const [confirmingDelete, setConfirmingDelete] = useState<number | null>(null);
   const [editingStudent, setEditingStudent] = useState<Student | null>(null);
@@ -96,51 +103,88 @@ const AllStudentsManagerNEW: React.FC<AllStudentsManagerProps> = ({
   // State for batch form
   const [showBatchForm, setShowBatchForm] = useState(false);
   const [selectedClass, setSelectedClass] = useState<null | {id: number, name: string, nbre_subclasses?: number}>(null);
-
+  const [filterSubClass, setFilterSubClass] = useState<string | 'all'>('all');
+  const [availableSubClasses, setAvailableSubClasses] = useState<string[]>([]);
+  // État pour stocker les groupes disponibles par classe
+  const [classGroupsMapping, setClassGroupsMapping] = useState<{[classId: number]: string[]}>({});
   const router = useRouter();
 
+  // Fonction pour gérer le changement de sous-classe
+  const handleSubClassFilterChange = (event: SelectChangeEvent<string>) => {
+    setFilterSubClass(event.target.value);
+    setPage(0); // Reset pagination when changing sub-class
+  };
 
+  
+  const toggleEmailColumn = () => {
+    setShowEmailColumn(prev => !prev);
+  };
+  const toggleNameColumn = () => {
+    setShowNameColumn(prev => !prev);
+  };
 
   // Filter students based on criteria
-  const filteredStudents = students
-    .filter(student => {
-      // Filter by search term
-      if (searchTerm && 
-          !(student.first_name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-            student.last_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            student.email.toLowerCase().includes(searchTerm.toLowerCase()))) {
-        return false;
+  const filteredStudents = students.filter(student => {
+    // Filter by search term
+    if (searchTerm && 
+        !(student.first_name.toLowerCase().includes(searchTerm.toLowerCase()) || 
+          student.last_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          student.email.toLowerCase().includes(searchTerm.toLowerCase()))) {
+      return false;
+    }
+    
+    // Filter by tab (with/without corrections)
+    if (filterTab === 1 && (!student.corrections_count || student.corrections_count <= 0)) {
+      return false; // "With Corrections" tab
+    } else if (filterTab === 2 && (student.corrections_count && student.corrections_count > 0)) {
+      return false; // "Without Correction" tab
+    }
+
+    // Filter by class - check in allClasses array if available, otherwise fallback to classId
+    if (filterClass !== 'all') {
+      let matchesClass = false;
+      
+      if (student.allClasses) {
+        matchesClass = student.allClasses.some((cls: {classId: number}) => cls.classId === filterClass);
+      } else {
+        matchesClass = student.classId === filterClass;
       }
       
-      // Filter by tab (with/without corrections)
-      if (filterTab === 1 && (!student.corrections_count || student.corrections_count <= 0)) {
-        return false; // "With Corrections" tab
-      } else if (filterTab === 2 && (student.corrections_count && student.corrections_count > 0)) {
-        return false; // "Without Correction" tab
-      }
-
-      // Filter by class - check in allClasses array if available, otherwise fallback to classId
-      if (filterClass !== 'all') {
+      if (!matchesClass) return false;
+      
+      // If subclass filter is active and the class has subclasses
+      if (filterSubClass !== 'all' && availableSubClasses.length > 0) {
+        // Find the relevant class record in allClasses for the selected class
         if (student.allClasses) {
-          return student.allClasses.some((cls: {classId: number}) => cls.classId === filterClass);
+          const classRecord = student.allClasses.find((cls: {classId: number, sub_class?: string | number | null}) => 
+            cls.classId === filterClass
+          );
+          // Check if the sub_class in the found class record matches the selected subclass
+          return classRecord && classRecord.sub_class?.toString() === filterSubClass;
         } else {
-          return student.classId === filterClass;
+          // Fallback to student.group if allClasses is not available
+          return student.group === filterSubClass;
         }
       }
-      
-      return true;
-    })
-    .sort((a, b) => {
-      // Sort by selected property
-      const valueA = a[orderBy] || '';
-      const valueB = b[orderBy] || '';
-      
-      if (order === 'asc') {
-        return valueA < valueB ? -1 : 1;
-      } else {
-        return valueA > valueB ? -1 : 1;
-      }
-    });
+    }
+    
+    // Filter by gender
+    if (filterGender !== 'all' && student.gender !== filterGender) {
+      return false;
+    }
+    
+    return true;
+  }).sort((a, b) => {
+    // Sort by selected property
+    const valueA = a[orderBy] || '';
+    const valueB = b[orderBy] || '';
+    
+    if (order === 'asc') {
+      return valueA < valueB ? -1 : 1;
+    } else {
+      return valueA > valueB ? -1 : 1;
+    }
+  });
 
   // Pagination
   const paginatedStudents = filteredStudents.slice(
@@ -159,6 +203,9 @@ const AllStudentsManagerNEW: React.FC<AllStudentsManagerProps> = ({
     const newValue = event.target.value as number | 'all';
     setFilterClass(newValue);
     
+    // Reset sub-class filter when changing class
+    setFilterSubClass('all');
+    
     // If a class is selected, fetch its information
     if (newValue !== 'all') {
       fetch(`/api/classes/${newValue}`)
@@ -171,13 +218,26 @@ const AllStudentsManagerNEW: React.FC<AllStudentsManagerProps> = ({
               name: classData.name,
               nbre_subclasses: data.nbre_subclasses || 0
             });
+            
+            // If the class has subclasses, generate the available options
+            if (data.nbre_subclasses && data.nbre_subclasses > 0) {
+              const subClasses = Array.from(
+                { length: data.nbre_subclasses },
+                (_, index) => (index + 1).toString()
+              );
+              setAvailableSubClasses(subClasses);
+            } else {
+              setAvailableSubClasses([]);
+            }
           }
         })
         .catch(error => {
           console.error('Error fetching class details:', error);
+          setAvailableSubClasses([]);
         });
     } else {
       setSelectedClass(null);
+      setAvailableSubClasses([]);
     }
     
     setPage(0); // Reset pagination when changing class
@@ -203,6 +263,8 @@ const AllStudentsManagerNEW: React.FC<AllStudentsManagerProps> = ({
     setSearchTerm('');
     setFilterTab(0);
     setFilterClass('all');
+    setFilterGender('all');
+    setFilterSubClass('all');
     setPage(0);
   };
 
@@ -263,6 +325,12 @@ const AllStudentsManagerNEW: React.FC<AllStudentsManagerProps> = ({
   };
 
   const handleEditClick = async (student: Student) => {
+    // Assurez-vous que l'étudiant a un ID défini
+    if (!student.id) {
+      console.error('Attempted to edit a student without an ID');
+      return;
+    }
+    
     setEditingStudent(student);
     setEditError(null);
     
@@ -448,6 +516,8 @@ const AllStudentsManagerNEW: React.FC<AllStudentsManagerProps> = ({
     }
   };
 
+  console.log('Available subgroups:', editingStudent);
+
   // BatchStudentForm integration handlers
   const handleOpenBatchForm = () => {
     // If a class filter is active, use this class by default
@@ -596,6 +666,35 @@ const AllStudentsManagerNEW: React.FC<AllStudentsManagerProps> = ({
               ),
             }}
           />
+
+          <FormControl size="small" sx={{ minWidth: 150 }}>
+            <InputLabel>Genre</InputLabel>
+            <Select
+              value={filterGender}
+              onChange={(e) => setFilterGender(e.target.value as 'all' | 'M' | 'F' | 'N')}
+              label="Genre"
+            >
+              <MenuItem value="all">Tout</MenuItem>
+              <MenuItem value="M">
+                <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                  <MaleIcon fontSize="small" sx={{ mr: 1, color: 'info.main' }} />
+                  Masculin
+                </Box>
+              </MenuItem>
+              <MenuItem value="F">
+                <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                  <FemaleIcon fontSize="small" sx={{ mr: 1, color: 'secondary.main' }} />
+                  Féminin
+                </Box>
+              </MenuItem>
+              <MenuItem value="N">
+                <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                  <GpsNotFixedIcon fontSize="small" sx={{ mr: 1, color: 'text.secondary' }} />
+                  Non précisé
+                </Box>
+              </MenuItem>
+            </Select>
+          </FormControl>
           
           <FormControl size="small" sx={{ minWidth: 150 }}>
             <InputLabel>Class</InputLabel>
@@ -615,8 +714,29 @@ const AllStudentsManagerNEW: React.FC<AllStudentsManagerProps> = ({
               ))}
             </Select>
           </FormControl>
+
+          {availableSubClasses.length > 0 && filterClass !== 'all' && (
+            <FormControl size="small" sx={{ minWidth: 150 }}>
+              <InputLabel>Groupe</InputLabel>
+              <Select
+                value={filterSubClass}
+                onChange={handleSubClassFilterChange}
+                label="Groupe"
+              >
+                <MenuItem value="all">Tous les groupes</MenuItem>
+                {availableSubClasses.map((subClass) => (
+                  <MenuItem key={subClass} value={subClass}>
+                    <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                      <RecentActorsIcon fontSize="small" sx={{ mr: 1, color: 'info.main' }} />
+                      Groupe {subClass}
+                    </Box>
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+          )}
           
-          {searchTerm || filterClass !== 'all' || filterTab !== 0 ? (
+          {searchTerm || filterClass !== 'all' || filterTab !== 0 || filterGender !== 'all' || filterSubClass !== 'all' ? (
             <Button
               size="small"
               variant="outlined"
@@ -670,6 +790,11 @@ const AllStudentsManagerNEW: React.FC<AllStudentsManagerProps> = ({
                     >
                       Nom
                     </TableSortLabel>
+                      <Tooltip title={showNameColumn ? "Masquer les noms" : "Afficher les noms"}>
+                        <IconButton size="small" onClick={toggleNameColumn}>
+                          {showNameColumn ? <VisibilityOffIcon fontSize="small" /> : <VisibilityIcon fontSize="small" />}
+                        </IconButton>
+                      </Tooltip>
                   </TableCell>
                   <TableCell>
                     <TableSortLabel
@@ -680,7 +805,17 @@ const AllStudentsManagerNEW: React.FC<AllStudentsManagerProps> = ({
                       Prénom
                     </TableSortLabel>
                   </TableCell>
-                  <TableCell>Email</TableCell>
+                      <TableCell>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                          <EmailIcon fontSize="small" />
+                          <span>Email</span>
+                          <Tooltip title={showEmailColumn ? "Masquer les emails" : "Afficher les emails"}>
+                            <IconButton size="small" onClick={toggleEmailColumn}>
+                              {showEmailColumn ? <VisibilityOffIcon fontSize="small" /> : <VisibilityIcon fontSize="small" />}
+                            </IconButton>
+                          </Tooltip>
+                        </Box>
+                      </TableCell>
                   <TableCell>
                     <TableSortLabel
                       active={orderBy === 'className'}
@@ -701,24 +836,52 @@ const AllStudentsManagerNEW: React.FC<AllStudentsManagerProps> = ({
                     <TableCell component="th" scope="row">
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                         <Avatar 
-                        sx={{ 
-                          width: 28, 
-                          height: 28, 
-                          bgcolor: student.gender === 'M' ? 'info.main' : student.gender === 'F' ? 'secondary.main' : 'grey.500',
-                          fontSize: '1.5rem',
-                          boxShadow: '0 4px 8px rgba(0,0,0,0.2)'
-                        }}
+                          sx={{ 
+                            width: 28, 
+                            height: 28, 
+                            bgcolor: student.gender === 'M' ? 'info.main' : student.gender === 'F' ? 'secondary.main' : 'grey.500',
+                            fontSize: '1.5rem',
+                            boxShadow: '0 4px 8px rgba(0,0,0,0.2)'
+                          }}
                         >
-                        {student.gender === 'M' ? <MaleIcon fontSize="medium" /> : 
-                          student.gender === 'F' ? <FemaleIcon fontSize="medium" /> : 
-                          student.gender === 'N' ? <GpsNotFixedIcon fontSize="small" /> : 
-                          <NotInterestedIcon fontSize="medium" />}
+                          {student.gender === 'M' ? <MaleIcon fontSize="medium" /> : 
+                            student.gender === 'F' ? <FemaleIcon fontSize="medium" /> : 
+                            student.gender === 'N' ? <GpsNotFixedIcon fontSize="small" /> : 
+                            <NotInterestedIcon fontSize="medium" />}
                         </Avatar>
-                        <span>{student.last_name}</span>
+                        {showNameColumn ? (
+                          <span>{student.last_name}</span>
+                        ) : (
+                          <Typography 
+                            variant="body2" 
+                            color="text.secondary" 
+                            sx={{ 
+                              cursor: 'pointer',
+                              '&:hover': { textDecoration: 'underline' }
+                            }}
+                            onClick={toggleNameColumn}
+                          >
+                            •••••
+                          </Typography>
+                        )}
                       </Box>
                     </TableCell>
                     <TableCell>{student.first_name}</TableCell>
-                    <TableCell>{student.email}</TableCell>
+                    <TableCell>
+                      {showEmailColumn ? student.email : (
+                        <Typography 
+                          variant="body2" 
+                          color="text.secondary" 
+                          sx={{ 
+                            cursor: 'pointer',
+                            '&:hover': { textDecoration: 'underline' }
+                          }}
+                          onClick={toggleEmailColumn}
+                        >
+                          ••••@••••
+                        </Typography>
+                      )}
+                    </TableCell>
                     <TableCell>
                       <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
                         {student.className && (
@@ -741,14 +904,39 @@ const AllStudentsManagerNEW: React.FC<AllStudentsManagerProps> = ({
                       </Box>
                     </TableCell>
                     <TableCell>
-                      {student.group && (
+                      {student && student.allClasses ? (
+                        // Afficher tous les groupes de l'étudiant pour toutes ses classes
+                        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                          {student.allClasses.map(cls => 
+                            cls.sub_class ? (
+                              <Chip 
+                                key={cls.classId}
+                                size="small" 
+                                label={`${cls.className} - Groupe ${cls.sub_class}`}
+                                color="info" 
+                                variant="outlined"
+                                sx={{ cursor: 'default' }}
+                              />
+                            ) : null
+                          )}
+                          {student.allClasses.every(cls => !cls.sub_class) && (
+                            <Typography variant="body2" color="text.secondary">
+                              -
+                            </Typography>
+                          )}
+                        </Box>
+                      ) : student && student.sub_class ? (
                         <Chip 
                           size="small" 
-                          label={student.group} 
+                          label={`Groupe ${student.sub_class}`} 
                           color="info" 
                           variant="outlined"
                           sx={{ cursor: 'default' }}
                         />
+                      ) : (
+                        <Typography variant="body2" color="text.secondary">
+                          -
+                        </Typography>
                       )}
                     </TableCell>
                     <TableCell>
@@ -772,7 +960,7 @@ const AllStudentsManagerNEW: React.FC<AllStudentsManagerProps> = ({
                         </Tooltip>
                       ) : (
                         <Typography variant="body2" color="text.secondary">
-                          Aucun
+                          Aucune
                         </Typography>
                       )}
                     </TableCell>
@@ -787,17 +975,24 @@ const AllStudentsManagerNEW: React.FC<AllStudentsManagerProps> = ({
                             <EditIcon fontSize="small" />
                           </IconButton>
                         </Tooltip>
-                        
                         <Tooltip title="Consulter étudiant">
-                          <IconButton
-                            size="small"
-                            color="info"
-                            component={Link}
-                            href={`/students/${student.id}`}
-                          >
-                            <LinkIcon fontSize="small" />
-                          </IconButton>
+                              <IconButton
+                              size="small"
+                              color="info"
+                              component={student?.id ? Link : 'button'}
+                              href={student?.id ? `/students/${student.id}` : undefined}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              disabled={!student?.id}
+                              >
+                              {student?.id ? (
+                                <OpenInNewIcon fontSize="small" />
+                              ) : (
+                                <LinkOffIcon fontSize="small" />
+                              )}
+                              </IconButton>
                         </Tooltip>
+
                         
                         {confirmingDelete === student.id ? (
                           <>
@@ -862,7 +1057,13 @@ const AllStudentsManagerNEW: React.FC<AllStudentsManagerProps> = ({
         loadingSubgroups={loadingSubgroups}
         onClose={handleEditClose}
         onSave={handleEditSave}
-        onStudentChange={setEditingStudent}
+        onStudentChange={(student: Student | null) => {
+          if (student === null) {
+            setEditingStudent(null);
+          } else {
+            setEditingStudent(student);
+          }
+        }}
         onSelectedClassesChange={setSelectedClasses}
         fetchClassSubgroups={fetchClassSubgroups}
       />

@@ -273,7 +273,7 @@ function CorrectionsContent() {
                     boxShadow: '0 4px 20px rgba(0,0,0,0.2)'
                   }}
                 >
-                  <AssignmentIcon sx={{ fontSize: 36, color: (theme) => theme.palette.text.primary }} />
+                  <AssignmentIcon sx={{ fontSize: 50, color: (theme) => theme.palette.text.primary }} />
                 </Box>
                 
                 <Box>
@@ -287,258 +287,258 @@ function CorrectionsContent() {
           
             {/* Filters display */}
             {activeFilters.length > 0 && (
-<Box sx={{ 
-  bgcolor: (theme) => alpha(theme.palette.background.paper,1),
-  borderRadius: 2,
-  boxShadow: 3,
-  mt: 2,
-  p: 2,
-  border: '1px solid',
-  borderColor: (theme) => alpha(theme.palette.primary.main, 0.2),
-  position: 'relative',
-  overflow: 'hidden'
-}}>
+          <Box sx={{ 
+            bgcolor: (theme) => alpha(theme.palette.background.paper,1),
+            borderRadius: 2,
+            boxShadow: 3,
+            mt: 2,
+            p: 2,
+            border: '1px solid',
+            borderColor: (theme) => alpha(theme.palette.primary.main, 0.2),
+            position: 'relative',
+            overflow: 'hidden'
+          }}>
 
-  <Box sx={{ 
-    display: 'flex', 
-    alignItems: 'center', 
-    mb: 2,
-    pl: 1
-  }}>
-    <FilterAltIcon sx={{ mr: 1, color: 'primary.main' }} />
-    <Typography 
-      variant="subtitle1" 
-      sx={{ 
-        fontWeight: 600,
-        color: 'text.primary'
-      }}
-    >
-      Filtres actifs ({activeFilters.length})
-    </Typography>
-    <Button 
-      size="small" 
-      onClick={handleClearAllFilters}
-      variant="outlined"
-      startIcon={<CloseIcon />}
-      sx={{ 
-        ml: 'auto',
-        borderRadius: 4,
-        textTransform: 'none',
-        px: 2
-      }}
-    >
-      Tout effacer
-    </Button>
-  </Box>
-  
-  <Box sx={{ 
-    display: 'flex', 
-    flexWrap: 'wrap', 
-    gap: 1.2,
-    pl: 1
-  }}>
-    {activeFilters.includes('search') && (
-      <Chip 
-        label={`Recherche: ${filters.search}`} 
-        onDelete={() => handleRemoveFilter('search')}
-        color="primary"
-        variant="outlined"
-        sx={{ 
-          borderRadius: 3, 
-          '& .MuiChip-deleteIcon': { 
-            color: 'primary.light',
-            '&:hover': { color: 'error.main' } 
-          },
-          py: 0.5,
-          fontWeight: 500,
-          borderWidth: 1.5
-        }}
-      />
-    )}
-    
-    {activeFilters.includes('classId') && (
-      <Chip 
-        icon={<SchoolIcon />}
-        label={`Classe: ${metaData.classes.find(c => c.id.toString() === filters.classId)?.name || 'Inconnue'}`}
-        onDelete={() => handleRemoveFilter('classId')}
-        color="primary"
-        variant="outlined"
-        sx={{ 
-          borderRadius: 3, 
-          '& .MuiChip-deleteIcon': { 
-            color: 'primary.light',
-            '&:hover': { color: 'error.main' } 
-          },
-          py: 0.5,
-          fontWeight: 500,
-          borderWidth: 1.5
-        }}
-      />
-    )}
-    
-    {activeFilters.includes('studentId') && (
-      <Chip 
-        icon={<PersonIcon />}
-        label={`Étudiant: ${metaData.students.find(s => s.id.toString() === filters.studentId)?.name || 'Inconnu'}`}
-        onDelete={() => handleRemoveFilter('studentId')}
-        color="primary"
-        variant="outlined"
-        sx={{ 
-          borderRadius: 3, 
-          '& .MuiChip-deleteIcon': { 
-            color: 'primary.light',
-            '&:hover': { color: 'error.main' } 
-          },
-          py: 0.5,
-          fontWeight: 500,
-          borderWidth: 1.5
-        }}
-      />
-    )}
-    
-    {activeFilters.includes('activityId') && (
-      <Chip 
-        icon={<AssignmentIcon sx={{color: 'secondary.dark'}} />}
-        label={`Activité: ${metaData.activities.find(a => a.id.toString() === filters.activityId)?.name || 'Inconnue'}`}
-        onDelete={() => handleRemoveFilter('activityId')}
-        color="primary"
-        variant="outlined"
-        sx={{ 
-          borderRadius: 3, 
-          '& .MuiChip-deleteIcon': { 
-            color: 'primary.light',
-            '&:hover': { color: 'error.main' } 
-          },
-          py: 0.5,
-          fontWeight: 500,
-          borderWidth: 1.5
-        }}
-      />
-    )}
-    
-    {activeFilters.includes('recent') && (
-      <Chip 
-        icon={<CalendarIcon sx={{color: 'secondary.dark'}} />}
-        label="Dernières 24h"
-        onDelete={() => handleRemoveFilter('recent')}
-        color="secondary"
-        variant="outlined"
-        sx={{ 
-          color:"text.primary",
-          borderRadius: 3, 
-          '& .MuiChip-deleteIcon': { 
-            color: 'secondary.dark',
-            '&:hover': { color: 'error.main' } 
-          },
-          py: 0.5,
-          fontWeight: 500,
-          borderWidth: 1.5
-        }}
-      />
-    )}
-    
-    {activeFilters.includes('dateFrom') && (
-      <Chip 
-        icon={<CalendarIcon sx={{color: 'secondary.dark'}} />}
-        label={`Depuis: ${dayjs(filters.dateFrom).format('DD/MM/YYYY')}`}
-        onDelete={() => handleRemoveFilter('dateFrom')}
-        variant="outlined"
-        sx={{ 
-          borderRadius: 3, 
-          color:"text.primary",
-          '& .MuiChip-deleteIcon': { 
-            color: 'secondary.dark',
-            '&:hover': { color: 'error.main' } 
-          },
-          py: 0.5,
-          fontWeight: 500,
-          borderWidth: 1.5
-        }}
-      />
-    )}
-    
-    {activeFilters.includes('dateTo') && (
-      <Chip 
-        icon={<CalendarIcon sx={{color: 'secondary.dark'}} />}
-        label={`Jusqu'à: ${dayjs(filters.dateTo).format('DD/MM/YYYY')}`}
-        onDelete={() => handleRemoveFilter('dateTo')}
-        color="secondary"
-        variant="outlined"
-        sx={{ 
-          color:"text.primary",
-          borderRadius: 3, 
-          '& .MuiChip-deleteIcon': { 
-            color: 'secondary.dark',
-            '&:hover': { color: 'error.main' } 
-          },
-          py: 0.5,
-          fontWeight: 500,
-          borderWidth: 1.5
-        }}
-      />
-    )}
-    
-    {activeFilters.includes('minGrade') && (
-      <Chip 
-        icon={<GradeIcon sx={{color: 'secondary.dark'}} />}
-        label={`Note min: ${filters.minGrade}`}
-        onDelete={() => handleRemoveFilter('minGrade')}
-        color="info"
-        variant="outlined"
-        sx={{ 
-          borderRadius: 3, 
-          '& .MuiChip-deleteIcon': { 
-            color: 'info.dark',
-            '&:hover': { color: 'error.main' } 
-          },
-          py: 0.5,
-          fontWeight: 500,
-          borderWidth: 1.5
-        }}
-      />
-    )}
-    
-    {activeFilters.includes('maxGrade') && (
-      <Chip 
-        icon={<GradeIcon sx={{color: 'secondary.dark'}} />}
-        label={`Note max: ${filters.maxGrade}`}
-        onDelete={() => handleRemoveFilter('maxGrade')}
-        color="info"
-        variant="outlined"
-        sx={{ 
-          borderRadius: 3, 
-          '& .MuiChip-deleteIcon': { 
-            color: 'info.dark',
-            '&:hover': { color: 'error.main' } 
-          },
-          py: 0.5,
-          fontWeight: 500,
-          borderWidth: 1.5
-        }}
-      />
-    )}
-    
-    {activeFilters.includes('correctionId') && (
-      <Chip 
-        icon={<AssignmentIcon />}
-        label={`ID: ${filters.correctionId}`}
-        onDelete={() => handleRemoveFilter('correctionId')}
-        color="warning"
-        variant="outlined"
-        sx={{ 
-          borderRadius: 3, 
-          '& .MuiChip-deleteIcon': { 
-            color: 'warning.dark',
-            '&:hover': { color: 'error.main' } 
-          },
-          py: 0.5,
-          fontWeight: 500,
-          borderWidth: 1.5
-        }}
-      />
-    )}
-  </Box>
-</Box>
+            <Box sx={{ 
+              display: 'flex', 
+              alignItems: 'center', 
+              mb: 2,
+              pl: 1
+            }}>
+              <FilterAltIcon sx={{ mr: 1, color: 'primary.main' }} />
+              <Typography 
+                variant="subtitle1" 
+                sx={{ 
+                  fontWeight: 600,
+                  color: 'text.primary'
+                }}
+              >
+                Filtres actifs ({activeFilters.length})
+              </Typography>
+              <Button 
+                size="small" 
+                onClick={handleClearAllFilters}
+                variant="outlined"
+                startIcon={<CloseIcon />}
+                sx={{ 
+                  ml: 'auto',
+                  borderRadius: 4,
+                  textTransform: 'none',
+                  px: 2
+                }}
+              >
+                Tout effacer
+              </Button>
+            </Box>
+            
+            <Box sx={{ 
+              display: 'flex', 
+              flexWrap: 'wrap', 
+              gap: 1.2,
+              pl: 1
+            }}>
+              {activeFilters.includes('search') && (
+                <Chip 
+                  label={`Recherche: ${filters.search}`} 
+                  onDelete={() => handleRemoveFilter('search')}
+                  color="primary"
+                  variant="outlined"
+                  sx={{ 
+                    borderRadius: 3, 
+                    '& .MuiChip-deleteIcon': { 
+                      color: 'primary.light',
+                      '&:hover': { color: 'error.main' } 
+                    },
+                    py: 0.5,
+                    fontWeight: 500,
+                    borderWidth: 1.5
+                  }}
+                />
+              )}
+              
+              {activeFilters.includes('classId') && (
+                <Chip 
+                  icon={<SchoolIcon />}
+                  label={`Classe: ${metaData.classes.find(c => c.id.toString() === filters.classId)?.name || 'Inconnue'}`}
+                  onDelete={() => handleRemoveFilter('classId')}
+                  color="primary"
+                  variant="outlined"
+                  sx={{ 
+                    borderRadius: 3, 
+                    '& .MuiChip-deleteIcon': { 
+                      color: 'primary.light',
+                      '&:hover': { color: 'error.main' } 
+                    },
+                    py: 0.5,
+                    fontWeight: 500,
+                    borderWidth: 1.5
+                  }}
+                />
+              )}
+              
+              {activeFilters.includes('studentId') && (
+                <Chip 
+                  icon={<PersonIcon />}
+                  label={`Étudiant: ${metaData.students.find(s => s.id.toString() === filters.studentId)?.name || 'Inconnu'}`}
+                  onDelete={() => handleRemoveFilter('studentId')}
+                  color="primary"
+                  variant="outlined"
+                  sx={{ 
+                    borderRadius: 3, 
+                    '& .MuiChip-deleteIcon': { 
+                      color: 'primary.light',
+                      '&:hover': { color: 'error.main' } 
+                    },
+                    py: 0.5,
+                    fontWeight: 500,
+                    borderWidth: 1.5
+                  }}
+                />
+              )}
+              
+              {activeFilters.includes('activityId') && (
+                <Chip 
+                  icon={<AssignmentIcon sx={{color: 'secondary.dark'}} />}
+                  label={`Activité: ${metaData.activities.find(a => a.id.toString() === filters.activityId)?.name || 'Inconnue'}`}
+                  onDelete={() => handleRemoveFilter('activityId')}
+                  color="primary"
+                  variant="outlined"
+                  sx={{ 
+                    borderRadius: 3, 
+                    '& .MuiChip-deleteIcon': { 
+                      color: 'primary.light',
+                      '&:hover': { color: 'error.main' } 
+                    },
+                    py: 0.5,
+                    fontWeight: 500,
+                    borderWidth: 1.5
+                  }}
+                />
+              )}
+              
+              {activeFilters.includes('recent') && (
+                <Chip 
+                  icon={<CalendarIcon sx={{color: 'secondary.dark'}} />}
+                  label="Dernières 24h"
+                  onDelete={() => handleRemoveFilter('recent')}
+                  color="secondary"
+                  variant="outlined"
+                  sx={{ 
+                    color:"text.primary",
+                    borderRadius: 3, 
+                    '& .MuiChip-deleteIcon': { 
+                      color: 'secondary.dark',
+                      '&:hover': { color: 'error.main' } 
+                    },
+                    py: 0.5,
+                    fontWeight: 500,
+                    borderWidth: 1.5
+                  }}
+                />
+              )}
+              
+              {activeFilters.includes('dateFrom') && (
+                <Chip 
+                  icon={<CalendarIcon sx={{color: 'secondary.dark'}} />}
+                  label={`Depuis: ${dayjs(filters.dateFrom).format('DD/MM/YYYY')}`}
+                  onDelete={() => handleRemoveFilter('dateFrom')}
+                  variant="outlined"
+                  sx={{ 
+                    borderRadius: 3, 
+                    color:"text.primary",
+                    '& .MuiChip-deleteIcon': { 
+                      color: 'secondary.dark',
+                      '&:hover': { color: 'error.main' } 
+                    },
+                    py: 0.5,
+                    fontWeight: 500,
+                    borderWidth: 1.5
+                  }}
+                />
+              )}
+              
+              {activeFilters.includes('dateTo') && (
+                <Chip 
+                  icon={<CalendarIcon sx={{color: 'secondary.dark'}} />}
+                  label={`Jusqu'à: ${dayjs(filters.dateTo).format('DD/MM/YYYY')}`}
+                  onDelete={() => handleRemoveFilter('dateTo')}
+                  color="secondary"
+                  variant="outlined"
+                  sx={{ 
+                    color:"text.primary",
+                    borderRadius: 3, 
+                    '& .MuiChip-deleteIcon': { 
+                      color: 'secondary.dark',
+                      '&:hover': { color: 'error.main' } 
+                    },
+                    py: 0.5,
+                    fontWeight: 500,
+                    borderWidth: 1.5
+                  }}
+                />
+              )}
+              
+              {activeFilters.includes('minGrade') && (
+                <Chip 
+                  icon={<GradeIcon sx={{color: 'secondary.dark'}} />}
+                  label={`Note min: ${filters.minGrade}`}
+                  onDelete={() => handleRemoveFilter('minGrade')}
+                  color="info"
+                  variant="outlined"
+                  sx={{ 
+                    borderRadius: 3, 
+                    '& .MuiChip-deleteIcon': { 
+                      color: 'info.dark',
+                      '&:hover': { color: 'error.main' } 
+                    },
+                    py: 0.5,
+                    fontWeight: 500,
+                    borderWidth: 1.5
+                  }}
+                />
+              )}
+              
+              {activeFilters.includes('maxGrade') && (
+                <Chip 
+                  icon={<GradeIcon sx={{color: 'secondary.dark'}} />}
+                  label={`Note max: ${filters.maxGrade}`}
+                  onDelete={() => handleRemoveFilter('maxGrade')}
+                  color="info"
+                  variant="outlined"
+                  sx={{ 
+                    borderRadius: 3, 
+                    '& .MuiChip-deleteIcon': { 
+                      color: 'info.dark',
+                      '&:hover': { color: 'error.main' } 
+                    },
+                    py: 0.5,
+                    fontWeight: 500,
+                    borderWidth: 1.5
+                  }}
+                />
+              )}
+              
+              {activeFilters.includes('correctionId') && (
+                <Chip 
+                  icon={<AssignmentIcon />}
+                  label={`ID: ${filters.correctionId}`}
+                  onDelete={() => handleRemoveFilter('correctionId')}
+                  color="warning"
+                  variant="outlined"
+                  sx={{ 
+                    borderRadius: 3, 
+                    '& .MuiChip-deleteIcon': { 
+                      color: 'warning.dark',
+                      '&:hover': { color: 'error.main' } 
+                    },
+                    py: 0.5,
+                    fontWeight: 500,
+                    borderWidth: 1.5
+                  }}
+                />
+              )}
+            </Box>
+          </Box>
             )}
           </PatternBackground>
         </GradientBackground>

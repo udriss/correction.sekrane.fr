@@ -19,6 +19,39 @@ interface FragmentRow extends RowDataPacket {
   isOwner?: boolean;
 }
 
+function processFragments(rows: any[], userId: string | undefined) {
+  return rows.map(row => {
+    // Préparation de l'objet fragment
+    const processedFragment = {
+      ...row,
+      // Assurer que tags est un tableau valide
+      tags: row.tags 
+            ? (typeof row.tags === 'string' 
+                ? JSON.parse(row.tags) 
+                : (Array.isArray(row.tags) ? row.tags : []))
+            : [],
+      // Assurer que categories est un tableau valide
+      categories: row.category_ids
+                ? row.category_ids.split(',')
+                    .filter((id: string) => id.trim() !== '')
+                    .map((id: string) => parseInt(id, 10))
+                : []
+    };
+    
+    // Ajouter le flag isOwner
+    if (userId) {
+      const userIdStr = String(userId);
+      const fragmentUserIdStr = String(row.user_id);
+      processedFragment.isOwner = userIdStr === fragmentUserIdStr;
+      
+    } else {
+      processedFragment.isOwner = false;
+    }
+    
+    return processedFragment;
+  });
+}
+
 // Define a type for the processed fragment with parsed tags
 interface ProcessedFragment extends Omit<FragmentRow, 'tags'> {
   tags: string[];
@@ -57,6 +90,7 @@ export async function GET(request: NextRequest) {
         LEFT JOIN activities a ON f.activity_id = a.id
         WHERE 1=1
       `;
+
       
       // Prepare parameters array
       let params: any[] = [];
@@ -98,54 +132,16 @@ export async function GET(request: NextRequest) {
       try {
         const [rows] = await connection.query<FragmentRow[]>(query, params);
         
-        // Process the rows to parse tags and add category information
-        const fragments = Array.isArray(rows) ? rows.map((row: FragmentRow) => {
-          // Create a new object for the processed fragment
-          const processedFragment: ProcessedFragment = {
-            ...row,
-            tags: [],
-            categories: [] // Initialize categories array
-          };
-          
-          // Parse tags if they exist
-          if (row.tags && typeof row.tags === 'string') {
-            try {
-              processedFragment.tags = JSON.parse(row.tags);
-            } catch (e) {
-              console.error('Error parsing tags:', e);
-              processedFragment.tags = [];
-            }
-          }
-          
-          // Process category_ids if they exist (from the fragments_categories table)
-          if (fragmentCategoriesTableExists && row.category_ids) {
-            processedFragment.categories = row.category_ids.split(',')
-              .filter((id: string) => id.trim() !== '')
-              .map((id: string) => parseInt(id));
-          } else {
-            // Initialize with empty array if no categories are found
-            processedFragment.categories = [];
-          }
-          
-          // Add a flag indicating if the current user owns this fragment
-          // Convert both to strings for comparison to ensure proper matching
-          if (userId) {
-            const userIdStr = String(userId);
-            const fragmentUserIdStr = String(row.user_id);
-            processedFragment.isOwner = userIdStr === fragmentUserIdStr;
-            
-            if (userIdStr === fragmentUserIdStr) {
-              
-            }
-          } else {
-            processedFragment.isOwner = false;
-          }
-          
-          return processedFragment;
-        }) : [];
+        // Utiliser la fonction processFragments améliorée et passer userId (converti en string si nécessaire)
+        const processedFragments = processFragments(rows, userId ? String(userId) : undefined);
 
-
-        return NextResponse.json(fragments);
+        
+        // Retourner les fragments traités
+        return new Response(JSON.stringify(processedFragments), {
+          headers: { 'Content-Type': 'application/json' },
+          status: 200
+        });
+        
       } catch (sqlError: any) {
         // Handle SQL error and provide detailed error information
         console.error('SQL Error in fragments query:', sqlError);
@@ -386,7 +382,7 @@ export async function PUT(request: NextRequest) {
     const fragmentId = fragmentData.id;
     
     return await withConnection(async (connection) => {
-      // Check fragment ownership
+      // Check fragment ownership - Amélioration de la requête pour être plus claire
       const [ownerRows] = await connection.query(
         'SELECT user_id, content FROM fragments WHERE id = ?',
         [fragmentId]
@@ -405,6 +401,9 @@ export async function PUT(request: NextRequest) {
       const userIdStr = String(userId);
       const fragmentUserIdStr = String(owner.user_id);
       
+      // Debug log pour vérifier la comparaison
+      
+      
       // Verify ownership
       if (userIdStr !== fragmentUserIdStr) {
         return NextResponse.json(
@@ -414,9 +413,28 @@ export async function PUT(request: NextRequest) {
       }
       
       // Prepare tags for storage
-      let tagsJson = '[]';
-      if (fragmentData.tags && Array.isArray(fragmentData.tags)) {
+      let tagsJson = '';
+      
+      // Si les tags sont vides, récupérer les tags existants pour les préserver
+      if (!fragmentData.tags || (Array.isArray(fragmentData.tags) && fragmentData.tags.length === 0)) {
+        // Récupérer les tags existants
+        const [existingTagsRows] = await connection.query(
+          'SELECT tags FROM fragments WHERE id = ?',
+          [fragmentId]
+        );
+        
+        if (Array.isArray(existingTagsRows) && existingTagsRows.length > 0) {
+          tagsJson = (existingTagsRows[0] as any).tags || '[]';
+          
+        } else {
+          tagsJson = '[]';
+        }
+      } else if (fragmentData.tags && Array.isArray(fragmentData.tags)) {
+        // Utiliser les nouveaux tags fournis
         tagsJson = JSON.stringify(fragmentData.tags);
+        
+      } else {
+        tagsJson = '[]';
       }
       
       // Update the fragment with current timestamp
@@ -463,8 +481,8 @@ export async function PUT(request: NextRequest) {
       // Get the updated fragment with all its data
       const [fragments] = await connection.query<FragmentRow[]>(
         `SELECT f.*, a.name as activity_name, 
-        '(SELECT GROUP_CONCAT(fc.category_id) 
-        FROM fragments_categories fc WHERE fc.fragment_id = f.id) as category_ids'
+        (SELECT GROUP_CONCAT(fc.category_id) 
+        FROM fragments_categories fc WHERE fc.fragment_id = f.id) as category_ids
          FROM fragments f
          LEFT JOIN activities a ON f.activity_id = a.id
          WHERE f.id = ?`,
@@ -527,6 +545,87 @@ export async function PUT(request: NextRequest) {
       },
       { status: 500 }
     );
+  }
+}
+
+// Pour la fonction DELETE aussi
+export async function DELETE(
+  request: NextRequest, 
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+
+    // Await the params
+    const { id } = await params;
+    const fragmentId = parseInt(id);
+
+    // Get user from both auth systems
+    const session = await getServerSession(authOptions);
+    const customUser = await getUser(request);
+    
+    const userId = customUser?.id || session?.user?.id;
+    
+    if (!userId) {
+      return NextResponse.json(
+        { error: 'Authentication required' },
+        { status: 401 }
+      );
+    }
+    
+
+    
+    return await withConnection(async (connection) => {
+      // Vérifier d'abord si le fragment est utilisé dans des corrections
+      const [usageRows] = await connection.query(
+        'SELECT COUNT(*) as count FROM correction_fragments WHERE fragment_id = ?',
+        [fragmentId]
+      );
+      
+      const usageCount = (usageRows as any)[0].count;
+      
+      if (usageCount > 0) {
+        return NextResponse.json(
+          { 
+            error: 'This fragment is used in corrections and cannot be deleted',
+            usageCount: usageCount
+          },
+          { status: 409 }
+        );
+      }
+      
+      // Vérifier la propriété du fragment
+      const [ownerRows] = await connection.query(
+        'SELECT user_id FROM fragments WHERE id = ?',
+        [fragmentId]
+      );
+      
+      if (!Array.isArray(ownerRows) || ownerRows.length === 0) {
+        return NextResponse.json(
+          { error: 'Fragment not found' },
+          { status: 404 }
+        );
+      }
+      
+      const owner = ownerRows[0] as any;
+      
+      // Compare user IDs as strings
+      const userIdStr = String(userId);
+      const fragmentUserIdStr = String(owner.user_id);
+      
+      // Debug log
+      
+      
+      if (userIdStr !== fragmentUserIdStr) {
+        return NextResponse.json(
+          { error: 'You are not authorized to delete this fragment' },
+          { status: 403 }
+        );
+      }
+      
+      // ...existing code for deleting the fragment...
+    });
+  } catch (error: any) {
+    // ...existing code...
   }
 }
 

@@ -557,7 +557,7 @@ Votre enseignant`;
                   boxShadow: '0 4px 20px rgba(0,0,0,0.2)'
                 }}
               >
-                <PersonIcon sx={{ fontSize: 36, color: (theme) => theme.palette.text.primary }} />
+                <PersonIcon sx={{ fontSize: 50, color: (theme) => theme.palette.text.primary }} />
               </Box>
               
                 <Box>
@@ -740,14 +740,6 @@ Votre enseignant`;
           <Typography variant="subtitle1" color="text.secondary" sx={{ mb: 2 }}>
             Aucune correction n'a encore été enregistrée pour cet étudiant
           </Typography>
-          <Button
-            variant="contained"
-            startIcon={<AssignmentIcon />}
-            component={Link}
-            href={`/corrections/unique?studentId=${studentId}`}
-          >
-            Ajouter une correction
-          </Button>
         </Paper>
       ) : (
         <Grid container spacing={3}>
@@ -868,7 +860,8 @@ Votre enseignant`;
         </Button>
         
         <Button
-          variant="contained"
+          variant="outlined"
+          color="success"
           startIcon={<AssignmentIcon />}
           component={Link}
           href={`/corrections/unique?studentId=${studentId}`}
@@ -880,7 +873,10 @@ Votre enseignant`;
       {/* Modal d'édition */}
       <StudentEditDialog
         open={openEditDialog}
-        student={editingStudent}
+        student={editingStudent ? {
+          ...editingStudent,
+          gender: editingStudent.gender || 'N'  // Provide default 'N' if gender is undefined
+        } : null}
         classes={classes}
         selectedClasses={selectedClasses}
         availableSubgroups={availableSubgroups}

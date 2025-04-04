@@ -34,6 +34,7 @@ function isValidRedirectUrl(path: string): boolean {
     '/corrections', 
     '/feedback', 
     '/dashboard',
+    '/stats',
     '/admin'
   ];
   
@@ -50,6 +51,7 @@ export async function middleware(request: NextRequest) {
     path === '/' ||
     path === '/login' || 
     path === '/api/auth/login' || 
+    path === '/demo' || 
     path === '/api/auth/logout';
     
   // Check if the path should be protected
@@ -57,7 +59,8 @@ export async function middleware(request: NextRequest) {
     path.startsWith('/activities') || 
     path.startsWith('/corrections') ||
     path.startsWith('/admin') ||
-    path.startsWith('/dashboard');
+    path.startsWith('/students') ||
+    path.startsWith('/stats');
   
   // Si le chemin n'est pas protégé ou est public, continuer
   if (!isPathProtected || isPublicPath) {
@@ -108,7 +111,8 @@ export const config = {
     '/',
     '/activities/:path*',
     '/corrections/:path*',
-    '/dashboard/:path*',
+    '/stats/:path*',
+    '/students/:path*',
     '/admin/:path*',
     '/login'
   ],

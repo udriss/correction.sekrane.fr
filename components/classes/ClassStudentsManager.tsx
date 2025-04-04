@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { 
   Typography, 
   Paper, 
@@ -13,6 +13,7 @@ import {
   TableContainer,
   TableHead,
   TableRow,
+  TableSortLabel,
   IconButton,
   Chip,
   Dialog,
@@ -28,9 +29,8 @@ import {
   InputLabel,
   Select,
   MenuItem,
-  InputAdornment,
+  Link,
   Tooltip,
-  SelectChangeEvent
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import EditIcon from '@mui/icons-material/Edit';
@@ -48,30 +48,39 @@ import LoadingSpinner from '@/components/LoadingSpinner';
 import { parseCSVContent } from '@/lib/utils/parse-csv';
 import UploadFileIcon from '@mui/icons-material/UploadFile';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
+import LinkOffIcon from '@mui/icons-material/LinkOff';
+import OpenInNewIcon from '@mui/icons-material/OpenInNew';
+import VisibilityIcon from '@mui/icons-material/Visibility';
+import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
+import EmailIcon from '@mui/icons-material/Email';
+import PersonIcon from '@mui/icons-material/Person';
+import StudentEditDialogForDetail from '@/components/students/StudentEditDialogForDetail';
+import StudentEditDialog from '@/components/students/StudentEditDialog';
 
-interface Student {
-  id: number;
-  email?: string;
-  first_name: string;
-  last_name: string;
-  gender: string;
-  sub_class?: number | null;
+import type { Student as ImportedStudent } from '@/lib/types';
+
+// Define local Student type that matches the component expectations
+interface Student extends Omit<ImportedStudent, 'email'> {
+  email: string | null;
 }
 
+// Interface spécifiques à ce composant
 interface StudentBatch {
   first_name: string;
   last_name: string;
   email?: string;
   gender: string;
   sub_class?: number | null;
-  markedForDeletion?: boolean; // Nouvelle propriété
+  markedForDeletion?: boolean;
 }
 
+// Modifions l'interface ClassData pour qu'elle soit compatible avec Class
 interface ClassData {
   id: number;
   name: string;
-  academic_year: string;
+  academic_year: string; // Garde comme obligatoire pour la compatibilité existante
   nbre_subclasses?: number | null;
+  // Ajoutez d'autres propriétés nécessaires si besoin
 }
 
 interface ClassStudentsManagerProps {
@@ -80,7 +89,7 @@ interface ClassStudentsManagerProps {
   embedded?: boolean;
 }
 
-// Add this new interface for editing state
+// Interface étendue pour l'état d'édition
 interface EditableStudent extends Student {
   isEditing?: boolean;
   editData?: {
@@ -113,6 +122,40 @@ export default function ClassStudentsManager({
   const [savingBatch, setSavingBatch] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isDragging, setIsDragging] = useState<boolean>(false);
+  
+  // États pour l'affichage/masquage des colonnes
+  const [showEmailColumn, setShowEmailColumn] = useState(false);
+  const [showNameColumn, setShowNameColumn] = useState(false);
+  
+  // États pour le tri
+  const [orderBy, setOrderBy] = useState<keyof Student>('last_name');
+  const [order, setOrder] = useState<'asc' | 'desc'>('asc');
+
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [studentToEdit, setStudentToEdit] = useState<Student | null>(null);
+  const [editingStudent, setEditingStudent] = useState<Student | null>(null);
+  const [selectedClassesForEdit, setSelectedClassesForEdit] = useState<{id: number, name: string}[]>([]);
+  const [allAvailableClasses, setAllAvailableClasses] = useState<{id: number, name: string}[]>([]);
+  const [subgroupsForEdit, setSubgroupsForEdit] = useState<string[]>([]);
+  const [loadingSubgroupsForEdit, setLoadingSubgroupsForEdit] = useState(false);
+  // Structure pour mémoriser les groupes disponibles par classe
+  const [classGroupsMapping, setClassGroupsMapping] = useState<{[classId: number]: string[]}>({});
+
+  // Fonctions pour afficher/masquer les colonnes
+  const toggleEmailColumn = () => {
+    setShowEmailColumn(prev => !prev);
+  };
+  
+  const toggleNameColumn = () => {
+    setShowNameColumn(prev => !prev);
+  };
+
+  // Fonction pour gérer le tri
+  const handleRequestSort = (property: keyof Student) => {
+    const isAsc = orderBy === property && order === 'asc';
+    setOrder(isAsc ? 'desc' : 'asc');
+    setOrderBy(property);
+  };
 
   const fetchStudents = useCallback(async () => {
     if (!classId) return;
@@ -122,18 +165,25 @@ export default function ClassStudentsManager({
       const response = await fetch(`/api/classes/${classId}/students`);
       
       if (!response.ok) {
-        throw new Error(`Erreur lors du chargement des étudiants (${response.status})`);
+        const data = await response.json();
+        throw new Error(`Erreur lors du chargement des étudiants : ${data.error}.`);
       }
       
       const data = await response.json();
-
-      
-      
-      // Add isEditing property to each student
+      // Add isEditing property and initialize allClasses for each student
       const formattedStudents = data.map((student: Student) => ({
         ...student,
-        isEditing: false
+        isEditing: false,
+        // Initialize allClasses for each student with their current class
+        // Make sure sub_class is a string
+        allClasses: student.allClasses || [{
+          classId: classId,
+          className: classData?.name || 'Class',
+          sub_class: student.sub_class ? String(student.sub_class) : null,
+          nbre_subclasses : classData?.nbre_subclasses || null
+        }]
       }));
+
       
       setStudents(formattedStudents);
     } catch (err) {
@@ -142,7 +192,7 @@ export default function ClassStudentsManager({
     } finally {
       setLoading(false);
     }
-  }, [classId]);
+  }, [classId, classData]);
 
   useEffect(() => {
     fetchStudents();
@@ -276,30 +326,181 @@ export default function ClassStudentsManager({
   };
 
   // Add these new functions for inline editing
-  const handleStartEditing = (studentId: number) => {
-    setStudents(prevStudents => 
-      prevStudents.map(student => {
-        if (student.id === studentId) {
-          return {
-            ...student,
-            isEditing: true,
-            editData: {
-              first_name: student.first_name,
-              last_name: student.last_name,
-              email: student.email || '',
-              gender: student.gender,
-              sub_class: student.sub_class
-            }
-          };
+  const handleOpenEditDialog = async (student: Student) => {
+    try {
+      // Create a properly formatted student object with all required properties
+      const studentToEdit = {
+        ...student,
+        // Initialize allClasses if it doesn't exist, ensure sub_class is string | null
+        allClasses: student.allClasses || [{
+          classId: classId,
+          className: classData?.name || 'Current Class',
+          // Convert sub_class to string if it's a number
+          sub_class: student.sub_class ? String(student.sub_class) : null
+        }]
+      };
+      
+      setStudentToEdit(studentToEdit);
+      setEditingStudent(studentToEdit);
+      
+      // Par défaut, l'étudiant est déjà dans la classe actuelle
+      const initialSelectedClasses = [{ 
+        id: classId, 
+        name: classData?.name || 'Classe actuelle' 
+      }];
+      
+      setSelectedClassesForEdit(initialSelectedClasses);
+      
+      // Récupérer toutes les classes disponibles
+      const allClassesResponse = await fetch('/api/classes');
+      if (allClassesResponse.ok) {
+        const allClassesData = await allClassesResponse.json();
+        setAllAvailableClasses(allClassesData);
+      }
+      
+      // Charger les sous-groupes disponibles
+      await fetchSubgroupsForEdit(classId);
+      
+      // Also fetch subgroups for any additional classes the student belongs to
+      if (student.allClasses && Array.isArray(student.allClasses)) {
+        for (const cls of student.allClasses) {
+          if (cls.classId !== classId) {
+            await fetchSubgroupsForClass(cls.classId);
+          }
         }
-        return {
-          ...student,
-          isEditing: false  // Ensure only one row is being edited at a time
-        };
-      })
-    );
+      }
+      
+      // Ouvrir le dialog
+      setEditDialogOpen(true);
+    } catch (err) {
+      console.error('Error preparing edit dialog:', err);
+      setError('Erreur lors de la préparation du formulaire d\'édition');
+    }
+  };
+
+  // Fonction pour charger les sous-groupes pour le dialog d'édition
+  const fetchSubgroupsForEdit = async (classId: number) => {
+    if (!classData?.nbre_subclasses) {
+      setSubgroupsForEdit([]);
+      return;
+    }
+    
+    try {
+      setLoadingSubgroupsForEdit(true);
+      // Générer les sous-groupes basés sur nbre_subclasses
+      const groups = Array.from(
+        { length: classData.nbre_subclasses }, 
+        (_, i) => (i + 1).toString()
+      );
+      setSubgroupsForEdit(groups);
+    } catch (error) {
+      console.error('Error loading subgroups:', error);
+      setSubgroupsForEdit([]);
+    } finally {
+      setLoadingSubgroupsForEdit(false);
+    }
   };
   
+  // Fonction pour fermer le dialog d'édition
+  const handleCloseEditDialog = () => {
+    setEditDialogOpen(false);
+    setStudentToEdit(null);
+  };
+  
+  // Fonction pour sauvegarder après édition
+  const handleSaveEdit = async () => {
+    try {
+      if (!editingStudent) {
+        console.error("Aucun étudiant à modifier");
+        return;
+      }
+
+      // Construire un objet étudiant complet avec tous les champs nécessaires
+      const studentData = {
+        id: editingStudent.id,
+        first_name: editingStudent.first_name,
+        last_name: editingStudent.last_name,
+        email: editingStudent.email || '',
+        gender: editingStudent.gender || 'N',
+        // S'assurer que classId est inclus, même si aucune modification n'a été apportée
+        classId: selectedClassesForEdit.length > 0 ? selectedClassesForEdit[0].id : null,
+        // Conserver le groupe si disponible
+        group: editingStudent.group || null,
+        // Maintenir les autres propriétés importantes
+        allClasses: editingStudent.allClasses || [],
+        sub_class: editingStudent.sub_class,
+        additionalClasses: editingStudent.additionalClasses,
+      };
+
+      // 1. Mettre à jour les informations de base de l'étudiant
+      const response = await fetch(`/api/students/${editingStudent.id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(studentData),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Erreur lors de la sauvegarde');
+      }
+
+      // 2. Mettre à jour les associations de classe
+      for (const cls of selectedClassesForEdit) {
+        console.log(`Mise à jour de l'étudiant ${editingStudent.id} dans la classe ${cls.id}`);
+        
+        // Find sub_class for this specific class in allClasses
+        let subClassForThisClass = null;
+        
+        if (editingStudent.allClasses) {
+          const classEntry = editingStudent.allClasses.find(c => c.classId === cls.id);
+          if (classEntry) {
+            subClassForThisClass = classEntry.sub_class;
+          }
+        }
+        
+        
+        // S'assurer que l'étudiant est associé à cette classe avec le bon sub_class
+        await fetch(`/api/classes/${cls.id}/students/${editingStudent.id}`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            student_id: editingStudent.id,
+            sub_class: subClassForThisClass
+          }),
+        }).catch(error => {
+          // Log error but continue
+          console.error(`Error updating student in class ${cls.id}:`, error);
+        });
+
+      }
+
+      // Refresh the students list
+      await fetchStudents();
+      setSuccess('Étudiant modifié avec succès');
+      
+      setTimeout(() => {
+        setSuccess('');
+      }, 3000);
+      
+      setEditDialogOpen(false);
+      setStudentToEdit(null);
+    } catch (err) {
+      console.error('Error:', err);
+      setError(err instanceof Error ? err.message : 'Une erreur est survenue');
+    }
+  };
+
+  const handleStartEditing = (studentId: number) => {
+    const student = students.find(s => s.id === studentId);
+    if (student) {
+      handleOpenEditDialog(student);
+    }
+  };
+
   const handleCancelEditing = (studentId: number) => {
     setStudents(prevStudents => 
       prevStudents.map(student => {
@@ -330,69 +531,6 @@ export default function ClassStudentsManager({
         return student;
       })
     );
-  };
-  
-  const handleSaveEdit = async (studentId: number) => {
-    const student = students.find(s => s.id === studentId);
-    
-    if (!student || !student.editData) return;
-    
-    try {
-      // Validation
-      if (!student.editData.first_name) {
-        setError('Le prénom est obligatoire');
-        return;
-      }
-      
-      const response = await fetch(`/api/classes/${classId}/students/${studentId}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          email: student.editData.email || `${student.editData.first_name.toLowerCase()}.${student.editData.last_name.toLowerCase()}@example.com`,
-          first_name: student.editData.first_name,
-          last_name: student.editData.last_name || '',
-          gender: student.editData.gender,
-          sub_class: student.editData.sub_class
-        }),
-      });
-      
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Erreur lors de la modification');
-      }
-      
-      setSuccess('Étudiant mis à jour avec succès');
-      
-      // Update the student in the local state
-      setStudents(prevStudents => 
-        prevStudents.map(s => {
-          if (s.id === studentId && s.editData) {
-            return {
-              ...s,
-              first_name: s.editData.first_name,
-              last_name: s.editData.last_name,
-              email: s.editData.email,
-              gender: s.editData.gender,
-              sub_class: s.editData.sub_class,
-              isEditing: false,
-              editData: undefined
-            };
-          }
-          return s;
-        })
-      );
-      
-      // Clear success message after 3 seconds
-      setTimeout(() => {
-        setSuccess('');
-      }, 3000);
-      
-    } catch (err) {
-      console.error('Error:', err);
-      setError(err instanceof Error ? err.message : 'Une erreur est survenue');
-    }
   };
   
   const handleOpenDeleteDialog = (studentId: number) => {
@@ -506,17 +644,44 @@ export default function ClassStudentsManager({
     }
   };
 
+  // Tri des étudiants
+  const sortedStudents = useMemo(() => {
+    // Copie pour ne pas modifier l'original
+    const sortableStudents = [...students];
+    
+    return sortableStudents.sort((a, b) => {
+      const aValue = a[orderBy] || '';
+      const bValue = b[orderBy] || '';
+      
+      // Pour les comparaisons de chaînes de caractères
+      if (typeof aValue === 'string' && typeof bValue === 'string') {
+        return order === 'asc' 
+          ? aValue.localeCompare(bValue) 
+          : bValue.localeCompare(aValue);
+      }
+      
+      // Pour les comparaisons numériques
+      if (typeof aValue === 'number' && typeof bValue === 'number') {
+        return order === 'asc' ? aValue - bValue : bValue - aValue;
+      }
+      
+      // Fallback
+      return 0;
+    });
+  }, [students, orderBy, order]);
+
   if (loading) {
     return (
       <div className="py-10 flex justify-center max-w-[400px] mx-auto">
-      <LoadingSpinner size="md" text="Chargement des étudiants" />
-    </div>
+        <LoadingSpinner size="md" text="Chargement des étudiants" />
+      </div>
     )
   }
 
+  // Les étudiants filtrés et triés
   const filteredStudents = currentFilter === null 
-    ? students 
-    : students.filter(student => student.sub_class === currentFilter);
+    ? sortedStudents 
+    : sortedStudents.filter(student => student.sub_class === currentFilter);
 
   const getGenderLabel = (gender: string) => {
     switch(gender) {
@@ -588,6 +753,97 @@ export default function ClassStudentsManager({
         </Tabs>
       </Box>
     );
+  };
+
+  // Add this handler for selected classes changes
+  const handleSelectedClassesChange = (newSelectedClasses: { id: number; name: string }[]) => {
+    setSelectedClassesForEdit(newSelectedClasses);
+  };
+
+  // Fonction pour gérer les changements de l'étudiant dans le dialog d'édition
+  const handleStudentChange = (updatedStudent: Student | null) => {
+    if (updatedStudent === null) {
+      setEditingStudent(null);
+      return;
+    }
+    
+    // Ensure allClasses exists with the correct types
+    let allClassesWithCorrectTypes: {
+      classId: number;
+      className: string;
+      sub_class?: string | null;
+    }[] = [];
+    
+    // Ensure sub_class is properly typed in allClasses
+    if (updatedStudent.allClasses) {
+      allClassesWithCorrectTypes = updatedStudent.allClasses.map(cls => ({
+        classId: cls.classId,
+        className: cls.className,
+        sub_class: cls.sub_class ? String(cls.sub_class) : null
+      }));
+    }
+    
+    // Create a copy with properly typed allClasses
+    const studentCopy = {
+      ...JSON.parse(JSON.stringify(updatedStudent)),
+      allClasses: allClassesWithCorrectTypes
+    };
+    
+    console.log("Student updated:", studentCopy);
+    setEditingStudent(studentCopy);
+    setStudentToEdit(studentCopy);
+  };
+
+  // Fonction pour charger les sous-groupes pour une classe spécifique
+  const fetchSubgroupsForClass = async (classId: number) => {
+    try {
+      setLoadingSubgroupsForEdit(true);
+      const response = await fetch(`/api/classes/${classId}`);
+      
+      if (!response.ok) {
+        throw new Error('Error loading class data');
+      }
+      
+      const classData = await response.json();
+      
+      // Si la classe a un nombre défini de sous-groupes
+      if (classData.nbre_subclasses) {
+        const groups = Array.from({ length: classData.nbre_subclasses }, (_, i) => (i + 1).toString());
+        
+        // Update class groups mapping
+        setClassGroupsMapping(prev => ({
+          ...prev,
+          [classId]: groups
+        }));
+        
+        return groups;
+      } else {
+        return [];
+      }
+    } catch (error) {
+      console.error(`Error loading subgroups for class ${classId}:`, error);
+      return [];
+    } finally {
+      setLoadingSubgroupsForEdit(false);
+    }
+  };
+
+  // Fonction pour gérer le changement de classe (ajout/suppression)
+  const handleClassSelectionChange = async (classId: number, isSelected: boolean) => {
+    try {
+      if (isSelected) {
+        // Si la classe est sélectionnée, récupérer ses sous-groupes disponibles
+        const groups = await fetchSubgroupsForClass(classId);
+        setClassGroupsMapping(prev => ({
+          ...prev,
+          [classId]: groups
+        }));
+        
+        console.log(`Updated class ${classId} groups:`, groups);
+      }
+    } catch (error) {
+      console.error('Error handling class selection change:', error);
+    }
   };
 
   return (
@@ -681,9 +937,19 @@ export default function ClassStudentsManager({
                       <Table size="small">
                         <TableHead>
                           <TableRow>
-                            <TableCell>Prénom*</TableCell>
-                            <TableCell>Nom</TableCell>
-                            <TableCell>Email</TableCell>
+                          <TableCell>Nom</TableCell>
+                          <TableCell>Prénom*</TableCell>
+                          <TableCell>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                              <EmailIcon fontSize="small" />
+                              <span>Email</span>
+                              <Tooltip title={showEmailColumn ? "Masquer les emails" : "Afficher les emails"}>
+                                <IconButton size="small" onClick={toggleEmailColumn}>
+                                  {showEmailColumn ? <VisibilityOffIcon fontSize="small" /> : <VisibilityIcon fontSize="small" />}
+                                </IconButton>
+                              </Tooltip>
+                            </Box>
+                          </TableCell>
                             <TableCell>Genre*</TableCell>
                             {classData?.nbre_subclasses && classData?.nbre_subclasses > 0 && (
                               <TableCell>Groupe</TableCell>
@@ -1071,12 +1337,61 @@ export default function ClassStudentsManager({
           <Table sx={{ minWidth: 650 }}>
             <TableHead>
               <TableRow>
-                <TableCell>Prénom</TableCell>
-                <TableCell>Nom</TableCell>
-                <TableCell>Email</TableCell>
-                <TableCell>Genre</TableCell>
+                <TableCell>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                    <TableSortLabel
+                      active={orderBy === 'last_name'}
+                      direction={orderBy === 'last_name' ? order : 'asc'}
+                      onClick={() => handleRequestSort('last_name')}
+                    >
+                      Nom
+                    </TableSortLabel>
+                    <Tooltip title={showNameColumn ? "Masquer les noms" : "Afficher les noms"}>
+                      <IconButton size="small" onClick={toggleNameColumn}>
+                        {showNameColumn ? <VisibilityOffIcon fontSize="small" /> : <VisibilityIcon fontSize="small" />}
+                      </IconButton>
+                    </Tooltip>
+                  </Box>
+                </TableCell>
+                <TableCell>
+                  <TableSortLabel
+                    active={orderBy === 'first_name'}
+                    direction={orderBy === 'first_name' ? order : 'asc'}
+                    onClick={() => handleRequestSort('first_name')}
+                  >
+                    Prénom
+                  </TableSortLabel>
+                </TableCell>               
+                <TableCell>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                    <EmailIcon fontSize="small" />
+                    <span>Email</span>
+                    <Tooltip title={showEmailColumn ? "Masquer les emails" : "Afficher les emails"}>
+                      <IconButton size="small" onClick={toggleEmailColumn}>
+                        {showEmailColumn ? <VisibilityOffIcon fontSize="small" /> : <VisibilityIcon fontSize="small" />}
+                      </IconButton>
+                    </Tooltip>
+                  </Box>
+                </TableCell>
+                <TableCell>
+                  <TableSortLabel
+                    active={orderBy === 'gender'}
+                    direction={orderBy === 'gender' ? order : 'asc'}
+                    onClick={() => handleRequestSort('gender')}
+                  >
+                    Genre
+                  </TableSortLabel>
+                </TableCell>
                 {classData?.nbre_subclasses && classData?.nbre_subclasses > 0 && (
-                  <TableCell>Groupe</TableCell>
+                  <TableCell>
+                    <TableSortLabel
+                      active={orderBy === 'sub_class'}
+                      direction={orderBy === 'sub_class' ? order : 'asc'}
+                      onClick={() => handleRequestSort('sub_class')}
+                    >
+                      Groupe
+                    </TableSortLabel>
+                  </TableCell>
                 )}
                 <TableCell align="right">Actions</TableCell>
               </TableRow>
@@ -1084,6 +1399,31 @@ export default function ClassStudentsManager({
             <TableBody>
               {filteredStudents.map((student) => (
                 <TableRow key={student.id}>
+                  <TableCell>
+                    {student.isEditing ? (
+                      <TextField
+                        size="small"
+                        fullWidth
+                        value={student.editData?.last_name || ''}
+                        onChange={(e) => handleEditFieldChange(student.id, 'last_name', e.target.value)}
+                        placeholder="Optionnel"
+                      />
+                    ) : (
+                      showNameColumn ? student.last_name : (
+                        <Typography 
+                          variant="body2" 
+                          color="text.secondary" 
+                          sx={{ 
+                            cursor: 'pointer',
+                            '&:hover': { textDecoration: 'underline' }
+                          }}
+                          onClick={toggleNameColumn}
+                        >
+                          •••••
+                        </Typography>
+                      )
+                    )}
+                  </TableCell>
                   <TableCell>
                     {student.isEditing ? (
                       <TextField
@@ -1104,26 +1444,25 @@ export default function ClassStudentsManager({
                       <TextField
                         size="small"
                         fullWidth
-                        value={student.editData?.last_name || ''}
-                        onChange={(e) => handleEditFieldChange(student.id, 'last_name', e.target.value)}
-                        placeholder="Optionnel"
-                      />
-                    ) : (
-                      student.last_name
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    {student.isEditing ? (
-                      <TextField
-                        size="small"
-                        fullWidth
                         type="email"
                         value={student.editData?.email || ''}
                         onChange={(e) => handleEditFieldChange(student.id, 'email', e.target.value)}
                         placeholder="Optionnel"
                       />
                     ) : (
-                      student.email
+                      showEmailColumn ? student.email : (
+                        <Typography 
+                          variant="body2" 
+                          color="text.secondary" 
+                          sx={{ 
+                            cursor: 'pointer',
+                            '&:hover': { textDecoration: 'underline' }
+                          }}
+                          onClick={toggleEmailColumn}
+                        >
+                          ••••@••••
+                        </Typography>
+                      )
                     )}
                   </TableCell>
                   <TableCell>
@@ -1174,7 +1513,11 @@ export default function ClassStudentsManager({
                               size="small" 
                               color="primary" 
                               variant="outlined"
-                              onClick={() => setSubClassTab(student.sub_class || 0)}
+                              onClick={() => setSubClassTab(
+                                typeof student.sub_class === 'string' 
+                                  ? parseInt(student.sub_class) 
+                                  : (student.sub_class || 0)
+                              )}
                               clickable
                               sx={{ 
                                 cursor: 'pointer',
@@ -1194,30 +1537,24 @@ export default function ClassStudentsManager({
                     </TableCell>
                   )}
                   <TableCell align="right">
-                    {student.isEditing ? (
-                      <>
-                        <Tooltip title="Enregistrer">
-                          <IconButton 
-                            size="small" 
-                            onClick={() => handleSaveEdit(student.id)}
-                            color="success"
-                          >
-                            <SaveIcon fontSize="small" />
-                          </IconButton>
+                  <>
+                  <Tooltip title="Consulter étudiant">
+                              <IconButton
+                              size="small"
+                              color="info"
+                              component={student?.id ? Link : 'button'}
+                              href={student?.id ? `/students/${student.id}` : undefined}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              disabled={!student?.id}
+                              >
+                              {student?.id ? (
+                                <OpenInNewIcon fontSize="small" />
+                              ) : (
+                                <LinkOffIcon fontSize="small" />
+                              )}
+                              </IconButton>
                         </Tooltip>
-                        <Tooltip title="Annuler">
-                          <IconButton 
-                            size="small" 
-                            onClick={() => handleCancelEditing(student.id)}
-                            color="default"
-                            className="ml-1"
-                          >
-                            <CancelIcon fontSize="small" />
-                          </IconButton>
-                        </Tooltip>
-                      </>
-                    ) : (
-                      <>
                         <Tooltip title="Modifier">
                           <IconButton 
                             size="small" 
@@ -1238,7 +1575,6 @@ export default function ClassStudentsManager({
                           </IconButton>
                         </Tooltip>
                       </>
-                    )}
                   </TableCell>
                 </TableRow>
               ))}
@@ -1299,6 +1635,30 @@ export default function ClassStudentsManager({
         {success}
       </Alert>
     )}
+
+    <StudentEditDialog
+      open={editDialogOpen}
+      onClose={handleCloseEditDialog}
+      student={studentToEdit ? {
+        ...studentToEdit,
+        email: studentToEdit.email || '' // Garantir que email n'est jamais null
+      } : null}
+      onSave={handleSaveEdit}
+      selectedClasses={selectedClassesForEdit}
+      onSelectedClassesChange={handleSelectedClassesChange}
+      classes={allAvailableClasses.map(cls => ({
+        id: cls.id,
+        name: cls.name,
+        year: classData?.academic_year || new Date().getFullYear().toString() // Ajouter year obligatoire
+      }))}
+      availableSubgroups={subgroupsForEdit}
+      loadingSubgroups={loadingSubgroupsForEdit}
+      onStudentChange={handleStudentChange}
+      fetchClassSubgroups={fetchSubgroupsForEdit}
+      classGroupsMapping={classGroupsMapping}
+      onClassSelectionChange={handleClassSelectionChange}
+    />
+
     </div>
   );
 }

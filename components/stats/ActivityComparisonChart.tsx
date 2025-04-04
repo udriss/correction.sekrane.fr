@@ -1,0 +1,72 @@
+'use client';
+
+import React from 'react';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, LabelList } from 'recharts';
+
+interface ActivityData {
+  activity_id: number;
+  activity_name: string;
+  correction_count: number;
+  average_grade: number;
+  highest_grade: number;
+  lowest_grade: number;
+}
+
+interface ActivityComparisonChartProps {
+  data: ActivityData[];
+}
+
+export default function ActivityComparisonChart({ data }: ActivityComparisonChartProps) {
+  // Limiter aux 10 premières activités pour la lisibilité et gérer les valeurs null/undefined
+  const displayData = data.slice(0, 10).map(item => ({
+    ...item,
+    name: item.activity_name.length > 20 ? item.activity_name.substring(0, 20) + '...' : item.activity_name,
+    // S'assurer que toutes les valeurs numériques sont valides
+    average_grade: typeof item.average_grade === 'number' ? item.average_grade : 0,
+    highest_grade: typeof item.highest_grade === 'number' ? item.highest_grade : 0,
+    lowest_grade: typeof item.lowest_grade === 'number' ? item.lowest_grade : 0
+  }));
+
+  return (
+    <ResponsiveContainer width="100%" height="100%">
+      <BarChart
+        data={displayData}
+        margin={{
+          top: 20,
+          right: 30,
+          left: 20,
+          bottom: 70,
+        }}
+        barGap={0}
+        barSize={25}
+      >
+        <CartesianGrid strokeDasharray="3 3" />
+        <XAxis 
+          dataKey="name" 
+          angle={-45} 
+          textAnchor="end" 
+          tick={{ fontSize: 10 }}
+          height={70}
+        />
+        <YAxis yAxisId="left" orientation="left" label={{ value: 'Note (/20)', angle: -90, position: 'insideLeft' }} domain={[0, 20]} />
+        <YAxis yAxisId="right" orientation="right" label={{ value: 'Nombre', angle: 90, position: 'insideRight' }} />
+        <Tooltip 
+          formatter={(value, name) => {
+            if (value === undefined || value === null) {
+              return ['Non évalué', name];
+            }
+            if (name === 'Corrections') return [`${value}`, name];
+            return [`${Number(value).toFixed(2)}/20`, name];
+          }}
+        />
+        <Legend />
+        <Bar yAxisId="left" dataKey="average_grade" name="Note moyenne" fill="#8884d8" />
+        <Bar yAxisId="left" dataKey="highest_grade" name="Note max" fill="#4CAF50" />
+        <Bar yAxisId="left" dataKey="lowest_grade" name="Note min" fill="#FF5722" />
+        <Bar yAxisId="right" dataKey="correction_count" name="Corrections" fill="#2196F3">
+          <LabelList dataKey="correction_count" position="top" />
+        </Bar>
+      </BarChart>
+    </ResponsiveContainer>
+  );
+}

@@ -7,80 +7,59 @@ import authOptions from '@/lib/auth';
 
 // Get students for a class
 export async function GET(
-  req: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    // Await the params as needed in Next.js 15
+    // Await the params
     const { id } = await params;
     const classId = parseInt(id);
     
     // Authentication check
     const session = await getServerSession(authOptions);
-    const customUser = await getUser(req);
+    const customUser = await getUser(request);
     const userId = customUser?.id || session?.user?.id;
     
     if (!userId) {
       return NextResponse.json(
-        { error: 'Authentification requise' },
+        { error: 'authentification requise' },
         { status: 401 }
       );
     }
+
     
-    if (isNaN(classId)) {
-      return NextResponse.json({ error: 'ID de classe invalide' }, { status: 400 });
+    if (!classId) {
+      return NextResponse.json(
+        { error: 'ID de classe manquant' },
+        { status: 400 }
+      );
     }
 
-    // Vérifier que la classe existe
-    const classData = await query<any[]>(`
-      SELECT * FROM classes WHERE id = ?
-    `, [classId]);
-
-    if (!classData || classData.length === 0) {
-      return NextResponse.json({ error: 'Classe non trouvée' }, { status: 404 });
-    }
-
-    // Récupérer les étudiants de cette classe avec leurs informations de sous-classe
+    // Récupérer tous les étudiants de cette classe
     const students = await query<any[]>(`
       SELECT 
-        s.*,
-        cs.class_id AS classId,
-        cs.sub_class AS sub_class,
-        COUNT(c.id) AS corrections_count
+        s.id, 
+        s.gender,
+        s.email,
+        s.first_name, 
+        s.last_name,
+        CONCAT(s.first_name, ' ', s.last_name) as name,
+        cs.sub_class
       FROM 
         students s
       JOIN 
         class_students cs ON s.id = cs.student_id
-      LEFT JOIN 
-        corrections c ON s.id = c.student_id
       WHERE 
         cs.class_id = ?
-      GROUP BY 
-        s.id, cs.sub_class
       ORDER BY 
         s.last_name, s.first_name
     `, [classId]);
 
-
-    // Formatter la réponse
-    const formattedStudents = students.map(student => ({
-      id: student.id,
-      first_name: student.first_name,
-      last_name: student.last_name,
-      email: student.email,
-      gender: student.gender,
-      classId: student.classId,
-      sub_class: student.sub_class,
-      className: classData[0].name,
-      corrections_count: student.corrections_count || 0
-    }));
-
-    return NextResponse.json(formattedStudents);
-    
+    return NextResponse.json(students);
   } catch (error) {
-    console.error('Erreur lors de la récupération des étudiants de la classe:', error);
+    console.error('Erreur lors de la récupération des étudiants:', error);
     return NextResponse.json(
-      { error: 'Erreur serveur' },
+      { message: 'Erreur serveur', error: (error as Error).message },
       { status: 500 }
     );
   }

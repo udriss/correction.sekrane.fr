@@ -27,11 +27,15 @@ import PeopleAltIcon from '@mui/icons-material/PeopleAlt';
 import ArticleIcon from '@mui/icons-material/Article';
 import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline';
 import AddIcon from '@mui/icons-material/Add';
+import EditNoteIcon from '@mui/icons-material/EditNote';
 import Link from 'next/link';
+import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
 
 import { Activity } from '@/lib/activity';
 import LoadingSpinner from '@/components/LoadingSpinner';
 import MultipleCorrectionsForm from '@/components/MultipleCorrectionsForm';
+import GradientBackground from '@/components/ui/GradientBackground';
+import PatternBackground from '@/components/ui/PatternBackground';
 
 export default function MultipleCorrections() {
   const router = useRouter();
@@ -141,6 +145,15 @@ export default function MultipleCorrections() {
         setGenericActivityId(activityData.id);
         setExperimentalPoints(activityData.experimental_points || 5);
         setTheoreticalPoints(activityData.theoretical_points || 15);
+        
+        // D'abord rafraîchir la liste des activités
+        await fetchAllActivities();
+        
+        // Ensuite seulement, mettre à jour l'ID sélectionné
+        setSelectedActivityId(activityData.id.toString());
+        
+        // Mettre à jour l'URL sans rafraîchir la page
+        router.push(`/corrections/multiples?activityId=${activityData.id}`, { scroll: false });
       } else {
         // Si aucune activité générique n'existe, en ajouter une nouvelle
         const createResponse = await fetch('/api/activities', {
@@ -162,6 +175,15 @@ export default function MultipleCorrections() {
           setGenericActivityId(newActivity.id);
           setExperimentalPoints(newActivity.experimental_points || 5);
           setTheoreticalPoints(newActivity.theoretical_points || 15);
+          
+          // D'abord rafraîchir la liste des activités
+          await fetchAllActivities();
+          
+          // Ensuite seulement, mettre à jour l'ID sélectionné
+          setSelectedActivityId(newActivity.id.toString());
+          
+          // Mettre à jour l'URL sans rafraîchir la page
+          router.push(`/corrections/multiples?activityId=${newActivity.id}`, { scroll: false });
         } else {
           throw new Error("Erreur lors de la création d'une activité générique");
         }
@@ -202,6 +224,7 @@ export default function MultipleCorrections() {
       }
     }
   };
+
 
   // Handle form submission for creating a group
   const handleCreateGroup = async (createdCorrectionIds: string[]) => {
@@ -310,38 +333,71 @@ export default function MultipleCorrections() {
       {/* Header with modern design and gradient */}
       <Paper 
         elevation={3}
-        className="mb-8 rounded-lg overflow-hidden bg-gradient-to-r from-blue-700 to-indigo-800"
+        className="mb-8 rounded-lg overflow-hidden"
       >
-        <div className="p-6 text-white relative">
-          {/* Decorative background pattern */}
-          <div className="absolute inset-0 opacity-10" 
-               style={{backgroundImage: 'url("data:image/svg+xml,%3Csvg width=\'60\' height=\'60\' viewBox=\'0 0 60 60\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cg fill=\'none\' fill-rule=\'evenodd\'%3E%3Cg fill=\'%23ffffff\' fill-opacity=\'1\'%3E%3Cpath d=\'M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z\'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")'}}
-          ></div>
-          
-          {/* Header content */}
-          <div className="relative z-10 flex justify-between items-center">
-            <div>
-              <Typography variant="h4" component="h1" className="font-bold text-black mb-1">
-                  Création de corrections multiples
-              </Typography>
-              <Typography variant="subtitle1" className="text-blue-600">
-                Sélectionnez une activité ou créez-en une nouvelle
-              </Typography>
-            </div>
+        <Box sx={{ position: 'relative' }}>
+          <GradientBackground variant="primary" sx={{ position: 'relative', zIndex: 1, p: { xs: 3, sm: 4 } }}>
+            <PatternBackground 
+              pattern='dots'
+              opacity={0.3}
+              sx={{ 
+                position: 'absolute', 
+                top: 0, 
+                left: 0, 
+                right: 0, 
+                bottom: 0, 
+                zIndex: -1 
+              }}
+            />
             
-            <div className="flex gap-3">
+            {/* Header content */}
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
+              <Box 
+                sx={{ 
+                  background: (theme) => `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.secondary.main} 100%)`,
+                  p: 1.5, 
+                  borderRadius: '50%',
+                  display: 'flex',
+                  boxShadow: '0 4px 20px rgba(0,0,0,0.2)'
+                }}
+              >
+                <EditNoteIcon sx={{ fontSize: 50, color: (theme) => theme.palette.text.primary }} />
+              </Box>
+              
+              <Box sx={{ flexGrow: 1 }}>
+                <Typography variant="h4" fontWeight={700} color="text.primary">
+                  Nouvelles corrections en lot
+                </Typography>
+                <Typography color='text.secondary' variant="subtitle1" sx={{ opacity: 0.9, mb: 1 }}>
+                  Sélectionnez une activité ou ajoutez-en une nouvelle
+                </Typography>
+              </Box>
+              
               <Button 
                 component={Link} 
-                href="/activities"
-                variant="outlined"
+                href="/corrections/new"
+                variant="contained"
                 color='secondary'
                 startIcon={<ArrowBackIcon />}
+                sx={{ 
+                  bgcolor: 'rgba(255,255,255,0.2)', 
+                  color: theme => theme.palette.text.primary,
+                  backdropFilter: 'blur(10px)',
+                  '&:hover': {
+                    bgcolor: 'rgba(255,255,255,0.3)',
+                  },
+                  fontWeight: 600,
+                  py: 1,
+                  px: 2,
+                  borderRadius: 2,
+                  boxShadow: '0 4px 15px rgba(0,0,0,0.15)'
+                }}
               >
                 Retour
               </Button>
-            </div>
-          </div>
-        </div>
+            </Box>
+          </GradientBackground>
+        </Box>
       </Paper>
 
       {/* Activity Selection Section */}
@@ -353,7 +409,9 @@ export default function MultipleCorrections() {
           </Typography>
         </div>
         
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+          <Grid container spacing={2} className="mb-4">
+            <Grid size={{xs:12, sm:12, md:8, lg:8}}
+            sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
           <FormControl fullWidth variant="outlined">
             <InputLabel id="activity-select-label">Activités existantes</InputLabel>
             <Select
@@ -366,41 +424,48 @@ export default function MultipleCorrections() {
               <MenuItem value="0">Aucune activité sélectionnée</MenuItem>
               <MenuItem disabled style={{ opacity: 0.7 }}>-- Activités régulières --</MenuItem>
               {allActivities.map((act) => (
-                <MenuItem key={act.id?.toString()} value={act.id?.toString() || ""}>
+                <MenuItem key={act.id?.toString() || 'unknown'} value={act.id?.toString() || "0"}>
                   {act.name}
                 </MenuItem>
               ))}
               <MenuItem disabled style={{ opacity: 0.7 }}>-- Activités génériques --</MenuItem>
               {genericActivities.map((act) => (
-                <MenuItem key={act.id?.toString()} value={act.id?.toString() || ""}>
+                <MenuItem key={act.id?.toString() || 'unknown'} value={act.id?.toString() || "0"}>
                   {act.name}
                 </MenuItem>
               ))}
             </Select>
           </FormControl>
-          
-          <div className="flex gap-2 items-center">
+          </Grid>
+
+            <Grid size={{xs:12, sm:12, md:4, lg:4}} 
+                container
+                direction={{ xs: 'row', md: 'column', lg: 'column' }}
+                spacing={2}>
             <Button
-              variant="contained"
+              variant="outlined"
               color="success"
-              startIcon={<AddIcon />}
+              endIcon={<ArrowForwardIcon />}
               component={Link}
               href="/activities/new"
               fullWidth
+              sx={{ mb:.5}}
             >
-              Créer une nouvelle activité
+              Ajouter une nouvelle activité
             </Button>
             
             <Button
               variant="outlined"
               color="primary"
+              startIcon={<AddIcon />}
               onClick={fetchOrCreateGenericActivity}
               disabled={!!activity}
+              fullWidth
             >
               Utiliser activité générique
             </Button>
-          </div>
-        </div>
+            </Grid>
+          </Grid>
         
         {error && (
           <Alert severity="error" className="mb-6 animate-fadeIn">
@@ -410,7 +475,7 @@ export default function MultipleCorrections() {
         
         {!activity && !error && (
           <Alert severity="info" className="my-4">
-            Veuillez sélectionner une activité existante, créer une nouvelle activité, ou utiliser une activité générique.
+            Sélectionnez une activité existante, ajoutez une nouvelle activité, ou utilisez une activité générique.
           </Alert>
         )}
       </Paper>

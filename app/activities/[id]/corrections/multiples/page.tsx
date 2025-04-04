@@ -60,7 +60,7 @@ export default function MultipleCorrectionsPage({ params }: { params: Promise<{ 
     const activityId = id;
 
 
-    const router = useRouter();
+  const router = useRouter();
   const [activity, setActivity] = useState<Activity | null>(null);
   const [loading, setLoading] = useState(true);
   const [classesLoading, setClassesLoading] = useState(true);

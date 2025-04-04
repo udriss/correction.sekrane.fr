@@ -1,160 +1,169 @@
+'use client';
+
 import React, { useState } from 'react';
-import { 
-  Box, Typography, TextField, Button, Paper, 
-  CircularProgress, Alert
-} from '@mui/material';
-import AddIcon from '@mui/icons-material/Add';
-import InfoIcon from '@mui/icons-material/Info';
-import CategorySelect from '@/components/fragments/CategorySelect';
-import { Fragment } from '@/lib/types';
-import { createFragment } from '@/lib/services/fragmentService';
+import { Box, TextField, Button, Alert, Chip, CircularProgress, Typography } from '@mui/material';
+import { CategorySelect } from './'; // Import depuis index.ts
 
 interface FragmentFormProps {
   activityId?: number;
   categories: Array<{id: number, name: string}>;
-  // Modification du type pour rendre 'category' optionnel dans le type Fragment
-  onSuccess: (fragment: any) => void; // Utilisez 'any' pour contourner l'incompatibilité temporairement
+  onSuccess: (fragment: any) => void;
   onCancel: () => void;
   refreshCategories: () => Promise<void>;
 }
 
-const FragmentForm: React.FC<FragmentFormProps> = ({
-  activityId,
-  categories,
-  onSuccess,
+const FragmentForm: React.FC<FragmentFormProps> = ({ 
+  activityId, 
+  categories, 
+  onSuccess, 
   onCancel,
-  refreshCategories
+  refreshCategories 
 }) => {
   const [content, setContent] = useState('');
-  const [selectedCategories, setSelectedCategories] = useState<number[]>([]);
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [tags, setTags] = useState<string[]>([]);
+  const [tagInput, setTagInput] = useState('');
+  const [selectedCategoryIds, setSelectedCategoryIds] = useState<number[]>([]);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
+  
+  const handleAddTag = () => {
+    if (tagInput.trim() && !tags.includes(tagInput.trim())) {
+      setTags([...tags, tagInput.trim()]);
+      setTagInput('');
+    }
+  };
+  
+  const handleRemoveTag = (tagToRemove: string) => {
+    setTags(tags.filter(tag => tag !== tagToRemove));
+  };
+  
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!content.trim()) return;
     
-    if (!content.trim() || !activityId) {
-      setError('Le contenu et l\'activité sont requis');
-      return;
-    }
-    
-    setIsSubmitting(true);
+    setLoading(true);
     setError(null);
     
     try {
-      const newFragment = await createFragment(activityId, content, selectedCategories);
-      
-      // Format categories as objects for display
-      const formattedCategories = selectedCategories.map(id => {
-        const cat = categories.find(c => c.id === id);
-        return cat ? { id: cat.id, name: cat.name } : { id, name: `Category ${id}` };
+      const response = await fetch('/api/fragments', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          content,
+          tags,
+          categories: selectedCategoryIds,
+          activity_id: activityId
+        }),
       });
       
-      const formattedFragment = {
-        ...newFragment,
-        categories: formattedCategories
-      };
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Erreur lors de la création du fragment');
+      }
       
-      // Call success callback
-      onSuccess(formattedFragment);
+      const newFragment = await response.json();
+      onSuccess(newFragment);
       
-      // Reset form
+      // Réinitialiser le formulaire
       setContent('');
-      setSelectedCategories([]);
-      
+      setTags([]);
+      setTagInput('');
+      setSelectedCategoryIds([]);
     } catch (error: any) {
       console.error('Error creating fragment:', error);
       setError(error.message || 'Erreur lors de la création du fragment');
     } finally {
-      setIsSubmitting(false);
+      setLoading(false);
     }
   };
-
-  const handleCategoryChange = (newCategories: number[]) => {
-    setSelectedCategories(newCategories);
-  };
-
+  
   return (
-    <Paper variant="outlined" sx={{ p: 3, mt: 3 }}>
-      <Typography variant="subtitle1" fontWeight="bold" sx={{ mb: 2 }}>
-        Ajouter un nouveau fragment
-      </Typography>
-      
+    <Box component="form" onSubmit={handleSubmit}>
       {error && (
         <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>
           {error}
         </Alert>
       )}
       
-      <form onSubmit={handleSubmit}>
-        <Box sx={{ mb: 2 }}>
+      <TextField
+        label="Contenu du fragment"
+        multiline
+        rows={4}
+        value={content}
+        onChange={(e) => setContent(e.target.value)}
+        fullWidth
+        required
+        sx={{ mb: 3 }}
+      />
+      
+      <Box sx={{ mb: 3 }}>
+        <Typography variant="subtitle2" gutterBottom>
+          Tags (optionnels)
+        </Typography>
+        
+        <Box sx={{ display: 'flex', gap: 1, mb: 1 }}>
           <TextField
-            value={content}
-            onChange={(e) => setContent(e.target.value)}
-            fullWidth
-            multiline
-            rows={4}
-            placeholder="Contenu du nouveau fragment..."
-            variant="outlined"
-            required
             size="small"
-            // Mise à jour des styles avec slotProps au lieu de InputProps
-            slotProps={{
-              input: {
-                style: {
-                  backgroundColor: 'background.paper',
-                }
-              }
-            }}
-            sx={{
-              backgroundColor: 'background.paper',
-              '& .MuiOutlinedInput-root': {
-                backgroundColor: 'background.paper',
-                '&:hover, &.Mui-focused': {
-                  backgroundColor: 'background.default',
-                }
+            value={tagInput}
+            onChange={(e) => setTagInput(e.target.value)}
+            placeholder="Ajouter un tag"
+            sx={{ flexGrow: 1 }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                handleAddTag();
               }
             }}
           />
+          <Button 
+            variant="outlined" 
+            size="small"
+            onClick={handleAddTag}
+            disabled={!tagInput.trim()}
+          >
+            Ajouter
+          </Button>
         </Box>
-
-        <CategorySelect
-          selectedCategories={selectedCategories}
-          availableCategories={categories}
-          onChange={handleCategoryChange}
-          refreshCategories={refreshCategories}
-        />
-
-        <Box sx={{ mt: 3, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          
-          <Box sx={{ display: 'flex', gap: 1 }}>
-            <Button 
-              variant="outlined" 
-              color="warning" 
-              onClick={onCancel}
-              disabled={isSubmitting}
-            >
-              <b>Annuler</b>
-            </Button>
-            <Button
-              type="submit"
-              disabled={isSubmitting || !content.trim()}
-              variant="contained"
-              color="success"
-              startIcon={isSubmitting ? <CircularProgress size={20} /> : <AddIcon />}
-            >
-              <b>{isSubmitting ? 'Ajout ...' : 'Ajouter'}</b>
-            </Button>
-          </Box>
+        
+        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+          {tags.map((tag, index) => (
+            <Chip
+              key={index}
+              label={tag}
+              onDelete={() => handleRemoveTag(tag)}
+              size="small"
+            />
+          ))}
         </Box>
-        <Box sx={{ display: 'flex', alignItems: 'center', color: 'text.secondary', mt: 2 }}>
-            <InfoIcon fontSize="small" sx={{ mr: 0.5 }} />
-            <Typography variant="caption">
-              Ce fragment sera disponible pour l'activité actuelle
-            </Typography>
-          </Box>
-      </form>
-    </Paper>
+      </Box>
+      
+      <CategorySelect 
+        selectedCategories={selectedCategoryIds}
+        availableCategories={categories}
+        onChange={setSelectedCategoryIds}
+        refreshCategories={refreshCategories}
+      />
+      
+      <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 2, mt: 3 }}>
+        <Button 
+          variant="outlined" 
+          color="secondary"
+          onClick={onCancel}
+          disabled={loading}
+        >
+          Annuler
+        </Button>
+        <Button 
+          type="submit" 
+          variant="contained" 
+          color="primary"
+          disabled={loading || !content.trim()}
+          startIcon={loading ? <CircularProgress size={20} /> : null}
+        >
+          {loading ? 'Création...' : 'Créer fragment'}
+        </Button>
+      </Box>
+    </Box>
   );
 };
 

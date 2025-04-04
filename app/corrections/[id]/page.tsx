@@ -669,7 +669,7 @@ export default function CorrectionDetail({ params }: { params: Promise<{ id: str
                   </Typography>
                 
                   {/* Email feedback button */}
-                  <Box sx={{ display: 'flex', gap: 2, mb: 3 }}>
+                  <Box sx={{ display: 'flex', justifyContent:'space-around', gap: 2, mb: 3 }}>
                     <EmailFeedback correctionId={correctionId} studentData={correction.student_data} />
                     <DuplicateCorrection correctionId={correctionId} />
                   </Box>

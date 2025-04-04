@@ -65,9 +65,11 @@ export default function ClassesBreadcrumbs({
   
   // Ajout de l'élément Accueil
   breadcrumbItems.push(
-    <Link key="home" href="/" className="text-blue-600 hover:underline flex items-center gap-1">
-      <HomeIcon fontSize="small" />
-      <span>Accueil</span>
+    <Link key="home" href="/" className="flex items-center gap-1">
+      <HomeIcon fontSize="small" color='primary' />
+      <Typography color="text.primary">
+      Accueil
+      </Typography>
     </Link>
   );
   
@@ -76,14 +78,16 @@ export default function ClassesBreadcrumbs({
     <Box 
       key="classes"
       onClick={handleMenuClick}
-      className="text-blue-600 hover:underline flex items-center gap-1 cursor-pointer"
+      className="hover:underline flex items-center gap-1 cursor-pointer"
       aria-controls={menuOpen ? 'classes-menu' : undefined}
       aria-haspopup="true"
       aria-expanded={menuOpen ? 'true' : undefined}
     >
-      <SchoolIcon fontSize="small" />
-      <span>Classes</span>
-      <ExpandMoreIcon fontSize="small" />
+      <SchoolIcon fontSize="small" color='primary' />
+      <Typography color="text.primary">
+      Classes
+      </Typography>
+      <ExpandMoreIcon fontSize="small" color='primary' />
     </Box>
   );
   
@@ -95,7 +99,7 @@ export default function ClassesBreadcrumbs({
           <Link 
             key={`extra-${index}`} 
             href={item.href} 
-            className="text-blue-600 hover:underline flex items-center gap-1"
+            className="hover:underline flex items-center gap-1"
           >
             {item.icon}
             <span>{item.label}</span>
@@ -113,8 +117,8 @@ export default function ClassesBreadcrumbs({
   // Ajout de la page courante si elle existe
   if (currentPageLabel) {
     breadcrumbItems.push(
-      <Typography key="current" color="text.primary" className="flex items-center gap-1">
-        <span>{currentPageLabel}</span>
+      <Typography sx={{ display: 'flex', alignItems: 'center', fontWeight: 700 }} color="primary">
+          {currentPageLabel}
       </Typography>
     );
   }
@@ -163,8 +167,8 @@ export default function ClassesBreadcrumbs({
         </MenuItem>
         
         <MenuItem 
-          onClick={() => navigateTo('/classes/analytics')}
-          selected={isActive('/classes/analytics')}
+          onClick={() => navigateTo('/stats')}
+          selected={isActive('/stats')}
         >
           <ListItemIcon><AnalyticsIcon fontSize="small" /></ListItemIcon>
           <ListItemText>Statistiques</ListItemText>

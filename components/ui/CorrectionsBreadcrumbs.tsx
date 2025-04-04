@@ -65,9 +65,9 @@ export default function CorrectionsBreadcrumbs({
   
   // Ajout de l'élément Accueil
   breadcrumbItems.push(
-    <Link key="home" href="/" className="text-blue-600 hover:underline flex items-center gap-1">
-      <HomeIcon fontSize="small" />
-      <span>Accueil</span>
+    <Link key="home" href="/" className="hover:underline flex items-center gap-1">
+      <HomeIcon fontSize="small" color='primary' />
+      <Typography color="text.primary">Accueil</Typography>
     </Link>
   );
   
@@ -76,13 +76,13 @@ export default function CorrectionsBreadcrumbs({
     <Box 
       key="corrections"
       onClick={handleMenuClick}
-      className="text-blue-600 hover:underline flex items-center gap-1 cursor-pointer"
+      className="text-blue-600 flex items-center gap-1 cursor-pointer"
       aria-controls={menuOpen ? 'corrections-menu' : undefined}
       aria-haspopup="true"
       aria-expanded={menuOpen ? 'true' : undefined}
     >
       <AssignmentIcon fontSize="small" />
-      <span>Corrections</span>
+      <Typography color="text.primary">Corrections</Typography>
       <ExpandMoreIcon fontSize="small" />
     </Box>
   );
@@ -95,17 +95,20 @@ export default function CorrectionsBreadcrumbs({
           <Link 
             key={`extra-${index}`} 
             href={item.href} 
-            color='primary'
+            color='text.primary'
             className="hover:underline flex items-center gap-1 font-bold"
           >
             {item.icon}
-            <span>{item.label}</span>
+          <Typography color="text.primary">{item.label}</Typography>
           </Link>
         ) : (
-          <Typography key={`extra-${index}`} color="text.primary" className="flex items-center gap-1">
+          <>
+          <Typography key={`extra-${index}`} color="primary" className="flex items-center gap-1">
             {item.icon}
-            <span>{item.label}</span>
-          </Typography>
+            </Typography>
+            <Typography color="text.primary">{item.label}</Typography>
+          </>
+
         )
       );
     });
@@ -114,8 +117,8 @@ export default function CorrectionsBreadcrumbs({
   // Ajout de la page courante si elle existe
   if (currentPageLabel) {
     breadcrumbItems.push(
-      <Typography key="current" color="text.primary" className="flex items-center gap-1">
-        <span>{currentPageLabel}</span>
+      <Typography sx={{ display: 'flex', alignItems: 'center', fontWeight: 700 }} color="primary">
+                {currentPageLabel}
       </Typography>
     );
   }

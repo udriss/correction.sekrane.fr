@@ -1,17 +1,17 @@
 export interface Correction {
   id: number;
+  student_id: number;
   activity_id: number;
-  student_id: number | null;
+  grade?: number;
+  experimental_points_earned?: number;
+  theoretical_points_earned?: number;
+  submission_date?: string;
   content: string | null;
   content_data?: Date | string; // Could be JSON or string
   created_at?: Date | string;
   updated_at?: Date | string;
-  grade?: number | null;
   penalty?: number | null;
   deadline?: Date | string | null;
-  submission_date?: Date | string | null;
-  experimental_points_earned?: number | null;
-  theoretical_points_earned?: number | null;
   group_id: number | null;
   class_id: number | null;
 }
@@ -25,21 +25,24 @@ export interface ShareCode {
   is_active: boolean;
 }
 
+// Ajoutons ou modifions le type Fragment pour qu'il soit uniforme dans toute l'application
+
 export interface Fragment {
   id: number;
   content: string;
-  tags?: string[] | string;
-  categories?: Array<{id: number, name: string}> | number[];
-  category?: string; // Pour compatibilité avec l'ancien format
-  // Suppression de category_id qui n'existe plus
-  activity_id?: number;
+  // Make tags always an array of strings
+  tags: string[];
+  // Make categories always required
+  categories: number[] | Array<{id: number, name: string}>;
+  activity_id?: number | null;
   user_id?: string;
-  created_at: string;
-  updated_at?: string;
-  activity_name?: string;
-  usage_count?: number;
   isOwner?: boolean;
+  activity_name?: string;
   isModified?: boolean;
+  usage_count?: number;
+  category?: string;
+  created_at?: string;
+  updated_at?: string;
 }
 
 export interface CorrectionWithShareCode extends Correction {
@@ -51,9 +54,21 @@ export interface Student {
   first_name: string;
   last_name: string;
   email: string;
-  gender?: 'M' | 'F' | 'N';
-  // New property to match the API response
-  allClasses?: { classId: number; className: string; sub_class?: number | null }[];
+  gender: 'M' | 'F' | 'N';
+  classId?: number | null;
+  group?: string;
+  // Support multiple data types for sub_class pour compatibilité avec les différentes parties de l'application
+  sub_class?: number | string | null;
+  // Propriétés additionnelles
+  className?: string;
+  corrections_count?: number;
+  // Définir allClasses comme un tableau d'objets
+  allClasses?: Array<{
+    classId: number;
+    className: string;
+    sub_class?: string | null;
+  }>;
+  additionalClasses?: {id: number, name: string}[];
   created_at?: string;
   updated_at?: string;
 }
@@ -61,14 +76,14 @@ export interface Student {
 export interface Class {
   id: number;
   name: string;
-  description: string;
-  academic_year: string;
-  nbre_subclasses?: number | null;
-  created_at: string;
-  updated_at: string;
-  // Add these properties returned by the API
+  year: string;
+  academic_year?: string;
+  description?: string;
+  nbre_subclasses?: number;
   student_count?: number;
   activity_count?: number;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface ClassStudent {

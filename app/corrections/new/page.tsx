@@ -13,6 +13,10 @@ import {
   CardContent,
   CardActions,
   Container,
+  ListItem,
+  ListItemText,
+  ListItemIcon,
+  List,
 } from '@mui/material';
 import AssignmentIndIcon from '@mui/icons-material/AssignmentInd';
 import GroupsIcon from '@mui/icons-material/Groups';
@@ -20,6 +24,9 @@ import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
 import GradeTwoToneIcon from '@mui/icons-material/GradeTwoTone';
 import SpeedIcon from '@mui/icons-material/Speed';
 import dynamic from 'next/dynamic';
+import FiberManualRecordIcon from '@mui/icons-material/FiberManualRecord';
+import AddCircleIcon from '@mui/icons-material/AddCircle';
+import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 
 // Import these components with dynamic to prevent SSR issues
 const GradientBackground = dynamic(
@@ -63,35 +70,76 @@ export default function NewCorrectionPage() {
   // Cette page est juste une page de sélection du type de correction
   
   return (
-    <Container maxWidth="lg" className="py-8">
+    <Container maxWidth="md" className="py-10">
       {/* Header with modern design and gradient */}
-      <Paper 
-        elevation={3}
-        className="mb-8 rounded-lg overflow-hidden"
-      >
-        {componentsLoaded ? (
-          <GradientBackground variant="primary">
-            <PatternBackground pattern="cross" opacity={0.25} color="000000" size={70}>
-              <Box className="p-6 relative">
-                <Typography variant="h4" component="h1" color='text.primary' fontWeight={700} className="mb-2">
-                  Nouvelle correction
-                </Typography>
-                <Typography variant="subtitle1" color='text.secondary'>
+        <Paper 
+          elevation={3} 
+          sx={{ 
+            borderRadius: 3,
+          }}>
+          {/* En-tête avec dégradé et motif */}
+          <Box sx={{ position: 'relative' }}>
+            <GradientBackground variant="primary" sx={{ position: 'relative', zIndex: 1, p: { xs: 3, sm: 4 } }}>
+              <PatternBackground 
+                pattern='dots'
+                opacity={0.3}
+                sx={{ 
+                  position: 'absolute', 
+                  top: 0, 
+                  left: 0, 
+                  right: 0, 
+                  bottom: 0, 
+                  zIndex: -1 
+                }}
+              />
+
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
+                <Box 
+                  sx={{ 
+                    background: (theme) => `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.secondary.main} 100%)`,
+                    p: 1.5, 
+                    borderRadius: '50%',
+                    display: 'flex',
+                    boxShadow: '0 4px 20px rgba(0,0,0,0.2)'
+                  }}
+                >
+                  <AddCircleIcon sx={{ fontSize: 50, color: (theme) => theme.palette.text.primary }} />
+                </Box>
+                
+                <Box sx={{ flexGrow: 1 }}>
+                <Typography variant="h4" fontWeight={700} color="text.primary">Nouvelle correction</Typography>
+                  <Typography color='text.secondary' variant="subtitle1" sx={{ opacity: 0.9, mb: 1 }}>
                   Choisissez le type de correction que vous souhaitez ajouter
-                </Typography>
+                  </Typography>
+                </Box>
+                
+                <Button 
+                  component={Link}
+                  color='secondary'
+                  href="/corrections"
+                  variant="contained"
+                  startIcon={<ArrowBackIcon />}
+                  sx={{ 
+                    bgcolor: 'rgba(255,255,255,0.2)', 
+                    color: theme => theme.palette.text.primary,
+                    backdropFilter: 'blur(10px)',
+                    '&:hover': {
+                      bgcolor: 'rgba(255,255,255,0.3)',
+                    },
+                    fontWeight: 600,
+                    py: 1,
+                    px: 2,
+                    borderRadius: 2,
+                    boxShadow: '0 4px 15px rgba(0,0,0,0.15)'
+                  }}
+                >
+                  Retour aux corrections
+                </Button>
               </Box>
-            </PatternBackground>
-          </GradientBackground>
-        ) : (
-          <Box className="p-6 relative" sx={{ bgcolor: '#f8f9fa' }}>
-            <Typography variant="h4" component="h1" fontWeight={700} className="mb-2">
-              Nouvelle correction
-            </Typography>
-            <Typography variant="subtitle1">
-              Choisissez le type de correction que vous souhaitez ajouter
-            </Typography>
+            </GradientBackground>
           </Box>
-        )}
+
+
         
         {/* Info cards */}
         <Box 
@@ -136,17 +184,29 @@ export default function NewCorrectionPage() {
         </Box>
       </Paper>
 
-      <Grid container spacing={4} className="mb-8">
+      <Grid sx={{mt:2}} container spacing={4} className="mb-8">
         {/* Option 1: Correction Unique */}
         <Grid size={{ xs: 12, md: 6 }}>
           <Card
             elevation={2}
-            className="h-full transition-all hover:shadow-lg border-t-4 border-green-500"
+            className="h-full transition-all hover:shadow-lg"
             sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}
           >
             <CardContent sx={{ flexGrow: 1 }}>
               <Box display="flex" alignItems="center" gap={2} mb={2}>
-                <AssignmentIndIcon color="primary" fontSize="large" />
+                <Box 
+                  sx={{ 
+                    background: (theme) => `linear-gradient(135deg, ${theme.palette.primary.light} 0%, ${theme.palette.secondary.light} 100%)`,
+                    borderRadius: '50%', 
+                    p: 1.5,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
+                  }}
+                >
+                  <AssignmentIndIcon sx={{color:"text.primary", backgroundColor: 'secondary'}} fontSize="large" />
+                </Box>
                 <Typography variant="h5" component="h2" fontWeight="bold">
                   Correction unique
                 </Typography>
@@ -154,41 +214,49 @@ export default function NewCorrectionPage() {
               <Typography variant="body1" paragraph>
                 Ajoutez une correction individuelle pour un étudiant spécifique.
               </Typography>
-              
-              {componentsLoaded ? (
-                <ThemeDependentBox>
-                  <Typography variant="body2">
-                    Idéal pour :
-                  </Typography>
-                  <ul className="list-disc pl-5 mt-1">
-                    <li>corriger un seul travail d'étudiant</li>
-                    <li>correction manuelle et détaillée</li>
-                    <li>ajouter une correction isolée</li>
-                  </ul>
-                </ThemeDependentBox>
-              ) : (
-                <Box style={fallbackBoxStyle}>
-                  <Typography variant="body2">
-                    Idéal pour :
-                  </Typography>
-                  <ul className="list-disc pl-5 mt-1">
-                    <li>corriger un seul travail d'étudiant</li>
-                    <li>correction manuelle et détaillée</li>
-                    <li>ajouter une correction isolée</li>
-                  </ul>
+                      <Box style={fallbackBoxStyle}>
+                        <Typography variant="body2">
+                        Idéal pour :
+                        </Typography>
+                        <List sx={{ mt: 1 }}>
+                        <ListItem sx={{ py: 0.5 }}>
+                          <ListItemIcon sx={{ minWidth: 28 }}>
+                          <FiberManualRecordIcon fontSize='small' sx={{fontSize:8, color: 'text.secondary' }} />
+                          </ListItemIcon>
+                          <Typography variant="body2">
+                          corriger un seul travail d'étudiant
+                        </Typography>
+                        </ListItem>
+                        <ListItem sx={{ py: 0.5 }}>
+                          <ListItemIcon sx={{ minWidth: 28 }}>
+                          <FiberManualRecordIcon fontSize='small' sx={{fontSize:8, color: 'text.secondary' }} />
+                          </ListItemIcon>
+                          <Typography variant="body2">
+                          correction manuelle et détaillée
+                        </Typography>
+                        </ListItem>
+                        <ListItem sx={{ py: 0.5 }}>
+                          <ListItemIcon sx={{ minWidth: 28 }}>
+                          <FiberManualRecordIcon fontSize='small' sx={{fontSize:8, color: 'text.secondary' }} />
+                          </ListItemIcon>
+                          <Typography variant="body2">
+                          ajouter une correction isolée
+                        </Typography>
+                        </ListItem>
+                        </List>
                 </Box>
-              )}
+                
             </CardContent>
             <CardActions className="p-4 pt-0">
               <Button
-                variant="contained"
+                variant="outlined"
                 color="primary"
                 endIcon={<ArrowForwardIcon />}
                 fullWidth
                 component={Link}
                 href="/corrections/unique"
               >
-                Correction unique
+                Ajouter une correction unique
               </Button>
             </CardActions>
           </Card>
@@ -198,54 +266,75 @@ export default function NewCorrectionPage() {
         <Grid size={{ xs: 12, md: 6 }}>
           <Card
             elevation={2}
-            className="h-full transition-all hover:shadow-lg border-t-4 border-purple-500" 
+            className="h-full transition-all hover:shadow-lg" 
             sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}
           >
             <CardContent sx={{ flexGrow: 1 }}>
               <Box display="flex" alignItems="center" gap={2} mb={2}>
-                <GroupsIcon color="secondary" fontSize="large" />
+              <Box 
+                  sx={{ 
+                    background: (theme) => `linear-gradient(135deg, ${theme.palette.secondary.light} 0%, ${theme.palette.primary.light} 100%)`,
+                    borderRadius: '50%', 
+                    p: 1.5,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
+                  }}
+                >
+                  <GroupsIcon sx={{color:"text.primary", backgroundColor: 'secondary'}} fontSize="large" />
+                </Box>
                 <Typography variant="h5" component="h2" fontWeight="bold">
-                  Corrections Multiples
+                  Corrections multiples
                 </Typography>
               </Box>
               <Typography variant="body1" paragraph>
                 Ajoutez plusieurs corrections en une seule opération pour un groupe d'étudiants.
               </Typography>
               
-              {componentsLoaded ? (
-                <ThemeDependentBox>
-                  <Typography variant="body2">
-                    Idéal pour :
-                  </Typography>
-                  <ul className="list-disc pl-5 mt-1">
-                    <li>corriger un groupe ou une classe entière</li>
-                    <li>ajouter rapidement plusieurs corrections</li>
-                    <li>corrections par lots avec barème commun</li>
-                  </ul>
-                </ThemeDependentBox>
-              ) : (
                 <Box style={fallbackBoxStyle}>
                   <Typography variant="body2">
                     Idéal pour :
                   </Typography>
-                  <ul className="list-disc pl-5 mt-1">
-                    <li>corriger un groupe ou une classe entière</li>
-                    <li>ajouter rapidement plusieurs corrections</li>
-                    <li>corrections par lots avec barème commun</li>
-                  </ul>
+                  <List sx={{ mt: 1 }}>
+                  <ListItem sx={{ py: 0.5 }}>
+                          <ListItemIcon sx={{ minWidth: 28 }}>
+                          <FiberManualRecordIcon fontSize='small' sx={{fontSize:8, color: 'text.secondary' }} />
+                          </ListItemIcon>
+                          <Typography variant="body2">
+                          corriger un groupe ou une classe entière
+                        </Typography>
+                        </ListItem>
+                        <ListItem sx={{ py: 0.5 }}>
+                          <ListItemIcon sx={{ minWidth: 28 }}>
+                          <FiberManualRecordIcon fontSize='small' sx={{fontSize:8, color: 'text.secondary' }} />
+                          </ListItemIcon>
+                          <Typography variant="body2">
+                          ajouter rapidement plusieurs corrections
+                        </Typography>
+                        </ListItem>
+                        <ListItem sx={{ py: 0.5 }}>
+                          <ListItemIcon sx={{ minWidth: 28 }}>
+                          <FiberManualRecordIcon fontSize='small' sx={{fontSize:8, color: 'text.secondary' }} />
+                          </ListItemIcon>
+                          <Typography variant="body2">
+                          corrections par lots avec barème commun
+                        </Typography>
+                        </ListItem>
+                  </List>
                 </Box>
-              )}
+
             </CardContent>
             <CardActions className="p-4 pt-0">
               <Button
-                variant="contained"
-                color="secondary"
+                variant="outlined"
+                color="primary"
                 endIcon={<ArrowForwardIcon />}
                 fullWidth
                 component={Link}
                 href="/corrections/multiples"
               >
-                Corrections multiples
+                Ajouter des corrections multiples
               </Button>
             </CardActions>
           </Card>

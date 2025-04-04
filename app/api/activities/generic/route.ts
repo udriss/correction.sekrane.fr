@@ -22,19 +22,18 @@ export async function GET() {
        WHERE name LIKE 'Activité générique%' 
        ORDER BY id DESC`
     );
-    console.log('allGenericActivities', allGenericActivities);
     
-    if (allGenericActivities && Array.isArray(allGenericActivities) && allGenericActivities.length > 0) {
+    if (allGenericActivities && allGenericActivities.length > 0) {
       // Analyser chaque nom pour extraire le numéro le plus élevé
-      for (const activity of allGenericActivities) {
-        const match = activity.name.match(/Activité générique.*/);
+      nextNumber = allGenericActivities.reduce((max, activity) => {
+        const match = activity.name.match(/Activité générique N° (\d+)/);
         if (match && match[1]) {
-          const num = parseInt(match[1], 10);
-          if (!isNaN(num) && num >= nextNumber) {
-            nextNumber = num + 1;
-          }
+          const number = parseInt(match[1], 10);
+          return Math.max(max, number);
         }
+        return max;
       }
+      , 0) + 1; // Incrémenter le numéro pour la nouvelle activité
     }
     
     // Créer une nouvelle activité générique avec le numéro suivant

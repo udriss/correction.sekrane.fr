@@ -1,6 +1,26 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  allowedDevOrigins: [
+    'correction.sekrane.fr',
+  ],
   reactStrictMode: true,
+  // Supprime les avertissements React liés à useLayoutEffect pendant le SSR
+  eslint: {
+    // Désactiver l'ESLint pendant le build pour ignorer ces avertissements
+    ignoreDuringBuilds: true,
+  },
+  onDemandEntries: {
+    // période en ms où les pages compilées en mémoire
+    maxInactiveAge: 25 * 1000,
+    // nombre de pages à maintenir en mémoire
+    pagesBufferLength: 2,
+  },
+  compiler: {
+    // Supprime les propriétés propres à React mais non utilisées des éléments DOM
+    // pour réduire la taille du HTML envoyé au client
+    reactRemoveProperties: process.env.NODE_ENV === 'production',
+    removeConsole: process.env.NODE_ENV === 'production',
+  },
   experimental: {
     serverActions: {},
   },

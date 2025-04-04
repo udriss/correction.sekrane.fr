@@ -74,7 +74,7 @@ const StudentsHeader: React.FC<StudentsHeaderProps> = ({
                   boxShadow: '0 4px 20px rgba(0,0,0,0.2)'
                 }}
               >
-                <PersonIcon sx={{ fontSize: 36, color: (theme) => theme.palette.text.primary }} />
+                <PersonIcon sx={{ fontSize: 50, color: (theme) => theme.palette.text.primary }} />
               </Box>
                 
                 <Box>

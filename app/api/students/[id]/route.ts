@@ -229,6 +229,8 @@ export async function PUT(
         SELECT class_id, sub_class FROM class_students 
         WHERE student_id = ?
       `, [studentId]);
+
+      console.log('Current associations:', currentAssociations);
       
       const currentClassIds = currentAssociations.map(assoc => assoc.class_id);
       

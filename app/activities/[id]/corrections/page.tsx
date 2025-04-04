@@ -23,32 +23,35 @@ import PersonIcon from '@mui/icons-material/Person';
 import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
 import GradientBackground from '@/components/ui/GradientBackground';
 import PatternBackground from '@/components/ui/PatternBackground';
+import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline';
 
-export default function CorrectionsPage({ params }: { params: Promise<{ activityId: string }> }) {
-  const { activityId } = React.use(params);
+export default function CorrectionsPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = React.use(params);
+  const activityId = id;
+
   const router = useRouter();
   
   const [activity, setActivity] = useState<Activity | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-  
+  const [error, setError] = useState('');  
+
   useEffect(() => {
-    const fetchActivity = async () => {
-      try {
-        const response = await fetch(`/api/activities/${activityId}`);
-        if (!response.ok) throw new Error('Erreur lors du chargement de l\'activité');
-        const data = await response.json();
-        setActivity(data);
-      } catch (err) {
-        console.error('Erreur:', err);
-        setError('Erreur lors du chargement de l\'activité');
-      } finally {
-        setLoading(false);
-      }
-    };
-    
-    fetchActivity();
-  }, [activityId]);
+      const fetchActivity = async () => {
+        try {
+          const response = await fetch(`/api/activities/${activityId}`);
+          if (!response.ok) throw new Error('Erreur lors du chargement de l\'activité');
+          const data = await response.json();
+          setActivity(data);
+        } catch (err) {
+          console.error('Erreur:', err);
+          setError('Erreur lors du chargement de l\'activité');
+        } finally {
+          setLoading(false);
+        }
+      };
+
+      fetchActivity();
+    }, [activityId]);
   
   if (loading) {
     return (
@@ -65,6 +68,12 @@ export default function CorrectionsPage({ params }: { params: Promise<{ activity
       <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4 py-8">
         <Box className="max-w-4xl w-full">
           <Paper elevation={2} sx={{ p: 4, borderRadius: 2 }} className="border-l-4 border-yellow-500">
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 3 }}>
+            <ErrorOutlineIcon color="warning" fontSize="large" />
+            <Typography variant="h5" color="warning.main" className="font-bold">
+              Activité non trouvée
+            </Typography>
+            </Box>
             <Alert severity="warning" sx={{ mb: 3 }}>
               L'activité demandée n'existe pas ou a été supprimée.
             </Alert>
@@ -96,7 +105,7 @@ export default function CorrectionsPage({ params }: { params: Promise<{ activity
             >
               <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 2 }}>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                  <AssignmentIcon sx={{ fontSize: 36, color: 'white' }} />
+                  <AssignmentIcon sx={{ fontSize: 50, color: 'white' }} />
                   <Box>
                     <Typography variant="h4" fontWeight={700} color="white">Corrections</Typography>
                     <Typography variant="subtitle1" color="white" sx={{ opacity: 0.9 }}>

@@ -253,14 +253,14 @@ export default function ActivitiesPage() {
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
                 <Box
                   sx={{
-                    bgcolor: 'rgba(255,255,255,0.15)',
+                    background: (theme) => `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.secondary.main} 100%)`,
                     p: 1.5,
                     borderRadius: '50%',
                     display: 'flex',
                     boxShadow: '0 4px 20px rgba(0,0,0,0.2)'
                   }}
                 >
-                  <MenuBookIcon sx={{ fontSize: 36, color: 'white' }} />
+                  <MenuBookIcon sx={{ fontSize: 50, color: (theme) => theme.palette.text.primary }} />
                 </Box>
                 
                 <Box>

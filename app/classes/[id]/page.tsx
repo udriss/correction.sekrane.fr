@@ -32,9 +32,13 @@ import {
   TableCell,
   TableBody,
   Checkbox,
-  CircularProgress
+  CircularProgress,
+  Tooltip,
 } from '@mui/material';
 import Grid from '@mui/material/Grid';
+import SchoolIcon from '@mui/icons-material/School';
+import {alpha} from '@mui/material/styles';
+import LinkOffIcon from '@mui/icons-material/LinkOff';
 
 import PatternBackground from '@/components/ui/PatternBackground';
 import GradientBackground from '@/components/ui/GradientBackground';
@@ -849,145 +853,186 @@ export default function ClassDetailPage({ params }: { params: Promise<{ id: stri
     <Container maxWidth="lg" className="py-8">
       {/* Header with gradient */}
       <Paper 
-  elevation={3}
-  className="mb-8 rounded-lg overflow-hidden"
->
-  <GradientBackground variant="primary" >
-    <PatternBackground 
-      pattern="cross" 
-      opacity={0.75} 
-      color="5566AA" 
-      size={70}
-      sx={{ p: 4, borderRadius: 2 }}
-    >
-      {isEditing && classData && classId ? (
-        <ClassEditForm 
-          id={classId.toString()}
-          initialData={{
-            name: classData?.name || '',
-            description: classData?.description || '',
-            academic_year: classData?.academic_year || '',
-            nbre_subclasses: classData?.nbre_subclasses || 0
-          }}
-          onCancel={() => setIsEditing(false)}
-          onSuccess={(updatedClass) => {
-            setClassData(updatedClass);
-            setIsEditing(false);
-          }}
-        />
-      ) : (
-        <div className="relative">
-          {/* Header content */}
-          <div className="flex justify-between items-start mb-4">
-            <div>
-              <Typography variant="h4" component="h1" className="font-bold text-blue-100 mb-1">
-                {classData.name}
-              </Typography>
-              <Typography variant="subtitle2" className="text-blue-100">
-                Année : {classData.academic_year}
-              </Typography>
-            </div>
-            
-            <div className="flex gap-2">
-              <Button 
-                variant="contained" 
-                color="secondary" 
-                startIcon={<ArrowBackIcon />} 
-                component={Link} 
-                href="/classes"
-              >
-                Retour
-              </Button>
-              
-              <Button
-                variant="contained"
-                color="primary"
-                startIcon={<EditIcon />}
-                onClick={() => setIsEditing(true)}
-              >
-                Modifier
-              </Button>
-            </div>
-          </div>
-          
-          {classData.description && (
-            <Typography variant="body1" className="mb-4 bg-white/10 p-3 rounded-lg text-blue-50">
-              {classData.description}
-            </Typography>
-          )}
-          {!classData.description && (
-            <Typography variant="body1" className="mb-4 bg-white/10 p-3 rounded-lg text-blue-50 italic">
-              Aucune description n'a été fournie pour cette classe.
-            </Typography>
-          )}
-          
-          {/* Stats cards grid */}
-          <Box sx={{ mt: 4 }}>
-            <Grid container spacing={2}>
-              <Grid size={{ xs: 12, sm:6, md: 3 }}>
-                <Paper sx={{ p: 2, textAlign: 'center', height: '100%', 
-                           bgcolor: 'rgba(255,255,255,0.9)', cursor: 'pointer',
-                           '&:hover': { bgcolor: 'rgba(255,255,255,1)', transform: 'translateY(-2px)' },
-                           transition: 'all 0.2s ease' }}
-                       onClick={() => handleChipClick(0)}>
-                  <MenuBookIcon color="secondary" fontSize="large" sx={{ mb: 1 }} />
-                  <Typography variant="h3" fontWeight="bold" color="secondary">
-                    {classData.activity_count}
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary">activités</Typography>
-                </Paper>
-              </Grid>
-              
-              <Grid size={{ xs: 12, sm:6, md: 3 }}>
-                <Paper sx={{ p: 2, textAlign: 'center', height: '100%', 
-                           bgcolor: 'rgba(255,255,255,0.9)', cursor: 'pointer',
-                           '&:hover': { bgcolor: 'rgba(255,255,255,1)', transform: 'translateY(-2px)' },
-                           transition: 'all 0.2s ease' }}
-                       onClick={() => handleChipClick(1)}>
-                  <PeopleIcon color="primary" fontSize="large" sx={{ mb: 1 }} />
-                  <Typography variant="h3" fontWeight="bold" color="primary">
-                    {classData.student_count}
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary">étudiants</Typography>
-                </Paper>
-              </Grid>
-              
-              {classData?.nbre_subclasses && classData.nbre_subclasses > 0 && (
-                <Grid size={{ xs: 12, sm:6, md: 3 }}>
-                  <Paper sx={{ p: 2, textAlign: 'center', height: '100%', 
-                             bgcolor: 'rgba(255,255,255,0.9)', cursor: 'pointer',
-                             '&:hover': { bgcolor: 'rgba(255,255,255,1)', transform: 'translateY(-2px)' },
-                             transition: 'all 0.2s ease' }}
-                         onClick={() => handleChipClick(1)}>
-                    <RecentActorsIcon color="info" fontSize="large" sx={{ mb: 1 }} />
-                    <Typography variant="h3" fontWeight="bold" color="info.main">
-                      {classData.nbre_subclasses}
+        elevation={3} 
+        sx={{ 
+          borderRadius: 3,
+          overflow: 'hidden',
+          mb: 4,
+        }}
+      >
+        <GradientBackground variant="primary" sx={{ p: 0 }}>
+          <PatternBackground 
+            pattern="dots" 
+            opacity={0.05} 
+            color="black" 
+            size={100}
+            sx={{ p: 4, borderRadius: 2 }}
+          >
+            {isEditing && classData && classId ? (
+              <ClassEditForm 
+                id={classId.toString()}
+                initialData={{
+                  name: classData?.name || '',
+                  description: classData?.description || '',
+                  academic_year: classData?.academic_year || '',
+                  nbre_subclasses: classData?.nbre_subclasses || 0
+                }}
+                onCancel={() => setIsEditing(false)}
+                onSuccess={(updatedClass) => {
+                  setClassData(updatedClass);
+                  setIsEditing(false);
+                }}
+              />
+            ) : (
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 2 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                  <Box 
+                    sx={{ 
+                      background: (theme) => `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.secondary.main} 100%)`,
+                      p: 1.5, 
+                      borderRadius: '50%',
+                      display: 'flex',
+                      boxShadow: '0 4px 20px rgba(0,0,0,0.2)'
+                    }}
+                  >
+                    <SchoolIcon sx={{ fontSize: 50, color: (theme) => theme.palette.text.primary }} />
+                  </Box>
+                  
+                  <Box>
+                    <Typography variant="h4" fontWeight={700} color="text.primary">{classData.name}</Typography>
+                    <Typography variant="subtitle1" color="text.secondary" sx={{ opacity: 0.9 }}>
+                      Année académique : {classData.academic_year}
                     </Typography>
-                    <Typography variant="body2" color="text.secondary">sous-classes</Typography>
-                  </Paper>
-                </Grid>
-              )}
-              
-              <Grid size={{ xs: 12, sm:6, md: 3 }} >
-                <Paper sx={{ p: 2, textAlign: 'center', height: '100%', 
-                           bgcolor: 'rgba(255,255,255,0.9)', cursor: 'pointer',
-                           '&:hover': { bgcolor: 'rgba(255,255,255,1)', transform: 'translateY(-2px)' },
-                           transition: 'all 0.2s ease' }}
-                       onClick={() => handleChipClick(2)}>
-                  <AssignmentTurnedInIcon color="success" fontSize="large" sx={{ mb: 1 }} />
-                  <Typography variant="h3" fontWeight="bold" color="success.main">
-                    {corrections.length}
+                  </Box>
+                </Box>
+                
+                <Box sx={{ display: 'flex', gap: 2 }}>
+                  <Button 
+                    variant="contained" 
+                    color="secondary" 
+                    startIcon={<ArrowBackIcon />} 
+                    component={Link} 
+                    href="/classes"
+                  >
+                    Retour
+                  </Button>
+                  
+                  <Button
+                    variant="contained"
+                    color="primary"
+                    startIcon={<EditIcon />}
+                    onClick={() => setIsEditing(true)}
+                  >
+                    Modifier
+                  </Button>
+                </Box>
+              </Box>
+            )}
+
+            {!isEditing && classData.description && (
+              <Typography variant="body1" color='text.primary' className="mt-4 bg-white/20 p-3 rounded-lg italic">
+                {classData.description}
+              </Typography>
+            )}
+            {!isEditing && !classData.description && (
+              <Typography variant="body1" color='text.primary' className="mt-4 bg-white/20 p-3 rounded-lg italic">
+                Aucune description n'a été fournie pour cette classe.
+              </Typography>
+            )}
+          </PatternBackground>
+        </GradientBackground>
+        
+        {/* Stats cards grid */}
+        <Box sx={{ p: 2 }}>
+          <Grid container spacing={2} sx={{ display: 'flex', justifyContent: 'space-around' }}>
+            <Grid size={{ xs: 12, sm: 6, md: 2 }}>
+              <Paper sx={{ 
+                p: 2, 
+                textAlign: 'center', 
+                height: '100%',
+                bgcolor: (theme) => alpha(theme.palette.myBoxes.primary, 0.5),
+                backdropFilter: 'blur(5px)',
+                borderRadius: 2,
+                cursor: 'pointer',
+                '&:hover': { transform: 'translateY(-2px)' },
+                transition: 'all 0.2s ease'
+              }}
+              onClick={() => handleChipClick(1)}>
+                <PeopleIcon color="primary" fontSize="large" sx={{ mb: 1 }} />
+                <Typography variant="h3" fontWeight="bold" color="primary">
+                  {classData.student_count}
+                </Typography>
+                <Typography variant="overline" color="text.secondary">étudiants</Typography>
+              </Paper>
+            </Grid>
+            
+            {classData?.nbre_subclasses && classData.nbre_subclasses > 0 && (
+              <Grid size={{ xs: 12, sm: 6, md: 2 }}>
+                <Paper sx={{ 
+                  p: 2, 
+                  textAlign: 'center', 
+                  height: '100%',
+                  bgcolor: (theme) => alpha(theme.palette.myBoxes.primary, 0.5),
+                  backdropFilter: 'blur(5px)',
+                  borderRadius: 2,
+                  cursor: 'pointer',
+                  '&:hover': { transform: 'translateY(-2px)' },
+                  transition: 'all 0.2s ease'
+                }}
+                onClick={() => handleChipClick(1)}>
+                  <RecentActorsIcon color="info" fontSize="large" sx={{ mb: 1 }} />
+                  <Typography variant="h3" fontWeight="bold" color="info.main">
+                    {classData.nbre_subclasses}
                   </Typography>
-                  <Typography variant="body2" color="text.secondary">corrections</Typography>
+                  <Typography color="text.secondary" variant="overline">sous-classes</Typography>
                 </Paper>
               </Grid>
+            )}
+
+            <Grid size={{ xs: 12, sm: 6, md: 2 }}>
+              <Paper sx={{ 
+                p: 2, 
+                textAlign: 'center', 
+                height: '100%',
+                bgcolor: (theme) => alpha(theme.palette.myBoxes.primary, 0.5),
+                backdropFilter: 'blur(5px)',
+                borderRadius: 2,
+                cursor: 'pointer',
+                '&:hover': { transform: 'translateY(-2px)' },
+                transition: 'all 0.2s ease'
+              }}
+              onClick={() => handleChipClick(0)}>
+                <MenuBookIcon color="secondary" fontSize="large" sx={{ mb: 1 }} />
+                <Typography variant="h3" fontWeight="bold" color="secondary">
+                  {classData.activity_count}
+                </Typography>
+                <Typography variant="overline" color="text.secondary">activités</Typography>
+              </Paper>
             </Grid>
-          </Box>
-        </div>
-      )}
-    </PatternBackground>
-  </GradientBackground>
-</Paper>
+            
+            <Grid size={{ xs: 12, sm: 6, md: 2 }}>
+              <Paper sx={{ 
+                p: 2, 
+                textAlign: 'center', 
+                height: '100%',
+                bgcolor: (theme) => alpha(theme.palette.myBoxes.primary, 0.5),
+                backdropFilter: 'blur(5px)',
+                borderRadius: 2,
+                cursor: 'pointer',
+                '&:hover': { transform: 'translateY(-2px)' },
+                transition: 'all 0.2s ease'
+              }}
+              onClick={() => handleChipClick(2)}>
+                <AssignmentTurnedInIcon color="success" fontSize="large" sx={{ mb: 1 }} />
+                <Typography variant="h3" fontWeight="bold" color="success.main">
+                  {corrections.length}
+                </Typography>
+                <Typography variant="overline" color="text.secondary">corrections</Typography>
+              </Paper>
+            </Grid>
+          </Grid>
+        </Box>
+      </Paper>
 
       {/* Tabs for different sections */}
       <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
@@ -1046,7 +1091,7 @@ export default function ClassDetailPage({ params }: { params: Promise<{ id: stri
                       <Chip 
                         label={`${activity.theoretical_points} points théo.`}
                         size="small"
-                        color="secondary"
+                        sx={{color:"secondary.dark"}}
                         variant="outlined"
                       />
                       <Chip 
@@ -1070,7 +1115,7 @@ export default function ClassDetailPage({ params }: { params: Promise<{ id: stri
                       size="small"
                       onClick={() => handleOpenCreateCorrections(activity.id)}
                     >
-                      Créer corrections
+                      Nouvelles corrections
                     </Button>
                   </CardActions>
                 </Card>
@@ -1101,7 +1146,12 @@ export default function ClassDetailPage({ params }: { params: Promise<{ id: stri
         {classId && (
           <ClassStudentsManager 
             classId={classId}
-            classData={classData}
+            classData={classData ? {
+              id: classData.id,
+              name: classData.name,
+              academic_year: classData.academic_year || '', // Assurez-vous que c'est toujours une chaîne
+              nbre_subclasses: classData.nbre_subclasses
+            } : null}
             embedded={true}
           />
         )}
@@ -1116,8 +1166,8 @@ export default function ClassDetailPage({ params }: { params: Promise<{ id: stri
             {activities.length > 0 && (
               <Button
                 variant="outlined"
-                color='primary'
-                startIcon={<MenuBookIcon />}
+                color='success'
+                startIcon={<AssignmentTurnedInIcon />}
                 onClick={() => handleOpenCreateCorrections(activities[0].id)}
               >
                 Ajouter des corrections
@@ -1333,11 +1383,12 @@ export default function ClassDetailPage({ params }: { params: Promise<{ id: stri
             </Typography>
             {activities.length > 0 ? (
               <Button
-                variant="contained"
                 startIcon={<AssignmentTurnedInIcon />}
+                color='success'
+                variant="outlined"
                 onClick={() => handleOpenCreateCorrections(activities[0].id)}
               >
-                Créer des corrections
+                Nouvelles des corrections
               </Button>
             ) : (
                       <Alert 
@@ -1736,6 +1787,7 @@ export default function ClassDetailPage({ params }: { params: Promise<{ id: stri
                             </Box>
                           ) : (
                             <Box sx={{ display: 'flex', gap: 1, justifyContent: 'center' }}>
+                              
                               <IconButton 
                                 size="small"
                                 onClick={() => toggleRowEditMode(correction)}

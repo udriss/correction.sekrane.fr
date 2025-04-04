@@ -3,7 +3,7 @@ import { Box } from '@mui/material';
 import { DndProvider } from 'react-dnd';
 import { HTML5Backend } from 'react-dnd-html5-backend';
 import { Fragment } from '@/lib/types';
-import FragmentCard from '@/components/fragments/FragmentCard';
+import FragmentCard from './FragmentCard';
 
 interface FragmentListProps {
   fragments: Fragment[];

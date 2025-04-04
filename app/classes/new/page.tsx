@@ -61,7 +61,7 @@ export default function NewClassPage() {
                   boxShadow: '0 4px 20px rgba(0,0,0,0.2)'
                 }}
               >
-                <SchoolIcon sx={{ fontSize: 36, color: (theme) => theme.palette.text.primary }} />
+                <SchoolIcon sx={{ fontSize: 50, color: (theme) => theme.palette.text.primary }} />
               </Box>
               
               <Box>

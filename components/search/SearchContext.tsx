@@ -461,7 +461,7 @@ export function SearchContextProvider({ children }: { children: React.ReactNode 
     if (e) e.preventDefault();
     
     if (!searchTerm || searchTerm.length < 1) {
-      setError('Veuillez saisir au moins 1 caractère pour effectuer une recherche');
+      setError('Saisir au moins 1 caractère pour effectuer une recherche');
       return;
     }
     
@@ -522,7 +522,7 @@ export function SearchContextProvider({ children }: { children: React.ReactNode 
       if (err.message && err.message.includes('too many connections')) {
         setError('Erreur de connexion à la base de données : trop de connexions simultanées. Veuillez réessayer dans quelques instants.');
       } else {
-        setError(err instanceof Error ? err.message : 'Une erreur est survenue lors de la recherche');
+        setError(err instanceof Error ? `Erreur : ${err.message}` : 'Une erreur est survenue lors de la recherche');
       }
     } finally {
       setIsSearching(false);

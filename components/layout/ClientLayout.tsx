@@ -30,7 +30,7 @@ export default function ClientLayout({ children }: ClientLayoutProps) {
   const isSettingsPage = pathname && pathname.startsWith('/settings');
   const isHelpPage = pathname && pathname.startsWith('/help');
   const isNotificationsPage = pathname && pathname === '/notifications';
-  const isAnalyticsPage = pathname && pathname.startsWith('/analytics');
+  const isAnalyticsPage = pathname && pathname.startsWith('/stats');
   const isContactPage = pathname && pathname === '/contact';
   const isAboutPage = pathname && pathname === '/about';
   const isClassesRoute = pathname && pathname.startsWith('/classes');
@@ -52,7 +52,7 @@ export default function ClientLayout({ children }: ClientLayoutProps) {
     if (isSettingsPage) return 'Paramètres';
     if (isHelpPage) return 'Aide';
     if (isNotificationsPage) return 'Notifications';
-    if (isAnalyticsPage) return 'Analyses';
+    if (isAnalyticsPage) return 'Statistiques';
     if (isContactPage) return 'Contact';
     if (isAboutPage) return 'À propos';
     if (isClassesRoute) {
