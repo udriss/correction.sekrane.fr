@@ -3,7 +3,8 @@ import {
   Button, Dialog, DialogTitle, DialogContent, DialogActions, 
   FormControl, InputLabel, Select, MenuItem, TextField, 
   Typography, Box, Chip, Alert, CircularProgress,
-  List, ListItem, ListItemText, IconButton, SelectChangeEvent, OutlinedInput, Switch
+  List, ListItem, ListItemText, IconButton, SelectChangeEvent, OutlinedInput, Switch,
+  alpha
 } from '@mui/material';
 import { Timeline, TimelineItem, TimelineSeparator, TimelineConnector, TimelineContent, TimelineDot } from '@mui/lab';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
@@ -11,7 +12,9 @@ import SchoolIcon from '@mui/icons-material/School';
 import PersonIcon from '@mui/icons-material/Person';
 import LaunchIcon from '@mui/icons-material/Launch';
 import ClearIcon from '@mui/icons-material/Clear';
+import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline'; // Import de l'icône d'alerte
 import Link from 'next/link';
+import { constructFromSymbol } from 'date-fns/constants';
 
 interface DuplicateCorrectionProps {
   correctionId: string;
@@ -55,6 +58,13 @@ interface GroupInfo {
   name: string;
 }
 
+// Interface pour les corrections existantes
+interface ExistingCorrection {
+  correctionId: string;
+  studentId: number;
+  activityId: number;
+}
+
 export default function DuplicateCorrection({ correctionId }: DuplicateCorrectionProps) {
   const [open, setOpen] = useState(false);
   const [classes, setClasses] = useState<Class[]>([]);
@@ -68,6 +78,13 @@ export default function DuplicateCorrection({ correctionId }: DuplicateCorrectio
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [duplicationStatuses, setDuplicationStatuses] = useState<DuplicationStatus[]>([]);
+  
+  // États pour gérer les corrections existantes
+  const [activityId, setActivityId] = useState<number | null>(null);
+  const [existingCorrections, setExistingCorrections] = useState<ExistingCorrection[]>([]);
+  const [showOverwriteDialog, setShowOverwriteDialog] = useState(false);
+  const [currentStudentToProcess, setCurrentStudentToProcess] = useState<StudentWithCustomEmail | null>(null);
+  const [overwriteMode, setOverwriteMode] = useState<'overwrite' | 'create'>('create');
 
   // Function to generate a unique key for each student
   const [studentKeys] = useState<Map<number, string>>(new Map());
@@ -82,6 +99,18 @@ export default function DuplicateCorrection({ correctionId }: DuplicateCorrectio
     setOpen(true);
     setError('');
     loadData();
+    
+    // Récupérer l'ID de l'activité associée à cette correction
+    fetch(`/api/corrections/${correctionId}`)
+      .then(response => response.json())
+      .then(data => {
+        if (data && data.activity_id) {
+          setActivityId(data.activity_id);
+        }
+      })
+      .catch(error => {
+        console.error('Erreur lors de la récupération des informations de la correction:', error);
+      });
   };
 
   const handleClose = () => {
@@ -287,8 +316,20 @@ export default function DuplicateCorrection({ correctionId }: DuplicateCorrectio
       );
       
       try {
-        // Duplicate the correction
-        const newCorrectionId = await duplicateCorrection(student.id);
+        // Utiliser la nouvelle fonction processSingleStudent qui gère la vérification des corrections existantes
+        const newCorrectionId = await processSingleStudent(student, overwriteMode);
+        
+        // Si le résultat est null, cela signifie que le dialogue de confirmation est affiché
+        // Dans ce cas, on interrompt le traitement et on attend la décision de l'utilisateur
+        if (newCorrectionId === null) {
+          // On restaure le statut à pending pour cet étudiant
+          setDuplicationStatuses(prev => 
+            prev.map(s => s.studentId === student.id ? { ...s, status: 'pending' } : s)
+          );
+          // On met fin à la soumission pour permettre à l'utilisateur d'interagir
+          setSubmitting(false);
+          return;
+        }
         
         // Update status to success
         setDuplicationStatuses(prev => 
@@ -318,6 +359,214 @@ export default function DuplicateCorrection({ correctionId }: DuplicateCorrectio
     }
   }, [selectedClassIds, allStudents, open]);
 
+
+  // Effet pour vérifier les corrections existantes lorsque les étudiants sont sélectionnés
+  useEffect(() => {
+    if (activityId && studentsToProcess.length > 0) {
+      const studentIds = studentsToProcess.map(s => s.id);
+      console.log('Vérification des corrections existantes pour activityId:', activityId, 'studentIds:', studentIds);
+      
+      // Récupérer les corrections existantes pour ces étudiants et cette activité
+      fetch(`/api/corrections/check-existing?activityId=${activityId}&studentIds=${studentIds.join(',')}`)
+        .then(response => response.json())
+        .then(data => {
+          
+          // Convertir la réponse en tableau si ce n'est pas déjà le cas
+          let corrections = [];
+          if (Array.isArray(data)) {
+            corrections = data;
+          } else if (data && typeof data === 'object') {
+            // Si c'est un objet mais pas un tableau, vérifier s'il a des propriétés de correction
+            if (data.correctionId || data.studentId || data.activityId) {
+              corrections = [data]; // Considérer comme une seule correction
+            } else {
+              // Sinon, essayer de convertir les valeurs de l'objet en tableau
+              corrections = Object.values(data).filter(item => item && typeof item === 'object');
+            }
+          }
+          
+          setExistingCorrections(corrections);
+        })
+        .catch(error => {
+          console.error('Erreur lors de la vérification des corrections existantes:', error);
+        });
+    }
+  }, [activityId, studentsToProcess]);
+
+
+  // Fonction pour vérifier si un étudiant a déjà une correction pour cette activité
+  const hasExistingCorrection = (studentId: number) => {
+    return existingCorrections.some(
+      correction => correction.studentId === studentId && correction.activityId === activityId
+    );
+  };
+
+  // Fonction pour obtenir l'ID de la correction existante
+  const getExistingCorrectionId = (studentId: number) => {
+    const existing = existingCorrections.find(
+      correction => correction.studentId === studentId && correction.activityId === activityId
+    );
+    return existing ? existing.correctionId : null;
+  };
+
+  // Gérer le choix de l'utilisateur concernant l'écrasement ou la création d'une nouvelle correction
+  const handleOverwriteChoice = (choice: 'overwrite' | 'create') => {
+    setOverwriteMode(choice);
+    setShowOverwriteDialog(false);
+    
+    if (currentStudentToProcess) {
+      // Appeler directement la fonction qui effectue la duplication, 
+      // sans repasser par la vérification d'existence
+      duplicateCorrectionWithMode(currentStudentToProcess, choice);
+    }
+  };
+  
+  // Fonction pour dupliquer une correction avec un mode spécifique (créer ou écraser)
+  const duplicateCorrectionWithMode = async (student: StudentWithCustomEmail, mode: 'overwrite' | 'create') => {
+    try {
+      // Update status to processing
+      setDuplicationStatuses(prev => 
+        prev.map(s => s.studentId === student.id ? { ...s, status: 'processing' } : s)
+      );
+      
+      // Récupérer l'ID de la correction existante si en mode écrasement
+      const existingCorrectionId = getExistingCorrectionId(student.id);
+      
+      // Préparer les données à envoyer
+      const additionalData: Record<string, any> = { 
+        studentId: student.id
+      };
+      
+      // Ajouter le mode d'écrasement si spécifié
+      if (mode === 'overwrite' && existingCorrectionId) {
+        additionalData.overwriteExisting = true;
+        additionalData.existingCorrectionId = existingCorrectionId;
+      }
+      
+      // Ajouter les informations de classe si nécessaire
+      if (assignToClass && selectedClassId) {
+        additionalData.classId = selectedClassId;
+      }
+      
+      // Ajouter les informations de groupe si nécessaire
+      if (useCustomGroup && customGroupName.trim()) {
+        additionalData.groupName = customGroupName.trim();
+      }
+      
+      // Faire la requête de duplication
+      const response = await fetch(`/api/corrections/${correctionId}/duplicate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(additionalData)
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Erreur lors de la duplication');
+      }
+      
+      const data = await response.json();
+      
+      // Update status to success
+      setDuplicationStatuses(prev => 
+        prev.map(s => s.studentId === student.id 
+          ? { ...s, status: 'success', newCorrectionId: data.correctionId } 
+          : s
+        )
+      );
+      
+      // Continuer avec le reste des étudiants
+      const nextStudents = studentsToProcess.filter(s => 
+        s.id !== student.id && 
+        !duplicationStatuses.some(
+          status => status.studentId === s.id && 
+          (status.status === 'success' || status.status === 'processing')
+        )
+      );
+      
+      if (nextStudents.length > 0) {
+        for (const nextStudent of nextStudents) {
+          const result = await processSingleStudent(nextStudent, mode);
+          if (result === null) break; // Si un autre dialogue s'ouvre, arrêter le traitement
+        }
+      }
+      
+      if (nextStudents.length === 0) {
+        setSubmitting(false);
+      }
+      
+      return data.correctionId;
+    } catch (error) {
+      console.error('Error processing student with mode:', error);
+      
+      // Update status to error
+      setDuplicationStatuses(prev => 
+        prev.map(s => s.studentId === student.id 
+          ? { ...s, status: 'error', error: error instanceof Error ? error.message : 'Erreur inconnue' } 
+          : s
+        )
+      );
+      
+      setSubmitting(false);
+      throw error;
+    }
+  };
+
+  // Vérifier et traiter un étudiant individuellement
+  const processSingleStudent = async (student: StudentWithCustomEmail, mode?: 'overwrite' | 'create') => {
+    try {
+      // Vérifier si une correction existe déjà pour cet étudiant et cette activité
+      const existingCorrectionId = getExistingCorrectionId(student.id);
+      // Si une correction existe et qu'aucun mode n'est spécifié, montrer le dialogue de confirmation
+      console.log('Vérification mode:', mode);
+      if (existingCorrectionId) {
+        setCurrentStudentToProcess(student);
+        setShowOverwriteDialog(true);
+        return null; // Attendre la décision de l'utilisateur
+      }
+      
+      // Préparer les données à envoyer
+      const additionalData: Record<string, any> = { 
+        studentId: student.id
+      };
+      
+      // Ajouter le mode d'écrasement si spécifié
+      if (mode === 'overwrite' && existingCorrectionId) {
+        additionalData.overwriteExisting = true;
+        additionalData.existingCorrectionId = existingCorrectionId;
+      }
+      
+      // Ajouter les informations de classe si nécessaire
+      if (assignToClass && selectedClassId) {
+        additionalData.classId = selectedClassId;
+      }
+      
+      // Ajouter les informations de groupe si nécessaire
+      if (useCustomGroup && customGroupName.trim()) {
+        additionalData.groupName = customGroupName.trim();
+      }
+      
+      // Faire la requête de duplication
+      const response = await fetch(`/api/corrections/${correctionId}/duplicate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(additionalData)
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Erreur lors de la duplication');
+      }
+      
+      const data = await response.json();
+      return data.correctionId;
+      
+    } catch (error) {
+      console.error('Error processing student:', error);
+      throw error;
+    }
+  };
+
   return (
     <>
       <Button
@@ -329,6 +578,133 @@ export default function DuplicateCorrection({ correctionId }: DuplicateCorrectio
       >
         Dupliquer cette correction
       </Button>
+      
+      {/* Dialogue de confirmation pour les corrections existantes */}
+      <Dialog 
+        open={showOverwriteDialog} 
+        onClose={() => setShowOverwriteDialog(false)}
+        maxWidth="sm"
+        fullWidth
+        PaperProps={{
+          sx: {
+            borderRadius: 2,
+            boxShadow: '0 8px 24px rgba(0, 0, 0, 0.12)',
+            overflow: 'hidden'
+          }
+        }}
+      >
+        <DialogTitle sx={{ 
+          color: 'error.dark', 
+          py: 2,
+          fontWeight: 'medium',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 1
+        }}>
+          <Box component="span" sx={{ display: 'flex', alignItems: 'center', mr: 1 }}>
+            <ErrorOutlineIcon sx={{ fontSize: 24, mr: 1 }} />
+          </Box>
+          Correction existante détectée
+        </DialogTitle>
+        <DialogContent sx={{ pt: 3, pb: 2 }}>
+          {currentStudentToProcess && (
+            <Box>
+              <Alert 
+                severity="warning" 
+                sx={{ 
+                  mb: 3,
+                  borderRadius: 1,
+                  '& .MuiAlert-icon': {
+                    fontSize: '1.5rem'
+                  }
+                }}
+                variant="outlined"
+              >
+                Une correction pour cette activité existe déjà pour l'étudiant <strong>{currentStudentToProcess.first_name} {currentStudentToProcess.last_name}</strong>.
+              </Alert>
+              <Typography variant="body1" sx={{ mb: 3, fontWeight: 500 }}>
+                Que souhaitez-vous faire ?
+              </Typography>
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                <Box 
+                  sx={{ 
+                    p: 2.5, 
+                    border: '1px solid', 
+                    borderColor: 'warning.light',
+                    bgcolor: 'warning.50',
+                    borderRadius: 2,
+                    transition: 'all 0.2s ease',
+                    '&:hover': {
+                      boxShadow: '0 4px 12px rgba(0, 0, 0, 0.08)',
+                      borderColor: 'warning.main'
+                    }
+                  }}
+                >
+                  <Typography variant="subtitle1" fontWeight="bold" color="warning.dark" gutterBottom>
+                    Écraser la correction existante
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    Les données de la correction existante seront remplacées par les données de la correction que vous dupliquez.
+                  </Typography>
+                </Box>
+                
+                <Box 
+                  sx={{ 
+                    p: 2.5, 
+                    border: '1px solid', 
+                    borderColor: 'primary.light',
+                    bgcolor: 'primary.50',
+                    borderRadius: 2,
+                    transition: 'all 0.2s ease',
+                    '&:hover': {
+                      boxShadow: '0 4px 12px rgba(0, 0, 0, 0.08)',
+                      borderColor: 'primary.main'
+                    }
+                  }}
+                >
+                  <Typography variant="subtitle1" fontWeight="bold" color="primary.dark" gutterBottom>
+                  Ajouter une nouvelle correction
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    Une nouvelle correction sera créée pour cet étudiant, en plus de la correction existante.
+                  </Typography>
+                </Box>
+              </Box>
+            </Box>
+          )}
+        </DialogContent>
+        <DialogActions sx={{ px: 3, py: 2, bgcolor: 'grey.50' }}>
+          <Button 
+            onClick={() => handleOverwriteChoice('create')} 
+            color="primary"
+            variant="outlined"
+            sx={{ 
+              borderRadius: 2, 
+              px: 3,
+              fontWeight: 'medium' 
+            }}
+          >
+            Ajouter une nouvelle
+          </Button>
+            <Button 
+            onClick={() => handleOverwriteChoice('overwrite')} 
+            
+            variant="outlined"
+            sx={{ 
+              color:'warning.dark',
+              borderColor: 'warning.dark',
+              borderRadius: 2, 
+              px: 3,
+              fontWeight: 'medium',
+              '&:hover': {
+              bgcolor: theme => alpha(theme.palette.warning.main, 0.15),
+              }
+            }}
+            >
+            Écraser l'existante
+            </Button>
+        </DialogActions>
+      </Dialog>
       
       <Dialog open={open} onClose={handleClose} maxWidth="md" fullWidth>
         <DialogTitle>Dupliquer la correction pour d'autres étudiants</DialogTitle>
@@ -525,7 +901,7 @@ export default function DuplicateCorrection({ correctionId }: DuplicateCorrectio
               {/* List of selected students with editable emails */}
               {studentsToProcess.length > 0 && (
                 <Box sx={{ mb: 3, mt: 3 }}>
-                  <Typography variant="subtitle2" gutterBottom>
+                  <Typography variant="overline" gutterBottom>
                     Étudiants sélectionnés
                   </Typography>
                   
@@ -533,59 +909,23 @@ export default function DuplicateCorrection({ correctionId }: DuplicateCorrectio
                     {studentsToProcess.map((student) => (
                       <ListItem
                         key={getStudentKey(student.id, 'duplicate')}
-                        secondaryAction={
-                          <IconButton 
-                            edge="end" 
-                            onClick={() => handleRemoveStudent(student.id)}
-                            aria-label="remove"
-                          >
-                            <ClearIcon />
-                          </IconButton>
-                        }
                         sx={{ px: 0 }}
                       >
-                        <ListItemText
-                          primary={
-                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                              <Chip
-                                label={`${student.first_name} ${student.last_name}`}
-                                size="small"
-                                color="primary"
-                                variant="outlined"
-                              />
-                            </Box>
-                          }
-                          secondary={
-                            <TextField
-                              size="small"
-                              value={student.customEmail}
-                              onChange={(e) => handleEmailChange(student.id, e.target.value)}
-                              placeholder="Email"
-                              fullWidth
-                              margin="dense"
-                              sx={{
-                                '& .MuiInputBase-input': {
-                                  color: student.isEmailModified ? 'warning.main' : 'inherit',
-                                  fontWeight: student.isEmailModified ? 'medium' : 'normal',
-                                }
-                              }}
-                              InputProps={{
-                                endAdornment: student.isEmailModified && (
-                                  <Box 
-                                    component="span" 
-                                    sx={{ 
-                                      fontSize: '0.75rem', 
-                                      color: 'warning.main',
-                                      ml: 1
-                                    }}
-                                  >
-                                    (modifié)
-                                  </Box>
-                                )
-                              }}
-                            />
-                          }
-                        />
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                          <Chip
+                            label={`${student.first_name} ${student.last_name}`}
+                            size="small"
+                            color="primary"
+                            variant="outlined"
+                          />
+                      <IconButton 
+                        edge="end"
+                        onClick={() => handleRemoveStudent(student.id)}
+                        aria-label="remove"
+                      >
+                        <ClearIcon color="error"  />
+                      </IconButton>
+                        </Box>
                       </ListItem>
                     ))}
                   </List>
@@ -595,7 +935,7 @@ export default function DuplicateCorrection({ correctionId }: DuplicateCorrectio
               {/* Timeline for duplication progress */}
               {duplicationStatuses.length > 0 && (
                 <Box sx={{ mt: 3, mb: 2 }}>
-                  <Typography variant="subtitle2" gutterBottom>
+                  <Typography variant="overline" gutterBottom>
                     Statut de la duplication
                   </Typography>
                   <Timeline position="right">
@@ -629,6 +969,8 @@ export default function DuplicateCorrection({ correctionId }: DuplicateCorrectio
                                 <IconButton
                                   component={Link}
                                   href={`/corrections/${status.newCorrectionId}`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
                                   size="small"
                                   color="primary"
                                   title="Voir la correction dupliquée"

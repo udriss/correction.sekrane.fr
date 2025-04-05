@@ -1,3 +1,112 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id         Int         @id @default(autoincrement())
+  username   String      @unique
+  password   String
+  name       String?
+  last_login DateTime?
+  createdAt  DateTime    @default(now()) @map("created_at")
+  updatedAt  DateTime    @updatedAt @map("updated_at")
+  activities Activity[]
+  corrections Correction[]
+
+  @@map("users")
+}
+
+model Student {
+  id         Int             @id @default(autoincrement())
+  email      String?         @unique @map("email")
+  firstName  String          @map("first_name")
+  lastName   String          @map("last_name")
+  gender     String          @db.Char(1)
+  createdAt  DateTime        @default(now()) @map("created_at")
+  updatedAt  DateTime        @updatedAt @map("updated_at")
+  
+  // Relations
+  classStudents ClassStudent[]
+  corrections   Correction[]
+  groupStudents GroupStudent[]
+
+  @@map("students")
+}
+
+model Class {
+  id             Int            @id @default(autoincrement())
+  name           String
+  description    String?        @db.Text
+  academicYear   String         @map("academic_year")
+  createdAt      DateTime       @default(now()) @map("created_at")
+  updatedAt      DateTime       @updatedAt @map("updated_at")
+  nbreSubclasses Int?           @map("nbre_subclasses")
+  
+  // Relations
+  classStudents   ClassStudent[]
+  classActivities ClassActivity[]
+  corrections     Correction[]
+
+  @@map("classes")
+}
+
+model ClassStudent {
+  id         Int       @id @default(autoincrement())
+  classId    Int       @map("class_id")
+  studentId  Int       @map("student_id")
+  createdAt  DateTime  @default(now()) @map("created_at")
+  updatedAt  DateTime  @updatedAt @map("updated_at")
+  subClass   Int?      @map("sub_class")
+  
+  // Relations
+  class      Class     @relation(fields: [classId], references: [id], onDelete: Cascade)
+  student    Student   @relation(fields: [studentId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@unique([classId, studentId])
+  @@index([subClass], name: "idx_class_students_sub_class")
+  @@map("class_students")
+}
+
+model Activity {
+  id                Int               @id @default(autoincrement())
+  name              String
+  content           String?           @db.Text
+  createdAt         DateTime          @default(now()) @map("created_at")
+  updatedAt         DateTime          @updatedAt @map("updated_at")
+  experimentalPoints Int              @default(5) @map("experimental_points")
+  theoreticalPoints Int               @default(15) @map("theoretical_points")
+  userId            Int?              @map("user_id")
+  
+  // Relations
+  user              User?             @relation(fields: [userId], references: [id])
+  fragments         Fragment[]
+  classActivities   ClassActivity[]
+  corrections       Correction[]
+  correctionGroups  CorrectionGroup[]
+
+  @@map("activities")
+}
+
+model ClassActivity {
+  id         Int       @id @default(autoincrement())
+  classId    Int       @map("class_id")
+  activityId Int       @map("activity_id")
+  createdAt  DateTime  @default(now()) @map("created_at")
+  updatedAt  DateTime  @updatedAt @map("updated_at")
+  
+  // Relations
+  class      Class     @relation(fields: [classId], references: [id], onDelete: Cascade)
+  activity   Activity  @relation(fields: [activityId], references: [id], onDelete: Cascade)
+
+  @@unique([classId, activityId])
+  @@map("class_activities")
+}
+
 model Category {
   id        Int       @id @default(autoincrement())
   name      String
@@ -11,26 +120,32 @@ model Category {
 }
 
 model Fragment {
-  id         Int       @id @default(autoincrement())
-  content    String    @db.Text
-  order      Int       @default(0)
-  activityId Int       @map("activity_id")
-  createdAt  DateTime  @default(now()) @map("created_at")
-  updatedAt  DateTime  @updatedAt @map("updated_at")
+  id           Int       @id @default(autoincrement())
+  activityId   Int?      @map("activity_id")
+  content      String    @db.Text
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+  positionOrder Int?     @default(0) @map("position_order")
+  tags         Json?
+  userId       String?   @map("user_id")
   
   // Relation avec Activity
-  activity   Activity  @relation(fields: [activityId], references: [id], onDelete: Cascade)
+  activity     Activity? @relation(fields: [activityId], references: [id], onDelete: Cascade)
   
   // Relation many-to-many avec Category
-  categories FragmentsOnCategories[]
+  categories   FragmentsOnCategories[]
+  
+  // Relation avec CorrectionFragment
+  correctionFragments CorrectionFragment[]
 
   @@map("fragments")
 }
 
-// Table de jointure pour la relation many-to-many entre Fragment et Category
 model FragmentsOnCategories {
   fragmentId Int      @map("fragment_id")
   categoryId Int      @map("category_id")
+  
+  // Relations
   fragment   Fragment @relation(fields: [fragmentId], references: [id], onDelete: Cascade)
   category   Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
 
@@ -40,27 +155,117 @@ model FragmentsOnCategories {
 
 model Correction {
   id                      Int       @id @default(autoincrement())
+  activityId              Int       @map("activity_id")
   content                 String?   @db.Text
-  student_id              Int?
-  class_id                Int?
-  activity_id             Int
-  teacher_id              Int
-  grade                   Float?
-  experimental_points_earned Float?
-  theoretical_points_earned Float?
-  status                  String?   @default("pending")
-  submission_date         DateTime?
-  sub_class               String?
-  created_at              DateTime  @default(now())
-  updated_at              DateTime  @updatedAt
+  contentData             Json?     @map("content_data")
+  createdAt               DateTime  @default(now()) @map("created_at")
+  updatedAt               DateTime  @updatedAt @map("updated_at")
+  grade                   Decimal?  @db.Decimal(4, 2)
+  penalty                 Decimal?  @db.Decimal(4, 2)
+  deadline                DateTime? @db.Date
+  submissionDate          DateTime? @map("submission_date") @db.Date
+  experimentalPointsEarned Decimal?  @map("experimental_points_earned") @db.Decimal(4, 2)
+  theoreticalPointsEarned  Decimal?  @map("theoretical_points_earned") @db.Decimal(4, 2)
+  groupId                 Int?      @map("group_id")
+  classId                 Int?      @map("class_id")
+  studentId               Int?      @map("student_id")
+  userId                  Int?      @map("user_id")
   
-  student                 Student?  @relation(fields: [student_id], references: [id])
-  class                   Class?    @relation(fields: [class_id], references: [id])
-  activity                Activity  @relation(fields: [activity_id], references: [id])
-  teacher                 User      @relation(fields: [teacher_id], references: [id])
+  // Relations
+  activity                Activity  @relation(fields: [activityId], references: [id], onDelete: Cascade)
+  class                   Class?    @relation(fields: [classId], references: [id], onDelete: SetNull)
+  student                 Student?  @relation(fields: [studentId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  user                    User?     @relation(fields: [userId], references: [id])
+  correctionFragments     CorrectionFragment[]
+  shareCodes              ShareCode[]
+  correctionGroupItems    CorrectionGroupItem[]
+
+  @@index([activityId])
+  @@index([classId])
+  @@index([studentId])
+  @@map("corrections")
+}
+
+model CorrectionGroup {
+  id          Int       @id @default(autoincrement())
+  activityId  Int       @map("activity_id")
+  name        String
+  description String?   @db.Text
+  createdAt   DateTime  @default(now()) @map("created_at")
   
-  @@index([student_id])
-  @@index([class_id])
-  @@index([activity_id])
-  @@index([teacher_id])
+  // Relations
+  activity    Activity  @relation(fields: [activityId], references: [id], onDelete: Cascade)
+  items       CorrectionGroupItem[]
+
+  @@map("correction_groups")
+}
+
+model CorrectionGroupItem {
+  groupId      Int            @map("group_id")
+  correctionId Int            @map("correction_id")
+  
+  // Relations
+  group        CorrectionGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  correction   Correction     @relation(fields: [correctionId], references: [id], onDelete: Cascade)
+
+  @@id([groupId, correctionId])
+  @@map("correction_group_items")
+}
+
+model CorrectionFragment {
+  id            Int       @id @default(autoincrement())
+  correctionId  Int       @map("correction_id")
+  fragmentId    Int       @map("fragment_id")
+  position      Int?      @default(0)
+  customContent String?   @map("custom_content") @db.Text
+  createdAt     DateTime  @default(now()) @map("created_at")
+  
+  // Relations
+  correction    Correction @relation(fields: [correctionId], references: [id], onDelete: Cascade)
+  fragment      Fragment   @relation(fields: [fragmentId], references: [id])
+
+  @@map("correction_fragments")
+}
+
+model Group {
+  id          Int           @id @default(autoincrement())
+  name        String        @unique(map: "unique_group_name")
+  description String?       @db.Text
+  createdAt   DateTime      @default(now()) @map("created_at")
+  updatedAt   DateTime      @updatedAt @map("updated_at")
+  
+  // Relations
+  students    GroupStudent[]
+
+  @@map("groups")
+}
+
+model GroupStudent {
+  id         Int       @id @default(autoincrement())
+  groupId    Int       @map("group_id")
+  studentId  Int       @map("student_id")
+  createdAt  DateTime  @default(now()) @map("created_at")
+  updatedAt  DateTime  @updatedAt @map("updated_at")
+  
+  // Relations
+  group      Group     @relation(fields: [groupId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  student    Student   @relation(fields: [studentId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@unique([groupId, studentId], map: "unique_group_student")
+  @@map("group_students")
+}
+
+model ShareCode {
+  id           Int       @id @default(autoincrement())
+  code         String    @unique
+  correctionId Int       @map("correction_id")
+  createdAt    DateTime? @default(now()) @map("created_at")
+  expiresAt    DateTime? @map("expires_at")
+  isActive     Boolean?  @default(true) @map("is_active")
+  
+  // Relations
+  correction   Correction @relation(fields: [correctionId], references: [id], onDelete: Cascade)
+
+  @@index([code])
+  @@map("share_codes")
 }

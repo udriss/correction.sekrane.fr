@@ -34,7 +34,13 @@ export async function POST(
     
     // Récupérer les données de la requête
     const body = await req.json();
-    const { studentId, classId, groupName } = body;
+    const { 
+      studentId, 
+      classId, 
+      groupName, 
+      overwriteExisting, 
+      existingCorrectionId 
+    } = body;
     
     if (!studentId) {
       return NextResponse.json(
@@ -57,61 +63,16 @@ export async function POST(
       
       const originalCorrection = (correctionRows as any[])[0];
       
-      // 2. Créer la nouvelle correction avec les données de l'étudiant spécifié
-      const [insertResult] = await connection.query(
-        `INSERT INTO corrections (
-          activity_id, student_id, content, grade, penalty, 
-          created_at, updated_at, name, deadline, submission_date,
-          theoretical_points_earned, experimental_points_earned, 
-          feedback, status, teacher_id
-        ) 
-        VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        [
-          originalCorrection.activity_id,
-          studentId,
-          originalCorrection.content,
-          originalCorrection.grade,
-          originalCorrection.penalty,
-          originalCorrection.name,
-          originalCorrection.deadline,
-          originalCorrection.submission_date,
-          originalCorrection.theoretical_points_earned,
-          originalCorrection.experimental_points_earned,
-          originalCorrection.feedback,
-          originalCorrection.status,
-          userId
-        ]
-      );
+      let newCorrectionId;
+      let groupId = null;
       
-      const newCorrectionId = (insertResult as any).insertId;
-      
-      // 3. Si une classe est spécifiée, associer l'étudiant à cette classe
-      if (classId) {
-        // Vérifier si l'association existe déjà
-        const [existingAssociation] = await connection.query(
-          `SELECT * FROM class_students WHERE student_id = ? AND class_id = ?`,
-          [studentId, classId]
-        );
-        
-        if ((existingAssociation as any[]).length === 0) {
-          // Créer l'association
-          await connection.query(
-            `INSERT INTO class_students (student_id, class_id, created_at, updated_at)
-            VALUES (?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
-            [studentId, classId]
-          );
-        }
-      }
-      
-      // 4. Si un groupe est spécifié, créer ou trouver le groupe et associer l'étudiant
+      // Gérer le cas où un nom de groupe est fourni
       if (groupName) {
         // Vérifier si le groupe existe déjà
         const [existingGroups] = await connection.query(
           `SELECT id FROM groups WHERE name = ?`,
           [groupName]
         );
-        
-        let groupId;
         
         if ((existingGroups as any[]).length > 0) {
           // Utiliser le groupe existant
@@ -139,6 +100,86 @@ export async function POST(
             `INSERT INTO group_students (student_id, group_id, created_at, updated_at)
             VALUES (?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
             [studentId, groupId]
+          );
+        }
+      }
+      
+      // 2. Vérifier si l'utilisateur souhaite écraser une correction existante
+      if (overwriteExisting && existingCorrectionId) {
+        // Mettre à jour la correction existante avec les nouvelles données
+        await connection.query(
+          `UPDATE corrections SET 
+            content = ?, 
+            content_data = ?,
+            grade = ?, 
+            penalty = ?, 
+            deadline = ?, 
+            submission_date = ?, 
+            theoretical_points_earned = ?, 
+            experimental_points_earned = ?,
+            class_id = ?,
+            group_id = ?,
+            updated_at = CURRENT_TIMESTAMP
+          WHERE id = ?`,
+          [
+            originalCorrection.content,
+            JSON.stringify(originalCorrection.content_data), // Convertir en JSON string comme pour l'INSERT
+            originalCorrection.grade,
+            originalCorrection.penalty,
+            originalCorrection.deadline,
+            originalCorrection.submission_date,
+            originalCorrection.theoretical_points_earned,
+            originalCorrection.experimental_points_earned,
+            classId || originalCorrection.class_id,
+            groupId || originalCorrection.group_id,
+            existingCorrectionId
+          ]
+        );
+        
+        newCorrectionId = existingCorrectionId;
+      } else {
+        // Créer une nouvelle correction avec les données de l'étudiant spécifié
+        const [insertResult] = await connection.query(
+          `INSERT INTO corrections (
+            activity_id, student_id, content, content_data, grade, penalty, 
+            created_at, updated_at, deadline, submission_date,
+            theoretical_points_earned, experimental_points_earned,
+            class_id, group_id
+          ) 
+          VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, ?, ?, ?, ?, ?, ?)`,
+          [
+            originalCorrection.activity_id,
+            studentId,
+            originalCorrection.content,
+            JSON.stringify(originalCorrection.content_data), // Convertir en JSON string
+            originalCorrection.grade,
+            originalCorrection.penalty,
+            originalCorrection.deadline,
+            originalCorrection.submission_date,
+            originalCorrection.theoretical_points_earned,
+            originalCorrection.experimental_points_earned,
+            classId || null,
+            groupId || null
+          ]
+        );
+        
+        newCorrectionId = (insertResult as any).insertId;
+      }
+      
+      // Si une classe est spécifiée, associer l'étudiant à cette classe
+      if (classId) {
+        // Vérifier si l'association existe déjà
+        const [existingAssociation] = await connection.query(
+          `SELECT * FROM class_students WHERE student_id = ? AND class_id = ?`,
+          [studentId, classId]
+        );
+        
+        if ((existingAssociation as any[]).length === 0) {
+          // Créer l'association
+          await connection.query(
+            `INSERT INTO class_students (student_id, class_id, created_at, updated_at)
+            VALUES (?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
+            [studentId, classId]
           );
         }
       }

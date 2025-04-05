@@ -1,7 +1,7 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Box, Alert, Paper, Typography, Button, Accordion, AccordionSummary, 
-  AccordionDetails, Chip, Divider
+  AccordionDetails, Chip, Divider, Card
 } from '@mui/material';
 import CancelIcon from '@mui/icons-material/Cancel';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
@@ -9,6 +9,10 @@ import SchoolIcon from '@mui/icons-material/School';
 import CorrectionCard from '@/components/allCorrections/CorrectionCard';
 import Grid from '@mui/material/Grid';
 import { Correction as ProviderCorrection } from '@/app/components/CorrectionsDataProvider';
+import { getBatchShareCodes } from '@/lib/services/shareService';
+import dayjs from 'dayjs';
+import 'dayjs/locale/fr';
+import { alpha } from '@mui/material/styles';
 
 interface ClassesListProps {
   filteredCorrections: ProviderCorrection[];
@@ -16,6 +20,8 @@ interface ClassesListProps {
   activeFilters: string[];
   handleClearAllFilters: () => void;
   getGradeColor: (grade: number) => string;
+  highlightedIds?: string[]; // IDs explicitement mis en évidence
+  recentFilter?: boolean; // Indique si le filtre "recent" est actif
 }
 
 const ClassesList: React.FC<ClassesListProps> = ({
@@ -23,8 +29,44 @@ const ClassesList: React.FC<ClassesListProps> = ({
   error,
   activeFilters,
   handleClearAllFilters,
-  getGradeColor
+  getGradeColor,
+  highlightedIds = [], // Valeur par défaut vide
+  recentFilter = false // Par défaut, le filtre recent n'est pas actif
 }) => {
+  const [shareCodesMap, setShareCodesMap] = useState<Map<string, string>>(new Map());
+  
+  // Chargement en masse des codes de partage quand les corrections changent
+  useEffect(() => {
+    const loadShareCodes = async () => {
+      if (filteredCorrections.length > 0) {
+        const correctionIds = filteredCorrections.map(c => c.id.toString());
+        const shareCodes = await getBatchShareCodes(correctionIds);
+        setShareCodesMap(shareCodes);
+      } else {
+        setShareCodesMap(new Map());
+      }
+    };
+    
+    loadShareCodes();
+  }, [filteredCorrections]);
+  
+  // Fonction pour déterminer si une correction doit être mise en évidence
+  const shouldHighlight = (correction: ProviderCorrection) => {
+    // Si l'ID est explicitement dans la liste des IDs à mettre en évidence
+    if (highlightedIds.includes(correction.id.toString())) {
+      return true;
+    }
+    
+    // Si le filtre "recent" est actif, vérifier si c'est une correction récente (24h)
+    if (recentFilter) {
+      const recentDate = dayjs().subtract(24, 'hour');
+      const correctionDate = dayjs(correction.created_at || correction.submission_date);
+      return correctionDate.isAfter(recentDate);
+    }
+    
+    return false;
+  };
+  
   // Grouper les corrections par classe
   const correctionsByClass = filteredCorrections.reduce((acc, correction) => {
     const classId = correction.class_id;
@@ -107,15 +149,24 @@ const ClassesList: React.FC<ClassesListProps> = ({
                 <Divider sx={{ mb: 2 }} />
                 <Grid container spacing={3}>
                 
-                  {correctionsByClass[classId].corrections.map(correction => (
-                    <Grid size={{ xs: 12, sm: 6, md: 4 }} key={correction.id}>
-                    <CorrectionCard 
-                      key={correction.id} 
-                      correction={correction} 
-                      getGradeColor={getGradeColor} 
-                    />
-                    </Grid>
-                  ))}
+                  {correctionsByClass[classId].corrections.map((correction,) => {
+                    // Récupérer le code de partage préchargé pour cette correction
+                    const preloadedShareCode = shareCodesMap.get(correction.id.toString());
+                    const isHighlighted = shouldHighlight(correction);
+                    console.log('isHighlighted CLASSE:', isHighlighted);
+
+                    return (
+                      <Grid size={{ xs: 12, sm: 6, md: 4 }} key={correction.id}>
+                          <CorrectionCard 
+                          key={correction.id} 
+                          correction={correction} 
+                          getGradeColor={getGradeColor} 
+                          preloadedShareCode={preloadedShareCode}
+                          highlighted={isHighlighted}
+                        />
+                      </Grid>
+                    );
+                  })}
                 </Grid>
               </AccordionDetails>
             </Accordion>

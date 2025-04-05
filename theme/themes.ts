@@ -8,7 +8,7 @@ const themeGradients = {
     success: 'linear-gradient(135deg, #2e7d32, #66bb6a)',
     warning: 'linear-gradient(135deg, #ed6c02, #ffa726)',
     error: 'linear-gradient(135deg, #d32f2f, #ef5350)',
-    info: 'linear-gradient(135deg, #0288d1, #29b6f6)',
+    info: 'linear-gradient(135deg,rgb(147, 204, 236),rgb(76, 204, 243))',
   },
   dark: {
     primary: 'linear-gradient(135deg, #1f35b2, #3f51b5)',
@@ -16,7 +16,7 @@ const themeGradients = {
     success: 'linear-gradient(135deg, #1b5e20, #388e3c)',
     warning: 'linear-gradient(135deg, #e65100, #ef6c00)',
     error: 'linear-gradient(135deg, #b71c1c, #c62828)',
-    info: 'linear-gradient(135deg, #01579b, #0277bd)',
+    info: 'linear-gradient(135deg,rgb(11, 75, 123),rgb(1, 110, 140)89, 164))',
   },
   intermediate: {
     primary: 'linear-gradient(135deg,rgb(156, 194, 255),rgb(97, 231, 255))',
@@ -24,7 +24,7 @@ const themeGradients = {
     success: 'linear-gradient(135deg, #10b981, #34d399)',
     warning: 'linear-gradient(135deg, #f59e0b, #fcd34d)',
     error: 'linear-gradient(135deg, #ef4444, #f87171)',
-    info: 'linear-gradient(135deg, #0ea5e9, #38bdf8)',
+    info: 'linear-gradient(135deg,rgb(143, 190, 216),rgba(24, 180, 223, 0.71))',
   },
   default: {
     primary: 'linear-gradient(135deg, #1976d2, #42a5f5)',
@@ -32,7 +32,7 @@ const themeGradients = {
     success: 'linear-gradient(135deg, #2e7d32, #66bb6a)',
     warning: 'linear-gradient(135deg, #ed6c02, #ffa726)',
     error: 'linear-gradient(135deg, #d32f2f, #ef5350)',
-    info: 'linear-gradient(135deg, #0288d1, #29b6f6)',
+    info: 'linear-gradient(135deg,rgb(143, 190, 216),rgba(24, 180, 223, 0.71))',
   },
 };
 

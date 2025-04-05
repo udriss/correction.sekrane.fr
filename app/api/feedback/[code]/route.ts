@@ -35,10 +35,10 @@ export async function GET(
       // Récupérer la correction avec les notes et calculer le grade si nécessaire
       const [rows] = await connection.query(
         `SELECT c.*, a.name as activity_name, a.experimental_points, a.theoretical_points,
-                CONCAT(s.first_name, ' ', s.last_name) as student_name,
-                IFNULL(c.grade, (c.experimental_points_earned + c.theoretical_points_earned)) as grade, 
-                IFNULL(c.penalty, 0) as penalty,
-                (IFNULL(c.grade, (c.experimental_points_earned + c.theoretical_points_earned)) - IFNULL(c.penalty, 0)) as final_grade
+            CONCAT(s.first_name, ' ', LEFT(s.last_name, 1), '.') as student_name,
+            IFNULL(c.grade, (c.experimental_points_earned + c.theoretical_points_earned)) as grade, 
+            IFNULL(c.penalty, 0) as penalty,
+            (IFNULL(c.grade, (c.experimental_points_earned + c.theoretical_points_earned)) - IFNULL(c.penalty, 0)) as final_grade
          FROM corrections c 
          JOIN activities a ON c.activity_id = a.id 
          LEFT JOIN students s ON c.student_id = s.id

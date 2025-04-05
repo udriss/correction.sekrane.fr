@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Box, Alert, Paper, Typography, Button, Grid, Card, CardContent, Chip
 } from '@mui/material';
@@ -7,6 +7,7 @@ import { alpha } from '@mui/material/styles';
 import EmptyState from '@/components/ui/EmptyState';
 import { Correction as ProviderCorrection } from '@/app/components/CorrectionsDataProvider';
 import dayjs from 'dayjs';
+import { getBatchShareCodes } from '@/lib/services/shareService';
 
 // Utiliser le type du provider ou ajuster votre interface
 interface CorrectionsListProps {
@@ -28,6 +29,23 @@ const CorrectionsList: React.FC<CorrectionsListProps> = ({
   highlightedIds = [], // Valeur par défaut vide
   recentFilter = false // Par défaut, le filtre recent n'est pas actif
 }) => {
+  const [shareCodesMap, setShareCodesMap] = useState<Map<string, string>>(new Map());
+  
+  // Chargement en masse des codes de partage quand les corrections changent
+  useEffect(() => {
+    const loadShareCodes = async () => {
+      if (filteredCorrections.length > 0) {
+        const correctionIds = filteredCorrections.map(c => c.id.toString());
+        const shareCodes = await getBatchShareCodes(correctionIds);
+        setShareCodesMap(shareCodes);
+      } else {
+        setShareCodesMap(new Map());
+      }
+    };
+    
+    loadShareCodes();
+  }, [filteredCorrections]);
+
   if (error) {
     return (
       <Alert severity="error" variant="filled">
@@ -72,35 +90,22 @@ const CorrectionsList: React.FC<CorrectionsListProps> = ({
   return (
     <Box>
       <Grid container spacing={2}>
-        {filteredCorrections.map((correction) => {
+        {filteredCorrections.map((correction, index) => {
           // Vérifier si cette correction doit être mise en évidence
           const isHighlighted = shouldHighlight(correction);
-          
+          // Récupérer le code de partage préchargé pour cette correction
+          const preloadedShareCode = shareCodesMap.get(correction.id.toString());
+          console.log('isHighlighted CORRECTION:', isHighlighted);
           return (
             <Grid size={{ xs: 12, sm: 6, md: 4 }} key={correction.id}>
-                {/* Badge de nouvelle correction si mise en évidence */}
-                {isHighlighted && (
-                  <Chip
-                    label="Nouveau"
-                    color="secondary"
-                    size="small"
-                    sx={{
-                      position: 'absolute',
-                      top: 10,
-                      right: 10,
-                      zIndex: 1,
-                      fontWeight: 'bold'
-                    }}
-                  />
-                )}
-                
-                {/* Contenu existant de la carte */}
-                  <CorrectionCard 
-                    key={correction.id} 
-                    correction={correction} 
-                    getGradeColor={getGradeColor} 
-                    highlighted={isHighlighted}
-                  />
+                {/* Contenu de la carte avec le code de partage préchargé */}
+                <CorrectionCard 
+                  key={correction.id} 
+                  correction={correction} 
+                  getGradeColor={getGradeColor} 
+                  highlighted={isHighlighted}
+                  preloadedShareCode={preloadedShareCode}
+                />
             </Grid>
           );
         })}

@@ -10,7 +10,7 @@ const gradientMap = {
   success: 'linear-gradient(45deg, #2e7d32 30%, #4caf50 90%)',
   error: 'linear-gradient(45deg, #d32f2f 30%, #f44336 90%)',
   warning: 'linear-gradient(45deg, #ed6c02 30%, #ff9800 90%)',
-  info: 'linear-gradient(45deg, #0288d1 30%, #03a9f4 90%)',
+  info: 'linear-gradient(45deg,rgb(141, 209, 226) 30%,rgba(28, 163, 225, 0.72) 90%)',
 };
 
 type GradientVariant = 'primary' | 'secondary' | 'success' | 'error' | 'warning' | 'info';

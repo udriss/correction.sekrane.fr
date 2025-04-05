@@ -25,31 +25,27 @@ interface CorrectionCardProps {
   correction: Correction;
   getGradeColor: (grade: number) => string;
   highlighted?: boolean;
+  preloadedShareCode?: string; // Nouveau prop pour recevoir un code de partage pré-chargé
 }
+
+
 
 const CorrectionCard: React.FC<CorrectionCardProps> = ({ 
   correction, 
   getGradeColor,
-  highlighted = false
+  highlighted = false,
+  preloadedShareCode,
 }) => {
+  // Utiliser useEffect pour s'assurer que shareCode est mis à jour quand preloadedShareCode change
   const [shareCode, setShareCode] = useState<string | null>(null);
   const [shareModalOpen, setShareModalOpen] = useState(false);
   
-  // Check for existing share code on component mount
+  // S'assurer que shareCode est mis à jour lorsque preloadedShareCode change
   useEffect(() => {
-    const checkExistingShareCode = async () => {
-      try {
-        const response = await shareService.getExistingShareCode(correction.id.toString());
-        if (response.exists && response.code) {
-          setShareCode(response.code);
-        }
-      } catch (error) {
-        console.error('Error checking share code:', error);
-      }
-    };
-    
-    checkExistingShareCode();
-  }, [correction.id]);
+    if (preloadedShareCode) {
+      setShareCode(preloadedShareCode);
+    }
+  }, [preloadedShareCode]);
   
   // Handle share modal events
   const handleOpenShareModal = () => {
@@ -65,7 +61,13 @@ const CorrectionCard: React.FC<CorrectionCardProps> = ({
   };
   
   const formattedDate = correction.submission_date 
-    ? format(new Date(correction.submission_date), 'PPP', { locale: fr })
+    ? format(
+        new Date(correction.submission_date), 
+        new Date(correction.submission_date).getHours() === 0 && new Date(correction.submission_date).getMinutes() === 0
+          ? 'PPP'
+          : 'PPP à HH:mm',
+        { locale: fr }
+      )
     : 'Date inconnue';
     
   // Calculate normalized grade (0-20)
@@ -75,69 +77,82 @@ const CorrectionCard: React.FC<CorrectionCardProps> = ({
   
   const gradeColor = getGradeColor(normalizedGrade);
 
+
   return (
     <Card 
       elevation={highlighted ? 2 : 1} 
       sx={{ 
-        height: '100%', 
-        display: 'flex', 
-        flexDirection: 'column',
-        transition: 'transform 0.2s, box-shadow 0.2s',
-        position: 'relative',
-        overflow: 'visible',
+      padding: 1,
+      height: '100%', 
+      display: 'flex', 
+      flexDirection: 'column',
+      transition: 'transform 0.2s, box-shadow 0.2s',
+      position: 'relative',
+      overflow: 'visible',
         '&:hover': {
           boxShadow: 3,
         },
-        border: highlighted ? 2 : 20,
-        borderColor: highlighted ? 'success.main' : 'transparent',
+        border: highlighted ? 4 : 0,
+        borderColor: highlighted ? 'secondary.main' : 'transparent',
       }}
     >
-      {highlighted && (
-        <Chip
-          label="Nouvelle correction"
-          color="success"
-          size="small"
-          sx={{ 
-            position: 'absolute', 
-            top: -12, 
-            right: 16, 
-            fontWeight: 'bold',
-            zIndex: 1
-          }}
-        />
-      )}
+
       
       <Box 
         sx={{ 
           display: 'flex', 
           justifyContent: 'space-between', 
-          alignItems: 'center',
-          p: 2,
-          bgcolor: `${gradeColor}.main`,
-          color: 'white'
+          color: 'text.primary',
         }}
       >
-        <Box sx={{ display: 'flex', alignItems: 'center' }}>
+        <Box sx={{ 
+          display: 'flex', 
+          alignItems: 'center',
+           bgcolor: `${gradeColor}.main`, 
+           p: 1, borderRadius: 2, 
+           color: 'white' }}>
           <Typography variant="h5" component="div" fontWeight="bold">
-            {correction.grade.toFixed(1)}
+        {correction.grade.toFixed(1)}
           </Typography>
-            <Typography variant="body2" sx={{ ml: 1, opacity: 0.9 }}>
-            / {correction.experimental_points !== undefined && correction.theoretical_points !== undefined 
-              ? (correction.experimental_points + correction.theoretical_points).toFixed(1)
-              : '-'}
-            </Typography>
+        <Typography variant="body2" sx={{ ml: 1, opacity: 0.9 }}>
+        / {correction.experimental_points !== undefined && correction.theoretical_points !== undefined 
+          ? (correction.experimental_points + correction.theoretical_points).toFixed(1)
+          : '-'}
+        </Typography>
         </Box>
+        <Box sx={{
+          display: 'flex',
+          alignItems: 'flex-end',
+          justifyContent: 'flex-end',
+          flexGrow: 1,
+          flexDirection: 'column',
+        }}
+          >
         <Typography variant="caption" sx={{ fontWeight: 500, opacity: 0.9 }}>
           {formattedDate}
         </Typography>
+        {highlighted && (
+        <Chip
+          label="Nouveau"
+          color="secondary"
+          size="small"
+          sx={{ 
+            fontWeight: 'bold',
+            zIndex: 1,
+            maxWidth: 'auto',
+            mt: 0.5
+          }}
+        />
+            )}
+            </Box>
       </Box>
       
-      <CardContent sx={{ flexGrow: 1, pt: 2 }}>
+      <CardContent sx={{ flexGrow: 1, p:0, pt:1 }}>
         <Typography variant="h6" gutterBottom noWrap title={correction.activity_name}>
           {correction.activity_name || 'Activité sans nom'}
         </Typography>
         
-        <Box sx={{ mb: 2 }}>
+        <Box sx={{ mb: 2, display: 'flex', flexDirection: 'column' }}>
           {correction.student_name && (
             <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
               <PersonIcon fontSize="small" sx={{ mr: 1, color: 'text.secondary' }} />
@@ -164,7 +179,7 @@ const CorrectionCard: React.FC<CorrectionCardProps> = ({
             {correction.experimental_points !== undefined && (
               <Chip 
                 size="small" 
-                label={`Exp: ${correction.experimental_points.toFixed(1)}`} 
+                label={`Exp : ${correction.experimental_points.toFixed(1)}`} 
                 color="info"
                 variant="outlined"
               />
@@ -172,7 +187,7 @@ const CorrectionCard: React.FC<CorrectionCardProps> = ({
             {correction.theoretical_points !== undefined && (
               <Chip 
                 size="small" 
-                label={`Theo: ${correction.theoretical_points.toFixed(1)}`} 
+                label={`Theo : ${correction.theoretical_points.toFixed(1)}`} 
                 color="secondary"
                 variant="outlined"
               />
@@ -181,16 +196,18 @@ const CorrectionCard: React.FC<CorrectionCardProps> = ({
         )}
       </CardContent>
       
-      <CardActions sx={{ p: 2, pt: 0, justifyContent: 'flex-end' }}>
+      <CardActions sx={{ p: 0, justifyContent: 'flex-end' }}>
         {shareCode ? (
-          <Tooltip title="Voir la correction">
+          <Tooltip title="Voir le feedback">
             <IconButton 
               component={Link} 
               href={`/feedback/${shareCode}`}
               color="primary"
-              size="small"
+              size="medium"
+              target="_blank"
+              rel="noopener noreferrer"
             >
-              <VisibilityIcon />
+              <VisibilityIcon fontSize='medium' />
             </IconButton>
           </Tooltip>
         ) : (
@@ -198,9 +215,9 @@ const CorrectionCard: React.FC<CorrectionCardProps> = ({
             <IconButton 
               onClick={handleOpenShareModal}
               color="primary"
-              size="small"
+              size="medium"
             >
-              <ShareIcon />
+              <ShareIcon fontSize='medium' />
             </IconButton>
           </Tooltip>
         )}
@@ -209,9 +226,11 @@ const CorrectionCard: React.FC<CorrectionCardProps> = ({
             component={Link} 
             href={`/corrections/${correction.id}`}
             color="secondary"
-            size="small"
+            size="medium"
+            target="_blank"
+            rel="noopener noreferrer"
           >
-            <EditIcon />
+            <EditIcon fontSize='medium' />
           </IconButton>
         </Tooltip>
       </CardActions>

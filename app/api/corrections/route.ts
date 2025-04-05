@@ -99,7 +99,7 @@ export async function POST(request: Request) {
         grade: null as number | null, // Will calculate below
         penalty: data.penalty || null,
         deadline: data.deadline || new Date().toISOString().split('T')[0],
-        submission_date: data.submission_date || new Date().toISOString().split('T')[0],
+        submission_date: data.submission_date || new Date().toISOString(), // Now includes time
         experimental_points_earned: parseFloat(data.experimental_points_earned) || 0,
         theoretical_points_earned: parseFloat(data.theoretical_points_earned) || 0,
         class_id: data.class_id ? parseInt(data.class_id) : null,

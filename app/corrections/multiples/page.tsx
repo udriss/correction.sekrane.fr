@@ -30,6 +30,7 @@ import AddIcon from '@mui/icons-material/Add';
 import EditNoteIcon from '@mui/icons-material/EditNote';
 import Link from 'next/link';
 import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
+import PublishedWithChangesIcon from '@mui/icons-material/PublishedWithChanges';
 
 import { Activity } from '@/lib/activity';
 import LoadingSpinner from '@/components/LoadingSpinner';
@@ -442,6 +443,18 @@ export default function MultipleCorrections() {
                 container
                 direction={{ xs: 'row', md: 'column', lg: 'column' }}
                 spacing={2}>
+
+            <Button
+              variant="outlined"
+              color="error"
+              endIcon={<PublishedWithChangesIcon />}
+              component={Link}
+              href={`/activities/${activityId}`}
+              fullWidth
+              sx={{ mb:.5}}
+            >
+              Modifier cette activité
+            </Button>
             <Button
               variant="outlined"
               color="success"

@@ -717,6 +717,7 @@ function CorrectionsContent() {
           error={error}
           activeFilters={activeFilters}
           handleClearAllFilters={handleClearAllFilters}
+          highlightedIds={searchParams?.get('highlight')?.split(',').filter(Boolean) || []}
           getGradeColor={getGradeColor}
         />
       )}

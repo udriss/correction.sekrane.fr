@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Box, Alert, Paper, Typography, Button, Accordion, AccordionSummary, 
   AccordionDetails, Chip, Divider, Avatar, Card
@@ -10,6 +10,7 @@ import Grid from '@mui/material/Grid';
 import { Correction as ProviderCorrection } from '@/app/components/CorrectionsDataProvider';
 import dayjs from 'dayjs';
 import { alpha } from '@mui/material/styles';
+import { getBatchShareCodes } from '@/lib/services/shareService';
 
 interface StudentsListProps {
   filteredCorrections: ProviderCorrection[];
@@ -30,6 +31,23 @@ const StudentsList: React.FC<StudentsListProps> = ({
   highlightedIds = [],
   recentFilter = false // Valeur par défaut false
 }) => {
+  const [shareCodesMap, setShareCodesMap] = useState<Map<string, string>>(new Map());
+  
+  // Chargement en masse des codes de partage quand les corrections changent
+  useEffect(() => {
+    const loadShareCodes = async () => {
+      if (filteredCorrections.length > 0) {
+        const correctionIds = filteredCorrections.map(c => c.id.toString());
+        const shareCodes = await getBatchShareCodes(correctionIds);
+        setShareCodesMap(shareCodes);
+      } else {
+        setShareCodesMap(new Map());
+      }
+    };
+    
+    loadShareCodes();
+  }, [filteredCorrections]);
+
   // Fonction pour déterminer si une correction doit être mise en évidence
   const shouldHighlight = (correction: ProviderCorrection) => {
     // Si l'ID est explicitement dans la liste des IDs à mettre en évidence
@@ -149,41 +167,13 @@ const StudentsList: React.FC<StudentsListProps> = ({
                     
                     return (
                       <Grid size={{ xs: 12, sm: 6, md: 4 }} key={correction.id}>
-                        <Card 
-                          sx={{ 
-                            height: '100%',
-                            display: 'flex',
-                            flexDirection: 'column',
-                            transition: 'all 0.3s ease',
-                            position: 'relative',
-                            // Appliquer un style spécial si la correction est mise en évidence
-                            border: isHighlighted ? '2px solid' : '1px solid',
-                            borderColor: isHighlighted ? 'secondary.main' : 'divider',
-                            boxShadow: isHighlighted ? (theme) => `0 0 15px ${alpha(theme.palette.secondary.main, 0.5)}` : 1,
-                          }}
-                        >
-                          {/* Badge de nouvelle correction si mise en évidence */}
-                          {isHighlighted && (
-                            <Chip
-                              label="Nouveau"
-                              color="secondary"
-                              size="small"
-                              sx={{
-                                position: 'absolute',
-                                top: 10,
-                                right: 10,
-                                zIndex: 1,
-                                fontWeight: 'bold'
-                              }}
-                            />
-                          )}
                           <CorrectionCard 
                             key={correction.id} 
                             correction={correction} 
                             getGradeColor={getGradeColor} 
                             highlighted={isHighlighted}
+                            preloadedShareCode={shareCodesMap.get(correction.id.toString())}
                           />
-                        </Card>
                       </Grid>
                     );
                   })}

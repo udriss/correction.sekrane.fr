@@ -46,16 +46,17 @@ import {
   } from '@mui/material';
 
 import { Activity } from '@/lib/activity';
-
+import { constructFromSymbol } from 'date-fns/constants';
 
 type Student = {
-  name: string;
+  id?: number;
+  firstName: string;
+  lastName: string;
   experimentalGrade: string;
   theoreticalGrade: string;
   correctionId?: string;
   shareCode?: string;
 };
-
 
 interface MultipleCorrectionsFormProps {
   activityId: string | number;
@@ -86,18 +87,19 @@ interface ClassStudent {
   sub_class?: number | null;
 }
 
-// Add this interface to define the correction data structure
+// Modifier l'interface pour correspondre exactement à ce qu'attend l'API
 interface CorrectionData {
   activity_id: string | number;
-  student_name: string;
-  experimental_points_earned: number;
-  theoretical_points_earned: number;
-  experimental_points: number;
-  theoretical_points: number;
+  student_id: number | null;
   content: string;
+  content_data: string | null;
+  penalty: number | null;
   deadline: string;
   submission_date: string;
-  class_id?: number; // Make class_id optional
+  experimental_points_earned: number;
+  theoretical_points_earned: number;
+  class_id?: number | null;
+  group_id?: number | null;
 }
 
 export default function MultipleCorrectionsForm({
@@ -176,7 +178,8 @@ export default function MultipleCorrectionsForm({
 
   const handleCreateManualStudents = () => {
     const newStudents = Array.from({ length: manualStudentCount }, (_, i) => ({
-      name: `Étudiant ${i + 1}`,
+      firstName: `Étudiant`,
+      lastName: `${i + 1}`,
       experimentalGrade: '',
       theoreticalGrade: '',
     }));
@@ -211,7 +214,8 @@ export default function MultipleCorrectionsForm({
       
       if (data.students && data.students.length > 0) {
         const parsedStudents = data.students.map((student: any) => ({
-          name: student.name || 'Sans nom',
+          firstName: student.firstName || 'Sans',
+          lastName: student.lastName || 'nom',
           experimentalGrade: '',
           theoreticalGrade: '',
         }));
@@ -253,9 +257,11 @@ export default function MultipleCorrectionsForm({
   };
 
   const handleStudentNameChange = (index: number, value: string) => {
+    const [firstName, lastName] = value.split(' ');
     setStudents(prev => {
       const updated = [...prev];
-      updated[index].name = value;
+      updated[index].firstName = firstName;
+      updated[index].lastName = lastName;
       return updated;
     });
   };
@@ -287,28 +293,20 @@ export default function MultipleCorrectionsForm({
         const expGrade = parseFloat(student.experimentalGrade) || 0;
         const theoGrade = parseFloat(student.theoreticalGrade) || 0;
   
-        // Create properly typed correction data object
+        // Create correction data object according to what the API expects
         const correctionData: CorrectionData = {
           activity_id: activityId,
-          student_name: student.name,
-          experimental_points_earned: expGrade,
-          theoretical_points_earned: theoGrade,
-          experimental_points: experimentalPoints,
-          theoretical_points: theoreticalPoints,
+          student_id: student.id || null, // Utilisation de l'ID étudiant
           content: "",
+          content_data: null,
+          penalty: null,
           deadline: defaultDeadline,
           submission_date: submissionDate,
+          experimental_points_earned: expGrade,
+          theoretical_points_earned: theoGrade,
+          class_id: selectedClassId ? parseInt(selectedClassId) : null,
+          group_id: groupId ? parseInt(groupId.toString()) : null,
         };
-  
-        // Add class_id only if selected
-        if (selectedClassId) {
-          correctionData.class_id = parseInt(selectedClassId);
-          
-          // Optionally add sub_class information if we need it in the API
-          if (selectedSubClass) {
-            (correctionData as any).sub_class = parseInt(selectedSubClass);
-          }
-        }
         
         const createResponse = await fetch('/api/corrections', {
           method: 'POST',
@@ -321,9 +319,9 @@ export default function MultipleCorrectionsForm({
         if (!createResponse.ok) {
           try {
             const errorData = await createResponse.json();
-            throw new Error(errorData.error || errorData.details || `Erreur lors de la création de la correction pour ${student.name}`);
+            throw new Error(errorData.error || errorData.details || `Erreur lors de la création de la correction pour ${student.firstName} ${student.lastName}`);
           } catch (e) {
-            throw new Error(`Erreur lors de la création de la correction pour ${student.name}`);
+            throw new Error(`Erreur lors de la création de la correction pour ${student.firstName} ${student.lastName}`);
           }
         }
         
@@ -402,7 +400,7 @@ export default function MultipleCorrectionsForm({
         const data = await response.json();
         setClassStudents(data);
 
-        
+        console.log('Fetched class students:', data);
 
         // Filter by subclass if specified
         let studentsToUse = data;
@@ -413,8 +411,11 @@ export default function MultipleCorrectionsForm({
         }
         
         // Convert class students to the format needed for corrections
+        // Inclure l'ID étudiant pour l'API
         const formattedStudents = studentsToUse.map((student: ClassStudent) => ({
-          name: `${student.first_name} ${student.last_name}`,
+          id: student.id, // Ajouter l'ID étudiant
+          firstName: student.first_name,
+          lastName: student.last_name,
           experimentalGrade: '',
           theoreticalGrade: '',
         }));
@@ -482,6 +483,7 @@ export default function MultipleCorrectionsForm({
     );
   }
 
+  console.log('Students:', students);
   return (
     <div className="space-y-6">
       {/* Input selection section - Always visible */}
@@ -747,11 +749,12 @@ export default function MultipleCorrectionsForm({
           <Box display="flex" justifyContent="space-between" alignItems="center" mb={4}>
             <div className="flex items-center gap-2">
               <PersonAddIcon className="text-amber-600" fontSize="large" />
-              <Typography variant="h5" className="font-bold">
-                Liste des étudiants ({students.length})
-              </Typography>
+                <Typography variant="h5" className="font-bold">
+                {students.length === 0 ? 'Aucun étudiant sélectionné' : 
+                 students.length === 1 ? 'Un étudiant sélectionné' : 
+                 `${students.length} étudiants sélectionnés`}
+                </Typography>
             </div>
-            
             <Button
               variant="outlined"
               color="success"
@@ -763,6 +766,9 @@ export default function MultipleCorrectionsForm({
               {saving ? 'Enregistrement...' : 'Ajouter les corrections'}
             </Button>
           </Box>
+          <Typography variant="overline" className="font-bold" sx={{ mb: 2, fontWeight: 'bold', color: '#d43100' }}>
+                Les notes peuvent être modifiées à tout moment. Une redirection a lieu après l'enregistrement.
+          </Typography>
 
           {/* Afficher un message d'avertissement si le nom de groupe est requis mais vide */}
           {requireGroupName && !groupName.trim() && students.length > 0 && (
@@ -777,7 +783,8 @@ export default function MultipleCorrectionsForm({
               <TableHead className="bg-gradient-to-r from-gray-100 to-blue-50">
                 <TableRow>
                   <TableCell align="left" width="40px"></TableCell>
-                  <TableCell align="left">Prénom / Nom</TableCell>
+                  <TableCell align="left">Prénom</TableCell>
+                  <TableCell align="left">Nom</TableCell>
                   <TableCell align="center">Note exp. /{experimentalPoints}</TableCell>
                   <TableCell align="center">Note théo. /{theoreticalPoints}</TableCell>
                   <TableCell align="center">Total /20</TableCell>
@@ -801,8 +808,29 @@ export default function MultipleCorrectionsForm({
                     </TableCell>
                     <TableCell>
                       <TextField
-                        value={student.name}
-                        onChange={(e) => handleStudentNameChange(index, e.target.value)}
+                        value={student.firstName}
+                        onChange={(e) => {
+                          setStudents(prev => {
+                            const updated = [...prev];
+                            updated[index].firstName = e.target.value;
+                            return updated;
+                          });
+                        }}
+                        variant="standard"
+                        size="small"
+                        fullWidth
+                      />
+                    </TableCell>
+                    <TableCell>
+                      <TextField
+                        value={student.lastName}
+                        onChange={(e) => {
+                          setStudents(prev => {
+                            const updated = [...prev];
+                            updated[index].lastName = e.target.value;
+                            return updated;
+                          });
+                        }}
                         variant="standard"
                         size="small"
                         fullWidth

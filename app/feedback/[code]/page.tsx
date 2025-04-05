@@ -16,7 +16,9 @@ import {
   Accordion,
   AccordionSummary,
   AccordionDetails,
-  Grid 
+  Grid,
+  useMediaQuery,
+  useTheme 
 } from '@mui/material';
 import { useRouter } from 'next/navigation';
 import { parseContentItems } from '@/lib/services/correctionService';
@@ -31,6 +33,8 @@ import EventAvailableIcon from '@mui/icons-material/EventAvailable';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import ScheduleIcon from '@mui/icons-material/Schedule';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import GradientBackground from '@/components/ui/GradientBackground';
+import PatternBackground from '@/components/ui/PatternBackground';
 
 // Initialiser la police Inter
 const inter = Inter({ subsets: ['latin'] });
@@ -39,6 +43,8 @@ export default function FeedbackViewer({ params }: { params: Promise<{ code: str
   // Unwrap the Promise for params using React.use in client components
   const { code } = React.use(params);
   const router = useRouter();
+  const theme = useTheme(); // Obtenir le thème
+  const isMediumScreen = useMediaQuery(theme.breakpoints.up('md')); // Détecter si écran md ou plus grand
   
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -51,8 +57,17 @@ export default function FeedbackViewer({ params }: { params: Promise<{ code: str
   const [correctionContent, setCorrectionContent] = useState<string>('');
   const [editorContent, setEditorContent] = useState<any[]>([]);
   const [datesExpanded, setDatesExpanded] = useState<boolean>(false);
-  // Add new state for grades accordion
+  // Add new state for grades accordion with default value based on screen size
   const [gradesExpanded, setGradesExpanded] = useState<boolean>(false);
+  // Nouvel état pour l'accordéon du contenu de correction
+  const [contentExpanded, setContentExpanded] = useState<boolean>(true);
+
+  // Effet pour ajuster l'état de l'accordéon en fonction de la taille de l'écran
+  useEffect(() => {
+    setGradesExpanded(isMediumScreen);
+    // On garde le contenu de la correction toujours ouvert par défaut
+    setContentExpanded(true);
+  }, [isMediumScreen]);
 
   // Version améliorée de formatGrade
   const formatGrade = (value: number | string | null | undefined) => {
@@ -209,6 +224,7 @@ export default function FeedbackViewer({ params }: { params: Promise<{ code: str
     );
   }
 
+
   // Vérifier si des notes sont présentes
   const hasGrade = correction.grade !== null && correction.grade !== undefined;
   const hasPenalty = correction.penalty !== null && correction.penalty !== undefined && parseFloat(correction.penalty) > 0;
@@ -251,7 +267,7 @@ export default function FeedbackViewer({ params }: { params: Promise<{ code: str
       className={inter.className} 
       sx={{ 
         minHeight: '100vh', 
-        background: (theme) => `linear-gradient(to bottom, ${theme.palette.grey[50]}, ${theme.palette.primary.light}20)`,
+        background: (theme) => theme.palette.grey[50],
         display: 'flex',
         justifyContent: 'center',
         px: 2,
@@ -270,49 +286,40 @@ export default function FeedbackViewer({ params }: { params: Promise<{ code: str
                 boxShadow: (theme) => theme.shadows[3]
               }}
             >
-              {/* Bannière supérieure avec dégradé et image de fond */}
-              <Box 
-                sx={{ 
-                  background: (theme) => `linear-gradient(to right, ${theme.palette.secondary.dark}, ${theme.palette.primary.dark})`,
-                  color: 'white', 
-                  p: 4, 
-                  position: 'relative', 
-                  overflow: 'hidden'
-                }}
-              >
-                {/* Motif de fond discret */}
-                <Box 
-                  sx={{ 
-                    position: 'absolute', 
-                    inset: 0, 
-                    opacity: 0.1,
-                    backgroundImage: 'url("data:image/svg+xml,%3Csvg width=\'60\' height=\'60\' viewBox=\'0 0 60 60\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cg fill=\'none\' fill-rule=\'evenodd\'%3E%3Cg fill=\'%23ffffff\' fill-opacity=\'1\'%3E%3Cpath d=\'M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z\'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")'
+              {/* Bannière supérieure avec GradientBackground et PatternBackground */}
+              <GradientBackground variant="primary" sx={{ p: 0 }}>
+                <PatternBackground 
+                  pattern="dots" 
+                  opacity={0.05} 
+                  color="black" 
+                  size={100}
+                  sx={{ position: 'relative', overflow: 'hidden' }}
+                >
+                  {/* Contenu de l'en-tête */}
+                  <Box sx={{ flexDirection:'column', display: 'flex', zIndex: 10, textAlign: 'center', p: 4 }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection:'row', gap: 2 }}>
+                     <Box
+                  sx={{
+                    background: (theme) => `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.secondary.main} 100%)`,
+                    p: 1.5,
+                    borderRadius: '50%',
+                    display: 'flex',
+                    boxShadow: '0 4px 20px rgba(0,0,0,0.2)'
                   }}
-                />
-                
-                {/* Contenu de l'en-tête */}
-                <Box sx={{ position: 'relative', zIndex: 10, textAlign: 'center' }}>
-                  <Box 
-                    sx={{ 
-                      display: 'inline-flex', 
-                      alignItems: 'center', 
-                      justifyContent: 'center', 
-                      mb: 2, 
-                      bgcolor: 'rgba(255, 255, 255, 0.2)', 
-                      p: 1.5, 
-                      borderRadius: '50%' 
-                    }}
-                  >
-                    <RuleIcon sx={{ fontSize: 38 }} />
-                  </Box>
-                  <Typography variant="h4" sx={{ fontWeight: 'bold', mb: 1 }}>
-                    Correction de {correction.student_name || "l'élève"}
-                  </Typography>
-                  <Typography variant="h5"  sx={{ color: 'text.secondary', fontWeight: 700 }}>
-                    {correction.activity_name}
-                  </Typography>
+                >
+                  <RuleIcon sx={{ fontSize: 50, color: (theme) => theme.palette.text.primary }} />
                 </Box>
-              </Box>
+                
+                    <Typography variant="h4" sx={{ fontWeight: 'bold', mb: 1, color: 'text.primary' }}>
+                      Correction de {correction.student_name || "l'élève"}
+                    </Typography>
+                    </Box>
+                    <Typography variant="h5" sx={{ color: 'text.secondary', fontWeight: 700 }}>
+                      {correction.activity_name}
+                    </Typography>
+                    </Box>
+                </PatternBackground>
+              </GradientBackground>
 
               {/* Contenu principal avec présentation améliorée */}
               <Box sx={{ p: 4 }}>
@@ -493,41 +500,53 @@ export default function FeedbackViewer({ params }: { params: Promise<{ code: str
 
 
 
-                {/* Contenu de la correction avec style amélioré */}
-                <Paper 
-                  elevation={0}
-                  variant="outlined" 
-                  sx={{ 
+                {/* Contenu de la correction avec style amélioré et transformé en accordéon */}
+                <Accordion 
+                  expanded={contentExpanded}
+                  onChange={() => setContentExpanded(!contentExpanded)}
+                  slotProps={{
+                    transition: { timeout: 300 }
+                  }}
+                  sx={{
+                    mb: 3,
                     borderRadius: 2,
                     overflow: 'hidden',
-                    mb: 3
+                    '&:before': {
+                      display: 'none',
+                    },
+                    boxShadow: 'none',
+                    border: '1px solid',
+                    borderColor: 'divider',
+                    '& .MuiAccordionSummary-root': {
+                      borderLeft: '4px solid',
+                      borderColor: 'primary.main'
+                    }
                   }}
                 >
-                  {/* En-tête stylisé pour le contenu */}
-                  <Box 
-                    sx={{ 
-                      background: (theme) => `linear-gradient(to bottom right, ${theme.palette.secondary.main}, ${theme.palette.primary.main})`,
-                      borderBottom: 1,
-                      borderColor: 'divider',
-                      p: 2, 
-                      display: 'flex', 
-                      alignItems: 'center', 
-                      gap: 1
-                    }}
-                  >
-                    <Typography variant="h6" sx={{ fontWeight: 'bold', color: 'white' }}>
-                      Contenu de la correction
-                    </Typography>
-                  </Box>
-                  
-                  {/* Contenu avec style amélioré */}
-                  <Box 
-                    sx={{ 
-                      p: 3, 
+                  <AccordionSummary
+                    expandIcon={<ExpandMoreIcon />}
+                    aria-controls="content-correction"
+                    id="content-correction-header"
+                    sx={{
                       bgcolor: 'background.paper',
-                      boxShadow: 'inset 0 2px 4px 0 rgba(0,0,0,0.06)'
+                      '&:hover': { backgroundColor: 'rgb(212, 212, 212)' },
+                      flexDirection: 'row',
+                      display: 'flex',
                     }}
                   >
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                      <RuleIcon color="primary" />
+                      <Typography variant="h6" sx={{ fontWeight: 'bold' }}>
+                        Contenu de la correction
+                      </Typography>
+                    </Box>
+                  </AccordionSummary>
+                  
+                  <AccordionDetails sx={{ 
+                    bgcolor: 'background.paper',
+                    p: 3,
+                    boxShadow: 'inset 0 2px 4px 0 rgba(0,0,0,0.06)'
+                  }}>
                     <Box 
                       dangerouslySetInnerHTML={{ __html: renderedHtml }} 
                       sx={{
@@ -541,13 +560,32 @@ export default function FeedbackViewer({ params }: { params: Promise<{ code: str
                         '& img': {
                           maxWidth: '100%',
                           height: 'auto'
+                        },
+                        // Styles pour les fragments de correction
+                        '& > p': {
+                          position: 'relative',
+                          paddingLeft: '20px',
+                          marginBottom: '5px',
+                          '&::before': {
+                            content: '"•"',
+                            position: 'absolute',
+                            left: '5px',
+                            color: theme => theme.palette.primary.main,
+                            fontWeight: 'bold',
+                            fontSize: '18px'
+                          }
+                        },
+                        '& > *': {
+                          marginBottom: '5px'
+                        },
+                        '& > div': {
+                          marginBottom: '5px'
                         }
                       }}
                       className="correction-content prose prose-sm md:prose-base"
                     />
-                  </Box>
-                </Paper>
-                
+                  </AccordionDetails>
+                </Accordion>
 
                 {/* Section des dates en accordéon (fermé par défaut) */}
                 <Accordion 
@@ -696,27 +734,38 @@ export default function FeedbackViewer({ params }: { params: Promise<{ code: str
               </Box>
               
               {/* Pied de page amélioré */}
-              <Box 
-                sx={{ 
-                  background: (theme) => `linear-gradient(to right, ${theme.palette.grey[800]}, ${theme.palette.grey[900]})`,
-                  color: 'white', 
-                  p: 2, 
-                  display: 'flex', 
-                  justifyContent: 'space-between', 
-                  alignItems: 'center'
-                }}
-              >
-                <Typography variant="caption" sx={{ color: 'grey.300' }}>
-                  Correction #{correction.id}
-                </Typography>
-                <Typography variant="caption" sx={{ color: 'grey.300' }}>
-                  Créée le {new Date(correction.created_at).toLocaleDateString('fr-FR', {
-                    day: 'numeric',
-                    month: 'long',
-                    year: 'numeric'
-                  })}
-                </Typography>
-              </Box>
+              <GradientBackground variant='primary' sx={{ p: 0 }}>
+                <Box 
+                  sx={{ 
+                    p: 2, 
+                    display: 'flex', 
+                    justifyContent: 'space-between', 
+                    alignItems: 'center'
+                  }}
+                >
+                  <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                    Correction #{correction.id}
+                  </Typography>
+                  <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                    Ajoutée le {new Date(correction.created_at).toLocaleDateString('fr-FR', {
+                      day: 'numeric',
+                      month: 'long',
+                      year: 'numeric'
+                    })}
+                  </Typography>
+                  <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                    Mise à jour le {new Date(correction.updated_at).toLocaleDateString('fr-FR', {
+                      day: 'numeric',
+                      month: 'long',
+                      year: 'numeric',
+                      hour: '2-digit',
+                      minute: '2-digit'
+                    })}
+                  </Typography>
+
+                  
+                </Box>
+              </GradientBackground>
             </Paper>
           </Zoom>
         </Box>

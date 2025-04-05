@@ -101,3 +101,43 @@ export async function getShareCodeDetails(code: string): Promise<ShareCode | nul
     return null;
   }
 }
+
+/**
+ * Récupère en lot les codes de partage pour plusieurs corrections
+ * @param correctionIds Liste des IDs de corrections
+ * @returns Map des codes de partage indexés par ID de correction
+ */
+export async function getBatchShareCodes(correctionIds: string[]): Promise<Map<string, string>> {
+  try {
+    if (!correctionIds.length) return new Map();
+    
+    const response = await fetch(`/api/share/batch`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ correctionIds }),
+    });
+
+    if (!response.ok) {
+      console.error('Error fetching batch share codes:', response.statusText);
+      return new Map();
+    }
+    
+    const data = await response.json();
+    const shareCodesMap = new Map<string, string>();
+    
+    if (data.shareCodes && Array.isArray(data.shareCodes)) {
+      data.shareCodes.forEach((item: any) => {
+        if (item.correction_id && item.code) {
+          shareCodesMap.set(item.correction_id.toString(), item.code);
+        }
+      });
+    }
+    
+    return shareCodesMap;
+  } catch (error) {
+    console.error('Error fetching batch share codes:', error);
+    return new Map();
+  }
+}
