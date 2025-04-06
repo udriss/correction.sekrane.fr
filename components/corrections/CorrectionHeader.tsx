@@ -9,13 +9,16 @@ import {
   Button,
   Grid,
   Chip,
+  alpha,
 } from '@mui/material';
+import { rgbToHex } from '@mui/material/styles';
 import EditIcon from '@mui/icons-material/Edit';
 import CheckIcon from '@mui/icons-material/Check';
 import CloseIcon from '@mui/icons-material/Close';
 import DeleteIcon from '@mui/icons-material/Delete';
 import SchoolIcon from '@mui/icons-material/School';
 import GroupsIcon from '@mui/icons-material/Groups';
+import { th } from 'date-fns/locale';
 
 interface CorrectionHeaderProps {
   correction: any;
@@ -316,7 +319,18 @@ const CorrectionHeader: React.FC<CorrectionHeaderProps> = ({
             )}
             
             {correction.created_at && (
-              <Typography variant="body2" sx={{ color: 'text.secondary', mt: 0.5 }}>
+                <Typography variant="body2" sx={{ 
+                color: 'text.secondary',
+                mt: 0.5,
+                bgcolor: theme => alpha(theme.palette.secondary.light, 0.15),
+                p: 1,
+                borderRadius: 1,
+                display: 'inline-block',
+                '&:hover': {
+                  bgcolor: theme => alpha(theme.palette.secondary.light, 0.4),
+                  transition: 'background-color 0.3s ease'
+                }
+                }}>
                 Ajoutée le {new Date(correction.created_at).toLocaleDateString('fr-FR', {
                   year: 'numeric',
                   month: 'long',
@@ -324,7 +338,29 @@ const CorrectionHeader: React.FC<CorrectionHeaderProps> = ({
                   hour: '2-digit',
                   minute: '2-digit'
                 })}
-              </Typography>
+                </Typography>
+            )}
+            {correction.updated_at && (
+                <Typography variant="body2" sx={{ 
+                  ml:1,
+                color: 'text.secondary',
+                bgcolor: alpha('rgb(255, 255, 255)', 0.15),
+                p: 1,
+                borderRadius: 1,
+                display: 'inline-block',
+                '&:hover': {
+                  bgcolor: alpha('rgb(255, 255, 255)', 0.4),
+                  transition: 'background-color 0.3s ease'
+                }
+                }}>
+                Mise à jour le {new Date(correction.updated_at).toLocaleDateString('fr-FR', {
+                  year: 'numeric',
+                  month: 'long',
+                  day: 'numeric',
+                  hour: '2-digit',
+                  minute: '2-digit'
+                })}
+                </Typography>
             )}
           </>
         )}

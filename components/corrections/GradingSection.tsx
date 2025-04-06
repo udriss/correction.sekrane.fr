@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Paper, Typography, Slider, Box, Grid, Divider, FormControlLabel, Checkbox, Alert } from '@mui/material';
 
 interface GradingSectionProps {
@@ -36,6 +36,8 @@ const GradingSection: React.FC<GradingSectionProps> = ({
 }) => {
   // État pour le checkbox "Travail non rendu"
   const [neverSubmitted, setNeverSubmitted] = useState(false);
+  // Référence pour stocker la dernière requête API
+  const apiCallInProgressRef = useRef(false);
   
   // Vérifier si la pénalité actuelle correspond au cas "travail non rendu"
   useEffect(() => {
@@ -53,6 +55,59 @@ const GradingSection: React.FC<GradingSectionProps> = ({
     }
   }, [isPenaltyEnabled, penalty, experimentalGrade, theoreticalGrade]);
   
+  // Fonction optimisée pour sauvegarder les notes sans rafraîchir toute la page
+  const saveGradeWithDebounce = (exp: number, theo: number, pen: number) => {
+    // Annuler tout timeout en cours
+    if (saveGradeTimeout) {
+      clearTimeout(saveGradeTimeout);
+    }
+    
+    // Configurer un nouveau timeout pour la sauvegarde différée
+    const timeout = setTimeout(() => {
+      // Vérifier si une requête API est déjà en cours
+      if (!apiCallInProgressRef.current && correction) {
+        apiCallInProgressRef.current = true; // Marquer une requête en cours
+        
+        // Appeler l'API directement au lieu d'utiliser correctionsHook
+        fetch(`/api/corrections/${correction.id}/grade`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ 
+            grade: exp + theo,
+            experimental_points_earned: exp,
+            theoretical_points_earned: theo,
+            penalty: pen
+          }),
+        })
+          .then(response => {
+            if (!response.ok) throw new Error('Failed to update grade');
+            return response.json();
+          })
+          .then(() => {
+            // Mise à jour des messages de statut uniquement, pas de mise à jour de l'état global
+            const event = new CustomEvent('gradeUpdated', { 
+              detail: { message: 'Note mise à jour' } 
+            });
+            window.dispatchEvent(event);
+          })
+          .catch(err => {
+            console.error('Erreur lors de la mise à jour de la note:', err);
+            const event = new CustomEvent('gradeError', { 
+              detail: { message: 'Erreur lors de la mise à jour de la note' } 
+            });
+            window.dispatchEvent(event);
+          })
+          .finally(() => {
+            apiCallInProgressRef.current = false; // Marquer la fin de la requête
+          });
+      }
+    }, 500);
+    
+    setSaveGradeTimeout(timeout);
+  };
+
   // Fonction pour appliquer la notation "travail non rendu"
   const handleNeverSubmittedChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const isChecked = event.target.checked;
@@ -69,22 +124,8 @@ const GradingSection: React.FC<GradingSectionProps> = ({
       setTheoreticalGrade(theoPoints.toFixed(1));
       setPenalty('15');
       
-      // Sauvegarder les modifications
-      if (saveGradeTimeout) {
-        clearTimeout(saveGradeTimeout);
-      }
-      
-      const timeout = setTimeout(() => {
-        if (correction) {
-          correctionsHook.saveGradeAndPenalty(
-            expPoints,
-            theoPoints,
-            15
-          );
-        }
-      }, 500);
-      
-      setSaveGradeTimeout(timeout);
+      // Sauvegarder les modifications avec la fonction optimisée
+      saveGradeWithDebounce(expPoints, theoPoints, 15);
     }
   };
   
@@ -129,21 +170,12 @@ const GradingSection: React.FC<GradingSectionProps> = ({
                 const newGrade = String(newValue);
                 setExperimentalGrade(newGrade);
                 
-                if (saveGradeTimeout) {
-                  clearTimeout(saveGradeTimeout);
-                }
-                
-                const timeout = setTimeout(() => {
-                  if (correction) {
-                    correctionsHook.saveGradeAndPenalty(
-                      parseFloat(newGrade),
-                      parseFloat(theoreticalGrade || '0'),
-                      isPenaltyEnabled ? parseFloat(penalty || '0') : 0
-                    );
-                  }
-                }, 500);
-                
-                setSaveGradeTimeout(timeout);
+                // Utiliser la nouvelle fonction de sauvegarde optimisée
+                saveGradeWithDebounce(
+                  parseFloat(newGrade),
+                  parseFloat(theoreticalGrade || '0'),
+                  isPenaltyEnabled ? parseFloat(penalty || '0') : 0
+                );
               }}
               min={0}
               max={experimentalPoints}
@@ -182,21 +214,12 @@ const GradingSection: React.FC<GradingSectionProps> = ({
                 const newGrade = String(newValue);
                 setTheoreticalGrade(newGrade);
                 
-                if (saveGradeTimeout) {
-                  clearTimeout(saveGradeTimeout);
-                }
-                
-                const timeout = setTimeout(() => {
-                  if (correction) {
-                    correctionsHook.saveGradeAndPenalty(
-                      parseFloat(experimentalGrade || '0'),
-                      parseFloat(newGrade),
-                      isPenaltyEnabled ? parseFloat(penalty || '0') : 0
-                    );
-                  }
-                }, 500);
-                
-                setSaveGradeTimeout(timeout);
+                // Utiliser la nouvelle fonction de sauvegarde optimisée
+                saveGradeWithDebounce(
+                  parseFloat(experimentalGrade || '0'),
+                  parseFloat(newGrade),
+                  isPenaltyEnabled ? parseFloat(penalty || '0') : 0
+                );
               }}
               min={0}
               max={theoreticalPoints}
@@ -238,21 +261,12 @@ const GradingSection: React.FC<GradingSectionProps> = ({
                     const newPenalty = String(newValue);
                     setPenalty(newPenalty);
                     
-                    if (saveGradeTimeout) {
-                      clearTimeout(saveGradeTimeout);
-                    }
-                    
-                    const timeout = setTimeout(() => {
-                      if (correction) {
-                        correctionsHook.saveGradeAndPenalty(
-                          parseFloat(experimentalGrade || '0'),
-                          parseFloat(theoreticalGrade || '0'),
-                          parseFloat(newPenalty)
-                        );
-                      }
-                    }, 500);
-                    
-                    setSaveGradeTimeout(timeout);
+                    // Utiliser la nouvelle fonction de sauvegarde optimisée
+                    saveGradeWithDebounce(
+                      parseFloat(experimentalGrade || '0'),
+                      parseFloat(theoreticalGrade || '0'),
+                      parseFloat(newPenalty)
+                    );
                   }}
                   min={0}
                   max={16}

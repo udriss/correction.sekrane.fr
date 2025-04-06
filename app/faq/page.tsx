@@ -33,6 +33,8 @@ import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import ViewListIcon from '@mui/icons-material/ViewList';
 import ClassIcon from '@mui/icons-material/Class';
 import FormatListBulletedIcon from '@mui/icons-material/FormatListBulleted';
+import HistoryIcon from '@mui/icons-material/History';
+import EmailIcon from '@mui/icons-material/Email';
 
 // FAQ data with expanded and updated content based on system capabilities
 const faqData = [
@@ -170,6 +172,10 @@ const faqData = [
       {
         question: "Comment transférer des étudiants entre classes ?",
         answer: "Dans l'interface de gestion des classes, vous pouvez sélectionner un ou plusieurs étudiants et les déplacer vers une autre classe. Vous pouvez également copier des étudiants vers une autre classe tout en les conservant dans leur classe d'origine. Les historiques de corrections sont conservés et restent accessibles même après un transfert."
+      },
+      {
+        question: "Comment importer une liste d'étudiants depuis un fichier CSV ?",
+        answer: "La plateforme propose une fonctionnalité d'import CSV qui reconnaît automatiquement différents formats de délimiteurs (virgule, point-virgule, tabulation). Lors de l'import, le système analyse intelligemment les noms pour extraire correctement les prénoms et noms de famille selon diverses conventions. Cette fonction vous permet d'importer rapidement des listes entières d'étudiants sans avoir à les saisir manuellement."
       }
     ]
   },
@@ -355,6 +361,10 @@ const faqData = [
       {
         question: "Comment fonctionnent les liens de partage ?",
         answer: "Chaque correction peut être partagée via un lien unique sécurisé. Ces liens contiennent un code aléatoire et peuvent avoir une date d'expiration. L'accès est en lecture seule par défaut, ce qui permet aux étudiants de voir leur correction mais pas de la modifier. La page de correction partagée présente une interface simplifiée et intuitive avec les notes, commentaires et éventuels fichiers associés."
+      },
+      {
+        question: "Comment savoir si un étudiant a consulté sa correction ?",
+        answer: "Le système intègre un système complet de logs qui enregistre chaque consultation de correction partagée. Vous pouvez voir quand un étudiant a accédé à sa correction, depuis quel appareil et navigateur, et combien de temps il y a passé. Ces informations sont disponibles dans la section 'Logs' et vous permettent de suivre l'engagement des étudiants avec vos retours."
       }
     ]
   },
@@ -381,6 +391,92 @@ const faqData = [
       {
         question: "Comment gérer l'espace de stockage des fichiers ?",
         answer: "Les fichiers sont stockés de manière efficace sur nos serveurs, organisés par activité pour faciliter leur gestion. Vous pouvez consulter et gérer vos fichiers téléchargés depuis l'interface d'administration. Si vous n'avez plus besoin de certains fichiers, vous pouvez les supprimer pour libérer de l'espace."
+      }
+    ]
+  },
+  {
+    category: 'Suivi des activités et journalisation',
+    icon: <HistoryIcon color="primary" />,
+    items: [
+      {
+        question: "Comment accéder à l'historique des actions effectuées sur la plateforme ?",
+        answer: "La plateforme dispose d'un système complet de journalisation (logs) qui enregistre toutes les actions importantes : création de corrections, modifications de notes, envoi d'emails, consultations de feedback, etc. Vous pouvez accéder à ces logs depuis la section 'Historique' du menu principal. Cet historique vous permet de suivre l'activité sur votre compte et de vérifier quand certaines actions ont été effectuées."
+      },
+      {
+        question: "Quels types d'actions sont enregistrés dans les logs ?",
+        answer: "Le système enregistre de nombreuses actions, notamment : la création et modification de corrections, les changements de notes, les consultations de feedback par les étudiants, les envois d'emails, les connexions et déconnexions, et les modifications importantes des données. Chaque entrée de log contient la date et l'heure, l'action effectuée, l'utilisateur concerné, et d'autres métadonnées pertinentes."
+      },
+      {
+        question: "Comment savoir quand un étudiant a consulté sa correction ?",
+        answer: "Lorsqu'un étudiant accède à une correction via un lien partagé ou un QR code, cette action est automatiquement enregistrée dans les logs. Dans l'historique, vous pouvez filtrer par type d'action 'VIEW_FEEDBACK' pour voir toutes les consultations de corrections. Ces entrées incluent l'identifiant de l'étudiant, la date et l'heure de consultation, ainsi que des informations sur le navigateur et l'appareil utilisés."
+      },
+      {
+        question: "Est-il possible de filtrer les logs par type d'action ou par période ?",
+        answer: "Oui, l'interface des logs offre plusieurs options de filtrage. Vous pouvez filtrer par type d'action (création, modification, consultation), par période (jour, semaine, mois), par utilisateur, ou par entité concernée (correction, étudiant, classe). Ces filtres vous permettent de retrouver facilement des actions spécifiques ou d'analyser l'activité sur une période donnée."
+      },
+      {
+        question: "Les logs peuvent-ils être exportés pour analyse externe ?",
+        answer: "Oui, vous pouvez exporter les données de logs au format CSV ou JSON pour les analyser dans d'autres outils. Cette fonctionnalité est particulièrement utile si vous souhaitez effectuer des analyses plus poussées sur l'engagement des étudiants avec vos corrections ou sur votre propre utilisation de la plateforme au fil du temps."
+      },
+      {
+        question: "Comment obtenir des statistiques d'engagement des étudiants avec leurs corrections ?",
+        answer: "Dans la section 'Statistiques', vous trouverez des graphiques et tableaux qui analysent l'engagement des étudiants. Ces données incluent le taux de consultation des corrections, le temps moyen passé sur chaque correction, et le délai entre l'envoi de la correction et sa première consultation. Ces informations vous aident à comprendre comment vos étudiants interagissent avec vos retours pédagogiques.",
+        underConstruction: true
+      },
+      {
+        question: "Est-il possible de savoir combien de temps un étudiant a passé à consulter sa correction ?",
+        answer: "Oui, le système estime le temps passé sur chaque correction en analysant les comportements de navigation. Dans les logs détaillés, vous pouvez voir la durée approximative de consultation pour chaque visite. Cette information vous aide à déterminer si les étudiants lisent attentivement vos retours ou s'ils ne font que survoler les corrections.",
+        underConstruction: true
+      },
+      {
+        question: "Puis-je recevoir des notifications lorsqu'un étudiant consulte sa correction ?",
+        answer: "Oui, vous pouvez activer les notifications pour être informé lorsqu'un étudiant consulte sa correction pour la première fois. Cette option se trouve dans vos paramètres de compte. Vous pouvez choisir de recevoir ces notifications par email ou directement dans l'interface de la plateforme. C'est particulièrement utile pour suivre l'engagement des étudiants sans avoir à consulter régulièrement les logs.",
+        underConstruction: true
+      }
+    ]
+  },
+  {
+    category: 'Communication avec les étudiants',
+    icon: <EmailIcon color="primary" />,
+    items: [
+      {
+        question: "Comment envoyer une correction par email à un étudiant ?",
+        answer: "À partir de la page d'une correction, cliquez sur le bouton 'Partager par email'. Vous pourrez saisir l'adresse email de l'étudiant, personnaliser le sujet et le message, puis envoyer le lien de la correction. Le système utilise un modèle d'email par défaut que vous pouvez personnaliser. L'étudiant recevra un email contenant un lien cliquable vers sa correction."
+      },
+      {
+        question: "Puis-je personnaliser les messages envoyés aux étudiants ?",
+        answer: "Oui, lors de l'envoi d'un email, vous pouvez choisir entre utiliser un message prédéfini ou créer un message personnalisé. Pour les messages personnalisés, vous avez accès à un éditeur de texte riche qui vous permet de formater votre message, d'ajouter des éléments visuels et d'adapter le contenu à chaque étudiant. Vous pouvez également modifier l'objet de l'email."
+      },
+      {
+        question: "Comment envoyer des corrections à plusieurs étudiants simultanément ?",
+        answer: "Pour les groupes de corrections, vous pouvez utiliser la fonction d'envoi en lot. Dans la page de détails du groupe, sélectionnez 'Envoyer par email à tous les étudiants'. Vous pourrez ensuite personnaliser un message commun et l'envoyer à tous les étudiants du groupe. Le système enverra un email individuel à chaque étudiant avec le lien vers sa propre correction."
+      },
+      {
+        question: "Le système garde-t-il une trace des emails envoyés ?",
+        answer: "Oui, chaque envoi d'email est enregistré dans le système de logs. Vous pouvez consulter l'historique des emails envoyés, voir à qui ils ont été adressés, quand ils ont été envoyés, et s'ils contenaient un message personnalisé. Ces informations sont utiles pour suivre votre communication avec les étudiants et vérifier quelles corrections ont été partagées."
+      },
+      {
+        question: "Que se passe-t-il si un étudiant n'a pas d'adresse email enregistrée ?",
+        answer: "Si un étudiant n'a pas d'adresse email enregistrée dans son profil, vous pouvez saisir manuellement une adresse lors de l'envoi ou utiliser l'option alternative de partage par QR code. Les QR codes peuvent être imprimés et distribués physiquement aux étudiants, ce qui est particulièrement utile dans les environnements où l'accès aux emails est limité."
+      },
+      {
+        question: "Puis-je ajouter et sauvegarder des modèles d'emails pour les réutiliser ?",
+        answer: "Oui, vous pouvez ajouter plusieurs modèles d'emails personnalisés et les sauvegarder dans votre compte. Ces modèles peuvent inclure des variables dynamiques comme le nom de l'étudiant, le titre de l'activité, ou la note obtenue, qui seront automatiquement remplacées par les informations correspondantes lors de l'envoi. Cette fonctionnalité vous fait gagner du temps et maintient une communication cohérente.",
+        underConstruction: true
+      },
+      {
+        question: "Comment suivre si les étudiants ont ouvert les emails envoyés ?",
+        answer: "Le système enregistre quand un étudiant clique sur le lien de correction contenu dans l'email. Dans la section 'Logs', vous pouvez filtrer par type d'action 'EMAIL_LINK_CLICKED' pour voir quels étudiants ont accédé à leur correction via l'email. Cela vous permet d'identifier les étudiants qui n'ont pas consulté leurs corrections et éventuellement de faire un suivi."
+      },
+      {
+        question: "Est-il possible d'envoyer un rappel aux étudiants qui n'ont pas consulté leur correction ?",
+        answer: "Oui, dans la page de détails d'un groupe, vous pouvez filtrer les étudiants qui n'ont pas encore consulté leur correction et leur envoyer un email de rappel en un seul clic. Vous pouvez personnaliser ce message de rappel ou utiliser un modèle prédéfini. Cette fonctionnalité est particulièrement utile pour augmenter le taux de consultation des corrections.",
+        underConstruction: true
+      },
+      {
+        question: "Puis-je programmer l'envoi d'emails pour une date ultérieure ?",
+        answer: "Oui, lors de l'envoi d'emails, vous avez l'option de programmer l'envoi pour une date et une heure futures. Cela est utile si vous souhaitez que tous les étudiants reçoivent leurs corrections simultanément à un moment précis, par exemple après une session de cours ou à la date officielle de publication des résultats.",
+        underConstruction: true
       }
     ]
   }
@@ -442,7 +538,7 @@ export default function FAQPage() {
         </Typography>
       </Box>
       
-      <Paper elevation={3} className="p-6 mb-8 bg-white">
+      <Paper elevation={3} className="p-6 mb:8 bg-white">
         <TextField
           fullWidth
           variant="outlined"

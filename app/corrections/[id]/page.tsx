@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useIsomorphicLayoutEffect } from '@/utils/client-hooks';
 import { DndProvider } from 'react-dnd';
 import { HTML5Backend } from 'react-dnd-html5-backend';
@@ -14,7 +14,7 @@ import { copyToClipboard } from '@/utils/clipboardUtils';
 import { 
   Paper, Alert, Box, Container, Divider, Fade, Zoom, 
   Typography, useTheme, alpha, Drawer, IconButton, 
-  Tooltip, Card, Tab, Tabs
+  Tooltip, Card, Tab, Tabs, Link
 } from '@mui/material';
 
 // Import our new hooks
@@ -129,6 +129,11 @@ export default function CorrectionDetail({ params }: { params: Promise<{ id: str
     setDrawerOpen(!drawerOpen);
   };
 
+  // Add state for auto-save feature
+  const [autoSaveActive, setAutoSaveActive] = useState<boolean>(true);
+  const [lastAutoSave, setLastAutoSave] = useState<Date | null>(null);
+  const autoSaveTimerRef = useRef<NodeJS.Timeout | null>(null);
+
   // Initialize data on component mount
   useEffect(() => {
     // Fetch activities and correction, then set selected activity to the correction's activity
@@ -138,6 +143,126 @@ export default function CorrectionDetail({ params }: { params: Promise<{ id: str
       fetchFragmentsForActivity(activityId);
     });
   }, [fetchAllActivities, fetchCorrectionData, setSelectedActivityId, fetchFragmentsForActivity]);
+
+  // Effect to handle auto-save functionality
+  useEffect(() => {
+    // Only set up auto-save if correction exists and auto-save is active
+        if (correction && autoSaveActive) {
+      // Clear any existing timer
+      if (autoSaveTimerRef.current) {
+        clearInterval(autoSaveTimerRef.current);
+      }
+      
+      // Create an interval that runs every 70 seconds
+      console.log(`[Auto-save] Démarrage du système d'auto-sauvegarde (intervalle de 70 secondes)`);
+      
+      // Set up interval timer - save every 70 seconds
+      autoSaveTimerRef.current = setInterval(() => {
+        // Only auto-save if there are unsaved changes
+        if (history.length > 0 || contentItems.length > 0) {
+          console.log(`[Auto-save] Sauvegarde en cours...`);
+          handleSaveCorrection();
+          setLastAutoSave(new Date());
+        } else {
+          console.log(`[Auto-save] Aucune modification à sauvegarder`);
+        }
+      }, 70000); // 70 seconds
+    }
+    
+    // Clean up timer on component unmount
+    return () => {
+      if (autoSaveTimerRef.current) {
+        clearInterval(autoSaveTimerRef.current);
+      }
+    };
+  }, [correction, autoSaveActive]);
+
+  // Effect to handle beforeunload event to warn about unsaved changes
+  useEffect(() => {
+    // Function to handle beforeunload event
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      // Check if there are unsaved changes
+      if (history.length > 0) {
+        // Standard way to show confirmation dialog before leaving page
+        // This works in all modern browsers
+        const message = "Vous avez des modifications non enregistrées. Voulez-vous vraiment quitter la page?";
+        e.preventDefault();
+        e.returnValue = message;
+        return message;
+      }
+    };
+    
+    // Add event listener
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    
+    // Clean up the event listener on component unmount
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }, [history.length]);
+  
+  // Add popstate event handling to catch browser back/forward navigation
+  useEffect(() => {
+    // Function to handle popstate events (browser back/forward buttons)
+    const handlePopState = (e: PopStateEvent) => {
+      // Check if there are unsaved changes
+      if (history.length > 0) {
+        // Show a confirmation dialog
+        const message = "Vous avez des modifications non enregistrées. Voulez-vous vraiment quitter la page?";
+        
+        // This effectively blocks navigation until the user confirms
+        if (window.confirm(message)) {
+          // User confirmed, let them leave (data will be lost)
+          // We can't automatically save here because the navigation already happened
+        } else {
+          // User cancelled, prevent navigation by pushing the current state again
+          // This is a workaround to stay on the current page
+          window.history.pushState(null, '', window.location.pathname);
+          
+          // Optional: offer to save
+          if (window.confirm("Voulez-vous sauvegarder vos modifications?")) {
+            handleSaveCorrection();
+          }
+        }
+      }
+    };
+    
+    // Add event listener for browser back/forward buttons
+    window.addEventListener('popstate', handlePopState);
+    
+    // Set up initial history state to enable popstate capture
+    if (history.length > 0) {
+      window.history.pushState(null, '', window.location.pathname);
+    }
+    
+    // Clean up the event listener on component unmount
+    return () => {
+      window.removeEventListener('popstate', handlePopState);
+    };
+  }, [history.length, handleSaveCorrection]);
+
+  // Add handler for internal navigation to prevent data loss
+  const handleInternalNavigation = (e: React.MouseEvent<HTMLAnchorElement, MouseEvent>) => {
+    // Only intercept navigation if there are unsaved changes
+    if (history.length > 0) {
+      e.preventDefault();
+      
+      const href = e.currentTarget.href;
+      
+      // Show confirm dialog
+      if (window.confirm("Vous avez des modifications non enregistrées. Voulez-vous sauvegarder avant de quitter la page?")) {
+        // Save changes first, then navigate
+        handleSaveCorrection().then(() => {
+          // Navigate after save completes
+          window.location.href = href;
+        });
+      } else {
+        // Navigate without saving
+        window.location.href = href;
+      }
+    }
+    // If no unsaved changes, let the navigation proceed normally
+  };
 
   // Fonction pour mettre à jour l'aperçu complet de façon fiable
   const updatePreview = useCallback(() => {
@@ -590,6 +715,20 @@ export default function CorrectionDetail({ params }: { params: Promise<{ id: str
   // Calculate drawer width
   const drawerWidth = 340;
 
+  // Créer un wrapper pour les liens qui interceptera la navigation
+  // en cas de modifications non enregistrées
+  const SafeLink = ({ href, children, ...props }: React.ComponentProps<typeof Link>) => {
+    return (
+      <Link
+        href={href}
+        onClick={handleInternalNavigation}
+        {...props}
+      >
+        {children}
+      </Link>
+    );
+  };
+
   return (
     <DndProvider backend={HTML5Backend}>
       <LocalizationProvider dateAdapter={AdapterDayjs}>
@@ -712,6 +851,9 @@ export default function CorrectionDetail({ params }: { params: Promise<{ id: str
                       historyLength={history.length}
                       activityId={correction.activity_id}
                       correctionId={correctionId}
+                      autoSaveActive={autoSaveActive}
+                      setAutoSaveActive={setAutoSaveActive}
+                      lastAutoSave={lastAutoSave}
                     />
                   </Box>
                   

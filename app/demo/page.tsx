@@ -738,7 +738,7 @@ export default function DemoPage() {
               
               <div className="bg-gray-100 p-4 text-right border-t">
                 <Typography variant="caption" className="text-gray-500">
-                  Correction ajoutée le 19/12/2023
+                  Correction ajoutée le 12/03/2025
                 </Typography>
               </div>
             </Paper>
