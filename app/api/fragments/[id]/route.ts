@@ -183,7 +183,7 @@ export async function PUT(
     return await withConnection(async (connection) => {
       // Check fragment ownership
       const [ownerRows] = await connection.query(
-        'SELECT user_id, content FROM fragments WHERE id = ?',
+        'SELECT user_id, content, tags FROM fragments WHERE id = ?',
         [fragmentId]
       );
       
@@ -208,11 +208,38 @@ export async function PUT(
         );
       }
       
-      // Prepare tags for storage
-      let tagsJson = '[]';
-      if (fragmentData.tags && Array.isArray(fragmentData.tags)) {
-        tagsJson = JSON.stringify(fragmentData.tags);
+      // Préparation des tags à sauvegarder
+      // Toujours utiliser les tags fournis par le client, qu'ils soient vides ou non
+      let tagsToSave = fragmentData.tags;
+      
+      
+      
+      // Si tags n'est pas fourni du tout (undefined), récupérer les tags existants
+      if (tagsToSave === undefined) {
+        try {
+          if (owner.tags && typeof owner.tags === 'string') {
+            tagsToSave = JSON.parse(owner.tags);
+            
+          } else if (Array.isArray(owner.tags)) {
+            tagsToSave = [...owner.tags];
+            
+          } else {
+            tagsToSave = [];
+          }
+        } catch (e) {
+          console.error('Erreur lors du parsing des tags existants:', e);
+          tagsToSave = [];
+        }
       }
+      
+      // S'assurer que tagsToSave est toujours un tableau
+      if (!Array.isArray(tagsToSave)) {
+        tagsToSave = [];
+      }
+      
+      // Convertir en JSON pour stockage
+      const tagsJson = JSON.stringify(tagsToSave);
+      
       
       // Update fragment with current timestamp for updated_at
       await connection.query(
@@ -278,22 +305,13 @@ export async function PUT(
       
       const updatedFragment = rows[0];
       
+      
       // Create a processed fragment with correct types
       const processedFragment: ProcessedFragment = {
         ...updatedFragment,
-        tags: [], // Initialize with empty array
+        tags: tagsToSave, // Utiliser directement les tags sauvegardés pour garantir la cohérence
         categories: [] // Initialize categories with empty array
       };
-      
-      // Parse tags if they exist
-      if (updatedFragment.tags && typeof updatedFragment.tags === 'string') {
-        try {
-          processedFragment.tags = JSON.parse(updatedFragment.tags);
-        } catch (e) {
-          console.error('Error parsing tags', e);
-          // Keep the default empty array
-        }
-      }
       
       // Process category_ids if they exist
       if (fragmentCategoriesTableExists && updatedFragment.category_ids) {
@@ -314,17 +332,8 @@ export async function PUT(
       // Add isOwner flag
       processedFragment.isOwner = true;
       
-      // Fetch categories associated with this fragment
-      const [categoryRows] = await connection.query(
-        `SELECT c.id, c.name 
-         FROM categories c
-         JOIN fragments_categories fc ON c.id = fc.category_id
-         WHERE fc.fragment_id = ?`,
-        [fragmentId]
-      );
-      
-      // Add categories to the response
-      processedFragment.categories = Array.isArray(categoryRows) ? categoryRows : [];
+      // Add updateKey to force refresh in client
+      processedFragment._updateKey = Date.now();
       
       return NextResponse.json(processedFragment);
     });

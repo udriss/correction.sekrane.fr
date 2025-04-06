@@ -26,15 +26,64 @@ const FragmentForm: React.FC<FragmentFormProps> = ({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   
+  // État pour gérer la création d'une nouvelle catégorie
+  const [newCategoryName, setNewCategoryName] = useState('');
+  const [isAddingCategory, setIsAddingCategory] = useState(false);
+  const [showCategoryDialog, setShowCategoryDialog] = useState(false);
+  const [categoryAddSuccess, setCategoryAddSuccess] = useState(false);
+  
   const handleAddTag = () => {
     if (tagInput.trim() && !tags.includes(tagInput.trim())) {
       setTags([...tags, tagInput.trim()]);
       setTagInput('');
     }
   };
-  
+
   const handleRemoveTag = (tagToRemove: string) => {
     setTags(tags.filter(tag => tag !== tagToRemove));
+  };
+  
+  // Fonction pour ajouter une nouvelle catégorie
+  const handleAddNewCategory = async () => {
+    if (!newCategoryName.trim()) return;
+    
+    setIsAddingCategory(true);
+    setCategoryAddSuccess(false);
+    
+    try {
+      const response = await fetch('/api/categories', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: newCategoryName.trim() }),
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Erreur lors de la création de la catégorie');
+      }
+      
+      const newCategory = await response.json();
+      
+      // Sélectionner automatiquement la nouvelle catégorie
+      setSelectedCategoryIds(prev => [...prev, newCategory.id]);
+      
+      // Rafraîchir la liste des catégories
+      await refreshCategories();
+      
+      // Afficher un message de succès
+      setCategoryAddSuccess(true);
+      
+      // Réinitialiser après un court délai
+      setTimeout(() => {
+        setNewCategoryName('');
+        setCategoryAddSuccess(false);
+        setShowCategoryDialog(false);
+      }, 1500);
+    } catch (error: any) {
+      setError(error.message || 'Erreur lors de la création de la catégorie');
+    } finally {
+      setIsAddingCategory(false);
+    }
   };
   
   const handleSubmit = async (e: React.FormEvent) => {

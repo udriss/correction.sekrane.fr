@@ -192,7 +192,7 @@ export async function POST(
     }
     
     const body = await req.json();
-    console.log('POST request body:', body);
+    
     
     // Extract sub_class from the request body
     const subClass = body.sub_class !== undefined ? body.sub_class : null;

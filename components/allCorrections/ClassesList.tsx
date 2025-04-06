@@ -22,6 +22,7 @@ interface ClassesListProps {
   getGradeColor: (grade: number) => string;
   highlightedIds?: string[]; // IDs explicitement mis en évidence
   recentFilter?: boolean; // Indique si le filtre "recent" est actif
+  subClassFilter?: string; // Make sure this is optional and of type string
 }
 
 const ClassesList: React.FC<ClassesListProps> = ({
@@ -31,7 +32,8 @@ const ClassesList: React.FC<ClassesListProps> = ({
   handleClearAllFilters,
   getGradeColor,
   highlightedIds = [], // Valeur par défaut vide
-  recentFilter = false // Par défaut, le filtre recent n'est pas actif
+  recentFilter = false, // Par défaut, le filtre recent n'est pas actif
+  subClassFilter // New prop
 }) => {
   const [shareCodesMap, setShareCodesMap] = useState<Map<string, string>>(new Map());
   
@@ -91,6 +93,31 @@ const ClassesList: React.FC<ClassesListProps> = ({
     correctionsByClass[a].className.localeCompare(correctionsByClass[b].className)
   );
 
+  // Group corrections by class first, fixing the null index type issue
+  const classGroups = React.useMemo(() => {
+    const groups: Record<string, ProviderCorrection[]> = {}; // Use string as index type instead of number
+    
+    filteredCorrections.forEach(correction => {
+      // Skip corrections with null or undefined class_id
+      if (correction.class_id === null || correction.class_id === undefined) return;
+      
+      // Skip corrections that don't match the sub-class filter if it's active
+      if (subClassFilter && correction.sub_class?.toString() !== subClassFilter) {
+        return;
+      }
+      
+      // Convert class_id to string for use as object key
+      const classIdKey = correction.class_id.toString();
+      
+      if (!groups[classIdKey]) {
+        groups[classIdKey] = [];
+      }
+      groups[classIdKey].push(correction);
+    });
+    
+    return groups;
+  }, [filteredCorrections, subClassFilter]);
+
   return (
     <Box>
       {error ? (
@@ -132,7 +159,17 @@ const ClassesList: React.FC<ClassesListProps> = ({
               <AccordionSummary expandIcon={<ExpandMoreIcon />}>
                 <Box sx={{ display: 'flex', alignItems: 'center', width: '100%' }}>
                   <SchoolIcon sx={{ mr: 1, color: 'primary.main' }} />
-                  <Typography variant="h6">{correctionsByClass[classId].className}</Typography>
+                  <Typography variant="h6">
+                    {correctionsByClass[classId].className}
+                    {subClassFilter && (
+                      <Chip 
+                        size="small" 
+                        label={`Groupe ${subClassFilter}`}
+                        color="info"
+                        sx={{ ml: 1, fontWeight: 500 }}
+                      />
+                    )}
+                  </Typography>
                   <Chip 
                     label={`${correctionsByClass[classId].corrections.length} corrections`} 
                     size="small" 
@@ -153,7 +190,7 @@ const ClassesList: React.FC<ClassesListProps> = ({
                     // Récupérer le code de partage préchargé pour cette correction
                     const preloadedShareCode = shareCodesMap.get(correction.id.toString());
                     const isHighlighted = shouldHighlight(correction);
-                    console.log('isHighlighted CLASSE:', isHighlighted);
+                    
 
                     return (
                       <Grid size={{ xs: 12, sm: 6, md: 4 }} key={correction.id}>

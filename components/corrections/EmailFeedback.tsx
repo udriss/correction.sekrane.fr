@@ -280,7 +280,7 @@ export default function EmailFeedback({
   // Ajouter un effet pour initialiser le message par défaut quand l'éditeur est prêt
   useEffect(() => {
     if (editor && shareUrl && messageType === MESSAGE_TYPES.CUSTOM) {
-      const defaultMessage = generateDefaultMessage(fullStudentName, shareUrl);
+      const defaultMessage = generateDefaultMessage(student?.first_name || '', shareUrl);
       editor.commands.setContent(defaultMessage.html);
       setCustomMessage(defaultMessage.html);
     }
@@ -292,7 +292,7 @@ export default function EmailFeedback({
   const handleTabChange = (_: React.SyntheticEvent, newValue: typeof MESSAGE_TYPES.PREDEFINED | typeof MESSAGE_TYPES.CUSTOM) => {
     setMessageType(newValue);
     if (newValue === MESSAGE_TYPES.CUSTOM && editor && shareUrl) {
-      const defaultMessage = generateDefaultMessage(fullStudentName, shareUrl);
+      const defaultMessage = generateDefaultMessage(student?.first_name || '', shareUrl);
       editor.commands.setContent(defaultMessage.html);
       setCustomMessage(defaultMessage.html);
     }
@@ -323,7 +323,7 @@ export default function EmailFeedback({
     
     try {
       const messageToSend = messageType === MESSAGE_TYPES.PREDEFINED 
-        ? generateDefaultMessage(fullStudentName, shareUrl)
+        ? generateDefaultMessage(student?.first_name || '', shareUrl)
         : {
             text: customMessage.replace(/<[^>]*>/g, ''),
             html: customMessage
@@ -413,7 +413,7 @@ export default function EmailFeedback({
     const feedbackUrl = await fetchShareCode(targetCorrectionId);
     
     const messageToSend = messageType === MESSAGE_TYPES.PREDEFINED 
-      ? generateDefaultMessage(studentName, feedbackUrl)
+      ? generateDefaultMessage(student?.first_name || '', feedbackUrl)
       : {
           text: customMessage.replace(/<[^>]*>/g, ''),
           html: customMessage.replace(shareUrl, feedbackUrl) // Remplacer l'URL principale par l'URL spécifique
@@ -774,7 +774,7 @@ export default function EmailFeedback({
               multiline
               rows={15}
               fullWidth
-              value={generateDefaultMessage(fullStudentName, shareUrl).text}
+              value={generateDefaultMessage(student?.first_name || '', shareUrl).text}
               InputProps={{
                 readOnly: true,
               }}

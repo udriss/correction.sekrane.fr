@@ -313,7 +313,11 @@ export default function MultipleCorrectionsPage({ params }: { params: Promise<{ 
       const failures = results.filter(r => r.status === 'rejected');
       
       if (successes.length > 0) {
-        setSuccessMessage(`${successes.length} correction(s) créée(s) avec succès${groupId ? ' dans le groupe ' + groupName : ''}.`);
+        setSuccessMessage(
+          successes.length === 1
+            ? `1 correction ajoutée avec succès${groupId ? ' dans le groupe ' + groupName : ''}.`
+            : `${successes.length} corrections ajoutées avec succès${groupId ? ' dans le groupe ' + groupName : ''}.`
+        );
         
         // Extract the IDs of successfully created corrections
         const successfulCorrectionIds = await Promise.all(

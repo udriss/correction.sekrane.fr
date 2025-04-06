@@ -73,3 +73,62 @@ export async function GET() {
     );
   }
 }
+
+export async function POST(request: Request) {
+  try {
+    const body = await request.json();
+    
+    // Validate required fields
+    if (!body.first_name || !body.last_name) {
+      return NextResponse.json(
+        { error: 'First name and last name are required' },
+        { status: 400 }
+      );
+    }
+    
+    // Insert student into the database
+    const result = await query<any>(
+      `INSERT INTO students (first_name, last_name, email, gender) 
+       VALUES (?, ?, ?, ?)`,
+      [
+        body.first_name,
+        body.last_name,
+        body.email || '',
+        body.gender || 'N'
+      ]
+    );
+    
+    // Get the inserted student id
+    const studentId = result.insertId;
+    
+    // If classId is provided, associate student with the class
+    if (body.classId) {
+      await query(
+        `INSERT INTO class_students (class_id, student_id, sub_class) 
+         VALUES (?, ?, ?)`,
+        [
+          body.classId,
+          studentId,
+          body.sub_class || null
+        ]
+      );
+    }
+    
+    return NextResponse.json({
+      id: studentId,
+      first_name: body.first_name,
+      last_name: body.last_name,
+      email: body.email || '',
+      gender: body.gender || 'N',
+      classId: body.classId || null,
+      sub_class: body.sub_class || null
+    }, { status: 201 });
+    
+  } catch (error) {
+    console.error('Database error:', error);
+    return NextResponse.json(
+      { error: 'Failed to create student' },
+      { status: 500 }
+    );
+  }
+}

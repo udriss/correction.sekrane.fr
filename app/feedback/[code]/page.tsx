@@ -744,7 +744,7 @@ export default function FeedbackViewer({ params }: { params: Promise<{ code: str
                   }}
                 >
                   <Typography variant="caption" sx={{ color: 'text.secondary' }}>
-                    Correction #{correction.id}
+                  Correction #{correction.id}
                   </Typography>
                   <Typography variant="caption" sx={{ color: 'text.secondary' }}>
                     Ajoutée le {new Date(correction.created_at).toLocaleDateString('fr-FR', {

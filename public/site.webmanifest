@@ -71,7 +71,7 @@
     {
       "name": "Nouvelle correction",
       "url": "/corrections/new",
-      "description": "Créer une nouvelle correction"
+      "description": "Ajouter une nouvelle correction"
     },
     {
       "name": "Corrections récentes",

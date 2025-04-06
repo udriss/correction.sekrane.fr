@@ -43,6 +43,8 @@ export interface Fragment {
   category?: string;
   created_at?: string;
   updated_at?: string;
+  _updateKey?: string;
+  position_order?: number | null;
 }
 
 export interface CorrectionWithShareCode extends Correction {

@@ -1,25 +1,52 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Activity } from '@/lib/activity';
-import { Correction } from '@/lib/types';
+import { Correction, CorrectionWithShareCode } from '@/lib/types';
 import LoadingSpinner from '@/components/LoadingSpinner';
-import { Button, IconButton, Paper, Typography, TextField, CircularProgress, Alert, Tooltip, Container, Tabs, Tab } from '@mui/material';
+import { 
+  Button, 
+  IconButton, 
+  Paper, 
+  Typography, 
+  TextField, 
+  CircularProgress, 
+  Alert, 
+  Tooltip, 
+  Container, 
+  Tabs, 
+  Tab, 
+  FormControl, 
+  InputLabel, 
+  Select, 
+  MenuItem, 
+  SelectChangeEvent, 
+  Checkbox, 
+  FormControlLabel, 
+  Box, 
+  Grid,
+  Divider,
+  List,
+  ListItem,
+  ListItemText,
+  Chip
+} from '@mui/material';
 import EditIcon from '@mui/icons-material/Edit';
 import SaveIcon from '@mui/icons-material/Save';
 import CloseIcon from '@mui/icons-material/Close';
 import DeleteIcon from '@mui/icons-material/Delete';
-import ArticleIcon from '@mui/icons-material/Article';
-import AddIcon from '@mui/icons-material/Add';
-import BarChartIcon from '@mui/icons-material/BarChart';
 import CheckIcon from '@mui/icons-material/Check';
 import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline';
+import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf';
 import { useSnackbar } from 'notistack';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
-import Box from '@mui/material/Box';
+import QrCodeIcon from '@mui/icons-material/QrCode';
+import ClassIcon from '@mui/icons-material/Class';
+import GroupsIcon from '@mui/icons-material/Groups';
+import GroupIcon from '@mui/icons-material/Group';
 import ActivityStatsGraphs from '@/components/ActivityStatsGraphs';
 // Import components
 import FragmentsList from '@/components/FragmentsList';
@@ -29,14 +56,45 @@ import H1Title from '@/components/ui/H1Title';
 import GradientBackground from '@/components/ui/GradientBackground';
 // Import the Fragment type from FragmentEditModal
 import FragmentEditModal, { Fragment as EditModalFragment } from '@/components/FragmentEditModal';
+// Import QR Code Generator utility
+import { generateQRCodePDF } from '@/utils/qrGeneratorPDF';
+
+// Type guard pour vérifier si une correction a un shareCode
+function hasShareCode(correction: Correction): correction is CorrectionWithShareCode {
+  return 'shareCode' in correction && correction.shareCode !== null && correction.shareCode !== undefined;
+}
 
 // Replace custom Fragment interface with the imported type
 type Fragment = EditModalFragment;
+
+// Interface for Class data
+interface Class {
+  id: number;
+  name: string;
+  nbre_subclasses?: number;
+  subGroups?: string[];
+}
+
+// Interface for Student data
+interface Student {
+  id: number;
+  first_name: string;
+  last_name: string;
+  gender?: string;
+  email?: string;
+  name?: string;
+  sub_class?: string; // Propriété pour stocker le sous-groupe de l'étudiant
+  group?: string; // Maintenir la rétrocompatibilité
+}
 
 export default function ActivityDetail({ params }: { params: Promise<{ id: string }> }) {
   // Unwrap the Promise for params using React.use
   const { id } = React.use(params);
   const activityId = id;
+  
+  const router = useRouter();
+  // Fix the type error by directly using useSearchParams without React.use
+  const searchParams = useSearchParams();
   
   const [activity, setActivity] = useState<Activity | null>(null);
   const [corrections, setCorrections] = useState<Correction[]>([]);
@@ -46,7 +104,6 @@ export default function ActivityDetail({ params }: { params: Promise<{ id: strin
   const [fragments, setFragments] = useState<Fragment[]>([]);
   const [loadingFragments, setLoadingFragments] = useState(false);
 
-  const router = useRouter();
   const { enqueueSnackbar } = useSnackbar();
   
   const [isEditing, setIsEditing] = useState(false);
@@ -61,7 +118,33 @@ export default function ActivityDetail({ params }: { params: Promise<{ id: strin
   // Remplacer l'état pour suivre la correction à supprimer
   const [correctionToDelete, setCorrectionToDelete] = useState<number | null>(null);
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
-  const [tabValue, setTabValue] = useState(0);
+  
+  // Récupérer le tab initial depuis l'URL ou utiliser 0 par défaut
+  const initialTabValue = useMemo(() => {
+    const tabParam = searchParams.get('tab');
+    if (tabParam !== null) {
+      const tabIndex = parseInt(tabParam, 10);
+      // Vérifier que le tab est valide (entre 0 et 4)
+      if (!isNaN(tabIndex) && tabIndex >= 0 && tabIndex <= 4) {
+        return tabIndex;
+      }
+    }
+    return 0;
+  }, [searchParams]);
+  
+  const [tabValue, setTabValue] = useState(initialTabValue);
+  
+  // PDF Export states
+  const [classes, setClasses] = useState<Class[]>([]);
+  const [selectedClass, setSelectedClass] = useState<number | null>(null);
+  const [selectedSubGroup, setSelectedSubGroup] = useState<string>('');
+  const [subGroups, setSubGroups] = useState<string[]>([]);
+  const [filteredCorrections, setFilteredCorrections] = useState<CorrectionWithShareCode[]>([]);
+  const [students, setStudents] = useState<Student[]>([]);
+  const [isExporting, setIsExporting] = useState(false);
+  const [includeUncorrected, setIncludeUncorrected] = useState(false);
+  // Add state for class students
+  const [classStudents, setClassStudents] = useState<Student[]>([]);
   
   useEffect(() => {
     const fetchActivityAndCorrections = async () => {
@@ -90,6 +173,30 @@ export default function ActivityDetail({ params }: { params: Promise<{ id: strin
         }
         const correctionsData = await correctionsResponse.json();
         setCorrections(correctionsData);
+        setFilteredCorrections(correctionsData);
+        
+        // Fetch classes for the filter
+        try {
+          const classesResponse = await fetch(`/api/activities/${activityId}/classes`);
+          if (classesResponse.ok) {
+            const classesData = await classesResponse.json();
+            console.log('Classes data:', classesData);
+            setClasses(classesData);
+          }
+        } catch (err) {
+          console.error('Erreur lors du chargement des classes:', err);
+        }
+        
+        // Fetch students data
+        try {
+          const studentsResponse = await fetch('/api/students');
+          if (studentsResponse.ok) {
+            const studentsData = await studentsResponse.json();
+            setStudents(studentsData);
+          }
+        } catch (err) {
+          console.error('Erreur lors du chargement des étudiants:', err);
+        }
       } catch (err) {
         console.error('Erreur:', err);
         setError('Erreur lors du chargement des données');
@@ -128,8 +235,148 @@ export default function ActivityDetail({ params }: { params: Promise<{ id: strin
     fetchFragments();
   }, [activityId, tabValue, enqueueSnackbar]);
   
+  // Update subgroups when class is selected
+  useEffect(() => {
+    if (selectedClass && selectedClass !== null) {
+      const selectedClassObj = classes.find(c => c.id === selectedClass);
+      console.log('Selected class object:', selectedClassObj);
+      
+      if (selectedClassObj) {
+        // Si la classe a déjà des sous-groupes prédéfinis, les utiliser
+        if (selectedClassObj.subGroups && selectedClassObj.subGroups.length > 0) {
+          setSubGroups(selectedClassObj.subGroups);
+        } 
+        // Sinon, initialiser subGroups à un tableau vide car nous utiliserons directement nbre_subclasses
+        else {
+          setSubGroups([]);
+        }
+      }
+      
+      // Reset subgroup selection when class changes
+      setSelectedSubGroup('');
+    }
+  }, [selectedClass, classes]);
+  
+  // Filter corrections when filters change
+  useEffect(() => {
+    if (!corrections.length) return;
+    
+    let filtered = [...corrections] as (CorrectionWithShareCode)[];
+    
+    if (selectedClass) {
+      // Filtrer par classe en utilisant les données de class_students
+      const studentIdsInClass = classStudents.map(student => student.id);
+      
+      filtered = filtered.filter(correction => 
+        // Vérifier si l'étudiant associé à cette correction est dans la classe sélectionnée
+        correction.student_id !== null && studentIdsInClass.includes(correction.student_id)
+      );
+      
+      // Filtrer davantage par sous-groupe si sélectionné
+      if (selectedSubGroup && selectedSubGroup !== '') {
+        const groupNumber = parseInt(selectedSubGroup);
+        console.log('Selected subgroup:', selectedSubGroup, 'Group number (as number):', groupNumber);
+        
+        filtered = filtered.filter(correction => {
+          // Trouver l'étudiant associé à cette correction dans les étudiants de la classe
+          const student = classStudents.find(s => s.id === correction.student_id);
+          // Vérifier si l'étudiant appartient au sous-groupe sélectionné
+          // student.sub_class est déjà un nombre dans la base de données, donc on compare avec groupNumber converti en nombre
+          return student && parseInt(student.sub_class as string) === groupNumber;
+        });
+      }
+    }
+    
+    // Ajouter class_name à chaque correction basé sur le class_id
+    filtered = filtered.map(correction => {
+      // Rechercher la classe correspondante pour obtenir le nom
+      const classObj = correction.class_id ? classes.find(c => c.id === correction.class_id) : null;
+      // Retourner la correction avec class_name ajouté
+      return {
+        ...correction,
+        class_name: classObj ? classObj.name : undefined
+      };
+    });
+    
+    setFilteredCorrections(filtered as CorrectionWithShareCode[]);
+  }, [selectedClass, selectedSubGroup, corrections, classStudents, classes]);
+
+  // Load students data for a specific class when selectedClass changes
+  useEffect(() => {
+    const fetchClassStudents = async () => {
+      if (selectedClass) {
+        try {
+          // Récupérer les étudiants de la classe sélectionnée, y compris leur sous-groupe (sub_class)
+          const response = await fetch(`/api/classes/${selectedClass}/students`);
+          if (response.ok) {
+            const data = await response.json();
+            setClassStudents(data);
+          } else {
+            console.error('Erreur lors du chargement des étudiants de la classe:', response.statusText);
+          }
+        } catch (err) {
+          console.error('Erreur lors du chargement des étudiants de la classe:', err);
+        }
+      } else {
+        // Réinitialiser les étudiants de classe si aucune classe n'est sélectionnée
+        setClassStudents([]);
+      }
+    };
+
+    fetchClassStudents();
+  }, [selectedClass]);
+  
   const handleEditClick = () => {
     setIsEditing(true);
+  };
+  
+  // Add missing handlers for class and subgroup selection
+  const handleClassChange = (event: SelectChangeEvent<string | number>) => {
+    const value = event.target.value;
+    setSelectedClass(value === "" ? null : Number(value));
+  };
+  
+  const handleSubGroupChange = (event: SelectChangeEvent<string>) => {
+    setSelectedSubGroup(event.target.value);
+  };
+  
+  // Add missing handler for PDF export
+  const handleExportPDF = async () => {
+    try {
+      setIsExporting(true);
+      // Generate PDF with QR codes
+      const pdfFileName = await generateQRCodePDF({
+        corrections: filteredCorrections,
+        group: {
+          name: `Groupe ${selectedSubGroup}` || (selectedClass ? classes.find(c => c.id === selectedClass)?.name || 'Classe inconnue' : 'Toutes les classes'),
+          activity_name: activity?.name || 'Activité sans nom'
+        },
+        generateShareCode: async (correctionId) => {
+          const response = await fetch(`/api/corrections/${correctionId}/share`, {
+            method: 'POST',
+          });
+          const data = await response.json();
+          return { isNew: true, code: data.code };
+        },
+        getExistingShareCode: async (correctionId) => {
+          const response = await fetch(`/api/corrections/${correctionId}/share`);
+          const data = await response.json();
+          return { exists: data.exists, code: data.code };
+        },
+        students: students
+      });
+      
+      if (pdfFileName) {
+        enqueueSnackbar(`PDF généré avec succès : ${pdfFileName}`, { variant: 'success' });
+      } else {
+        throw new Error('Erreur lors de la génération du PDF');
+      }
+    } catch (error) {
+      console.error('Erreur:', error);
+      enqueueSnackbar(`Erreur lors de l'export PDF: ${(error as Error).message}`, { variant: 'error' });
+    } finally {
+      setIsExporting(false);
+    }
   };
   
   // Add handlers for fragments
@@ -372,8 +619,16 @@ export default function ActivityDetail({ params }: { params: Promise<{ id: strin
     setCorrectionToDelete(null);
   };
 
+  // Modifier la fonction handleTabChange pour mettre à jour l'URL
   const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
     setTabValue(newValue);
+    
+    // Mettre à jour l'URL avec le nouveau tab
+    const params = new URLSearchParams(searchParams.toString());
+    params.set('tab', newValue.toString());
+    
+    // Utiliser router.replace pour éviter d'ajouter une entrée dans l'historique
+    router.replace(`/activities/${activityId}?${params.toString()}`, { scroll: false });
   };
   
   if (loading) {
@@ -562,6 +817,7 @@ export default function ActivityDetail({ params }: { params: Promise<{ id: strin
             <Tab label="Fragments" />
             <Tab label="Corrections" />
             <Tab label="Statistiques" />
+            <Tab label="Export PDF" icon={<QrCodeIcon />} iconPosition="start" />
           </Tabs>
         </Box>
         
@@ -625,6 +881,148 @@ export default function ActivityDetail({ params }: { params: Promise<{ id: strin
           {tabValue === 3 && (
             <Box>
               <ActivityStatsGraphs activityId={parseInt(id)} />
+            </Box>
+          )}
+          
+          {tabValue === 4 && (
+            <Box sx={{ mt: 2 }}>
+              <Typography variant="h6" gutterBottom>
+                Export des QR codes de feedback
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                Exportez un document PDF contenant les QR codes d'accès aux corrections pour chaque étudiant. Les étudiants peuvent scanner ces codes pour voir leurs résultats.
+              </Typography>
+              
+              <Paper variant="outlined" sx={{ p: 3, mt: 2 }}>
+                <Grid container spacing={3}>
+                  <Grid size={{ xs: 12, md: 6 }}>
+                    <FormControl fullWidth size="small">
+                      <InputLabel id="class-select-label">Classe</InputLabel>
+                      <Select
+                        labelId="class-select-label"
+                        value={selectedClass === null ? "" : selectedClass}
+                        onChange={handleClassChange}
+                        label="Classe"
+                        startAdornment={
+                          <ClassIcon sx={{ ml: 1, mr: 0.5, color: 'primary.main' }} />
+                        }
+                      >
+                        <MenuItem value="">Toutes les classes</MenuItem>
+                        {classes.map((cls) => (
+                          <MenuItem key={cls.id} value={cls.id}>{cls.name}</MenuItem>
+                        ))}
+                      </Select>
+                    </FormControl>
+                  </Grid>
+                  
+                  <Grid size={{ xs: 12, md: 6 }}>
+                    <FormControl fullWidth size="small" disabled={!selectedClass || !classes.find(c => c.id === selectedClass)?.nbre_subclasses}>
+                      <InputLabel id="subgroup-select-label">Sous-groupe</InputLabel>
+                      <Select
+                        labelId="subgroup-select-label"
+                        value={selectedSubGroup}
+                        onChange={handleSubGroupChange}
+                        label="Sous-groupe"
+                        startAdornment={
+                          <GroupIcon sx={{ ml: 1, mr: 0.5, color: 'secondary.main' }} />
+                        }
+                      >
+                        <MenuItem value="">Tous les sous-groupes</MenuItem>
+                        {selectedClass && classes.find(c => c.id === selectedClass)?.nbre_subclasses ? 
+                          // Générer directement les options de sous-groupes à partir de nbre_subclasses
+                          Array.from(
+                            { length: classes.find(c => c.id === selectedClass)!.nbre_subclasses! }, 
+                            (_, i) => (
+                              <MenuItem key={`Groupe ${i + 1}`} value={`${i + 1}`}>
+                                Groupe {i + 1}
+                              </MenuItem>
+                            )
+                          )
+                          : 
+                          // Utiliser subGroups comme fallback si disponible
+                          subGroups.map((group) => (
+                            <MenuItem key={group} value={group}>{group}</MenuItem>
+                          ))
+                        }
+                      </Select>
+                    </FormControl>
+                  </Grid>
+                  
+                  <Grid size={{ xs: 12 }}>
+                    <FormControlLabel
+                      control={
+                        <Checkbox
+                          checked={includeUncorrected}
+                          onChange={(e) => setIncludeUncorrected(e.target.checked)}
+                          color="primary"
+                        />
+                      }
+                      label="Inclure les élèves sans correction"
+                    />
+                  </Grid>
+                </Grid>
+                
+                <Divider sx={{ my: 3 }} />
+                
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <Typography variant="body2">
+                    {filteredCorrections.length} correction(s) sélectionnée(s)
+                  </Typography>
+                  <Button
+                    variant="contained"
+                    color="primary"
+                    startIcon={<PictureAsPdfIcon />}
+                    onClick={handleExportPDF}
+                    disabled={isExporting || filteredCorrections.length === 0}
+                  >
+                    {isExporting ? 'Génération en cours...' : 'Générer le PDF'}
+                  </Button>
+                </Box>
+                
+                {filteredCorrections.length > 0 && (
+                  <Box sx={{ mt: 3 }}>
+                    <Typography variant="subtitle2" gutterBottom>
+                      Aperçu des corrections sélectionnées:
+                    </Typography>
+                    <List dense sx={{ maxHeight: 200, overflow: 'auto', bgcolor: 'background.paper' }}>
+                      {filteredCorrections.slice(0, 10).map((correction) => {
+                        const student = students.find(s => s.id === correction.student_id);
+                        return (
+                          <ListItem key={correction.id} divider>
+                            <ListItemText
+                              primary={student ? `${student.first_name} ${student.last_name}` : `Étudiant #${correction.student_id}`}
+                              secondary={correction.grade !== undefined ? `Note: ${correction.grade}/20` : 'Note non disponible'}
+                            />
+                            {/* Utiliser une assertion de type ou vérification de propriété pour éviter l'erreur TypeScript */}
+                            {hasShareCode(correction) ? (
+                              <Chip
+                                size="small"
+                                icon={<QrCodeIcon />}
+                                label="Lien de partage prêt"
+                                color="success"
+                                variant="outlined"
+                              />
+                            ) : (
+                              <Chip
+                                size="small"
+                                icon={<QrCodeIcon />}
+                                label="Lien de partage manquant"
+                                color="warning"
+                                variant="outlined"
+                              />
+                            )}
+                          </ListItem>
+                        );
+                      })}
+                      {filteredCorrections.length > 10 && (
+                        <ListItem>
+                          <ListItemText primary={`+ ${filteredCorrections.length - 10} autres corrections...`} />
+                        </ListItem>
+                      )}
+                    </List>
+                  </Box>
+                )}
+              </Paper>
             </Box>
           )}
         </Box>

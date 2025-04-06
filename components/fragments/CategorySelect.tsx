@@ -37,6 +37,8 @@ const CategorySelect: React.FC<CategorySelectProps> = ({
   const [deleteSuccess, setDeleteSuccess] = useState(false);
   // Add state to track newly added categories that may not be in availableCategories yet
   const [newlyAddedCategories, setNewlyAddedCategories] = useState<Array<{id: number, name: string}>>([]);
+  // État pour le succès d'ajout d'une catégorie
+  const [addSuccess, setAddSuccess] = useState(false);
 
   // Create a combined list of categories to show correct names for newly added ones
   const allCategories = [...availableCategories, ...newlyAddedCategories.filter(
@@ -67,6 +69,7 @@ const CategorySelect: React.FC<CategorySelectProps> = ({
     
     setIsAddingCategory(true);
     setCategoryError(null);
+    setAddSuccess(false);
     
     try {
       const response = await fetch('/api/categories', {
@@ -91,9 +94,15 @@ const CategorySelect: React.FC<CategorySelectProps> = ({
       // Refresh categories list
       await refreshCategories();
       
-      // Reset and close dialog
-      setNewCategoryName('');
-      setShowNewCategoryDialog(false);
+      // Afficher le message de succès
+      setAddSuccess(true);
+      
+      // Reset after a short delay
+      setTimeout(() => {
+        setNewCategoryName('');
+        setAddSuccess(false);
+        setShowNewCategoryDialog(false);
+      }, 1500);
     } catch (error: any) {
       console.error('Error creating category:', error);
       setCategoryError(error.message || 'Erreur lors de la création de la catégorie');
@@ -307,6 +316,11 @@ const CategorySelect: React.FC<CategorySelectProps> = ({
               }
             }}
           />
+          {addSuccess && (
+            <Alert severity="success" sx={{ mt: 2 }}>
+              Catégorie ajoutée avec succès !
+            </Alert>
+          )}
         </DialogContent>
         <DialogActions>
             <IconButton 

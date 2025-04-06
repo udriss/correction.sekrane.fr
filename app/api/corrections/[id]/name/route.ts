@@ -41,11 +41,16 @@ export async function PUT(
     // Check if we have the necessary data
     const studentFirstName = body.student_first_name;
     const studentLastName = body.student_last_name;
-    
+    const studentEmail = body.student_email; // Ajout de la récupération de l'email
     
     
     if (!studentFirstName && !studentLastName) {
       return NextResponse.json({ error: 'Prénom ou nom requis' }, { status: 400 });
+    }
+    
+    // Validation du format d'email si fourni
+    if (studentEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(studentEmail)) {
+      return NextResponse.json({ error: 'Format d\'email invalide' }, { status: 400 });
     }
 
     return await withConnection(async (connection) => {
@@ -75,10 +80,10 @@ export async function PUT(
         return NextResponse.json({ error: 'Étudiant non trouvé' }, { status: 404 });
       }
 
-      // Update the student's name in the students table
+      // Update the student's information in the students table, including email
       await connection.query(
-        'UPDATE students SET first_name = ?, last_name = ? WHERE id = ?',
-        [studentFirstName, studentLastName, student_id]
+        'UPDATE students SET first_name = ?, last_name = ?, email = ? WHERE id = ?',
+        [studentFirstName, studentLastName, studentEmail, student_id]
       );
 
       // Get the updated student data
@@ -93,12 +98,13 @@ export async function PUT(
 
       const updatedStudent = (updatedStudentResult as any[])[0];
 
-      // Return the updated student data with additional logging
+      // Return the updated student data with additional logging and email field
       const response = {
         success: true,
         student_id: updatedStudent.id,
         student_first_name: updatedStudent.first_name,
         student_last_name: updatedStudent.last_name,
+        student_email: updatedStudent.email, // Ajout de l'email dans la réponse
         student_name: `${updatedStudent.first_name || ''} ${updatedStudent.last_name || ''}`.trim()
       };
       
@@ -106,7 +112,7 @@ export async function PUT(
       return NextResponse.json(response);
     });
   } catch (error) {
-    console.error('Error updating student name:', error);
-    return NextResponse.json({ error: "Erreur lors de la mise à jour du nom de l'étudiant" }, { status: 500 });
+    console.error('Error updating student information:', error);
+    return NextResponse.json({ error: "Erreur lors de la mise à jour des informations de l'étudiant" }, { status: 500 });
   }
 }

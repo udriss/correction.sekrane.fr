@@ -135,3 +135,29 @@ export async function associateFragmentWithCorrection(
     throw new Error('Erreur lors de l\'association du fragment avec la correction');
   }
 }
+
+// Fonction pour mettre à jour la position d'un fragment
+export async function updateFragmentPosition(fragmentId: number, newPosition: number) {
+  try {
+    const response = await fetch(`/api/fragments/update-position`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        fragmentId,
+        newPosition,
+      }),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Erreur lors de la mise à jour de la position');
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error('Error updating fragment position:', error);
+    throw error;
+  }
+}

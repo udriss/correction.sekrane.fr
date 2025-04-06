@@ -40,6 +40,7 @@ interface FragmentCardProps {
   onAddToCorrection?: () => void;
   moveFragment?: (dragIndex: number, hoverIndex: number) => void;
   refreshCategories?: () => Promise<void>;
+  renderPositionChip?: () => React.ReactNode;
 }
 
 // Type d'item pour le drag and drop
@@ -60,7 +61,8 @@ export default function FragmentCard({
   onDelete,
   onAddToCorrection,
   moveFragment,
-  refreshCategories
+  refreshCategories,
+  renderPositionChip
 }: FragmentCardProps) {
   // Remove menuAnchor state since we're no longer using it
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
@@ -106,11 +108,23 @@ export default function FragmentCard({
   }
 
   // Normaliser les tags pour s'assurer qu'ils sont toujours un tableau
-  // This logic can be simpler now since we ensure proper formatting at the API level
-  const normalizedTags = fragment.tags || [];
+  const normalizedTags = React.useMemo(() => {
+    
+    if (Array.isArray(fragment.tags)) {
+      return [...fragment.tags]; // Retourne une copie pour éviter les problèmes de référence
+    } else if (typeof fragment.tags === 'string') {
+      try {
+        return JSON.parse(fragment.tags);
+      } catch (e) {
+        console.error('Error parsing tags string:', e);
+        return [];
+      }
+    }
+    return []
+  }, [fragment.tags, fragment._updateKey]); // Dépend aussi de _updateKey pour forcer la réévaluation
 
-  console
-  // Remove handleMenuOpen and handleMenuClose functions
+
+
   
   const handleEditClick = () => {
     if (onEdit) {
@@ -176,6 +190,7 @@ export default function FragmentCard({
     cursor: moveFragment ? 'move' : 'default',
   };
 
+  
   return (
     <div ref={ref} style={cardStyle}>
       <Card elevation={2} sx={{ mb: 1, borderRadius: 2 }}>
@@ -190,6 +205,7 @@ export default function FragmentCard({
                   sx={{ mb: 1, mr: 1 }}
                 />
               )}
+              {renderPositionChip && renderPositionChip()}
               {fragment.isModified && (
                 <Chip 
                   size="small" 

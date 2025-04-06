@@ -223,26 +223,39 @@ export async function POST(request: NextRequest) {
       }
       
 
-      // Insert the new fragment - removing direct category field usage
+      // Insert the fragment without any category information
       try {
-        // Check for fragments_categories table
-        const fragmentCategoriesTableExists = await doesTableExist(connection, 'fragments_categories');
+        // Récupérer la position la plus élevée actuelle pour cette activité
+        const [positionResult] = await connection.query<RowDataPacket[]>(
+          `SELECT MAX(position_order) as max_position 
+           FROM fragments 
+           WHERE activity_id = ?`,
+          [activityId]
+        );
         
-        // Insert the fragment without any category information
+        const maxPosition = positionResult[0]?.max_position;
+        // Calculer la nouvelle position (max + 1 ou 0 si aucun fragment n'existe)
+        const newPosition = maxPosition !== null ? maxPosition + 1 : 0;
+        
+        // Insert the fragment with the correct position
         const [result] = await connection.query(
           `INSERT INTO fragments 
-          (content, tags, activity_id, user_id, created_at) 
-          VALUES (?, ?, ?, ?, NOW())`,
+          (content, tags, activity_id, user_id, position_order, created_at) 
+          VALUES (?, ?, ?, ?, ?, NOW())`,
           [
             fragmentData.content,
             tagsJson,
             activityId,
-            userId
+            userId,
+            newPosition
           ]
         );
         
         // Get the inserted ID
         const insertId = (result as any).insertId;
+        
+        // Check for fragments_categories table
+        const fragmentCategoriesTableExists = await doesTableExist(connection, 'fragments_categories');
         
         // Process categories if the table exists and categories are provided
         if (fragmentData.categories && 
@@ -505,15 +518,22 @@ export async function PUT(request: NextRequest) {
         categories: []
       };
       
-      // Parse tags if they exist
-      if (updatedFragment.tags && typeof updatedFragment.tags === 'string') {
-        try {
-          processedFragment.tags = JSON.parse(updatedFragment.tags);
-        } catch (e) {
-          console.error('Error parsing tags', e);
-          processedFragment.tags = [];
+      // Parse tags if they exist - Correction de la logique pour les tags
+      if (updatedFragment.tags) {
+        if (typeof updatedFragment.tags === 'string') {
+          try {
+            processedFragment.tags = JSON.parse(updatedFragment.tags);
+          } catch (e) {
+            console.error('Error parsing tags', e);
+            processedFragment.tags = [];
+          }
+        } else if (Array.isArray(updatedFragment.tags)) {
+          // Si c'est déjà un tableau, l'utiliser directement
+          processedFragment.tags = [...updatedFragment.tags];
         }
       }
+      
+      
       
       // Process category_ids if they exist
       if (updatedFragment.category_ids) {

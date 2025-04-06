@@ -31,7 +31,8 @@ export async function GET(request: NextRequest) {
           cl.name AS class_name,
           cl.id AS class_id,
           c.created_at,
-          c.updated_at
+          c.updated_at,
+          sc.code AS share_code
         FROM 
           corrections c
         LEFT JOIN 
@@ -40,6 +41,8 @@ export async function GET(request: NextRequest) {
           students s ON c.student_id = s.id
         LEFT JOIN 
           classes cl ON c.class_id = cl.id
+        LEFT JOIN
+          share_codes sc ON c.id = sc.correction_id
         ORDER BY 
           c.submission_date DESC, c.created_at DESC
       `);
@@ -84,7 +87,8 @@ export async function GET(request: NextRequest) {
           }
         })(),
         deadline: correction.deadline,
-        sub_class: correction.sub_class || null
+        sub_class: correction.sub_class || null,
+        shareCode: correction.share_code || null // Ajout du champ shareCode
       }));
 
       return NextResponse.json(formattedCorrections);

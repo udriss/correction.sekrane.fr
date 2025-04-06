@@ -640,6 +640,8 @@ export default function CorrectionDetail({ params }: { params: Promise<{ id: str
                     lastName={correction.student_data?.last_name || correction.student_last_name || ''}
                     setFirstName={(value) => correctionsHook.setFirstName?.(value)}
                     setLastName={(value) => correctionsHook.setLastName?.(value)}
+                    email={correction.student_data?.email || ''}
+                    setEmail={(value) => correctionsHook.setEmail?.(value)}
                   />
                 </GradientBackground>
               </Box>

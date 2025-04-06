@@ -225,7 +225,11 @@ export default function InlineCorrectionsForm({
         createdCorrectionIds.push(correction.id);
       }
       
-      setSuccessMessage(`${createdCorrectionIds.length} correction(s) créée(s) avec succès`);
+      setSuccessMessage(
+        createdCorrectionIds.length === 1 
+          ? "1 correction ajoutée avec succès" 
+          : `${createdCorrectionIds.length} corrections ajoutées avec succès`
+      );
       
       // Call onSuccess to notify parent component
       setTimeout(() => {

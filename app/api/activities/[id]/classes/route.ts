@@ -30,7 +30,7 @@ export async function GET(
 
       // Récupérer toutes les classes associées à cette activité
       const [classRows] = await connection.execute(
-        `SELECT c.id, c.name 
+        `SELECT c.id, c.name, c.nbre_subclasses 
          FROM classes c
          JOIN class_activities ca ON c.id = ca.class_id
          WHERE ca.activity_id = ?
@@ -118,14 +118,14 @@ export async function POST(
 
       const insertResult = result as any;
       
-      // Récupérer l'association créée
+      // Récupérer l'association ajoutée
       const [newAssociation] = await connection.execute(
         'SELECT * FROM class_activities WHERE id = ?',
         [insertResult.insertId]
       );
 
       return NextResponse.json({ 
-        message: 'association classe-activité créée avec succès',
+        message: 'association classe-activité ajoutée avec succès',
         exists: false,
         association: (newAssociation as any[])[0]
       });

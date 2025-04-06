@@ -1,36 +1,61 @@
-import React from 'react';
-import Link from 'next/link';
-import {
-  Typography,
-  Box,
+import React, { useState } from 'react';
+import { 
+  List, 
+  ListItem, 
+  Typography, 
+  Paper, 
+  Box, 
+  Grid, 
   Button,
+  IconButton,
+  Chip,
+  Tooltip,
+  Link as MuiLink,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  CircularProgress,
+  Collapse,
   Table,
   TableBody,
   TableCell,
   TableContainer,
   TableHead,
   TableRow,
-  IconButton,
-  Chip,
-  CircularProgress,
   TextField,
   Slider,
-  Tooltip,
   FormControl,
   InputLabel,
   Select,
-  MenuItem,
+  MenuItem
 } from '@mui/material';
+import CalendarMonthIcon from '@mui/icons-material/CalendarMonth';
+import DeleteIcon from '@mui/icons-material/Delete';
+import SchoolIcon from '@mui/icons-material/School';
+import PersonIcon from '@mui/icons-material/Person';
+import AssignmentIcon from '@mui/icons-material/Assignment';
+import AssignmentTurnedInIcon from '@mui/icons-material/AssignmentTurnedIn';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import ExpandLessIcon from '@mui/icons-material/ExpandLess';
+import QrCodeIcon from '@mui/icons-material/QrCode';
+import GradeIcon from '@mui/icons-material/Grade';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import ShareIcon from '@mui/icons-material/Share';
 import DeleteForeverIcon from '@mui/icons-material/DeleteForever';
 import RemoveCircleOutlineIcon from '@mui/icons-material/RemoveCircleOutline';
 import OpenInNewIcon from '@mui/icons-material/OpenInNew';
-import GradeIcon from '@mui/icons-material/Grade';
 import SaveIcon from '@mui/icons-material/Save';
 import CloseIcon from '@mui/icons-material/Close';
 import PersonAddAltIcon from '@mui/icons-material/PersonAddAlt';
-import { CorrectionWithShareCode } from '@/lib/types';
+
+import Link from 'next/link';
+import { Correction, CorrectionWithShareCode } from '@/lib/types';
+
+// Type guard correctement implémenté pour vérifier si une correction a un shareCode
+function hasShareCode(correction: Correction): correction is CorrectionWithShareCode {
+  return 'shareCode' in correction && correction.shareCode !== null && correction.shareCode !== undefined;
+}
 
 type Student = {
   id: number;
@@ -296,7 +321,7 @@ const CorrectionsList: React.FC<CorrectionsListProps> = ({
                         </Tooltip>
                         
                         {/* Afficher l'icône de lien externe si un code de partage existe */}
-                        {correction.shareCode && (
+                        {hasShareCode(correction) && (
                           <Tooltip title="Voir le feedback partagé">
                             <IconButton
                               size="small"

@@ -69,7 +69,7 @@ const CorrectionsList: React.FC<CorrectionsListProps> = ({
               href={`/corrections/multiples?activityId=${activityId}`}
               variant="outlined"
               size="small"
-              color='secondary'
+              color='success'
               startIcon={<PeopleAltIcon />}
             >
               Corrections en lot
@@ -109,7 +109,7 @@ const CorrectionsList: React.FC<CorrectionsListProps> = ({
       ) : (
         <Grid container spacing={2}>
           {corrections.map((correction) => (
-            <Grid size={{ xs: 12, sm: 6, md: 6, lg: 4 }} key={correction.id}>
+            <Grid size={{ xs: 12, sm: 6, md: 6, lg: 6 }} key={correction.id}>
               <Box
                 sx={{
                   position: 'relative',

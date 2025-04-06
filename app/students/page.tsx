@@ -14,18 +14,13 @@ import {
 } from '@mui/material';
 import Grid from '@mui/material/Grid';
 import LoadingSpinner from '@/components/LoadingSpinner';
-import StudentsHeader from '@/components/students/StudentsHeader';
 import StudentsTutorial from '@/components/students/StudentsTutorial';
 import AllStudentsManagerNEW from '@/components/students/AllStudentsManager';
 import GradientBackground from '@/components/ui/GradientBackground';
 import PatternBackground from '@/components/ui/PatternBackground';
-import Link from 'next/link';
-import AddIcon from '@mui/icons-material/Add';
 import PeopleIcon from '@mui/icons-material/People';
 import HelpOutlineIcon from '@mui/icons-material/HelpOutline';
 import RecentActorsIcon from '@mui/icons-material/RecentActors';
-import SchoolIcon from '@mui/icons-material/School';
-import AssignmentIcon from '@mui/icons-material/Assignment';
 import { Student, Class } from '@/lib/types';
 import MenuBookIcon from '@mui/icons-material/MenuBook';
 import BrowserNotSupportedIcon from '@mui/icons-material/BrowserNotSupported';

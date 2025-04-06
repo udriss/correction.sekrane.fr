@@ -349,7 +349,11 @@ export default function MultipleCorrectionsForm({
       }
       
       setStudents(updatedStudents);
-      setSuccessMessage(`${students.length} correction(s) créée(s) avec succès`);
+      setSuccessMessage(
+        students.length === 1 
+          ? `1 correction ajoutée avec succès`
+          : `${students.length} corrections ajoutées avec succès`
+      );
       
       if (onSuccess && createdCorrectionIds.length > 0) {
         onSuccess(createdCorrectionIds);
@@ -400,7 +404,7 @@ export default function MultipleCorrectionsForm({
         const data = await response.json();
         setClassStudents(data);
 
-        console.log('Fetched class students:', data);
+        
 
         // Filter by subclass if specified
         let studentsToUse = data;
@@ -483,7 +487,7 @@ export default function MultipleCorrectionsForm({
     );
   }
 
-  console.log('Students:', students);
+  
   return (
     <div className="space-y-6">
       {/* Input selection section - Always visible */}

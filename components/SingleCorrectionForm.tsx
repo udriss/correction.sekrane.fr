@@ -608,7 +608,7 @@ const SingleCorrectionForm: React.FC<SingleCorrectionFormProps> = ({
               startIcon={loading ? <CircularProgress size={20} /> : <SendIcon />}
               fullWidth
             >
-              {loading ? 'Création en cours...' : 'Créer la correction'}
+              {loading ? 'Ajout en cours...' : 'Ajouter la correction'}
             </Button>
           </Grid>
         </Grid>

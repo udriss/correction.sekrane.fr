@@ -79,10 +79,10 @@ export default function PrivacyPolicyPage() {
                   <ListItemText primary="Nom d'élève (pour les corrections)" secondary="Utilisé uniquement à des fins d'organisation" />
                 </ListItem>
                 <ListItem>
-                  <ListItemText primary="Contenu des corrections" secondary="Texte et évaluations que vous créez" />
+                  <ListItemText primary="Contenu des corrections" secondary="Texte et évaluations que vous ajoutez" />
                 </ListItem>
                 <ListItem>
-                  <ListItemText primary="Fragments et modèles" secondary="Contenu réutilisable que vous créez" />
+                  <ListItemText primary="Fragments et modèles" secondary="Contenu réutilisable que vous ajoutez" />
                 </ListItem>
               </List>
             </Paper>

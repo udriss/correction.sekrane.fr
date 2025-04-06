@@ -643,7 +643,7 @@ export default function NewCorrection({ params }: { params: Promise<{ id: string
                   disabled={isSubmitting}
                   startIcon={isSubmitting ? <HourglassEmptyIcon className="animate-spin" /> : <SaveIcon />}
                 >
-                  {isSubmitting ? "Création en cours..." : "Créer la correction"}
+                  {isSubmitting ? "Ajout en cours..." : "Ajouter la correction"}
                 </Button>
               </div>
             </form>

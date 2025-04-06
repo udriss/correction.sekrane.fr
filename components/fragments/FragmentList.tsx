@@ -16,7 +16,9 @@ interface FragmentListProps {
   onAddToCorrection?: (fragment: Fragment) => void;
   moveFragment: (dragIndex: number, hoverIndex: number) => void;
   refreshCategories: () => Promise<void>;
+  renderPositionChip?: (fragment: Fragment) => React.ReactNode;
 }
+
 
 const FragmentList: React.FC<FragmentListProps> = ({
   fragments,
@@ -28,8 +30,12 @@ const FragmentList: React.FC<FragmentListProps> = ({
   onDelete,
   onAddToCorrection,
   moveFragment,
-  refreshCategories
+  refreshCategories,
+  renderPositionChip
 }) => {
+
+  
+  
   return (
     <DndProvider backend={HTML5Backend}>
       <Box sx={{ maxHeight: 500, overflowY: 'auto', p: 0.5, '& > *': { mb: 1.5 } }}>
@@ -47,6 +53,7 @@ const FragmentList: React.FC<FragmentListProps> = ({
             onAddToCorrection={onAddToCorrection ? () => onAddToCorrection(fragment) : undefined}
             moveFragment={moveFragment}
             refreshCategories={refreshCategories}
+            renderPositionChip={renderPositionChip ? () => renderPositionChip(fragment) : undefined}
           />
         ))}
       </Box>

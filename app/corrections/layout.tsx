@@ -44,7 +44,7 @@ export default function CorrectionsLayout({
     else if (pathname && pathname.match(/^\/corrections\/\d+$/)) {
       const correctionId = pathname.split('/').pop();
       // Utilisation de JSX avec span et couleur primary pour le #ID
-      currentPageLabel = <>Correction <span style={{ color: '#1976d2', fontWeight: 'bold' }}>#{correctionId}</span></>;
+      currentPageLabel = <>Correction <span style={{ color: '#1976d2', fontWeight: 'bold' }}> #{correctionId}</span></>;
     }
     
     return { currentPageLabel, extraItems };

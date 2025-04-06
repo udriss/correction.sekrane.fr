@@ -2,13 +2,15 @@ import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { 
   Paper, Typography, FormControl, InputLabel, Select, MenuItem, 
-  Box, Button, Divider, CircularProgress, Alert
+  Box, Button, Divider, CircularProgress, Alert, Chip
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import CloseIcon from '@mui/icons-material/Close';
+import ReorderIcon from '@mui/icons-material/Reorder';
 
 import FragmentList from '@/components/fragments/FragmentList';
 import FragmentForm from '@/components/fragments/FragmentForm';
+import PositionModal from '@/components/fragments/PositionModal';
 import { fetchCategories, fetchAllActivities, fetchFragmentsForActivity } from '@/lib/services/fragmentService';
 import { Fragment } from '@/lib/types';
 
@@ -34,6 +36,10 @@ const FragmentsSidebar: React.FC<FragmentsSidebarProps> = ({
   const [showAddForm, setShowAddForm] = useState(false);
   const [selectedActivityId, setSelectedActivityId] = useState<number | null>(null);
   const [editingFragmentId, setEditingFragmentId] = useState<number | null>(null);
+  
+  // État pour le modal de position
+  const [positionModalOpen, setPositionModalOpen] = useState(false);
+  const [selectedFragment, setSelectedFragment] = useState<Fragment | null>(null);
   
   // État de chargement
   const [loadingActivities, setLoadingActivities] = useState(false);
@@ -135,9 +141,24 @@ const FragmentsSidebar: React.FC<FragmentsSidebarProps> = ({
 
   // Mettre à jour un fragment dans la liste
   const updateFragmentInList = (updatedFragment: Fragment) => {
+    // Créer un nouvel objet Fragment pour garantir une nouvelle référence
+    // et s'assurer que les tags sont correctement parsés
+    
+    const processedFragment = {
+      ...JSON.parse(JSON.stringify(updatedFragment)), // Deep clone pour éviter les problèmes de référence
+      tags: Array.isArray(updatedFragment.tags) 
+            ? [...updatedFragment.tags] 
+            : (typeof updatedFragment.tags === 'string' 
+                ? JSON.parse(updatedFragment.tags) 
+                : []),
+      _updateKey: Date.now() // Ajouter une clé pour forcer la mise à jour du rendu
+    };
+    
+    // Mettre à jour la liste des fragments avec le fragment traité
     setFragments(prev => prev.map(fragment => 
-      fragment.id === updatedFragment.id ? updatedFragment : fragment
+      fragment.id === processedFragment.id ? processedFragment : fragment
     ));
+    
     setSuccessMessage('Fragment mis à jour avec succès');
     setTimeout(() => setSuccessMessage(null), 3000);
   };
@@ -158,15 +179,36 @@ const FragmentsSidebar: React.FC<FragmentsSidebarProps> = ({
     setFragments(newFragments);
   };
 
+  // Ouvrir le modal pour régler la position
+  const handleOpenPositionModal = (fragment: Fragment) => {
+    setSelectedFragment(fragment);
+    setPositionModalOpen(true);
+  };
+
+  // Fermer le modal de position
+  const handleClosePositionModal = () => {
+    setPositionModalOpen(false);
+    setSelectedFragment(null);
+  };
+
+  // Mettre à jour la liste de fragments après le changement de position
+  const handlePositionUpdateSuccess = (updatedFragments: Fragment[]) => {
+    setFragments(updatedFragments);
+    setSuccessMessage('Position mise à jour avec succès');
+    setTimeout(() => setSuccessMessage(null), 3000);
+  };
+
   // Rafraîchir les catégories après modification
   const refreshCategories = async () => {
     try {
       const data = await fetchCategories();
       setCategories(data);
     } catch (error) {
-      console.error('Error refreshing categories:', error);
+      console.error('fragments:', fragments);
     }
   };
+
+
 
   const canAddNewFragments = inCorrectionContext ? 
     selectedActivityId === correction?.activity_id : true;
@@ -226,12 +268,18 @@ const FragmentsSidebar: React.FC<FragmentsSidebarProps> = ({
               startIcon={<AddIcon />}
               onClick={() => setShowAddForm(true)}
             >
-              Créer un fragment
+              Ajouter un fragment
             </Button>
           )}
         </Box>
       ) : (
         <>
+          <Box sx={{ mb: 2 }}>
+            <Typography variant="body2" color="textSecondary" sx={{ mb: 1 }}>
+              Cliquez sur la puce de position pour la modifier manuellement
+            </Typography>
+          </Box>
+          
           <FragmentList 
             fragments={fragments}
             editingFragmentId={editingFragmentId}
@@ -243,6 +291,23 @@ const FragmentsSidebar: React.FC<FragmentsSidebarProps> = ({
             onAddToCorrection={onAddFragmentToCorrection}
             moveFragment={moveFragment}
             refreshCategories={refreshCategories}
+            renderPositionChip={(fragment) => (
+              <Chip
+                icon={<ReorderIcon fontSize="small" />}
+                label={`Position : ${fragment.position_order || 0}`}
+                size="small"
+                color="primary"
+                variant="outlined"
+                onClick={() => handleOpenPositionModal(fragment)}
+                sx={{ 
+                  mr: 1, 
+                  cursor: 'pointer',
+                  '&:hover': { 
+                    backgroundColor: 'rgba(0, 0, 0, 0.04)'
+                  }
+                }}
+              />
+            )}
           />
           
           <Box sx={{ mt: 3, display: 'flex', justifyContent: 'space-between' }}>
@@ -284,6 +349,14 @@ const FragmentsSidebar: React.FC<FragmentsSidebarProps> = ({
           refreshCategories={refreshCategories}
         />
       )}
+
+      {/* Modal pour définir la position */}
+      <PositionModal
+        open={positionModalOpen}
+        onClose={handleClosePositionModal}
+        fragment={selectedFragment}
+        onSuccess={handlePositionUpdateSuccess}
+      />
     </Paper>
   );
 };

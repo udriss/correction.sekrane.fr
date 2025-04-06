@@ -125,7 +125,7 @@ model Fragment {
   content      String    @db.Text
   createdAt    DateTime  @default(now()) @map("created_at")
   updatedAt    DateTime  @updatedAt @map("updated_at")
-  positionOrder Int?     @default(0) @map("position_order")
+  position_order Int?     @default(0) @map("position_order")
   tags         Json?
   userId       String?   @map("user_id")
   

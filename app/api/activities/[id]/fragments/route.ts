@@ -87,7 +87,9 @@ export async function GET(
               ...fragment,
               tags: parsedTags,
               categories,
-              isOwner
+              isOwner,
+              // Assurer explicitement que position_order est inclus dans le retour
+              position_order: fragment.position_order
             };
           } catch (categoryError) {
             console.error(`Error fetching categories for fragment ${fragment.id}:`, categoryError);
@@ -111,12 +113,15 @@ export async function GET(
               ...fragment,
               tags: parsedTags,
               categories: [],
-              isOwner: userId ? String(userId) === String(fragment.user_id) : false
+              isOwner: userId ? String(userId) === String(fragment.user_id) : false,
+              // Assurer explicitement que position_order est inclus dans le retour
+              position_order: fragment.position_order
             };
           }
         })
       );
 
+      
       
       return NextResponse.json(fragmentsWithCategories);
     } catch (error) {

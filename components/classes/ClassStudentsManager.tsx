@@ -448,7 +448,7 @@ export default function ClassStudentsManager({
 
       // 2. Mettre à jour les associations de classe
       for (const cls of selectedClassesForEdit) {
-        console.log(`Mise à jour de l'étudiant ${editingStudent.id} dans la classe ${cls.id}`);
+        
         
         // Find sub_class for this specific class in allClasses
         let subClassForThisClass = null;
@@ -789,7 +789,7 @@ export default function ClassStudentsManager({
       allClasses: allClassesWithCorrectTypes
     };
     
-    console.log("Student updated:", studentCopy);
+    
     setEditingStudent(studentCopy);
     setStudentToEdit(studentCopy);
   };
@@ -839,7 +839,7 @@ export default function ClassStudentsManager({
           [classId]: groups
         }));
         
-        console.log(`Updated class ${classId} groups:`, groups);
+        
       }
     } catch (error) {
       console.error('Error handling class selection change:', error);
@@ -924,7 +924,7 @@ export default function ClassStudentsManager({
                   }
                 }}
                   >
-                      <PersonAddIcon /> Ajouter {manualStudentCount} ligne{manualStudentCount > 1 ? 's' : ''}
+                    Ajouter {manualStudentCount} ligne{manualStudentCount > 1 ? 's' : ''}
                   </Button>
                 </div>
 
@@ -1303,7 +1303,10 @@ export default function ClassStudentsManager({
                         disabled={savingBatch || batchStudents.filter(s => !s.markedForDeletion).length === 0}
                         startIcon={savingBatch ? <CircularProgress size={20} /> : <PersonAddIcon />}
                       >
-                        {savingBatch ? 'Enregistrement...' : `Ajouter ${batchStudents.filter(s => !s.markedForDeletion).length} étudiant(s)`}
+                        {savingBatch 
+                          ? 'Enregistrement...' 
+                          : `Ajouter ${batchStudents.filter(s => !s.markedForDeletion).length} étudiant${batchStudents.filter(s => !s.markedForDeletion).length > 1 ? 's' : ''}`
+                        }
                       </Button>
                     </Box>
                   </div>

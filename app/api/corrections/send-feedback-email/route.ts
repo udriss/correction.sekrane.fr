@@ -106,7 +106,7 @@ export async function POST(request: Request) {
       </div>`;
     
     const mailOptions = {
-      from: process.env.EMAIL_FROM || '"Centre de Correction" <correction@sekrane.fr>',
+      from: process.env.EMAIL_FROM || '"Système de correction" <correction@sekrane.fr>',
       to: email,
       subject: subject || `Correction disponible de l'activité ${activityInfo.activity_name}`,
       text: customMessage,

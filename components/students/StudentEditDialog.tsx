@@ -157,7 +157,7 @@ const StudentEditDialog: React.FC<StudentEditDialogProps> = ({
             allClasses: initialAllClasses
           });
           
-          console.log('Initialized allClasses with nbre_subclasses:', initialAllClasses);
+          
         })
         .catch(error => {
           console.error('Error fetching class details:', error);

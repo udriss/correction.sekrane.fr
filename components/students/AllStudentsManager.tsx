@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   Paper,
@@ -26,8 +26,8 @@ import {
   MenuItem,
   Tabs,
   Tab,
-  SelectChangeEvent,
-  Alert
+  Alert,
+  SelectChangeEvent
 } from '@mui/material';
 import PersonIcon from '@mui/icons-material/Person';
 import PersonAddIcon from '@mui/icons-material/PersonAdd';
@@ -42,6 +42,8 @@ import Link from 'next/link';
 import LoadingSpinner from '@/components/LoadingSpinner';
 import StudentEditDialog from './StudentEditDialog';
 import BatchStudentForm from './BatchStudentForm';
+import StudentsCsvExport from './StudentsCsvExport';
+import StudentsCsvImport from './StudentsCsvImport';
 import { Student, Class } from '@/lib/types';
 import MaleIcon from '@mui/icons-material/Male';
 import FemaleIcon from '@mui/icons-material/Female';
@@ -54,6 +56,10 @@ import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
 import EmailIcon from '@mui/icons-material/Email';
+import FileDownloadIcon from '@mui/icons-material/FileDownload';
+import FileUploadIcon from '@mui/icons-material/FileUpload';
+import { saveAs } from 'file-saver';
+import Papa from 'papaparse';
 
 interface AllStudentsManagerProps {
   students: Student[];
@@ -108,6 +114,11 @@ const AllStudentsManagerNEW: React.FC<AllStudentsManagerProps> = ({
   // État pour stocker les groupes disponibles par classe
   const [classGroupsMapping, setClassGroupsMapping] = useState<{[classId: number]: string[]}>({});
   const router = useRouter();
+
+  // State for CSV export/import
+  const [activeManagerTab, setActiveManagerTab] = useState(0);
+  const [showExportTab, setShowExportTab] = useState(false);
+  const [showImportTab, setShowImportTab] = useState(false);
 
   // Fonction pour gérer le changement de sous-classe
   const handleSubClassFilterChange = (event: SelectChangeEvent<string>) => {
@@ -396,6 +407,19 @@ const AllStudentsManagerNEW: React.FC<AllStudentsManagerProps> = ({
     setEditError(null);
     
     try {
+      // Determine the correct sub_class for the main class
+      // Find the selected class in the allClasses array to get the correct sub_class
+      let selectedSubClass = null;
+      
+      // Check if the student has allClasses data available
+      if (editingStudent.allClasses && selectedClasses.length > 0) {
+        const mainClassId = selectedClasses[0].id;
+        const classEntry = editingStudent.allClasses.find(cls => cls.classId === mainClassId);
+        if (classEntry) {
+          selectedSubClass = classEntry.sub_class || null;
+        }
+      }
+      
       // Explicitly format each field to ensure they are correctly sent
       const studentData = {
         id: editingStudent.id,
@@ -404,7 +428,7 @@ const AllStudentsManagerNEW: React.FC<AllStudentsManagerProps> = ({
         email: editingStudent.email,
         gender: editingStudent.gender || 'N',
         classId: selectedClasses.length > 0 ? selectedClasses[0].id : null,
-        group: editingStudent.group || null,
+        sub_class: selectedSubClass, // Use the correct sub_class from allClasses
       };
       
       
@@ -432,7 +456,6 @@ const AllStudentsManagerNEW: React.FC<AllStudentsManagerProps> = ({
       
       const updatedStudent = await response.json();
       
-      
       // 2. Class association management - first update the main class
       if (studentData.classId) {
         const updateClassResponse = await fetch(`/api/classes/${studentData.classId}/students/${editingStudent.id}`, {
@@ -441,12 +464,12 @@ const AllStudentsManagerNEW: React.FC<AllStudentsManagerProps> = ({
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            sub_class: studentData.group
+            sub_class: studentData.sub_class // Use the correct sub_class value
           }),
         });
         
         if (!updateClassResponse.ok) {
-          console.warn('Warning: Group update failed');
+          console.warn('Warning: Sub-class update failed for main class');
         }
       }
       
@@ -459,6 +482,15 @@ const AllStudentsManagerNEW: React.FC<AllStudentsManagerProps> = ({
         // For each selected class
         for (const selectedClass of selectedClasses) {
           const classExists = currentClasses.some((c: any) => c.id === selectedClass.id);
+          
+          // Find sub_class for this particular class if it exists in allClasses
+          let classSubClass = null;
+          if (editingStudent.allClasses) {
+            const classEntry = editingStudent.allClasses.find(cls => cls.classId === selectedClass.id);
+            if (classEntry) {
+              classSubClass = classEntry.sub_class || null;
+            }
+          }
           
           if (!classExists) {
             // Add the student to this class if not already there
@@ -473,18 +505,18 @@ const AllStudentsManagerNEW: React.FC<AllStudentsManagerProps> = ({
                 last_name: editingStudent.last_name,
                 email: editingStudent.email,
                 gender: editingStudent.gender || 'N',
-                sub_class: selectedClass.id === studentData.classId ? studentData.group : null
+                sub_class: classSubClass // Use the correct sub_class for this specific class
               }),
             });
-          } else if (selectedClass.id === studentData.classId && studentData.group) {
-            // Update the subgroup if it's the main class
+          } else if (classSubClass !== null) {
+            // Update the subgroup for any class (not just the main class)
             await fetch(`/api/classes/${selectedClass.id}/students/${editingStudent.id}`, {
               method: 'PATCH',
               headers: {
                 'Content-Type': 'application/json',
               },
               body: JSON.stringify({
-                sub_class: studentData.group
+                sub_class: classSubClass
               }),
             });
           }
@@ -516,7 +548,7 @@ const AllStudentsManagerNEW: React.FC<AllStudentsManagerProps> = ({
     }
   };
 
-  console.log('Available subgroups:', editingStudent);
+  
 
   // BatchStudentForm integration handlers
   const handleOpenBatchForm = () => {
@@ -556,7 +588,7 @@ const AllStudentsManagerNEW: React.FC<AllStudentsManagerProps> = ({
           email: student.email || '',
           gender: student.gender || 'N',
           classId: classId,
-          group: student.sub_class ? student.sub_class.toString() : null
+          sub_class: student.sub_class
         };
         
         // Add student to database
@@ -579,6 +611,31 @@ const AllStudentsManagerNEW: React.FC<AllStudentsManagerProps> = ({
       console.error('Error during batch addition:', err);
       throw err;
     }
+  };
+
+  // CSV Export/Import handlers
+  const handleManagerTabChange = (_: React.SyntheticEvent, newValue: number) => {
+    setActiveManagerTab(newValue);
+    
+    // Reset tabs visibility when changing main tab
+    if (newValue === 0) {
+      setShowExportTab(false);
+      setShowImportTab(false);
+    }
+  };
+  
+  // Toggle export tab
+  const handleToggleExportTab = () => {
+    setShowExportTab(prev => !prev);
+    if (showImportTab) setShowImportTab(false);
+    if (!showExportTab) setActiveManagerTab(1);
+  };
+  
+  // Toggle import tab
+  const handleToggleImportTab = () => {
+    setShowImportTab(prev => !prev);
+    if (showExportTab) setShowExportTab(false);
+    if (!showImportTab) setActiveManagerTab(1);
   };
 
   return (
@@ -612,6 +669,37 @@ const AllStudentsManagerNEW: React.FC<AllStudentsManagerProps> = ({
                 </Typography>
               </Box>
             </Box>
+            <Box sx={{ display: 'flex', gap: 2 }}>
+              <Button
+                variant="outlined"
+                color="primary"
+                startIcon={<FileDownloadIcon />}
+                onClick={handleToggleExportTab}
+                sx={{
+                  fontWeight: 600,
+                  borderWidth: 2,
+                  '&:hover': {
+                    borderWidth: 2,
+                  }
+                }}
+              >
+                Exporter CSV
+              </Button>
+              <Button
+                variant="outlined"
+                color="primary"
+                startIcon={<FileUploadIcon />}
+                onClick={handleToggleImportTab}
+                sx={{
+                  fontWeight: 600,
+                  borderWidth: 2,
+                  '&:hover': {
+                    borderWidth: 2,
+                  }
+                }}
+              >
+                Importer CSV
+              </Button>
               <Button
                 variant="contained"
                 color="secondary"
@@ -632,11 +720,45 @@ const AllStudentsManagerNEW: React.FC<AllStudentsManagerProps> = ({
               >
                 Plus d'étudiants
               </Button>
+            </Box>
           </Box>
         </Box>
       </GradientBackground>
 
       <Divider />
+
+      {/* CSV Export/Import Tabs */}
+      {(showExportTab || showImportTab) && (
+        <Box sx={{ bgcolor: 'background.paper', border: '1px solid', borderColor: 'divider' }}>
+          <Tabs
+            value={activeManagerTab}
+            onChange={handleManagerTabChange}
+            textColor="inherit"
+            sx={{ borderBottom: 1, borderColor: 'divider' }}
+          >
+            <Tab label="Liste des étudiants" />
+            <Tab label={showExportTab ? "Exporter CSV" : "Importer CSV"} />
+          </Tabs>
+          
+          {/* Export Tab Content */}
+          {showExportTab && activeManagerTab === 1 && (
+            <StudentsCsvExport 
+              onClose={() => setShowExportTab(false)}
+              onError={onError}
+              studentCount={filteredStudents.length}
+            />
+          )}
+          
+          {/* Import Tab Content */}
+          {showImportTab && activeManagerTab === 1 && (
+            <StudentsCsvImport
+              onClose={() => setShowImportTab(false)}
+              onError={onError}
+              onSuccess={onStudentUpdate}
+            />
+          )}
+        </Box>
+      )}
 
       {/* Batch student form */}
       {showBatchForm && (
@@ -648,402 +770,406 @@ const AllStudentsManagerNEW: React.FC<AllStudentsManagerProps> = ({
         />
       )}
       
-      {/* Filters */}
-      <Box sx={{ p: 2, borderBottom: '1px solid rgba(0, 0, 0, 0.12)' }}>
-        <Box sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 2, mb: 2 }}>
-          <TextField
-            placeholder="Rechercher des étudiants ..."
-            variant="outlined"
-            size="small"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            sx={{ flexGrow: 1, maxWidth: 300 }}
-            InputProps={{
-              startAdornment: (
-                <InputAdornment position="start">
-                  <SearchIcon />
-                </InputAdornment>
-              ),
-            }}
-          />
+      {/* Students list */}
+      {(!showExportTab && !showImportTab) && (
+        <>
+          <Box sx={{ p: 2, borderBottom: '1px solid rgba(0, 0, 0, 0.12)' }}>
+            <Box sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 2, mb: 2 }}>
+              <TextField
+                placeholder="Rechercher des étudiants ..."
+                variant="outlined"
+                size="small"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                sx={{ flexGrow: 1, maxWidth: 300 }}
+                InputProps={{
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <SearchIcon />
+                    </InputAdornment>
+                  ),
+                }}
+              />
 
-          <FormControl size="small" sx={{ minWidth: 150 }}>
-            <InputLabel>Genre</InputLabel>
-            <Select
-              value={filterGender}
-              onChange={(e) => setFilterGender(e.target.value as 'all' | 'M' | 'F' | 'N')}
-              label="Genre"
-            >
-              <MenuItem value="all">Tout</MenuItem>
-              <MenuItem value="M">
-                <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                  <MaleIcon fontSize="small" sx={{ mr: 1, color: 'info.main' }} />
-                  Masculin
-                </Box>
-              </MenuItem>
-              <MenuItem value="F">
-                <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                  <FemaleIcon fontSize="small" sx={{ mr: 1, color: 'secondary.main' }} />
-                  Féminin
-                </Box>
-              </MenuItem>
-              <MenuItem value="N">
-                <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                  <GpsNotFixedIcon fontSize="small" sx={{ mr: 1, color: 'text.secondary' }} />
-                  Non précisé
-                </Box>
-              </MenuItem>
-            </Select>
-          </FormControl>
-          
-          <FormControl size="small" sx={{ minWidth: 150 }}>
-            <InputLabel>Class</InputLabel>
-            <Select
-              value={filterClass}
-              onChange={handleClassFilterChange}
-              label="Classes"
-            >
-              <MenuItem value="all">Tout</MenuItem>
-              {classes.map((cls) => (
-                <MenuItem key={cls.id} value={cls.id}>
-                  <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                    <SchoolIcon fontSize="small" sx={{ mr: 1, color: 'primary.main' }} />
-                    {cls.name}
-                  </Box>
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
-
-          {availableSubClasses.length > 0 && filterClass !== 'all' && (
-            <FormControl size="small" sx={{ minWidth: 150 }}>
-              <InputLabel>Groupe</InputLabel>
-              <Select
-                value={filterSubClass}
-                onChange={handleSubClassFilterChange}
-                label="Groupe"
-              >
-                <MenuItem value="all">Tous les groupes</MenuItem>
-                {availableSubClasses.map((subClass) => (
-                  <MenuItem key={subClass} value={subClass}>
+              <FormControl size="small" sx={{ minWidth: 150 }}>
+                <InputLabel>Genre</InputLabel>
+                <Select
+                  value={filterGender}
+                  onChange={(e) => setFilterGender(e.target.value as 'all' | 'M' | 'F' | 'N')}
+                  label="Genre"
+                >
+                  <MenuItem value="all">Tout</MenuItem>
+                  <MenuItem value="M">
                     <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                      <RecentActorsIcon fontSize="small" sx={{ mr: 1, color: 'info.main' }} />
-                      Groupe {subClass}
+                      <MaleIcon fontSize="small" sx={{ mr: 1, color: 'info.main' }} />
+                      Masculin
                     </Box>
                   </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-          )}
+                  <MenuItem value="F">
+                    <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                      <FemaleIcon fontSize="small" sx={{ mr: 1, color: 'secondary.main' }} />
+                      Féminin
+                    </Box>
+                  </MenuItem>
+                  <MenuItem value="N">
+                    <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                      <GpsNotFixedIcon fontSize="small" sx={{ mr: 1, color: 'text.secondary' }} />
+                      Non précisé
+                    </Box>
+                  </MenuItem>
+                </Select>
+              </FormControl>
+              
+              <FormControl size="small" sx={{ minWidth: 150 }}>
+                <InputLabel>Class</InputLabel>
+                <Select
+                  value={filterClass}
+                  onChange={handleClassFilterChange}
+                  label="Classes"
+                >
+                  <MenuItem value="all">Tout</MenuItem>
+                  {classes.map((cls) => (
+                    <MenuItem key={cls.id} value={cls.id}>
+                      <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                        <SchoolIcon fontSize="small" sx={{ mr: 1, color: 'primary.main' }} />
+                        {cls.name}
+                      </Box>
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+
+              {availableSubClasses.length > 0 && filterClass !== 'all' && (
+                <FormControl size="small" sx={{ minWidth: 150 }}>
+                  <InputLabel>Groupe</InputLabel>
+                  <Select
+                    value={filterSubClass}
+                    onChange={handleSubClassFilterChange}
+                    label="Groupe"
+                  >
+                    <MenuItem value="all">Tous les groupes</MenuItem>
+                    {availableSubClasses.map((subClass) => (
+                      <MenuItem key={subClass} value={subClass}>
+                        <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                          <RecentActorsIcon fontSize="small" sx={{ mr: 1, color: 'info.main' }} />
+                          Groupe {subClass}
+                        </Box>
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+              )}
+              
+              {searchTerm || filterClass !== 'all' || filterTab !== 0 || filterGender !== 'all' || filterSubClass !== 'all' ? (
+                <Button
+                  size="small"
+                  variant="outlined"
+                  onClick={handleResetFilters}
+                  startIcon={<CloseIcon />}
+                >
+                  Rétablir
+                </Button>
+              ) : null}
+            </Box>
+            
+            <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
+              <Tabs value={filterTab} onChange={handleTabChange}>
+                <Tab label="Tout" />
+                <Tab label="Avec correction" />
+                <Tab label="Sans correction" />
+              </Tabs>
+            </Box>
+          </Box>
           
-          {searchTerm || filterClass !== 'all' || filterTab !== 0 || filterGender !== 'all' || filterSubClass !== 'all' ? (
-            <Button
-              size="small"
-              variant="outlined"
-              onClick={handleResetFilters}
-              startIcon={<CloseIcon />}
-            >
-              Rétablir
-            </Button>
-          ) : null}
-        </Box>
-        
-        <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
-          <Tabs value={filterTab} onChange={handleTabChange}>
-            <Tab label="Tout" />
-            <Tab label="Avec correction" />
-            <Tab label="Sans correction" />
-          </Tabs>
-        </Box>
-      </Box>
-      
-      {/* Students table */}
-      {loading ? (
-        <Box sx={{ display: 'flex', justifyContent: 'center', py: 4, maxWidth: '400px', mx: 'auto' }}>
-          <LoadingSpinner size="md" text="Chargement des étudiants" />
-        </Box>
-      ) : filteredStudents.length === 0 ? (
-        <Box sx={{ textAlign: 'center', py: 4 }}>
-          <SearchIcon fontSize="large" color="disabled" />
-          <Typography variant="h6" color="textSecondary" sx={{ mt: 1 }}>
-            No students match your search
-          </Typography>
-          <Button 
-            onClick={handleResetFilters}
-            variant="outlined"
-            sx={{ mt: 2 }}
-          >
-            Rétablir filtres
-          </Button>
-        </Box>
-      ) : (
-        <>
-          <TableContainer>
-            <Table aria-label="students table">
-              <TableHead>
-                <TableRow>
-                  <TableCell>
-                    <TableSortLabel
-                      active={orderBy === 'last_name'}
-                      direction={orderBy === 'last_name' ? order : 'asc'}
-                      onClick={() => handleRequestSort('last_name')}
-                    >
-                      Nom
-                    </TableSortLabel>
-                      <Tooltip title={showNameColumn ? "Masquer les noms" : "Afficher les noms"}>
-                        <IconButton size="small" onClick={toggleNameColumn}>
-                          {showNameColumn ? <VisibilityOffIcon fontSize="small" /> : <VisibilityIcon fontSize="small" />}
-                        </IconButton>
-                      </Tooltip>
-                  </TableCell>
-                  <TableCell>
-                    <TableSortLabel
-                      active={orderBy === 'first_name'}
-                      direction={orderBy === 'first_name' ? order : 'asc'}
-                      onClick={() => handleRequestSort('first_name')}
-                    >
-                      Prénom
-                    </TableSortLabel>
-                  </TableCell>
+          {/* Students table */}
+          {loading ? (
+            <Box sx={{ display: 'flex', justifyContent: 'center', py: 4, maxWidth: '400px', mx: 'auto' }}>
+              <LoadingSpinner size="md" text="Chargement des étudiants" />
+            </Box>
+          ) : filteredStudents.length === 0 ? (
+            <Box sx={{ textAlign: 'center', py: 4 }}>
+              <SearchIcon fontSize="large" color="disabled" />
+              <Typography variant="h6" color="textSecondary" sx={{ mt: 1 }}>
+                No students match your search
+              </Typography>
+              <Button 
+                onClick={handleResetFilters}
+                variant="outlined"
+                sx={{ mt: 2 }}
+              >
+                Rétablir filtres
+              </Button>
+            </Box>
+          ) : (
+            <>
+              <TableContainer>
+                <Table aria-label="students table">
+                  <TableHead>
+                    <TableRow>
                       <TableCell>
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                          <EmailIcon fontSize="small" />
-                          <span>Email</span>
-                          <Tooltip title={showEmailColumn ? "Masquer les emails" : "Afficher les emails"}>
-                            <IconButton size="small" onClick={toggleEmailColumn}>
-                              {showEmailColumn ? <VisibilityOffIcon fontSize="small" /> : <VisibilityIcon fontSize="small" />}
+                        <TableSortLabel
+                          active={orderBy === 'last_name'}
+                          direction={orderBy === 'last_name' ? order : 'asc'}
+                          onClick={() => handleRequestSort('last_name')}
+                        >
+                          Nom
+                        </TableSortLabel>
+                          <Tooltip title={showNameColumn ? "Masquer les noms" : "Afficher les noms"}>
+                            <IconButton size="small" onClick={toggleNameColumn}>
+                              {showNameColumn ? <VisibilityOffIcon fontSize="small" /> : <VisibilityIcon fontSize="small" />}
                             </IconButton>
                           </Tooltip>
-                        </Box>
                       </TableCell>
-                  <TableCell>
-                    <TableSortLabel
-                      active={orderBy === 'className'}
-                      direction={orderBy === 'className' ? order : 'asc'}
-                      onClick={() => handleRequestSort('className')}
-                    >
-                      Classe(s)
-                    </TableSortLabel>
-                  </TableCell>
-                  <TableCell>Groupe(s)</TableCell>
-                  <TableCell>Corrections</TableCell>
-                  <TableCell align="right">Actions</TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {paginatedStudents.map((student) => (
-                  <TableRow key={student.id} hover>
-                    <TableCell component="th" scope="row">
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                        <Avatar 
-                          sx={{ 
-                            width: 28, 
-                            height: 28, 
-                            bgcolor: student.gender === 'M' ? 'info.main' : student.gender === 'F' ? 'secondary.main' : 'grey.500',
-                            fontSize: '1.5rem',
-                            boxShadow: '0 4px 8px rgba(0,0,0,0.2)'
-                          }}
+                      <TableCell>
+                        <TableSortLabel
+                          active={orderBy === 'first_name'}
+                          direction={orderBy === 'first_name' ? order : 'asc'}
+                          onClick={() => handleRequestSort('first_name')}
                         >
-                          {student.gender === 'M' ? <MaleIcon fontSize="medium" /> : 
-                            student.gender === 'F' ? <FemaleIcon fontSize="medium" /> : 
-                            student.gender === 'N' ? <GpsNotFixedIcon fontSize="small" /> : 
-                            <NotInterestedIcon fontSize="medium" />}
-                        </Avatar>
-                        {showNameColumn ? (
-                          <span>{student.last_name}</span>
-                        ) : (
-                          <Typography 
-                            variant="body2" 
-                            color="text.secondary" 
-                            sx={{ 
-                              cursor: 'pointer',
-                              '&:hover': { textDecoration: 'underline' }
-                            }}
-                            onClick={toggleNameColumn}
-                          >
-                            •••••
-                          </Typography>
-                        )}
-                      </Box>
-                    </TableCell>
-                    <TableCell>{student.first_name}</TableCell>
-                    <TableCell>
-                      {showEmailColumn ? student.email : (
-                        <Typography 
-                          variant="body2" 
-                          color="text.secondary" 
-                          sx={{ 
-                            cursor: 'pointer',
-                            '&:hover': { textDecoration: 'underline' }
-                          }}
-                          onClick={toggleEmailColumn}
+                          Prénom
+                        </TableSortLabel>
+                      </TableCell>
+                          <TableCell>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                              <EmailIcon fontSize="small" />
+                              <span>Email</span>
+                              <Tooltip title={showEmailColumn ? "Masquer les emails" : "Afficher les emails"}>
+                                <IconButton size="small" onClick={toggleEmailColumn}>
+                                  {showEmailColumn ? <VisibilityOffIcon fontSize="small" /> : <VisibilityIcon fontSize="small" />}
+                                </IconButton>
+                              </Tooltip>
+                            </Box>
+                          </TableCell>
+                      <TableCell>
+                        <TableSortLabel
+                          active={orderBy === 'className'}
+                          direction={orderBy === 'className' ? order : 'asc'}
+                          onClick={() => handleRequestSort('className')}
                         >
-                          ••••@••••
-                        </Typography>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
-                        {student.className && (
-                          <Chip 
-                            size="small" 
-                            label={student.className} 
-                            sx={{ color: theme => theme.palette.primary.light, cursor: 'default' }}
-                            variant="outlined"
-                          />
-                        )}
-                        {student.additionalClasses?.map((cls) => (
-                          <Chip 
-                            key={cls.id}
-                            size="small" 
-                            label={cls.name} 
-                            variant="outlined"
-                            sx={{ color: theme => theme.palette.primary.light, cursor: 'default' }}
-                          />
-                        ))}
-                      </Box>
-                    </TableCell>
-                    <TableCell>
-                      {student && student.allClasses ? (
-                        // Afficher tous les groupes de l'étudiant pour toutes ses classes
-                        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
-                          {student.allClasses.map(cls => 
-                            cls.sub_class ? (
-                              <Chip 
-                                key={cls.classId}
-                                size="small" 
-                                label={`${cls.className} - Groupe ${cls.sub_class}`}
-                                color="info" 
-                                variant="outlined"
-                                sx={{ cursor: 'default' }}
-                              />
-                            ) : null
+                          Classe(s)
+                        </TableSortLabel>
+                      </TableCell>
+                      <TableCell>Groupe(s)</TableCell>
+                      <TableCell>Corrections</TableCell>
+                      <TableCell align="right">Actions</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {paginatedStudents.map((student) => (
+                      <TableRow key={student.id} hover>
+                        <TableCell component="th" scope="row">
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                            <Avatar 
+                              sx={{ 
+                                width: 28, 
+                                height: 28, 
+                                bgcolor: student.gender === 'M' ? 'info.main' : student.gender === 'F' ? 'secondary.main' : 'grey.500',
+                                fontSize: '1.5rem',
+                                boxShadow: '0 4px 8px rgba(0,0,0,0.2)'
+                              }}
+                            >
+                              {student.gender === 'M' ? <MaleIcon fontSize="medium" /> : 
+                                student.gender === 'F' ? <FemaleIcon fontSize="medium" /> : 
+                                student.gender === 'N' ? <GpsNotFixedIcon fontSize="small" /> : 
+                                <NotInterestedIcon fontSize="medium" />}
+                            </Avatar>
+                            {showNameColumn ? (
+                              <span>{student.last_name}</span>
+                            ) : (
+                              <Typography 
+                                variant="body2" 
+                                color="text.secondary" 
+                                sx={{ 
+                                  cursor: 'pointer',
+                                  '&:hover': { textDecoration: 'underline' }
+                                }}
+                                onClick={toggleNameColumn}
+                              >
+                                •••••
+                              </Typography>
+                            )}
+                          </Box>
+                        </TableCell>
+                        <TableCell>{student.first_name}</TableCell>
+                        <TableCell>
+                          {showEmailColumn ? student.email : (
+                            <Typography 
+                              variant="body2" 
+                              color="text.secondary" 
+                              sx={{ 
+                                cursor: 'pointer',
+                                '&:hover': { textDecoration: 'underline' }
+                              }}
+                              onClick={toggleEmailColumn}
+                            >
+                              ••••@••••
+                            </Typography>
                           )}
-                          {student.allClasses.every(cls => !cls.sub_class) && (
+                        </TableCell>
+                        <TableCell>
+                          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                            {student.className && (
+                              <Chip 
+                                size="small" 
+                                label={student.className} 
+                                sx={{ color: theme => theme.palette.primary.light, cursor: 'default' }}
+                                variant="outlined"
+                              />
+                            )}
+                            {student.additionalClasses?.map((cls) => (
+                              <Chip 
+                                key={cls.id}
+                                size="small" 
+                                label={cls.name} 
+                                variant="outlined"
+                                sx={{ color: theme => theme.palette.primary.light, cursor: 'default' }}
+                              />
+                            ))}
+                          </Box>
+                        </TableCell>
+                        <TableCell>
+                          {student && student.allClasses ? (
+                            // Afficher tous les groupes de l'étudiant pour toutes ses classes
+                            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                              {student.allClasses.map(cls => 
+                                cls.sub_class ? (
+                                  <Chip 
+                                    key={cls.classId}
+                                    size="small" 
+                                    label={`${cls.className} - Groupe ${cls.sub_class}`}
+                                    color="info" 
+                                    variant="outlined"
+                                    sx={{ cursor: 'default' }}
+                                  />
+                                ) : null
+                              )}
+                              {student.allClasses.every(cls => !cls.sub_class) && (
+                                <Typography variant="body2" color="text.secondary">
+                                  -
+                                </Typography>
+                              )}
+                            </Box>
+                          ) : student && student.sub_class ? (
+                            <Chip 
+                              size="small" 
+                              label={`Groupe ${student.sub_class}`} 
+                              color="info" 
+                              variant="outlined"
+                              sx={{ cursor: 'default' }}
+                            />
+                          ) : (
                             <Typography variant="body2" color="text.secondary">
                               -
                             </Typography>
                           )}
-                        </Box>
-                      ) : student && student.sub_class ? (
-                        <Chip 
-                          size="small" 
-                          label={`Groupe ${student.sub_class}`} 
-                          color="info" 
-                          variant="outlined"
-                          sx={{ cursor: 'default' }}
-                        />
-                      ) : (
-                        <Typography variant="body2" color="text.secondary">
-                          -
-                        </Typography>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      {student.corrections_count ? (
-                        <Tooltip title="Consulter tous les corrections">
-                          <Chip 
-                            size="small"
-                            label={student.corrections_count}
-                            color="success"
-                            component={Link}
-                            href={`/students/${student.id}`}
-                            clickable
-                            sx={{ 
-                              cursor: 'pointer',
-                              '&:hover': { 
-                                boxShadow: '0 1px 3px rgba(0,0,0,0.12)',
-                                backgroundColor: 'rgba(46, 125, 50, 0.08)'
-                              }
-                            }}
-                          />
-                        </Tooltip>
-                      ) : (
-                        <Typography variant="body2" color="text.secondary">
-                          Aucune
-                        </Typography>
-                      )}
-                    </TableCell>
-                    <TableCell align="center">
-                      <Box sx={{ display: 'flex', gap: 0.5, justifyContent: 'flex-end' }}>
-                        <Tooltip title="Modifier étudiant">
-                          <IconButton
-                            size="small"
-                            sx={{ color: theme => theme.palette.text.secondary }}
-                            onClick={() => handleEditClick(student)}
-                          >
-                            <EditIcon fontSize="small" />
-                          </IconButton>
-                        </Tooltip>
-                        <Tooltip title="Consulter étudiant">
-                              <IconButton
-                              size="small"
-                              color="info"
-                              component={student?.id ? Link : 'button'}
-                              href={student?.id ? `/students/${student.id}` : undefined}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              disabled={!student?.id}
-                              >
-                              {student?.id ? (
-                                <OpenInNewIcon fontSize="small" />
-                              ) : (
-                                <LinkOffIcon fontSize="small" />
-                              )}
-                              </IconButton>
-                        </Tooltip>
-
-                        
-                        {confirmingDelete === student.id ? (
-                          <>
-                            <Tooltip title="Confirmer la suppression">
-                              <IconButton
+                        </TableCell>
+                        <TableCell>
+                          {student.corrections_count ? (
+                            <Tooltip title="Consulter tous les corrections">
+                              <Chip 
                                 size="small"
+                                label={student.corrections_count}
                                 color="success"
-                                onClick={() => handleConfirmDelete(student.id!)}
-                              >
-                                <CheckIcon fontSize="small" />
-                              </IconButton>
+                                component={Link}
+                                href={`/students/${student.id}`}
+                                clickable
+                                sx={{ 
+                                  cursor: 'pointer',
+                                  '&:hover': { 
+                                    boxShadow: '0 1px 3px rgba(0,0,0,0.12)',
+                                    backgroundColor: 'rgba(46, 125, 50, 0.08)'
+                                  }
+                                }}
+                              />
                             </Tooltip>
-                            <Tooltip title="Annuler">
+                          ) : (
+                            <Typography variant="body2" color="text.secondary">
+                              Aucune
+                            </Typography>
+                          )}
+                        </TableCell>
+                        <TableCell align="center">
+                          <Box sx={{ display: 'flex', gap: 0.5, justifyContent: 'flex-end' }}>
+                            <Tooltip title="Modifier étudiant">
                               <IconButton
                                 size="small"
-                                color="inherit"
-                                onClick={handleCancelDelete}
+                                sx={{ color: theme => theme.palette.text.secondary }}
+                                onClick={() => handleEditClick(student)}
                               >
-                                <CloseIcon fontSize="small" />
+                                <EditIcon fontSize="small" />
                               </IconButton>
                             </Tooltip>
-                          </>
-                        ) : (
-                          <Tooltip title="Effacer étudiant">
-                            <IconButton
-                              size="small"
-                              color="error"
-                              onClick={() => handleDeleteClick(student.id!)}
-                            >
-                              <DeleteIcon fontSize="small" />
-                            </IconButton>
-                          </Tooltip>
-                        )}
-                      </Box>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </TableContainer>
-          <TablePagination
-            rowsPerPageOptions={[5, 10, 25, 50]}
-            component="div"
-            count={filteredStudents.length}
-            rowsPerPage={rowsPerPage}
-            page={page}
-            onPageChange={handleChangePage}
-            onRowsPerPageChange={handleChangeRowsPerPage}
-            labelRowsPerPage="Lignes par page"
-            labelDisplayedRows={({ from, to, count }) => `${from}-${to} of ${count}`}
-          />
+                            <Tooltip title="Consulter étudiant">
+                                  <IconButton
+                                  size="small"
+                                  color="info"
+                                  component={student?.id ? Link : 'button'}
+                                  href={student?.id ? `/students/${student.id}` : undefined}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  disabled={!student?.id}
+                                  >
+                                  {student?.id ? (
+                                    <OpenInNewIcon fontSize="small" />
+                                  ) : (
+                                    <LinkOffIcon fontSize="small" />
+                                  )}
+                                  </IconButton>
+                            </Tooltip>
+
+                            
+                            {confirmingDelete === student.id ? (
+                              <>
+                                <Tooltip title="Confirmer la suppression">
+                                  <IconButton
+                                    size="small"
+                                    color="success"
+                                    onClick={() => handleConfirmDelete(student.id!)}
+                                  >
+                                    <CheckIcon fontSize="small" />
+                                  </IconButton>
+                                </Tooltip>
+                                <Tooltip title="Annuler">
+                                  <IconButton
+                                    size="small"
+                                    color="inherit"
+                                    onClick={handleCancelDelete}
+                                  >
+                                    <CloseIcon fontSize="small" />
+                                  </IconButton>
+                                </Tooltip>
+                              </>
+                            ) : (
+                              <Tooltip title="Effacer étudiant">
+                                <IconButton
+                                  size="small"
+                                  color="error"
+                                  onClick={() => handleDeleteClick(student.id!)}
+                                >
+                                  <DeleteIcon fontSize="small" />
+                                </IconButton>
+                              </Tooltip>
+                            )}
+                          </Box>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+              <TablePagination
+                rowsPerPageOptions={[5, 10, 25, 50]}
+                component="div"
+                count={filteredStudents.length}
+                rowsPerPage={rowsPerPage}
+                page={page}
+                onPageChange={handleChangePage}
+                onRowsPerPageChange={handleChangeRowsPerPage}
+                labelRowsPerPage="Lignes par page"
+                labelDisplayedRows={({ from, to, count }) => `${from}-${to} of ${count}`}
+              />
+            </>
+          )}
         </>
       )}
       

@@ -30,10 +30,12 @@ export async function GET(
     return await withConnection(async (connection) => {
       const [rows] = await connection.query(
         `SELECT c.*, a.name as activity_name, 
-         CONCAT(s.first_name, ' ', s.last_name) as student_name
+         s.first_name, s.last_name,
+         sc.code as shareCode
          FROM corrections c 
          JOIN activities a ON c.activity_id = a.id 
          LEFT JOIN students s ON c.student_id = s.id
+         LEFT JOIN share_codes sc ON c.id = sc.correction_id AND sc.is_active = 1
          WHERE c.activity_id = ? 
          ORDER BY c.created_at DESC`,
         [activityId]

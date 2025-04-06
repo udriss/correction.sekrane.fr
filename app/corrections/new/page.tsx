@@ -18,7 +18,7 @@ import {
   ListItemIcon,
   List,
 } from '@mui/material';
-import AssignmentIndIcon from '@mui/icons-material/AssignmentInd';
+import PersonIcon from '@mui/icons-material/Person';
 import GroupsIcon from '@mui/icons-material/Groups';
 import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
 import GradeTwoToneIcon from '@mui/icons-material/GradeTwoTone';
@@ -205,13 +205,13 @@ export default function NewCorrectionPage() {
                     boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
                   }}
                 >
-                  <AssignmentIndIcon sx={{color:"text.primary", backgroundColor: 'secondary'}} fontSize="large" />
+                  <PersonIcon sx={{color:"text.primary", backgroundColor: 'secondary'}} fontSize="large" />
                 </Box>
                 <Typography variant="h5" component="h2" fontWeight="bold">
                   Correction unique
                 </Typography>
               </Box>
-              <Typography variant="body1" paragraph>
+              <Typography variant="body1" >
                 Ajoutez une correction individuelle pour un étudiant spécifique.
               </Typography>
                       <Box style={fallbackBoxStyle}>
@@ -288,7 +288,7 @@ export default function NewCorrectionPage() {
                   Corrections multiples
                 </Typography>
               </Box>
-              <Typography variant="body1" paragraph>
+              <Typography variant="body1">
                 Ajoutez plusieurs corrections en une seule opération pour un groupe d'étudiants.
               </Typography>
               
@@ -334,7 +334,7 @@ export default function NewCorrectionPage() {
                 component={Link}
                 href="/corrections/multiples"
               >
-                Ajouter des corrections multiples
+                Ajouter des corrections en lot
               </Button>
             </CardActions>
           </Card>

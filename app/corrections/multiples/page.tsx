@@ -288,7 +288,11 @@ export default function MultipleCorrections() {
   // Handle successful correction creation
   const handleSuccessfulCreateCorrections = (createdCorrectionIds: string[]) => {
     if (createdCorrectionIds.length > 0) {
-      setSuccessMessage(`${createdCorrectionIds.length} correction(s) créée(s) avec succès`);
+      setSuccessMessage(
+        createdCorrectionIds.length === 1 
+          ? `1 correction ajoutée avec succès` 
+          : `${createdCorrectionIds.length} corrections ajoutées avec succès`
+      );
       
       // If we have selectedClassId, we don't need to create a group
       // Only create a group if there's no class ID but we have a group name

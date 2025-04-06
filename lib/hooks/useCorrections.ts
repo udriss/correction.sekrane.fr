@@ -47,6 +47,7 @@ export function useCorrections(correctionId: string) {
   const [editedName, setEditedName] = useState('');
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
+  const [email, setEmail] = useState('');
   const [isEditingName, setIsEditingName] = useState(false);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const router = useRouter();
@@ -82,6 +83,7 @@ export function useCorrections(correctionId: string) {
         // Use the dedicated student_data object when available
         setFirstName(data.student_data.first_name || '');
         setLastName(data.student_data.last_name || '');
+        setEmail(data.student_data.email || ''); // Charger l'email
         // Set the display name using student_data
         const displayName = `${data.student_data.first_name || ''} ${data.student_data.last_name || ''}`.trim();
         setEditedName(displayName || data.student_name || '');
@@ -89,6 +91,7 @@ export function useCorrections(correctionId: string) {
         // Fallback to direct properties in the correction object
         setFirstName(data.student_first_name || '');
         setLastName(data.student_last_name || '');
+        setEmail(''); // Email vide par défaut si pas de student_data
         setEditedName(data.student_name || '');
       }
       
@@ -107,7 +110,7 @@ export function useCorrections(correctionId: string) {
     } finally {
       setLoading(false);
     }
-  }, [correctionId, setFirstName, setLastName, setEditedName, setContentItems, setCorrection, setError, setLoading]);
+  }, [correctionId, setFirstName, setLastName, setEmail, setEditedName, setContentItems, setCorrection, setError, setLoading]);
 
   // Save the correction
   const handleSaveCorrection = useCallback(async () => {
@@ -145,12 +148,17 @@ export function useCorrections(correctionId: string) {
   }, [correction, contentItems, correctionId]);
 
   // Save the student name with more robust state handling
-  const handleSaveName = useCallback(async (overrideFirstName?: string, overrideLastName?: string) => {
+  const handleSaveName = useCallback(async (
+    overrideFirstName?: string, 
+    overrideLastName?: string, 
+    overrideEmail?: string
+  ) => {
     if (!correction) return;
     
     // Use override values if provided, otherwise use state values
     const firstNameToSend = overrideFirstName !== undefined ? overrideFirstName : firstName;
     const lastNameToSend = overrideLastName !== undefined ? overrideLastName : lastName;
+    const emailToSend = overrideEmail !== undefined ? overrideEmail : email;
 
     // Validate before proceeding
     if (!firstNameToSend && !lastNameToSend) {
@@ -158,11 +166,17 @@ export function useCorrections(correctionId: string) {
       return;
     }
     
+    // Validate email format if provided
+    if (emailToSend && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailToSend)) {
+      setError('Format d\'email invalide');
+      return;
+    }
+    
     setError('');
     setSaving(true);
     
     try {
-      // Direct API call
+      // Direct API call with email added to the payload
       const response = await fetch(`/api/corrections/${correctionId}/name`, {
         method: 'PUT',
         headers: {
@@ -170,7 +184,8 @@ export function useCorrections(correctionId: string) {
         },
         body: JSON.stringify({
           student_first_name: firstNameToSend,
-          student_last_name: lastNameToSend
+          student_last_name: lastNameToSend,
+          student_email: emailToSend // Ajout du champ email
         }),
       });
       
@@ -182,10 +197,10 @@ export function useCorrections(correctionId: string) {
       
       const updatedData = await response.json();
 
-      // IMPORTANT: First update local state with the values we just sent
-      // This ensures immediate consistency with what user entered
+      // Update local state with the values we just sent
       setFirstName(firstNameToSend);
       setLastName(lastNameToSend);
+      setEmail(emailToSend);
       
       // Then update the correction object with API response data
       setCorrection(prev => {
@@ -195,8 +210,8 @@ export function useCorrections(correctionId: string) {
         const updated = {
           ...prev,
           studentName: updatedData.student_name || `${firstNameToSend} ${lastNameToSend}`.trim(),
-          firstName: firstNameToSend, // Use our sent values to ensure consistency
-          lastName: lastNameToSend,   // Use our sent values to ensure consistency
+          firstName: firstNameToSend,
+          lastName: lastNameToSend,
           student_name: updatedData.student_name || `${firstNameToSend} ${lastNameToSend}`.trim(),
           student_first_name: firstNameToSend,
           student_last_name: lastNameToSend,
@@ -204,8 +219,14 @@ export function useCorrections(correctionId: string) {
           student_data: prev.student_data ? {
             ...prev.student_data,
             first_name: firstNameToSend,
-            last_name: lastNameToSend
-          } : undefined
+            last_name: lastNameToSend,
+            email: emailToSend // Mise à jour de l'email dans student_data
+          } : {
+            // Create student_data if it doesn't exist
+            first_name: firstNameToSend,
+            last_name: lastNameToSend,
+            email: emailToSend
+          }
         };        
         return updated;
       });
@@ -215,18 +236,18 @@ export function useCorrections(correctionId: string) {
       setEditedName(combinedName);
       
       setIsEditingName(false);
-      setSuccessMessage('Nom mis à jour avec succès');
+      setSuccessMessage('Informations de l\'étudiant mises à jour avec succès');
       
       setTimeout(() => {
         setSuccessMessage('');
       }, 3000);
     } catch (err) {
       console.error('[useCorrections] Error in handleSaveName:', err);
-      setError('Erreur lors de la mise à jour du nom');
+      setError('Erreur lors de la mise à jour des informations de l\'étudiant');
     } finally {
       setSaving(false);
     }
-  }, [correction, correctionId, firstName, lastName]);
+  }, [correction, correctionId, firstName, lastName, email]);
 
   // Save the grade and penalty
   const saveGradeAndPenalty = useCallback(async (
@@ -387,17 +408,19 @@ export function useCorrections(correctionId: string) {
     error,
     successMessage,
     editedName,
-    firstName,        // Add the new state variables
+    firstName,
     lastName,
+    email,
     isEditingName,
     confirmingDelete,
     setContentItems,
     setError,
     setSuccessMessage,
     setEditedName,
-    setFirstName,     // Add setters for new state variables
+    setFirstName,
     setLastName,
-    updateNameFromParts, // Add the new utility function
+    setEmail,
+    updateNameFromParts,
     setIsEditingName,
     saveToHistory,
     handleUndo,

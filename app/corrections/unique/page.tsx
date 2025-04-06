@@ -204,7 +204,7 @@ export default function UniqueCorrection() {
   // Handle successful correction creation
   const handleSuccessfulCreateCorrection = (createdCorrectionId: string) => {
     if (createdCorrectionId) {
-      setSuccessMessage(`Correction créée avec succès`);
+      setSuccessMessage(`Correction ajoutée avec succès`);
       
       // Redirect to the correction page after successful creation
       setTimeout(() => {

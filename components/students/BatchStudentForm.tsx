@@ -79,6 +79,7 @@ const BatchStudentForm: React.FC<BatchStudentFormProps> = ({
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   
+  
   // Ajouter des états pour la gestion des étapes
   const [activeStep, setActiveStep] = useState(0);
   const steps = ['Chargement du fichier', 'Vérification des données', 'Confirmation'];
@@ -114,6 +115,7 @@ const BatchStudentForm: React.FC<BatchStudentFormProps> = ({
     updatedStudents[index] = { ...updatedStudents[index], [field]: value };
     setBatchStudents(updatedStudents);
   };
+
 
   const handleClickUploadButton = () => {
     if (fileInputRef.current) {
@@ -177,13 +179,7 @@ const BatchStudentForm: React.FC<BatchStudentFormProps> = ({
       const parsedData = parseCSVContent(text);
       
       // Transformer les données parsées au format attendu par le composant
-      const parsedStudents: BatchStudent[] = parsedData.map(data => ({
-        first_name: data.firstName,
-        last_name: data.lastName,
-        email: data.email || undefined,
-        gender: 'N',
-        sub_class: null
-      }));
+      const parsedStudents: BatchStudent[] = initializeImportedStudents(parsedData);
       
       setProcessedStudents(parsedStudents);
       setBatchStudents(parsedStudents);
@@ -197,6 +193,17 @@ const BatchStudentForm: React.FC<BatchStudentFormProps> = ({
     } finally {
       setLoading(false);
     }
+  };
+
+  // Fonction pour initialiser les étudiants importés
+  const initializeImportedStudents = (parsedData: any[]): BatchStudent[] => {
+    return parsedData.map(data => ({
+      first_name: data.firstName,
+      last_name: data.lastName,
+      email: data.email || undefined,
+      gender: 'N' as 'M' | 'F' | 'N', // Forcer le type avec une assertion
+      sub_class: null
+    }));
   };
 
   // Modifier la fonction pour marquer au lieu de supprimer
@@ -278,6 +285,15 @@ const BatchStudentForm: React.FC<BatchStudentFormProps> = ({
     const updatedStudents = [...batchStudents];
     updatedStudents[index] = { ...updatedStudents[index], [field]: value };
     setBatchStudents(updatedStudents);
+  };
+
+  // Add a function to delete a student from the batch
+  const handleDeleteStudent = (index: number) => {
+    setBatchStudents(prevStudents => {
+      const updatedStudents = [...prevStudents];
+      updatedStudents.splice(index, 1); // Remove the student at the specified index
+      return updatedStudents;
+    });
   };
 
   return (
@@ -392,7 +408,7 @@ const BatchStudentForm: React.FC<BatchStudentFormProps> = ({
                     filter: 'brightness(1.3)',
                   }
                 }}
-                  > Ajouter {manualStudentCount} ligne{manualStudentCount > 1 ? 's' : ''}
+                  > Afficher {manualStudentCount} ligne{manualStudentCount > 1 ? 's' : ''}
                   </Button>
             </Box>
 
@@ -405,6 +421,7 @@ const BatchStudentForm: React.FC<BatchStudentFormProps> = ({
                   <Table size="small">
                     <TableHead>
                       <TableRow>
+                        <TableCell width="40px"></TableCell>
                         <TableCell>Prénom*</TableCell>
                         <TableCell>Nom</TableCell>
                         <TableCell>Email</TableCell>
@@ -417,6 +434,22 @@ const BatchStudentForm: React.FC<BatchStudentFormProps> = ({
                     <TableBody>
                       {batchStudents.map((student, index) => (
                         <TableRow key={index}>
+                          <TableCell>
+                            <Tooltip title="Supprimer cet étudiant">
+                              <IconButton
+                                size="small"
+                                color="error"
+                                onClick={() => handleDeleteStudent(index)}
+                                sx={{
+                                  '&:hover': {
+                                    backgroundColor: 'rgba(211, 47, 47, 0.04)'
+                                  }
+                                }}
+                              >
+                                <DeleteIcon fontSize="small" />
+                              </IconButton>
+                            </Tooltip>
+                          </TableCell>
                           <TableCell>
                             <TextField
                               size="small"
@@ -499,7 +532,7 @@ const BatchStudentForm: React.FC<BatchStudentFormProps> = ({
                 color="success"
                 disabled={savingBatch}
                 startIcon={savingBatch ? <CircularProgress size={20} /> : <PersonAddIcon />}
-                onClick={handleCreateManualStudents}
+                onClick={handleAddBatchStudents}
                 sx={{
                   fontWeight: 600,
                   boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
@@ -692,6 +725,7 @@ const BatchStudentForm: React.FC<BatchStudentFormProps> = ({
                   <Table size="small">
                     <TableHead>
                       <TableRow>
+                        <TableCell width="40px"></TableCell>
                         <TableCell width="5%">#</TableCell>
                         <TableCell>Prénom*</TableCell>
                         <TableCell>Nom*</TableCell>
@@ -717,6 +751,23 @@ const BatchStudentForm: React.FC<BatchStudentFormProps> = ({
                             }
                           }}
                         >
+                          <TableCell>
+                            <Tooltip title="Supprimer définitivement cet étudiant">
+                              <IconButton
+                                size="small"
+                                color="error"
+                                onClick={() => handleDeleteStudent(index)}
+                                disabled={student.markedForDeletion}
+                                sx={{
+                                  '&:hover': {
+                                    backgroundColor: 'rgba(211, 47, 47, 0.04)'
+                                  }
+                                }}
+                              >
+                                <DeleteIcon fontSize="small" />
+                              </IconButton>
+                            </Tooltip>
+                          </TableCell>
                           <TableCell>{index + 1}</TableCell>
                           <TableCell>
                             <TextField

@@ -49,7 +49,7 @@ export async function GET(req: NextRequest) {
       [activityId, ...studentIds]
     );
     const rows = result as any[];
-    console.log('Corrections existantes:', rows);
+    
     return NextResponse.json(rows);
     
   } catch (error) {

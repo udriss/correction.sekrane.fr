@@ -95,7 +95,7 @@ const CorrectionsList: React.FC<CorrectionsListProps> = ({
           const isHighlighted = shouldHighlight(correction);
           // Récupérer le code de partage préchargé pour cette correction
           const preloadedShareCode = shareCodesMap.get(correction.id.toString());
-          console.log('isHighlighted CORRECTION:', isHighlighted);
+          
           return (
             <Grid size={{ xs: 12, sm: 6, md: 4 }} key={correction.id}>
                 {/* Contenu de la carte avec le code de partage préchargé */}

@@ -24,6 +24,17 @@ export interface Correction {
   sub_class?: string | null; // Ajout de la propriété sub_class
 }
 
+// Définition de l'interface Student pour typer correctement les étudiants
+interface Student {
+  id: number;
+  first_name: string;
+  last_name: string;
+  name: string;
+  email?: string;
+  gender?: string;
+  sub_class: string | null;
+}
+
 interface FilterState {
   search: string;
   classId: string;
@@ -35,6 +46,7 @@ interface FilterState {
   maxGrade: string;
   recent: boolean;
   correctionId: string; // Nouvel ajout pour filtrer par ID de correction
+  subClassId: string; // Add this property
 }
 
 interface SortOption {
@@ -115,7 +127,8 @@ export const CorrectionsProvider: React.FC<CorrectionsProviderProps> = ({
     minGrade: initialFilters.minGrade || '',
     maxGrade: initialFilters.maxGrade || '',
     recent: initialFilters.recent || false,
-    correctionId: initialFilters.correctionId || '' // Initialiser avec la valeur fournie ou vide
+    correctionId: initialFilters.correctionId || '', // Initialiser avec la valeur fournie ou vide
+    subClassId: initialFilters.subClassId || '' // Initialiser avec la valeur fournie ou vide
   });
   
   const [sortOptions, setSortOptions] = useState<SortOption>({
@@ -151,6 +164,9 @@ export const CorrectionsProvider: React.FC<CorrectionsProviderProps> = ({
         correction.class_id === parseInt(filters.classId)
       );
     }
+    
+    // Le filtrage par sous-groupe (subClassId) est traité dans un effet séparé ci-dessous
+    // pour permettre la récupération asynchrone des étudiants du sous-groupe
     
     if (filters.studentId && activeFilters.includes('studentId')) {
       filtered = filtered.filter(correction => 
@@ -247,6 +263,42 @@ export const CorrectionsProvider: React.FC<CorrectionsProviderProps> = ({
     
     setFilteredCorrections(filtered);
   }, [corrections, filters, activeFilters, sortOptions]);
+
+  // Effet pour récupérer les étudiants du sous-groupe quand le filtre change
+  useEffect(() => {
+    // Si un filtre de sous-groupe est actif et qu'une classe est sélectionnée
+    if (filters.subClassId && activeFilters.includes('subClassId') && filters.classId) {
+      const groupNumber = parseInt(filters.subClassId);
+      console.log('Selected subgroup:', filters.subClassId, 'Group number (as number):', groupNumber);
+      
+      // Récupérer les étudiants de la classe
+      fetch(`/api/classes/${filters.classId}/students`)
+        .then(response => response.json())
+        .then(students => {
+          // Filtrer les étudiants appartenant au sous-groupe spécifié
+          const studentsInGroup = students.filter((student: Student) => 
+            student.sub_class && parseInt(student.sub_class) === groupNumber
+          );
+          
+          // Récupérer les IDs des étudiants dans ce sous-groupe
+          const studentIdsInGroup = studentsInGroup.map((student: Student) => student.id);
+          console.log(`Trouvé ${studentIdsInGroup.length} étudiants dans le groupe ${groupNumber}`);
+          
+          // Appliquer le filtrage sur les corrections
+          if (corrections.length) {
+            const filtered = corrections.filter(correction => {
+              // Ne garder que les corrections des étudiants de ce sous-groupe
+
+              return studentIdsInGroup.includes(correction.student_id);
+            });
+            
+            // Appliquer les autres filtres à ces corrections filtrées
+            setFilteredCorrections(filtered);
+          }
+        })
+        .catch(err => console.error('Erreur lors de la récupération des étudiants:', err));
+    }
+  }, [filters.subClassId, filters.classId, activeFilters, corrections]);
   
   // Appliquer un filtre
   const applyFilter = (filterName: string) => {
@@ -279,7 +331,8 @@ export const CorrectionsProvider: React.FC<CorrectionsProviderProps> = ({
       minGrade: '',
       maxGrade: '',
       recent: false,
-      correctionId: ''
+      correctionId: '',
+      subClassId: ''
     });
   };
   

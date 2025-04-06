@@ -202,7 +202,7 @@ export default function ClassForm({ classData, onSuccess, onError }: ClassFormPr
                   startIcon={<SaveIcon />}
                   sx={{ borderRadius: 1.5, px: 4 }}
                 >
-                  {loading ? 'Enregistrement...' : classData ? 'Mettre à jour' : 'Créer la classe'}
+                  {loading ? 'Enregistrement...' : classData ? 'Mettre à jour' : 'Ajouter la classe'}
                 </Button>
               </Box>
             </Box>

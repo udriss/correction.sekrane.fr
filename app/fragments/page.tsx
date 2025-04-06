@@ -37,8 +37,11 @@ import { Category, Activity } from '@/types/fragments';
 import type { Fragment as ImportedFragment } from '@/types/fragments';
 
 // Define a compatible Fragment type that doesn't allow null for activity_name
+// Include UI-specific properties for rendering and updates
 type Fragment = Omit<ImportedFragment, 'activity_name'> & {
   activity_name?: string;
+  _forceUpdate?: number;
+  _renderKey?: number;
 };
 
 export default function FragmentsLibraryPage() {
@@ -79,6 +82,8 @@ export default function FragmentsLibraryPage() {
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [editingFragment, setEditingFragment] = useState<Fragment | null>(null);
   const [editingSuccess, setEditingSuccess] = useState(false);
+  // Ajout d'un état pour suivre l'ID du fragment en cours de mise à jour
+  const [updatingFragmentId, setUpdatingFragmentId] = useState<number | undefined>(undefined);
 
   const [newFragmentModalOpen, setNewFragmentModalOpen] = useState(false);
   const [creatingSuccess, setCreatingSuccess] = useState(false);
@@ -307,7 +312,18 @@ export default function FragmentsLibraryPage() {
   
   const indexOfLastFragment = page * fragmentsPerPage;
   const indexOfFirstFragment = indexOfLastFragment - fragmentsPerPage;
-  const currentFragments = filteredFragments.slice(indexOfFirstFragment, indexOfLastFragment);
+  
+  // Génération d'une clé de fragment unique pour forcer la mise à jour des composants enfants
+  const fragmentsWithKeys = React.useMemo(() => {
+    return filteredFragments.map(fragment => ({
+      ...fragment,
+      // Utiliser un nombre au lieu d'une chaîne pour _renderKey
+      _renderKey: Date.now() + Math.random() 
+    }));
+  }, [filteredFragments]);
+  
+  // Utiliser les fragments avec clés pour la pagination
+  const currentFragments = fragmentsWithKeys.slice(indexOfFirstFragment, indexOfLastFragment);
   const totalPages = Math.ceil(filteredFragments.length / fragmentsPerPage);
   
   const copyToClipboard = async (text: string) => {
@@ -419,7 +435,7 @@ export default function FragmentsLibraryPage() {
         throw new Error(errorData.error || 'Erreur lors de la création de la catégorie');
       }
       
-      // Récupérer la nouvelle catégorie créée avec son ID
+      // Récupérer la nouvelle catégorie ajoutée avec son ID
       const newCategoryData = await response.json();
       
       // Mettre à jour l'interface utilisateur
@@ -554,12 +570,12 @@ export default function FragmentsLibraryPage() {
   };
 
   const handleEditSuccess = (updatedFragment: ImportedFragment) => {
-    
+    // Définir l'ID du fragment en cours de mise à jour pour afficher le spinner
+    setUpdatingFragmentId(updatedFragment.id);
     
     // Vérifier et normaliser les tags
     // Si les tags sont vides et qu'il y a un fragment en édition, utiliser ses tags
     if (Array.isArray(updatedFragment.tags) && updatedFragment.tags.length === 0 && editingFragment) {
-      
       updatedFragment.tags = [...editingFragment.tags];
     }
     
@@ -567,57 +583,64 @@ export default function FragmentsLibraryPage() {
     const normalizedTags = Array.isArray(updatedFragment.tags) ? 
       [...updatedFragment.tags] : 
       (typeof updatedFragment.tags === 'string' ? 
-        JSON.parse(updatedFragment.tags) : []);
+        JSON.parse(updatedFragment.tags as string) : []);
     
-    // S'assurer que les catégories sont toujours un tableau
-    const normalizedCategories = updatedFragment.categories || [];
+    // Forcer une mise à jour visuelle avec un nouvel objet et un timestamp
+    const normalizedUpdateTime = Date.now();
     
-    // Créer une copie profonde avec les données normalisées
+    // Créer un fragment normalisé qui est compatible avec le type Fragment
     const normalizedFragment: Fragment = {
-      ...JSON.parse(JSON.stringify(updatedFragment)), // Deep copy
-      activity_name: updatedFragment.activity_name || undefined,
+      ...updatedFragment,
       tags: normalizedTags,
-      categories: normalizedCategories,
-      _forceUpdate: Date.now() // Ajouter un timestamp pour forcer la mise à jour
+      // Convertir null en undefined pour activity_name pour résoudre l'erreur de type
+      activity_name: updatedFragment.activity_name === null ? undefined : updatedFragment.activity_name,
+      // Ces propriétés supplémentaires sont utilisées pour forcer la mise à jour visuelle
+      _forceUpdate: normalizedUpdateTime,
+      _renderKey: Math.random(),
     };
     
+    // Mettre à jour le fragment dans le tableau et définir le succès
+    setFragments(prevFragments => {
+      return prevFragments.map(f => {
+        if (f.id === normalizedFragment.id) {
+          
+          return normalizedFragment; // Remplacer par le fragment mis à jour complet
+        }
+        return f;
+      });
+    });
     
+    // Forcer la mise à jour des fragments filtrés également
+    setFilteredFragments(prevFiltered => {
+      return prevFiltered.map(f => {
+        if (f.id === normalizedFragment.id) {
+          
+          return normalizedFragment;  // Remplacer par le fragment mis à jour complet
+        }
+        return f;
+      });
+    });
     
-    // Marquer l'édition comme réussie
+    // Mettre à jour fragmentsData pour forcer le rendu de la liste
+    setFragmentsData(prev => ({
+      ...prev,
+      lastUpdated: normalizedUpdateTime
+    }));
+    
     setEditingSuccess(true);
-    
-    // Créer de nouvelles références pour tous les tableaux d'état
-    const updatedFragmentsData = {
-      fragments: fragmentsData.fragments.map(f => 
-        f.id === normalizedFragment.id ? {...normalizedFragment} : {...f}
-      ),
-      lastUpdated: Date.now(),
-      isStale: false
-    };
-    
-    // Mettre à jour l'état principal
-    setFragmentsData(updatedFragmentsData);
-    
-    // Mettre à jour les états classiques
-    const updatedFragmentsList = fragments.map(f => 
-      f.id === normalizedFragment.id ? {...normalizedFragment} : {...f}
-    );
-    
-    setFragments([...updatedFragmentsList]);
-    
-    // Forcer la mise à jour des fragments filtrés immédiatement
-    setFilteredFragments(prev => prev.map(f => 
-      f.id === normalizedFragment.id ? {...normalizedFragment} : {...f}
-    ));
-    
-    // Notification de succès
     setNotification({
       open: true,
       message: 'Fragment mis à jour avec succès',
       severity: 'success'
     });
     
-    // Fermer le modal après un délai
+    // Réinitialiser l'ID du fragment en cours de mise à jour après un délai
+    // pour que le spinner disparaisse progressivement
+    setTimeout(() => {
+      setUpdatingFragmentId(undefined);
+    }, 800);
+    
+    // Fermer la modal après un délai
     setTimeout(() => {
       setEditModalOpen(false);
       setEditingFragment(null);
@@ -811,6 +834,8 @@ export default function FragmentsLibraryPage() {
     );
   }
 
+
+
   return (
     <Box
       className="max-w-4xl mx-auto"
@@ -860,6 +885,7 @@ export default function FragmentsLibraryPage() {
           setPage={setPage}
           theme={theme}
           lastUpdated={fragmentsData.lastUpdated} // Passer le timestamp pour forcer la mise à jour
+          updatingFragmentId={updatingFragmentId} // Passer l'ID du fragment en cours de mise à jour
         />
       </Container>
       

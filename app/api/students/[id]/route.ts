@@ -153,9 +153,9 @@ export async function PUT(
     
     
     // Validate required fields - make these match your actual field names in the form
-    if (!studentData.first_name || !studentData.last_name || !studentData.email) {
+    if (!studentData.first_name || !studentData.last_name) {
       return NextResponse.json(
-        { error: 'First name, last name and email are required' }, 
+        { error: 'First name and last name are required' }, 
         { status: 400 }
       );
     }
@@ -230,7 +230,7 @@ export async function PUT(
         WHERE student_id = ?
       `, [studentId]);
 
-      console.log('Current associations:', currentAssociations);
+      
       
       const currentClassIds = currentAssociations.map(assoc => assoc.class_id);
       

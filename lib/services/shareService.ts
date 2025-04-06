@@ -16,9 +16,12 @@ export interface ShareResponse {
  * @param correctionId ID de la correction
  * @returns Objet contenant existe (boolean) et code (string) si trouvé
  */
-export async function getExistingShareCode(correctionId: string): Promise<{ exists: boolean, code?: string }> {
+export async function getExistingShareCode(correctionId: string | number): Promise<{ exists: boolean, code?: string }> {
   try {
-    const response = await fetch(`/api/corrections/${correctionId}/share`, {
+    // Convert number to string if needed
+    const id = typeof correctionId === 'number' ? correctionId.toString() : correctionId;
+
+    const response = await fetch(`/api/corrections/${id}/share`, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
@@ -43,17 +46,20 @@ export async function getExistingShareCode(correctionId: string): Promise<{ exis
  * @param correctionId ID de la correction
  * @returns Objet contenant isNew (boolean) et code (string)
  */
-export async function generateShareCode(correctionId: string): Promise<{ isNew: boolean, code: string }> {
+export async function generateShareCode(correctionId: string | number): Promise<{ isNew: boolean, code: string }> {
   try {
+    // Convert number to string if needed
+    const id = typeof correctionId === 'number' ? correctionId.toString() : correctionId;
+
     // Try to get existing code first
-    const existingCode = await getExistingShareCode(correctionId);
+    const existingCode = await getExistingShareCode(id);
     
     if (existingCode.exists && existingCode.code) {
       return { isNew: false, code: existingCode.code };
     }
     
     // If no existing code, generate a new one
-    const response = await fetch(`/api/corrections/${correctionId}/share`, {
+    const response = await fetch(`/api/corrections/${id}/share`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -73,9 +79,12 @@ export async function generateShareCode(correctionId: string): Promise<{ isNew: 
   }
 }
 
-export async function deactivateShareCode(correctionId: string): Promise<boolean> {
+export async function deactivateShareCode(correctionId: string | number): Promise<boolean> {
   try {
-    const response = await fetch(`/api/corrections/${correctionId}/share`, {
+    // Convert number to string if needed
+    const id = typeof correctionId === 'number' ? correctionId.toString() : correctionId;
+
+    const response = await fetch(`/api/corrections/${id}/share`, {
       method: 'DELETE',
     });
     
@@ -107,16 +116,19 @@ export async function getShareCodeDetails(code: string): Promise<ShareCode | nul
  * @param correctionIds Liste des IDs de corrections
  * @returns Map des codes de partage indexés par ID de correction
  */
-export async function getBatchShareCodes(correctionIds: string[]): Promise<Map<string, string>> {
+export async function getBatchShareCodes(correctionIds: (string | number)[]): Promise<Map<string, string>> {
   try {
     if (!correctionIds.length) return new Map();
+
+    // Convert number IDs to strings if needed
+    const ids = correctionIds.map(id => typeof id === 'number' ? id.toString() : id);
     
     const response = await fetch(`/api/share/batch`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ correctionIds }),
+      body: JSON.stringify({ correctionIds: ids }),
     });
 
     if (!response.ok) {

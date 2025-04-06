@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import {
   Container, Paper, Typography, Box, Chip, Button, 
@@ -9,6 +9,8 @@ import {
   SelectChangeEvent, InputAdornment, Tabs, Tab, 
 } from '@mui/material';
 import Grid from '@mui/material/Grid';
+import { useSnackbar } from 'notistack';
+import { Correction, CorrectionWithShareCode } from '@/lib/types';
 
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import { LocalizationProvider, DatePicker } from '@mui/x-date-pickers';
@@ -25,6 +27,7 @@ import SearchIcon from '@mui/icons-material/Search';
 import GradeIcon from '@mui/icons-material/Grade';
 import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward';
 import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward';
+import RecentActorsIcon from '@mui/icons-material/RecentActors';
 import dayjs from 'dayjs';
 import LoadingSpinner from '@/components/LoadingSpinner';
 import GradientBackground from '@/components/ui/GradientBackground';
@@ -34,7 +37,10 @@ import CorrectionsList from '@/components/allCorrections/CorrectionsList';
 import ClassesList from '@/components/allCorrections/ClassesList';
 import StudentsList from '@/components/allCorrections/StudentsList';
 import ChronologyList from '@/components/allCorrections/ChronologyList';
-
+import { generateQRCodePDF } from '@/utils/qrGeneratorPDF';
+import QrCodeIcon from '@mui/icons-material/QrCode';
+import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf';
+import GroupIcon from '@mui/icons-material/Group';
 
 // Composant principal qui utilise le provider
 export default function CorrectionsPage() {
@@ -49,7 +55,8 @@ export default function CorrectionsPage() {
     activityId: searchParams?.get('activityId') || '',
     recent: searchParams?.get('recent') === 'true',
     highlight: searchParams?.get('highlight') || '',
-    correctionId: searchParams?.get('correctionId') || ''
+    correctionId: searchParams?.get('correctionId') || '',
+    subClassId: searchParams?.get('subClassId') || '', // Add subClassId to initialFilters
   };
   
   const initialSort = {
@@ -67,7 +74,9 @@ export default function CorrectionsPage() {
 // Composant qui affiche le contenu
 function CorrectionsContent() {
   const router = useRouter();
+  // Fix the type error by directly using useSearchParams without React.use
   const searchParams = useSearchParams();
+  const { enqueueSnackbar } = useSnackbar();
   
   // Utiliser le hook pour accéder aux données et fonctions
   const { 
@@ -89,7 +98,9 @@ function CorrectionsContent() {
   // State pour la gestion des menus
   const [sortAnchorEl, setSortAnchorEl] = useState<null | HTMLElement>(null);
   const [filterAnchorEl, setFilterAnchorEl] = useState<null | HTMLElement>(null);
-  const [tabValue, setTabValue] = useState(0);
+  
+  // Add state for available sub-classes
+  const [availableSubClasses, setAvailableSubClasses] = useState<{id: string, name: string}[]>([]);
   
   // Gérer l'initialisation des filtres actifs à partir de l'URL
   useEffect(() => {
@@ -100,9 +111,48 @@ function CorrectionsContent() {
     if (searchParams?.get('activityId')) newActiveFilters.push('activityId');
     if (searchParams?.get('recent') === 'true') newActiveFilters.push('recent');
     if (searchParams?.get('correctionId')) newActiveFilters.push('correctionId');
+    if (searchParams?.get('subClassId')) newActiveFilters.push('subClassId'); // Add subClassId check
     
     setActiveFilters(newActiveFilters);
   }, [searchParams, setActiveFilters]);
+  
+  // Add effect to fetch sub-classes when a class is selected
+  useEffect(() => {
+    const fetchSubClasses = async () => {
+      if (filters.classId) {
+        try {
+          const response = await fetch(`/api/classes/${filters.classId}`);
+          if (response.ok) {
+            const classData = await response.json();
+            if (classData.nbre_subclasses && classData.nbre_subclasses > 0) {
+              // Create sub-classes array
+              const subClasses = Array.from(
+                { length: classData.nbre_subclasses },
+                (_, index) => ({
+                  id: (index + 1).toString(),
+                  name: `Groupe ${index + 1}`
+                })
+              );
+              setAvailableSubClasses(subClasses);
+            } else {
+              setAvailableSubClasses([]);
+            }
+          }
+        } catch (error) {
+          console.error("Error fetching sub-classes:", error);
+          setAvailableSubClasses([]);
+        }
+      } else {
+        setAvailableSubClasses([]);
+        // Clear subClassId if class is cleared
+        if (activeFilters.includes('subClassId')) {
+          handleRemoveFilter('subClassId');
+        }
+      }
+    };
+    
+    fetchSubClasses();
+  }, [filters.classId]);
   
   // Menu handlers
   const handleSortClick = (event: React.MouseEvent<HTMLButtonElement>) => {
@@ -163,8 +213,8 @@ function CorrectionsContent() {
     applyFilter(filterName);
     handleFilterClose();
     
-    // Update URL for certain filters
-    if (['classId', 'studentId', 'activityId', 'search', 'recent', 'correctionId'].includes(filterName)) {
+    // Update URL for certain filters, including subClassId
+    if (['classId', 'studentId', 'activityId', 'search', 'recent', 'correctionId', 'subClassId'].includes(filterName)) {
       if (filterName === 'recent') {
         updateQueryParams({ recent: 'true' });
       } else {
@@ -178,10 +228,17 @@ function CorrectionsContent() {
     removeFilter(filterName);
     
     // Remove from URL
-    if (['classId', 'studentId', 'activityId', 'search', 'correctionId', 'recent'].includes(filterName)) {
+    if (['classId', 'studentId', 'activityId', 'search', 'correctionId', 'recent', 'subClassId'].includes(filterName)) {
       const newParams = new URLSearchParams(searchParams?.toString());
       newParams.delete(filterName);
       router.push(`/corrections?${newParams.toString()}`);
+      
+      // When removing classId, also remove subClassId filter
+      if (filterName === 'classId' && activeFilters.includes('subClassId')) {
+        removeFilter('subClassId');
+        newParams.delete('subClassId');
+        router.push(`/corrections?${newParams.toString()}`);
+      }
     }
   };
   
@@ -211,9 +268,31 @@ function CorrectionsContent() {
     router.push(`/corrections?${newParams.toString()}`);
   };
   
+  // Récupérer le tab initial depuis l'URL ou utiliser 0 par défaut
+  const initialTabValue = useMemo(() => {
+    const tabParam = searchParams.get('tab');
+    if (tabParam !== null) {
+      const tabIndex = parseInt(tabParam, 10);
+      // Vérifier que le tab est valide (entre 0 et 4)
+      if (!isNaN(tabIndex) && tabIndex >= 0 && tabIndex <= 4) {
+        return tabIndex;
+      }
+    }
+    return 0;
+  }, [searchParams]);
+  
+  const [tabValue, setTabValue] = useState(initialTabValue);
+  
   // Handle tab change
   const handleTabChange = (_: React.SyntheticEvent, newValue: number) => {
     setTabValue(newValue);
+    
+    // Mettre à jour l'URL avec le nouveau tab
+    const params = new URLSearchParams(searchParams.toString());
+    params.set('tab', newValue.toString());
+    
+    // Utiliser router.replace pour éviter d'ajouter une entrée dans l'historique
+    router.replace(`/corrections?${params.toString()}`, { scroll: false });
   };
 
   // Define the Activity type
@@ -537,6 +616,26 @@ function CorrectionsContent() {
                   }}
                 />
               )}
+              
+              {activeFilters.includes('subClassId') && (
+                <Chip 
+                  icon={<RecentActorsIcon />}
+                  label={`Groupe: ${filters.subClassId}`}
+                  onDelete={() => handleRemoveFilter('subClassId')}
+                  color="info"
+                  variant="outlined"
+                  sx={{ 
+                    borderRadius: 3, 
+                    '& .MuiChip-deleteIcon': { 
+                      color: 'info.light',
+                      '&:hover': { color: 'error.main' } 
+                    },
+                    py: 0.5,
+                    fontWeight: 500,
+                    borderWidth: 1.5
+                  }}
+                />
+              )}
             </Box>
           </Box>
             )}
@@ -663,6 +762,7 @@ function CorrectionsContent() {
           <Tab icon={<SchoolIcon />} label="Par classe" />
           <Tab icon={<PersonIcon />} label="Par étudiant" />
           <Tab icon={<CalendarIcon />} label="Chronologie" />
+          <Tab icon={<QrCodeIcon />} label="Export PDF" />
         </Tabs>
         
         {/* Boutons de filtre et tri */}
@@ -719,6 +819,7 @@ function CorrectionsContent() {
           handleClearAllFilters={handleClearAllFilters}
           highlightedIds={searchParams?.get('highlight')?.split(',').filter(Boolean) || []}
           getGradeColor={getGradeColor}
+          subClassFilter={filters.subClassId} // Add subClassFilter prop
         />
       )}
       
@@ -746,16 +847,278 @@ function CorrectionsContent() {
         />
       )}
       
+      {tabValue === 4 && (
+        <Box sx={{ mt: 2 }}>
+          <Typography variant="h6" gutterBottom>
+            Export des QR codes de feedback
+          </Typography>
+          <Typography variant="body2" color="text.secondary" paragraph>
+            Générez un document PDF contenant les QR codes d'accès aux corrections pour chaque étudiant. Les étudiants peuvent scanner ces codes pour voir leurs résultats.
+          </Typography>
+          
+          <Paper variant="outlined" sx={{ p: 3, mt: 2 }}>
+            <Grid container spacing={3}>
+              <Grid size={{ xs: 12, md: 4 }}>
+                <FormControl fullWidth size="small">
+                  <InputLabel id="activity-select-label">Activité</InputLabel>
+                  <Select
+                    labelId="activity-select-label"
+                    value={filters.activityId}
+                    onChange={handleFilterChange as (event: SelectChangeEvent<string>) => void}
+                    name="activityId"
+                    label="Activité"
+                    startAdornment={
+                      <AssignmentIcon sx={{ ml: 1, mr: 0.5, color: 'secondary.main' }} />
+                    }
+                  >
+                    <MenuItem value="">Toutes les activités</MenuItem>
+                    {metaData.activities.map(a => (
+                      <MenuItem key={a.id} value={a.id.toString()}>{a.name}</MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+                <Button 
+                  variant="text" 
+                  size="small" 
+                  onClick={() => handleApplyFilter('activityId')}
+                  disabled={!filters.activityId}
+                  sx={{ mt: 0.5 }}
+                >
+                  Appliquer
+                </Button>
+              </Grid>
+              
+              <Grid size={{ xs: 12, md: 4 }}>
+                <FormControl fullWidth size="small">
+                  <InputLabel id="class-select-label">Classe</InputLabel>
+                  <Select
+                    labelId="class-select-label"
+                    value={filters.classId}
+                    onChange={handleFilterChange as (event: SelectChangeEvent<string>) => void}
+                    name="classId"
+                    label="Classe"
+                    startAdornment={
+                      <SchoolIcon sx={{ ml: 1, mr: 0.5, color: 'primary.main' }} />
+                    }
+                  >
+                    <MenuItem value="">Toutes les classes</MenuItem>
+                    {metaData.classes.map(c => (
+                      <MenuItem key={c.id} value={c.id.toString()}>{c.name}</MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+                <Button 
+                  variant="text" 
+                  size="small" 
+                  onClick={() => handleApplyFilter('classId')}
+                  disabled={!filters.classId}
+                  sx={{ mt: 0.5 }}
+                >
+                  Appliquer
+                </Button>
+              </Grid>
+              
+              <Grid size={{ xs: 12, md: 4 }}>
+                <FormControl fullWidth size="small" disabled={!filters.classId || availableSubClasses.length === 0}>
+                  <InputLabel id="subgroup-select-label">Sous-groupe</InputLabel>
+                  <Select
+                    labelId="subgroup-select-label"
+                    value={filters.subClassId}
+                    onChange={handleFilterChange as (event: SelectChangeEvent<string>) => void}
+                    name="subClassId"
+                    label="Sous-groupe"
+                    startAdornment={
+                      <GroupIcon sx={{ ml: 1, mr: 0.5, color: 'secondary.main' }} />
+                    }
+                  >
+                    <MenuItem value="">Tous les sous-groupes</MenuItem>
+                    {availableSubClasses.map(group => (
+                      <MenuItem key={group.id} value={group.id}>{group.name}</MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+                <Button 
+                  variant="text" 
+                  size="small" 
+                  onClick={() => handleApplyFilter('subClassId')}
+                  disabled={!filters.subClassId || !filters.classId}
+                  sx={{ mt: 0.5 }}
+                >
+                  Appliquer
+                </Button>
+              </Grid>
+            </Grid>
+            
+            <Divider sx={{ my: 3 }} />
+            
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <Typography variant="body2">
+                {filteredCorrections.length} correction(s) sélectionnée(s)
+              </Typography>
+              <Button
+                variant="outlined"
+                color="success"
+                startIcon={<PictureAsPdfIcon />}
+                disabled={filteredCorrections.length === 0}
+                onClick={async () => {
+                  try {
+                    // Vérifier et créer des codes de partage pour toutes les corrections qui en ont besoin
+                    const correctionsWithoutShareCodes = filteredCorrections.filter(c => 
+                      // Vérifier si la propriété shareCode n'existe pas ou est nulle
+                      !('shareCode' in c) || !(c as any).shareCode
+                    );
+                    
+                    if (correctionsWithoutShareCodes.length > 0) {
+                      // Récupérer uniquement les IDs des corrections sans codes de partage
+                      const correctionIds = correctionsWithoutShareCodes.map(c => c.id!);
+                      
+                      // Créer des codes de partage par lots
+                      const response = await fetch('/api/share/batch', {
+                        method: 'POST',
+                        headers: {
+                          'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({ correctionIds }),
+                      });
+                      
+                      if (!response.ok) {
+                        throw new Error('Erreur lors de la création des codes de partage');
+                      }
+                    }
+                    
+                    // Générer le PDF de codes QR
+                    const groupName = filters.subClassId ? 
+                      availableSubClasses.find(g => g.id === filters.subClassId)?.name || 'Groupe' : 
+                      filters.classId ? 
+                        metaData.classes.find(c => c.id.toString() === filters.classId)?.name || 'Classe' : 
+                        'Toutes les corrections';
+                    
+                    const activityName = filters.activityId ? 
+                      metaData.activities.find(a => a.id.toString() === filters.activityId)?.name || 'Activité' : 
+                      'Toutes les activités';
+
+                    const pdfFileName = await generateQRCodePDF({
+                      corrections: filteredCorrections,
+                      group: {
+                        name: groupName,
+                        activity_name: activityName
+                      },
+                      generateShareCode: async (correctionId) => {
+                        const response = await fetch(`/api/corrections/${correctionId}/share`, {
+                          method: 'POST',
+                        });
+                        const data = await response.json();
+                        return { isNew: true, code: data.code };
+                      },
+                      getExistingShareCode: async (correctionId) => {
+                        const response = await fetch(`/api/corrections/${correctionId}/share`);
+                        const data = await response.json();
+                        return { exists: data.exists, code: data.code };
+                      },
+                      students: metaData.students.map(student => ({
+                        id: parseInt(student.id.toString()),
+                        first_name: student.name.split(' ')[0] || '',
+                        last_name: student.name.split(' ').slice(1).join(' ') || ''
+                      })),
+                      activities: metaData.activities.map(activity => ({
+                        id: parseInt(activity.id.toString()),
+                        name: activity.name
+                      }))
+                    });
+                    
+                    if (pdfFileName) {
+                      enqueueSnackbar(`PDF généré avec succès : ${pdfFileName}`, { variant: 'success' });
+                    } else {
+                      throw new Error('Erreur lors de la génération du PDF');
+                    }
+                  } catch (error) {
+                    console.error('Erreur:', error);
+                    enqueueSnackbar(`Erreur lors de l'export PDF: ${(error as Error).message}`, { variant: 'error' });
+                  }
+                }}
+              >
+                Générer le PDF
+              </Button>
+            </Box>
+            
+            {filteredCorrections.length > 0 && (
+              <Box sx={{ mt: 3 }}>
+                <Typography variant="subtitle2" gutterBottom>
+                  Aperçu des corrections sélectionnées:
+                </Typography>
+                <Box sx={{ maxHeight: 300, overflow: 'auto', bgcolor: 'background.paper', border: '1px solid', borderColor: 'divider', borderRadius: 1 }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                    <thead style={{ position: 'sticky', top: 0, backgroundColor: '#f5f5f5', zIndex: 1 }}>
+                      <tr>
+                        <th style={{ padding: '8px', textAlign: 'left', borderBottom: '1px solid #ddd' }}>Étudiant</th>
+                        <th style={{ padding: '8px', textAlign: 'left', borderBottom: '1px solid #ddd' }}>Activité</th>
+                        <th style={{ padding: '8px', textAlign: 'left', borderBottom: '1px solid #ddd' }}>Classe</th>
+                        <th style={{ padding: '8px', textAlign: 'center', borderBottom: '1px solid #ddd' }}>Note</th>
+                        <th style={{ padding: '8px', textAlign: 'center', borderBottom: '1px solid #ddd' }}>Lien de partage</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filteredCorrections.map((correction) => {
+                        const student = metaData.students.find(s => s.id === correction.student_id);
+                        const activity = metaData.activities.find(a => a.id === correction.activity_id);
+                        const classInfo = metaData.classes.find(c => c.id === correction.class_id);
+                        
+                        return (
+                          <tr key={correction.id} style={{ borderBottom: '1px solid #f0f0f0' }}>
+                            <td style={{ padding: '8px' }}>{student?.name || `ID: ${correction.student_id}`}</td>
+                            <td style={{ padding: '8px' }}>{activity?.name || `ID: ${correction.activity_id}`}</td>
+                            <td style={{ padding: '8px' }}>{classInfo?.name || `ID: ${correction.class_id}`}</td>
+                            <td style={{ padding: '8px', textAlign: 'center' }}>
+                              <Chip 
+                                label={`${correction.grade}/20`} 
+                                size="small"
+                                color={getGradeColor(correction.grade)}
+                                variant="outlined"
+                              />
+                            </td>
+                            <td style={{ padding: '8px', textAlign: 'center' }}>
+                              {((correction as unknown) as CorrectionWithShareCode).shareCode ? (
+                                <Chip
+                                  size="small"
+                                  icon={<QrCodeIcon />}
+                                  label="Prêt"
+                                  color="success"
+                                  variant="outlined"
+                                />
+                              ) : (
+                                <Chip
+                                  size="small"
+                                  icon={<QrCodeIcon />}
+                                  label="Manquant"
+                                  color="warning"
+                                  variant="outlined"
+                                />
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </Box>
+              </Box>
+            )}
+          </Paper>
+        </Box>
+      )}
+      
       {/* Sort Menu */}
       <Menu
         anchorEl={sortAnchorEl}
         open={Boolean(sortAnchorEl)}
         onClose={handleSortClose}
-        PaperProps={{
-          elevation: 3,
-          sx: {
-            minWidth: 200,
-            '& .MuiMenuItem-root': { py: 1.5 }
+        slotProps={{
+          paper: {
+            elevation: 3,
+            sx: {
+              minWidth: 200,
+              '& .MuiMenuItem-root': { py: 1.5 }
+            }
           }
         }}
       >
@@ -878,12 +1241,14 @@ function CorrectionsContent() {
             size="small"
             value={filters.search}
             onChange={handleFilterChange}
-            InputProps={{
-              startAdornment: (
-                <InputAdornment position="start">
-                  <SearchIcon fontSize="small" />
-                </InputAdornment>
-              ),
+            slotProps={{
+              input: {
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <SearchIcon fontSize="small" />
+                  </InputAdornment>
+                ),
+              }
             }}
           />
           <Button 
@@ -924,6 +1289,38 @@ function CorrectionsContent() {
             Appliquer
           </Button>
         </Box>
+        
+        {availableSubClasses.length > 0 && filters.classId && (
+          <Box sx={{ mb: 2 }}>
+            <FormControl fullWidth size="small">
+              <InputLabel>Groupe</InputLabel>
+              <Select
+                name="subClassId"
+                value={filters.subClassId}
+                onChange={handleFilterChange as (event: SelectChangeEvent<string>) => void}
+                label="Groupe"
+              >
+                <MenuItem value="">
+                  <em>Tous les groupes</em>
+                </MenuItem>
+                {availableSubClasses.map(group => (
+                  <MenuItem key={group.id} value={group.id}>
+                    {group.name}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+            <Button 
+              variant="text" 
+              size="small" 
+              onClick={() => handleApplyFilter('subClassId')}
+              disabled={!filters.subClassId}
+              sx={{ mt: 0.5 }}
+            >
+              Appliquer
+            </Button>
+          </Box>
+        )}
         
         <Box sx={{ mb: 2 }}>
           <FormControl fullWidth size="small">

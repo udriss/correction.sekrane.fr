@@ -26,9 +26,11 @@ interface CorrectionHeaderProps {
   setFirstName: (name: string) => void;
   setLastName: (name: string) => void;
   setIsEditingName: (isEditing: boolean) => void;
-  handleSaveName: (firstName: string, lastName: string) => void;
+  handleSaveName: (firstName: string, lastName: string, email?: string) => void;
   handleDelete: () => void;
   handleCancelDelete: () => void;
+  email?: string;
+  setEmail?: (email: string) => void;
 }
 
 const CorrectionHeader: React.FC<CorrectionHeaderProps> = ({
@@ -46,39 +48,49 @@ const CorrectionHeader: React.FC<CorrectionHeaderProps> = ({
   handleSaveName,
   handleDelete,
   handleCancelDelete,
+  email = '',
+  setEmail = () => {},
 }) => {
   // Add local state for form fields to prevent input issues
   const [localFirstName, setLocalFirstName] = useState('');
   const [localLastName, setLocalLastName] = useState('');
+  const [localEmail, setLocalEmail] = useState('');
   
   // Initialize local state when editing starts or correction changes
   useEffect(() => {
     if (isEditingName) {
-     
       // Use the parent state or fall back to correction data
       const firstNameValue = firstName;
       const lastNameValue = lastName;
+      const emailValue = email || correction?.student_data?.email || '';
+      
       setLocalFirstName(firstNameValue);
       setLocalLastName(lastNameValue);
-      
+      setLocalEmail(emailValue);
     }
-  }, [isEditingName, correction, firstName, lastName]);
+  }, [isEditingName, correction, firstName, lastName, email]);
 
   
   // Add type guards around student_name usage
   const displayName = correction.student_name || `${correction.activity_name || 'Activité'} - Sans nom`;
+  const displayEmail = correction?.student_data?.email || '';
 
   // Update parent state and handle form submission
   const handleFormSubmit = () => {
-    
     // Validate: At least one name field must be non-empty
     if (!localFirstName && !localLastName) {
       alert("Veuillez saisir au moins un prénom ou un nom.");
       return;
     }
     
-    // Pass the local values directly to handleSaveName
-    handleSaveName(localFirstName, localLastName);
+    // Validate email format if provided
+    if (localEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(localEmail)) {
+      alert("Veuillez saisir une adresse email valide.");
+      return;
+    }
+    
+    // Pass the local values directly to handleSaveName, including email
+    handleSaveName(localFirstName, localLastName, localEmail);
   };
 
   // Handle cancel editing with reset of all fields
@@ -87,9 +99,11 @@ const CorrectionHeader: React.FC<CorrectionHeaderProps> = ({
     // Reset local state
     setLocalFirstName('');
     setLocalLastName('');
+    setLocalEmail('');
     // Reset parent state to original values
     setFirstName(correction?.student_first_name || correction?.firstName || '');
     setLastName(correction?.student_last_name || correction?.lastName || '');
+    setEmail(correction?.student_data?.email || '');
     setEditedName(correction?.student_name || '');
   };
 
@@ -140,6 +154,35 @@ const CorrectionHeader: React.FC<CorrectionHeaderProps> = ({
                     setLocalLastName(e.target.value);
                   }}
                   placeholder="Nom de l'étudiant"
+                  variant="filled"
+                  color="primary"
+                  helperText="Entrée pour sauvegarder ou Échap pour annuler"
+                  size="small"
+                  sx={{
+                    backgroundColor: 'background.paper',
+                    '& .MuiFilledInput-root': {
+                      backgroundColor: 'background.paper',
+                      '&:hover, &.Mui-focused': {
+                        backgroundColor: 'background.default',
+                      }
+                    }
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') handleFormSubmit();
+                    if (e.key === 'Escape') handleCancelEditing();
+                  }}
+                />
+              </Grid>
+              <Grid size={{ xs: 12 }}>
+                <TextField
+                  fullWidth
+                  label="Email"
+                  // Use local state for controlled component
+                  value={localEmail}
+                  onChange={(e) => {
+                    setLocalEmail(e.target.value);
+                  }}
+                  placeholder="Email de l'étudiant"
                   variant="filled"
                   color="primary"
                   helperText="Entrée pour sauvegarder ou Échap pour annuler"

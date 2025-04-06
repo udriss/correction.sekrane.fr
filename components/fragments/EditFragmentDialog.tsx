@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Dialog,
   DialogTitle,
@@ -35,13 +35,19 @@ export const EditFragmentDialog: React.FC<EditFragmentDialogProps> = ({
   fetchCategories,
   theme
 }) => {
+  // État local pour stocker le fragment en cours d'édition
+  const [currentFragment, setCurrentFragment] = useState<Fragment | null>(null);
+  
   // Référence pour vérifier si un changement a eu lieu
   const originalFragmentRef = React.useRef<Fragment | null>(null);
   
-  // Mettre à jour la référence quand un nouveau fragment est défini
-  React.useEffect(() => {
+  // Mettre à jour le fragment local quand un nouveau fragment est reçu
+  useEffect(() => {
     if (fragment && open) {
-      originalFragmentRef.current = JSON.parse(JSON.stringify(fragment));
+      // Créer une copie profonde pour éviter les problèmes de référence
+      const fragmentCopy = JSON.parse(JSON.stringify(fragment));
+      setCurrentFragment(fragmentCopy);
+      originalFragmentRef.current = fragmentCopy;
     }
   }, [fragment, open]);
   
@@ -50,9 +56,10 @@ export const EditFragmentDialog: React.FC<EditFragmentDialogProps> = ({
     // Debug pour vérifier les tags reçus de FragmentEditor
     
     
+    
     // Préserver les tags originaux si aucun tag n'a été spécifié dans la mise à jour
-    const preservedTags = Array.isArray(updatedFragment.tags) && updatedFragment.tags.length === 0 && fragment
-      ? fragment.tags
+    const preservedTags = Array.isArray(updatedFragment.tags) && updatedFragment.tags.length === 0 && currentFragment
+      ? currentFragment.tags
       : updatedFragment.tags;
     
     
@@ -67,9 +74,11 @@ export const EditFragmentDialog: React.FC<EditFragmentDialogProps> = ({
       activity_id: updatedFragment.activity_id,
       activity_name: updatedFragment.activity_name,
       // Garantir que tags est toujours un tableau valide, en préservant les tags originaux si nécessaire
-      tags: Array.isArray(preservedTags) ? [...preservedTags] : 
-            (typeof preservedTags === 'string' ? 
-              JSON.parse(preservedTags as string) : fragment?.tags || []),
+      tags: Array.isArray(preservedTags) && preservedTags.length > 0 
+            ? [...preservedTags] 
+            : (currentFragment && Array.isArray(currentFragment.tags) 
+                ? [...currentFragment.tags] 
+                : []),
       created_at: updatedFragment.created_at || '',
       updated_at: new Date().toISOString(), // Ajouter un timestamp pour l'horodatage
       _updateKey: randomKey,
@@ -90,8 +99,8 @@ export const EditFragmentDialog: React.FC<EditFragmentDialogProps> = ({
       
     }
     
-    // Pas besoin d'ajouter un marqueur temporel, utilisons directement la copie profonde
-    // qui est déjà suffisante pour déclencher une mise à jour dans React
+    // Mettre à jour l'état local pour refléter les changements immédiatement
+    setCurrentFragment(convertedFragment);
     
     // Appeler onUpdate avec le fragment converti
     onUpdate(convertedFragment);
@@ -117,7 +126,7 @@ export const EditFragmentDialog: React.FC<EditFragmentDialogProps> = ({
         </IconButton>
       </DialogTitle>
       <DialogContent>
-        {fragment && (
+        {currentFragment && (
           <Box sx={{ pt: 2 }}>
             {editingSuccess ? (
               <Alert severity="success" sx={{ mb: 2 }}>
@@ -126,13 +135,13 @@ export const EditFragmentDialog: React.FC<EditFragmentDialogProps> = ({
             ) : (
               <FragmentEditor 
                 fragment={{
-                  ...fragment,
-                  tags: Array.isArray(fragment.tags) ? fragment.tags : 
-                        (typeof fragment.tags === 'string' ? 
-                          JSON.parse(fragment.tags as string) : []),
-                  categories: fragment.categories || [],
-                  activity_name: fragment.activity_name === null ? undefined : fragment.activity_name,
-                  activity_id: fragment.activity_id === null ? undefined : fragment.activity_id
+                  ...currentFragment,
+                  tags: Array.isArray(currentFragment.tags) ? currentFragment.tags : 
+                        (typeof currentFragment.tags === 'string' ? 
+                          JSON.parse(currentFragment.tags as string) : []),
+                  categories: currentFragment.categories || [],
+                  activity_name: currentFragment.activity_name === null ? undefined : currentFragment.activity_name,
+                  activity_id: currentFragment.activity_id === null ? undefined : currentFragment.activity_id
                 }}
                 categories={categories}
                 onUpdate={handleFragmentUpdate} // Use our converter function

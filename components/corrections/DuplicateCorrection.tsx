@@ -364,7 +364,7 @@ export default function DuplicateCorrection({ correctionId }: DuplicateCorrectio
   useEffect(() => {
     if (activityId && studentsToProcess.length > 0) {
       const studentIds = studentsToProcess.map(s => s.id);
-      console.log('Vérification des corrections existantes pour activityId:', activityId, 'studentIds:', studentIds);
+      
       
       // Récupérer les corrections existantes pour ces étudiants et cette activité
       fetch(`/api/corrections/check-existing?activityId=${activityId}&studentIds=${studentIds.join(',')}`)
@@ -518,7 +518,7 @@ export default function DuplicateCorrection({ correctionId }: DuplicateCorrectio
       // Vérifier si une correction existe déjà pour cet étudiant et cette activité
       const existingCorrectionId = getExistingCorrectionId(student.id);
       // Si une correction existe et qu'aucun mode n'est spécifié, montrer le dialogue de confirmation
-      console.log('Vérification mode:', mode);
+      
       if (existingCorrectionId) {
         setCurrentStudentToProcess(student);
         setShowOverwriteDialog(true);
@@ -666,7 +666,7 @@ export default function DuplicateCorrection({ correctionId }: DuplicateCorrectio
                   Ajouter une nouvelle correction
                   </Typography>
                   <Typography variant="body2" color="text.secondary">
-                    Une nouvelle correction sera créée pour cet étudiant, en plus de la correction existante.
+                    Une nouvelle correction sera ajoutée pour cet étudiant, en plus de la correction existante.
                   </Typography>
                 </Box>
               </Box>
