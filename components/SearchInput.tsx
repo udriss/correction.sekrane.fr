@@ -45,19 +45,21 @@ const SearchInput: React.FC<SearchInputProps> = ({
         variant={variant}
         value={searchTerm}
         onChange={(e) => setSearchTerm(e.target.value)}
-        InputProps={{
-          startAdornment: (
-            <InputAdornment position="start">
-              <SearchIcon color="action" />
-            </InputAdornment>
-          ),
-          endAdornment: searchTerm.length >= minLength && (
-            <InputAdornment position="end">
-              <IconButton type="submit" edge="end">
-                <SearchIcon />
-              </IconButton>
-            </InputAdornment>
-          )
+        slotProps={{
+          input: {
+            startAdornment: (
+              <InputAdornment position="start">
+                <SearchIcon color="action" />
+              </InputAdornment>
+            ),
+            endAdornment: searchTerm.length >= minLength && (
+              <InputAdornment position="end">
+                <IconButton type="submit" edge="end">
+                  <SearchIcon />
+                </IconButton>
+              </InputAdornment>
+            )
+          }
         }}
       />
     </Box>

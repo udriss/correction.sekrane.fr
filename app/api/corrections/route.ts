@@ -1,8 +1,10 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { withConnection } from '@/lib/db';
+import { createLogEntry } from '@/lib/services/logsService';
+import { getUser } from '@/lib/auth';
 
 export async function GET(
-  request: Request
+  request: NextRequest
 ) {
   try {
     // Get query parameters from the URL
@@ -74,10 +76,11 @@ export async function GET(
   }
 }
 
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   return await withConnection(async (connection) => {
     try {
       const data = await request.json();
+      const user = await getUser(request);
       
       // Validate activity_id - allow "0" as a valid ID
       const activity_id = data.activity_id || 0;
@@ -120,19 +123,35 @@ export async function POST(request: Request) {
       
       // Check if student_id is valid before inserting
       let studentId = data.student_id || null;
+      let studentName = null;
       
       // Explicitly check for negative IDs and set them to null
       if (studentId !== null && (studentId < 0 || typeof studentId !== 'number')) {
         studentId = null;
       } else if (studentId !== null) {
         const [students] = await connection.query(
-          'SELECT id FROM students WHERE id = ?',
+          'SELECT id, CONCAT(first_name, " ", last_name) as student_name FROM students WHERE id = ?',
           [studentId]
         );
         
         // If student doesn't exist, set to NULL
         if (!Array.isArray(students) || (students as any[]).length === 0) {
           studentId = null;
+        } else {
+          studentName = (students[0] as any).student_name;
+        }
+      }
+      
+      // Get activity name for logging
+      let activityName = "Activité inconnue";
+      if (numericActivityId > 0) {
+        const [activities] = await connection.query(
+          'SELECT name FROM activities WHERE id = ?',
+          [numericActivityId]
+        );
+        
+        if (Array.isArray(activities) && (activities as any[]).length > 0) {
+          activityName = (activities[0] as any).name;
         }
       }
       
@@ -160,6 +179,28 @@ export async function POST(request: Request) {
       );
       
       const correctionId = (result as any).insertId;
+      
+      // Logging de la création de correction
+      await createLogEntry({
+        action_type: 'CREATE_CORRECTION',
+        description: `Nouvelle correction ajoutée${studentName ? ` pour ${studentName}` : ''} - ${activityName}`,
+        entity_type: 'correction',
+        entity_id: correctionId,
+        user_id: user?.id,
+        username: user?.username,
+        ip_address: request.headers.get('x-forwarded-for') || 'unknown',
+        metadata: {
+          activity_id: numericActivityId,
+          activity_name: activityName,
+          student_id: studentId,
+          student_name: studentName,
+          class_id: correctionData.class_id,
+          grade: correctionData.grade,
+          has_penalty: correctionData.penalty !== null && correctionData.penalty > 0,
+          experimental_points: correctionData.experimental_points_earned,
+          theoretical_points: correctionData.theoretical_points_earned
+        }
+      });
 
       // If class_id is provided, update class_activities table to establish relationship
       if (correctionData.class_id) {
@@ -176,6 +217,30 @@ export async function POST(request: Request) {
               'INSERT INTO class_activities (class_id, activity_id, created_at) VALUES (?, ?, NOW())',
               [correctionData.class_id, correctionData.activity_id]
             );
+            
+            // Log de l'association classe-activité
+            const [classes] = await connection.query(
+              'SELECT name FROM classes WHERE id = ?',
+              [correctionData.class_id]
+            );
+            
+            const className = Array.isArray(classes) && classes.length > 0 
+              ? (classes[0] as any).name 
+              : 'Classe inconnue';
+              
+            await createLogEntry({
+              action_type: 'LINK_CLASS_ACTIVITY',
+              description: `Association de l'activité "${activityName}" à la classe "${className}"`,
+              entity_type: 'class_activity',
+              user_id: user?.id,
+              username: user?.username,
+              metadata: {
+                class_id: correctionData.class_id,
+                class_name: className,
+                activity_id: numericActivityId,
+                activity_name: activityName
+              }
+            });
           }
         } catch (err) {
           // Log error but don't fail the request
@@ -201,6 +266,21 @@ export async function POST(request: Request) {
       return Response.json(rows[0]);
     } catch (error) {
       console.error('Error creating correction:', error);
+      
+      // Log de l'erreur
+      try {
+        const user = await getUser(request);
+        await createLogEntry({
+          action_type: 'CREATE_CORRECTION_ERROR',
+          description: `Erreur lors de l'ajout d'une correction: ${(error as Error).message}`,
+          user_id: user?.id,
+          username: user?.username,
+          ip_address: request.headers.get('x-forwarded-for') || 'unknown'
+        });
+      } catch (logError) {
+        console.error('Error creating log entry:', logError);
+      }
+      
       return Response.json({ error: 'Server error', details: String(error) }, { status: 500 });
     }
   });

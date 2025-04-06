@@ -386,19 +386,21 @@ export default function DuplicateCorrectionMock({ studentName = "Jean Dupont" }:
                               fontWeight: student.isEmailModified ? 'medium' : 'normal',
                             }
                           }}
-                          InputProps={{
-                            endAdornment: student.isEmailModified && (
-                              <Box 
-                                component="span" 
-                                sx={{ 
-                                  fontSize: '0.75rem', 
-                                  color: 'warning.main',
-                                  ml: 1
-                                }}
-                              >
-                                (modifié)
-                              </Box>
-                            )
+                          slotProps={{
+                            input: {
+                              endAdornment: student.isEmailModified && (
+                                <Box 
+                                  component="span" 
+                                  sx={{ 
+                                    fontSize: '0.75rem', 
+                                    color: 'warning.main',
+                                    ml: 1
+                                  }}
+                                >
+                                  (modifié)
+                                </Box>
+                              )
+                            }
                           }}
                         />
                       }

@@ -11,6 +11,7 @@ export interface User {
   id: number;
   username: string;
   name: string;
+  is_admin?: boolean;
 }
 
 /**
@@ -55,13 +56,28 @@ export async function getUser(req?: NextRequest): Promise<User | null> {
     }
 
     // Verify the token
-    const secret = new TextEncoder().encode(process.env.JWT_SECRET || 'changeme');
+    const secret = new TextEncoder().encode(process.env.JWT_SECRET);
     const { payload } = await jwtVerify(token, secret);
     
+    // Récupérer les informations supplémentaires de l'utilisateur depuis la base de données
+    const userId = payload.id as number;
+    const users = await query<any[]>(`
+      SELECT id, name, username, is_admin 
+      FROM users 
+      WHERE id = ?
+    `, [userId]);
+    
+    const user = users[0];
+    
+    if (!user) {
+      return null;
+    }
+    
     return {
-      id: payload.id as number,
-      username: payload.username as string,
-      name: payload.name as string
+      id: user.id,
+      username: user.username,
+      name: user.name || user.username,
+      is_admin: user.is_admin === 1 // Convertir la valeur numérique en booléen
     };
   } catch (error) {
     console.error('Error verifying token:', error);

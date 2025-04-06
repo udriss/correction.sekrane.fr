@@ -3,6 +3,7 @@ import { compare } from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import { withConnection } from '@/lib/db';
 import { cookies } from 'next/headers';
+import { createLogEntry } from '@/lib/services/logsService';
 
 export async function POST(req: NextRequest) {
   try {
@@ -23,6 +24,13 @@ export async function POST(req: NextRequest) {
       );
 
       if (!Array.isArray(rows) || rows.length === 0) {
+        // Log échec de connexion - utilisateur inexistant
+        await createLogEntry({
+          action_type: 'LOGIN_FAILED',
+          description: `Tentative de connexion échouée: utilisateur "${username}" inexistant`,
+          ip_address: req.headers.get('x-forwarded-for') || req.headers.get('x-real-ip') || 'unknown'
+        });
+        
         return NextResponse.json(
           { error: 'Identifiants invalides' },
           { status: 401 }
@@ -35,6 +43,14 @@ export async function POST(req: NextRequest) {
       const passwordMatch = await compare(password, user.password);
 
       if (!passwordMatch) {
+        // Log échec de connexion - mot de passe incorrect
+        await createLogEntry({
+          action_type: 'LOGIN_FAILED',
+          description: `Tentative de connexion échouée: mot de passe incorrect pour "${username}"`,
+          user_id: user.id,
+          ip_address: req.headers.get('x-forwarded-for') || req.headers.get('x-real-ip') || 'unknown'
+        });
+        
         return NextResponse.json(
           { error: 'Identifiants invalides' },
           { status: 401 }
@@ -74,6 +90,15 @@ export async function POST(req: NextRequest) {
         maxAge: 60 * 60 * 24, // 1 day
         sameSite: 'lax',  // ou 'none' si vous avez des problèmes de CORS
       });
+      
+      // Log connexion réussie
+      await createLogEntry({
+        action_type: 'LOGIN_SUCCESS',
+        description: `Connexion réussie pour l'utilisateur "${username}"`,
+        user_id: user.id,
+        username: username,
+        ip_address: req.headers.get('x-forwarded-for') || req.headers.get('x-real-ip') || 'unknown'
+      });
 
       return NextResponse.json({
         success: true,
@@ -86,6 +111,14 @@ export async function POST(req: NextRequest) {
     });
   } catch (error) {
     console.error('Login error:', error);
+    
+    // Log erreur interne lors de la connexion
+    await createLogEntry({
+      action_type: 'LOGIN_ERROR',
+      description: `Erreur interne lors de la tentative de connexion: ${(error as Error).message}`,
+      ip_address: req.headers.get('x-forwarded-for') || req.headers.get('x-real-ip') || 'unknown'
+    });
+    
     return NextResponse.json(
       { error: 'Authentification échouée' },
       { status: 500 }

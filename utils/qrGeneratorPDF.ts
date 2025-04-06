@@ -1,6 +1,7 @@
 import { jsPDF } from 'jspdf';
 import QRCode from 'qrcode';
 import { Correction, Student, CorrectionWithShareCode } from '@/lib/types';
+import { createLogEntry } from '@/lib/services/logsService';
 
 // Ajout d'une interface pour les activités
 interface Activity {
@@ -285,6 +286,48 @@ export async function generateQRCodePDF({
     const sanitizedClassName = className.replace(/\s+/g, '_');
     const fileName = `${sanitizedActivityName}_${sanitizedClassName}_${new Date().toISOString().split('T')[0]}.pdf`;
     doc.save(fileName);
+    
+    // Enregistrer un log pour l'export PDF
+    try {
+      // Récupérer l'utilisateur actuel depuis l'API
+      const userResponse = await fetch('/api/auth/session');
+      let userId = null;
+      let username = null;
+      
+      if (userResponse.ok) {
+        const userData = await userResponse.json();
+        userId = userData?.user?.id;
+        username = userData?.user?.username || userData?.user?.name;
+      }
+      
+      // Collecter les IDs des corrections exportées
+      const correctionIds = corrections
+        .filter(c => c.id !== undefined)
+        .map(c => c.id);
+      
+      // Créer l'entrée de log
+      await createLogEntry({
+        action_type: 'EXPORT_PDF_QR_CODES',
+        description: `Export PDF des QR codes pour ${corrections.length} corrections - ${activityName} ${subtitle}`,
+        entity_type: 'pdf_export',
+        user_id: userId,
+        username: username,
+        metadata: {
+          file_name: fileName,
+          activity_id: activityId,
+          activity_name: activityName,
+          class_id: classId,
+          class_name: className,
+          corrections_count: corrections.length,
+          correction_ids: correctionIds,
+          pages_count: pageNumber,
+          group_name: group?.name || null
+        }
+      });
+    } catch (logError) {
+      // Ne pas bloquer l'exécution en cas d'erreur de journalisation
+      console.error('Error creating log entry for PDF export:', logError);
+    }
     
     // Pour le callback onSuccess, créer un nouvel array avec les shareCode ajoutés
     // seulement si le callback est fourni

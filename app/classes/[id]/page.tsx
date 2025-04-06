@@ -1260,7 +1260,9 @@ export default function ClassDetailPage({ params }: { params: Promise<{ id: stri
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 sx={{ flexGrow: 1, minWidth: 150 }}
-                inputProps={{ 'aria-label': 'Rechercher par nom ou activité' }}
+                slotProps={{
+                  input: { 'aria-label': 'Rechercher par nom ou activité' }
+                }}
               />
             </Box>
 

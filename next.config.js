@@ -24,6 +24,21 @@ const nextConfig = {
   experimental: {
     serverActions: {},
   },
+  webpack: (config) => {
+    // Resolve Node.js native modules
+    // necessary webpack configuration to handle Node.js native modules like 'net' and 'tls' that the mysql2 package requires.
+    config.resolve.fallback = {
+      ...config.resolve.fallback,
+      net: false,
+      tls: false,
+      fs: false,
+      dns: false,
+      child_process: false,
+      http2: false,
+    };
+    
+    return config;
+  },
   async headers() {
     return [
       {

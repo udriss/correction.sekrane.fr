@@ -1441,7 +1441,9 @@ function CorrectionsContent() {
               fullWidth
               value={filters.minGrade}
               onChange={handleFilterChange}
-              InputProps={{ inputProps: { min: 0, max: 20, step: 0.5 } }}
+              slotProps={{
+                input: { inputProps: { min: 0, max: 20, step: 0.5 } }
+              }}
             />
             <Button 
               variant="text" 
@@ -1461,7 +1463,9 @@ function CorrectionsContent() {
               fullWidth
               value={filters.maxGrade}
               onChange={handleFilterChange}
-              InputProps={{ inputProps: { min: 0, max: 20, step: 0.5 } }}
+              slotProps={{
+                input: { inputProps: { min: 0, max: 20, step: 0.5 } }
+              }}
             />
             <Button 
               variant="text" 
@@ -1482,12 +1486,14 @@ function CorrectionsContent() {
             size="small"
             value={filters.correctionId}
             onChange={handleFilterChange}
-            InputProps={{
-              startAdornment: (
-                <InputAdornment position="start">
-                  <AssignmentIcon fontSize="small" />
-                </InputAdornment>
-              ),
+            slotProps={{
+              input: {
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <AssignmentIcon fontSize="small" />
+                  </InputAdornment>
+                ),
+              }
             }}
           />
           <Button 

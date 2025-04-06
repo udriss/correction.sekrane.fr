@@ -1,6 +1,8 @@
-import { NextResponse } from 'next/server';
+import { NextResponse, NextRequest } from 'next/server';
 import nodemailer from 'nodemailer';
 import pool, { query } from '@/lib/db';  // Fix the import to match the actual exports
+import { createLogEntry } from '@/lib/services/logsService';
+import { getUser } from '@/lib/auth';
 
 export async function POST(request: Request) {
   try {
@@ -118,6 +120,26 @@ export async function POST(request: Request) {
     // Send email with better error handling
     try {
       const info = await transporter.sendMail(mailOptions);
+      
+      // Récupérer les informations de l'utilisateur actuel pour le log
+      const user = await getUser(request as NextRequest);
+      
+      // Enregistrer le log d'envoi d'email
+      await createLogEntry({
+        action_type: 'SEND_FEEDBACK_EMAIL',
+        description: `Email de feedback envoyé à ${studentName} pour l'activité "${activityInfo.activity_name}"`,
+        entity_type: 'correction',
+        entity_id: parseInt(correctionId),
+        user_id: user?.id,
+        username: user?.username,
+        ip_address: request.headers.get('x-forwarded-for') || 'unknown',
+        metadata: {
+          activity_name: activityInfo.activity_name,
+          recipient: email,
+          student_name: studentName,
+          has_custom_message: !!customMessage
+        }
+      });
       
       return NextResponse.json({ message: 'Email envoyé avec succès' });
     } catch (sendError) {

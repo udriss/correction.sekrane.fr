@@ -414,7 +414,9 @@ export default function UniqueCorrection() {
                     onChange={(e) => setExperimentalPoints(Number(e.target.value))}
                     variant="outlined"
                     size="small"
-                    inputProps={{ min: 0, max: 20 }}
+                    slotProps={{
+                      input: { inputProps: { min: 0, max: 20 } }
+                    }}
                     sx={{ mt: 1, width: '80px', textAlign: 'center' }}
                   />
                 ) : (
@@ -438,7 +440,9 @@ export default function UniqueCorrection() {
                     onChange={(e) => setTheoreticalPoints(Number(e.target.value))}
                     variant="outlined"
                     size="small"
-                    inputProps={{ min: 0, max: 20 }}
+                    slotProps={{
+                      input: { inputProps: { min: 0, max: 20 } }
+                    }}
                     sx={{ mt: 1, width: '80px', textAlign: 'center' }}
                   />
                 ) : (

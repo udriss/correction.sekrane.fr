@@ -193,7 +193,11 @@ const FragmentEditModal: React.FC<FragmentEditModalProps> = ({
             margin="normal"
             variant="outlined"
             helperText="Entrez le texte de votre fragment (maximum 500 caractères)"
-            inputProps={{ maxLength: 500 }}
+            slotProps={{
+              input: { 
+                inputProps: { maxLength: 500 }
+              }
+            }}
             disabled={loading}
           />
           

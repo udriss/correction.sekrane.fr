@@ -449,12 +449,10 @@ export default function FAQPage() {
           placeholder="Rechercher une question ou un mot-clé..."
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
-          InputProps={{
-            startAdornment: (
-              <InputAdornment position="start">
-                <SearchIcon color="action" />
-              </InputAdornment>
-            ),
+          slotProps={{
+            input: {
+              startAdornment: <SearchIcon fontSize="small" sx={{ mr: 1, color: 'text.secondary' }} />
+            }
           }}
           sx={{ mb: 2 }}
         />

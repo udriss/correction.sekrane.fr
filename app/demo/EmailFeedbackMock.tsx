@@ -131,8 +131,10 @@ M. SEKRANE`;
             rows={15}
             fullWidth
             value={defaultMessage}
-            InputProps={{
-              readOnly: messageType === 0,
+            slotProps={{
+              input: {
+                readOnly: messageType === 0,
+              }
             }}
             sx={{ 
               bgcolor: messageType === 0 ? 'action.hover' : 'transparent',

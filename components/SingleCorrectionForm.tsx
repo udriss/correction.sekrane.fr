@@ -378,12 +378,14 @@ const SingleCorrectionForm: React.FC<SingleCorrectionFormProps> = ({
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Nom ou email"
-                InputProps={{
-                  startAdornment: (
-                    <Box sx={{ color: 'action.active', mr: 1, mt: 0.5 }}>
-                      <SearchIcon />
-                    </Box>
-                  ),
+                slotProps={{
+                  input: {
+                    startAdornment: (
+                      <Box sx={{ color: 'action.active', mr: 1, mt: 0.5 }}>
+                        <SearchIcon />
+                      </Box>
+                    ),
+                  }
                 }}
               />
             </Box>
@@ -548,7 +550,11 @@ const SingleCorrectionForm: React.FC<SingleCorrectionFormProps> = ({
                   setExperimentalScore(value);
                 }
               }}
-              inputProps={{ min: 0, max: experimentalPoints, step: 0.5 }}
+              slotProps={{
+                input: { 
+                  inputProps: { min: 0, max: experimentalPoints, step: 0.5 }
+                }
+              }}
               required
             />
           </Grid>
@@ -566,7 +572,11 @@ const SingleCorrectionForm: React.FC<SingleCorrectionFormProps> = ({
                   setTheoreticalScore(value);
                 }
               }}
-              inputProps={{ min: 0, max: theoreticalPoints, step: 0.5 }}
+              slotProps={{
+                input: { 
+                  inputProps: { min: 0, max: theoreticalPoints, step: 0.5 }
+                }
+              }}
               required
             />
           </Grid>

@@ -121,7 +121,9 @@ const DraggableItemMock: React.FC<DraggableItemMockProps> = ({ item, index, move
             fullWidth
             variant="standard"
             value={item.content}
-            InputProps={{ readOnly: true }}
+            slotProps={{
+              input: { readOnly: true }
+            }}
             className="mt-0"
           />
         </div>

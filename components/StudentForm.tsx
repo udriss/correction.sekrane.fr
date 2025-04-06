@@ -143,12 +143,14 @@ export default function StudentForm({
               fullWidth
               margin="normal"
               variant="outlined"
-              InputProps={{
-                startAdornment: (
-                  <Box component="span" sx={{ color: 'action.active', mr: 1, my: 0.5 }}>
-                    <PersonIcon />
-                  </Box>
-                ),
+              slotProps={{
+                input: {
+                  startAdornment: (
+                    <Box component="span" sx={{ color: 'action.active', mr: 1, my: 0.5 }}>
+                      <PersonIcon />
+                    </Box>
+                  ),
+                }
               }}
             />
           </Grid>
@@ -175,12 +177,14 @@ export default function StudentForm({
               margin="normal"
               variant="outlined"
               helperText="Optionnel (une adresse par défaut sera générée si laissée vide)"
-              InputProps={{
-                startAdornment: (
-                  <Box component="span" sx={{ color: 'action.active', mr: 1, my: 0.5 }}>
-                    <EmailIcon />
-                  </Box>
-                ),
+              slotProps={{
+                input: {
+                  startAdornment: (
+                    <Box component="span" sx={{ color: 'action.active', mr: 1, my: 0.5 }}>
+                      <EmailIcon />
+                    </Box>
+                  ),
+                }
               }}
             />
           </Grid>

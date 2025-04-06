@@ -3,6 +3,7 @@ import { query, withConnection } from '@/lib/db';
 import { getServerSession } from 'next-auth';
 import authOptions from '@/lib/auth';
 import { getUser } from '@/lib/auth';
+import { createLogEntry } from '@/lib/services/logsService';
 
 export async function POST(
   req: NextRequest,
@@ -183,6 +184,52 @@ export async function POST(
           );
         }
       }
+      
+      // Récupérer les informations sur l'activité et l'étudiant pour le log
+      const [activityResults] = await connection.query(
+        `SELECT a.name as activity_name FROM corrections c
+         JOIN activities a ON c.activity_id = a.id
+         WHERE c.id = ?`,
+        [correctionId]
+      );
+      
+      const [studentResults] = await connection.query(
+        `SELECT CONCAT(first_name, ' ', last_name) as student_name FROM students
+         WHERE id = ?`,
+        [studentId]
+      );
+      
+      const activityName = Array.isArray(activityResults) && activityResults.length > 0
+        ? (activityResults[0] as any).activity_name || 'Activité inconnue'
+        : 'Activité inconnue';
+      
+      const studentName = Array.isArray(studentResults) && studentResults.length > 0
+        ? (studentResults[0] as any).student_name || 'Étudiant inconnu'
+        : 'Étudiant inconnu';
+      
+      const mode = overwriteExisting ? 'OVERWRITE' : 'CREATE_NEW';
+      
+      // Créer l'entrée de log pour la duplication
+      await createLogEntry({
+        action_type: `DUPLICATE_CORRECTION_${mode}`,
+        description: `Correction ${overwriteExisting ? 'écrasée' : 'dupliquée'} depuis #${correctionId} pour ${studentName} - ${activityName}`,
+        entity_type: 'correction',
+        entity_id: newCorrectionId,
+        user_id: typeof userId === 'string' ? parseInt(userId) : userId,
+        username: customUser?.username,
+        ip_address: req.headers.get('x-forwarded-for') || 'unknown',
+        metadata: {
+          original_correction_id: correctionId,
+          new_correction_id: newCorrectionId,
+          overwrite: overwriteExisting === true,
+          activity_name: activityName,
+          student_id: studentId,
+          student_name: studentName,
+          class_id: classId,
+          group_id: groupId,
+          group_name: groupName
+        }
+      });
       
       return NextResponse.json({
         success: true,

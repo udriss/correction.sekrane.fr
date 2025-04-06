@@ -198,12 +198,14 @@ export default function NewActivity() {
                       placeholder="Ex: TP sur les circuits électriques"
                       required
                       variant="outlined"
-                      InputProps={{
-                        startAdornment: (
-                          <InputAdornment position="start">
-                            <SchoolIcon color="primary" />
-                          </InputAdornment>
-                        ),
+                      slotProps={{
+                        input: {
+                          startAdornment: (
+                            <InputAdornment position="start">
+                              <SchoolIcon color="primary" />
+                            </InputAdornment>
+                          ),
+                        }
                       }}
                       sx={{ 
                         '& .MuiOutlinedInput-root': {
@@ -226,12 +228,14 @@ export default function NewActivity() {
                       onChange={(e) => setContent(e.target.value)}
                       placeholder="Description détaillée de l'activité..."
                       variant="outlined"
-                      InputProps={{
-                        startAdornment: (
-                          <InputAdornment position="start">
-                            <EmojiObjectsIcon color="primary" />
-                          </InputAdornment>
-                        ),
+                      slotProps={{
+                        input: {
+                          startAdornment: (
+                            <InputAdornment position="start">
+                              <EmojiObjectsIcon color="primary" />
+                            </InputAdornment>
+                          ),
+                        }
                       }}
                       sx={{ 
                         '& .MuiOutlinedInput-root': {

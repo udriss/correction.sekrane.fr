@@ -22,6 +22,7 @@ import CopyIcon from '@mui/icons-material/ContentCopy';
 import LinkIcon from '@mui/icons-material/Link';
 import CheckIcon from '@mui/icons-material/Check';
 import * as shareService from '@/lib/services/shareService';
+import SearchIcon from '@mui/icons-material/Search';
 
 interface ShareModalProps {
   open: boolean;
@@ -192,16 +193,15 @@ export default function ShareModal({ open, onClose, correctionId, onShareSuccess
                 variant="outlined"
                 size="small"
                 inputRef={textFieldRef}
-                InputProps={{
-                  readOnly: true,
-                  startAdornment: (
-                    <LinkIcon color="action" sx={{ mr: 1 }} />
-                  ),
-                  onClick: () => {
-                    // Use the ref directly instead of e.target
-                    if (textFieldRef.current) {
-                      textFieldRef.current.select();
-                    }
+                slotProps={{
+                  input: {
+                    startAdornment: <SearchIcon fontSize="small" sx={{ mr: 1, color: 'text.secondary' }} />
+                  }
+                }}
+                onClick={() => {
+                  // Use the ref directly instead of e.target
+                  if (textFieldRef.current) {
+                    textFieldRef.current.select();
                   }
                 }}
               />
@@ -230,9 +230,11 @@ export default function ShareModal({ open, onClose, correctionId, onShareSuccess
               value={shareCode}
               variant="outlined"
               size="small"
-              InputProps={{
-                readOnly: true,
-                sx: { fontWeight: 'bold', letterSpacing: '0.5px' }
+              slotProps={{
+                input: {
+                  readOnly: true,
+                  sx: { fontWeight: 'bold', letterSpacing: '0.5px' }
+                }
               }}
             />
           </>

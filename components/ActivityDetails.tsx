@@ -111,7 +111,11 @@ const ActivityDetails: React.FC<ActivityDetailsProps> = ({
                 <TextField
                   label="Points partie expérimentale"
                   type="number"
-                  InputProps={{ inputProps: { min: 0 } }}
+                  slotProps={{
+                    input: { 
+                      inputProps: { min: 0 }
+                    }
+                  }}
                   value={experimentalPoints}
                   onChange={(e) => handlePointsChange(e, setExperimentalPoints, theoreticalPoints, true)}
                   variant="outlined"
@@ -123,7 +127,11 @@ const ActivityDetails: React.FC<ActivityDetailsProps> = ({
                 <TextField
                   label="Points partie théorique"
                   type="number"
-                  InputProps={{ inputProps: { min: 0 } }}
+                  slotProps={{
+                    input: { 
+                      inputProps: { min: 0 }
+                    }
+                  }}
                   value={theoreticalPoints}
                   onChange={(e) => handlePointsChange(e, setTheoreticalPoints, experimentalPoints, false)}
                   variant="outlined"

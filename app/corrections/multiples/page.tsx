@@ -537,8 +537,10 @@ export default function MultipleCorrections() {
                     onChange={(e) => setExperimentalPoints(Number(e.target.value))}
                     variant="outlined"
                     size="small"
-                    inputProps={{ min: 0, max: 20 }}
                     sx={{ mt: 1, width: '80px', textAlign: 'center' }}
+                    slotProps={{
+                      input: { inputProps: { min: 0, max: 20 } }
+                    }}
                   />
                 ) : (
                   <Typography variant="h3" className="font-bold text-blue-600 mb-1">
@@ -561,8 +563,10 @@ export default function MultipleCorrections() {
                     onChange={(e) => setTheoreticalPoints(Number(e.target.value))}
                     variant="outlined"
                     size="small"
-                    inputProps={{ min: 0, max: 20 }}
                     sx={{ mt: 1, width: '80px', textAlign: 'center' }}
+                    slotProps={{
+                      input: { inputProps: { min: 0, max: 20 } }
+                    }}
                   />
                 ) : (
                   <Typography variant="h3" className="font-bold text-blue-600 mb-1">

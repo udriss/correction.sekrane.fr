@@ -278,17 +278,27 @@ export async function PUT(
   }
 }
 
+import { createLogEntry } from '@/lib/services/logsService';
+
 export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const { id } = await params;
+    const user = await getUser(request);
     
     // Utiliser withConnection au lieu de pool.query directement
     return await withConnection(async (connection) => {
       // Récupérer d'abord la correction pour la retourner après suppression
-      const [rows] = await connection.query('SELECT * FROM corrections WHERE id = ?', [id]);
+      const [rows] = await connection.query(
+        `SELECT c.*, a.name as activity_name, CONCAT(s.first_name, ' ', s.last_name) as student_name 
+         FROM corrections c
+         LEFT JOIN activities a ON c.activity_id = a.id
+         LEFT JOIN students s ON c.student_id = s.id
+         WHERE c.id = ?`, 
+        [id]
+      );
       
       if (!Array.isArray(rows) || rows.length === 0) {
         return new NextResponse(JSON.stringify({ error: 'Correction non trouvée' }), {
@@ -304,6 +314,25 @@ export async function DELETE(
       // Supprimer la correction
       await connection.query('DELETE FROM corrections WHERE id = ?', [id]);
       
+      // Enregistrer un log de suppression
+      await createLogEntry({
+        action_type: 'DELETE_CORRECTION',
+        description: `Suppression de la correction #${id}${correction.student_name ? ` pour ${correction.student_name}` : ''} - ${correction.activity_name || 'Activité inconnue'}`,
+        entity_type: 'correction',
+        entity_id: parseInt(id),
+        user_id: user?.id,
+        username: user?.username,
+        ip_address: request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || 'unknown',
+        metadata: {
+          activity_id: correction.activity_id,
+          activity_name: correction.activity_name,
+          student_id: correction.student_id,
+          student_name: correction.student_name,
+          class_id: correction.class_id,
+          grade: correction.grade
+        }
+      });
+      
       return new NextResponse(JSON.stringify(correction), {
         status: 200,
         headers: {
@@ -313,6 +342,21 @@ export async function DELETE(
     });
   } catch (error) {
     console.error('Erreur lors de la suppression de la correction:', error);
+    
+    // Log de l'erreur
+    try {
+      const user = await getUser(request);
+      await createLogEntry({
+        action_type: 'DELETE_CORRECTION_ERROR',
+        description: `Erreur lors de la suppression d'une correction: ${(error as Error).message}`,
+        user_id: user?.id,
+        username: user?.username,
+        ip_address: request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || 'unknown'
+      });
+    } catch (logError) {
+      console.error('Error creating log entry:', logError);
+    }
+    
     return new NextResponse(JSON.stringify({ error: 'Erreur serveur' }), {
       status: 500,
       headers: {
@@ -324,148 +368,211 @@ export async function DELETE(
 
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: Promise<Record<string, string>> }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id } = await Promise.resolve(params);
-    
-    const body = await request.json();
-    
-
-    // Convertir explicitement les valeurs numériques si présentes
-    if (body.experimental_points_earned !== undefined) {
-      body.experimental_points_earned = parseFloat(body.experimental_points_earned);
-    }
-    
-    if (body.theoretical_points_earned !== undefined) {
-      body.theoretical_points_earned = parseFloat(body.theoretical_points_earned);
+    const user = await getUser(request);
+    if (!user) {
+      return NextResponse.json({ error: 'Non autorisé' }, { status: 401 });
     }
 
-    // Recalculer la note totale si l'une des notes a été modifiée
-    if (body.experimental_points_earned !== undefined || body.theoretical_points_earned !== undefined) {
-      return await withConnection(async (connection) => {
-        // Récupérer les valeurs actuelles si nécessaire
-        const [currentData] = await connection.query(
-          'SELECT experimental_points_earned, theoretical_points_earned, activity_id FROM corrections WHERE id = ?',
-          [id]
-        );
+    const { id } = await params;
+    const correctionId = id;
+
+
+    const data = await request.json();
+
+    // Valider les données et récupérer l'ancienne correction pour comparaison
+    const oldCorrectionAndResult = await withConnection(async (connection) => {
+      // Récupérer l'ancienne correction pour le logging
+      const [oldCorrectionResult] = await connection.query(
+        'SELECT * FROM corrections WHERE id = ?',
+        [correctionId]
+      );
+      
+      const oldCorrection = Array.isArray(oldCorrectionResult) && oldCorrectionResult.length > 0
+        ? oldCorrectionResult[0]
+        : null;
         
-        if (!Array.isArray(currentData) || currentData.length === 0) {
-          return NextResponse.json({ error: 'Correction non trouvée' }, { status: 404 });
-        }
+      if (!oldCorrection) {
+        return { success: false, message: 'Correction non trouvée' };
+      }
+
+      // Construire l'ensemble des champs à mettre à jour
+      const fieldsToUpdate = [];
+      const params = [];
+      
+      if (data.experimental_points_earned !== undefined) {
+        fieldsToUpdate.push('experimental_points_earned = ?');
+        params.push(data.experimental_points_earned);
+      }
+      
+      if (data.theoretical_points_earned !== undefined) {
+        fieldsToUpdate.push('theoretical_points_earned = ?');
+        params.push(data.theoretical_points_earned);
+      }
+      
+      if (data.deadline !== undefined) {
+        fieldsToUpdate.push('deadline = ?');
+        params.push(data.deadline);
+      }
+      
+      if (data.submission_date !== undefined) {
+        fieldsToUpdate.push('submission_date = ?');
+        params.push(data.submission_date);
+      }
+      
+      if (data.penalty !== undefined) {
+        fieldsToUpdate.push('penalty = ?');
+        params.push(data.penalty);
+      }
+      
+      if (data.content !== undefined) {
+        fieldsToUpdate.push('content = ?');
+        params.push(JSON.stringify(data.content));
+      }
+      
+      // Calculer la note totale si les points expérimentaux et théoriques sont fournis
+      if (data.experimental_points_earned !== undefined && data.theoretical_points_earned !== undefined) {
+        const totalGrade = data.experimental_points_earned + data.theoretical_points_earned;
         
-        const current = currentData[0] as any;
-        
-        // Utiliser les nouvelles valeurs ou conserver les anciennes
-        const expPoints = body.experimental_points_earned !== undefined 
-          ? body.experimental_points_earned 
-          : parseFloat(current.experimental_points_earned) || 0;
+        // Si une pénalité est définie, l'appliquer à la note
+        const finalGrade = data.penalty !== undefined && data.penalty > 0
+          ? Math.max(0, totalGrade - data.penalty)
+          : totalGrade;
           
-        const theoPoints = body.theoretical_points_earned !== undefined 
-          ? body.theoretical_points_earned 
-          : parseFloat(current.theoretical_points_earned) || 0;
-        
-        // Calculer la note totale (grade)
-        const grade = expPoints + theoPoints;
-        
-        // Mettre à jour la correction
-        await connection.query(
-          `UPDATE corrections 
-           SET experimental_points_earned = ?, 
-               theoretical_points_earned = ?, 
-               grade = ?,
-               updated_at = NOW()
-           WHERE id = ?`,
-          [expPoints, theoPoints, grade, id]
-        );
-        
-        // Récupérer la correction mise à jour
-        const [rows] = await connection.query(
-          `SELECT c.*, a.name as activity_name,
-           CONCAT(s.first_name, ' ', s.last_name) as student_name
-           FROM corrections c 
-           JOIN activities a ON c.activity_id = a.id 
-           LEFT JOIN students s ON c.student_id = s.id
-           WHERE c.id = ?`,
-          [id]
-        );
-        
-        if (!Array.isArray(rows) || rows.length === 0) {
-          return NextResponse.json({ error: 'Correction non trouvée après mise à jour' }, { status: 404 });
-        }
-        
-        return NextResponse.json(rows[0]);
-      });
-    }
-    
-    // Pour les autres types de mises à jour (student_id, content, content_data)
-    return await withConnection(async (connection) => {
-      // Construire dynamiquement la requête SQL
-      const updateFields: string[] = [];
-      const updateValues: any[] = [];
-      
-      // Ajouter chaque champ présent dans body
-      if (body.student_id !== undefined) {
-        updateFields.push('student_id = ?');
-        updateValues.push(body.student_id);
+        fieldsToUpdate.push('grade = ?');
+        params.push(finalGrade);
+      } else if (data.grade !== undefined) {
+        // Permettre également de mettre à jour directement la note
+        fieldsToUpdate.push('grade = ?');
+        params.push(data.grade);
       }
       
-      if (body.content !== undefined) {
-        updateFields.push('content = ?');
-        updateValues.push(body.content);
+      if (fieldsToUpdate.length === 0) {
+        return { success: false, message: 'Aucune donnée à mettre à jour' };
       }
       
-      if (body.content_data !== undefined) {
-        updateFields.push('content_data = ?');
-        updateValues.push(typeof body.content_data === 'object' 
-          ? JSON.stringify(body.content_data) 
-          : body.content_data);
-      }
+      params.push(correctionId);
       
-      if (updateFields.length === 0) {
-        return NextResponse.json({ error: 'Aucun champ valide à mettre à jour' }, { status: 400 });
-      }
-      
-      // Ajouter l'ID à la fin des valeurs
-      updateValues.push(id);
-      
-      // Exécuter la requête de mise à jour
+      // Exécuter la mise à jour
       await connection.query(
-        `UPDATE corrections SET ${updateFields.join(', ')}, updated_at = NOW() WHERE id = ?`,
-        updateValues
+        `UPDATE corrections SET ${fieldsToUpdate.join(', ')} WHERE id = ?`,
+        params
       );
       
       // Récupérer la correction mise à jour
-      const [rows] = await connection.query(
-        `SELECT c.*, a.name as activity_name,
-         CONCAT(s.first_name, ' ', s.last_name) as student_name
-         FROM corrections c 
-         JOIN activities a ON c.activity_id = a.id 
-         LEFT JOIN students s ON c.student_id = s.id
-         WHERE c.id = ?`,
-        [id]
+      const [result] = await connection.query(
+        'SELECT * FROM corrections WHERE id = ?',
+        [correctionId]
       );
       
-      if (!Array.isArray(rows) || rows.length === 0) {
-        return NextResponse.json({ error: 'Correction non trouvée après mise à jour' }, { status: 404 });
-      }
-      
-      const updatedCorrection = rows[0] as any;
-      
-      // Parser content_data pour le retour si nécessaire
-      if (updatedCorrection.content_data && typeof updatedCorrection.content_data === 'string') {
-        try {
-          updatedCorrection.content_data = JSON.parse(updatedCorrection.content_data);
-        } catch (e) {
-          console.error('Erreur de parsing content_data après mise à jour:', e);
-        }
-      }
-      
-      return NextResponse.json(updatedCorrection);
+      return { 
+        success: true, 
+        data: Array.isArray(result) && result.length > 0 ? result[0] : null,
+        oldCorrection 
+      };
     });
     
+    if (!oldCorrectionAndResult.success) {
+      return NextResponse.json(
+        { error: oldCorrectionAndResult.message },
+        { status: 404 }
+      );
+    }
+    
+    const { data: updatedCorrection, oldCorrection } = oldCorrectionAndResult;
+    
+    // Logger les modifications
+    const changes: Record<string, { old: any; new: any }> = {};
+    
+    // Vérifier les changements de notes
+    if (data.experimental_points_earned !== undefined && 
+        (oldCorrection as any).experimental_points_earned !== data.experimental_points_earned) {
+      changes['experimental_points_earned'] = {
+        old: (oldCorrection as any).experimental_points_earned,
+        new: data.experimental_points_earned
+      };
+    }
+    
+    if (data.theoretical_points_earned !== undefined && 
+        (oldCorrection as any).theoretical_points_earned !== data.theoretical_points_earned) {
+      changes['theoretical_points_earned'] = {
+        old: (oldCorrection as any).theoretical_points_earned,
+        new: data.theoretical_points_earned
+      };
+    }
+    
+    if (data.penalty !== undefined && 
+        (oldCorrection as any).penalty !== data.penalty) {
+      changes['penalty'] = {
+        old: (oldCorrection as any).penalty,
+        new: data.penalty
+      };
+    }
+    
+    // Si des modifications de notes ont été effectuées, créer un log
+    if (Object.keys(changes).length > 0) {
+      await createLogEntry({
+        action_type: 'UPDATE_GRADE',
+        description: `Modification des notes pour la correction #${correctionId}`,
+        entity_type: 'correction',
+        entity_id: parseInt(correctionId),
+        user_id: user.id,
+        username: user.username,
+        metadata: {
+          changes,
+          old_grade: (oldCorrection as any).grade,
+          new_grade: (updatedCorrection as any).grade,
+          activity_id: (oldCorrection as any).activity_id,
+          student_id: (oldCorrection as any).student_id
+        }
+      });
+    }
+    
+    // Vérifier les changements de dates
+    const dateChanges: Record<string, { old: any; new: any }> = {};
+    
+    if (data.deadline !== undefined && 
+        (oldCorrection as any).deadline !== data.deadline) {
+      dateChanges['deadline'] = {
+        old: (oldCorrection as any).deadline,
+        new: data.deadline
+      };
+    }
+    
+    if (data.submission_date !== undefined && 
+        (oldCorrection as any).submission_date !== data.submission_date) {
+      dateChanges['submission_date'] = {
+        old: (oldCorrection as any).submission_date,
+        new: data.submission_date
+      };
+    }
+    
+    // Si des modifications de dates ont été effectuées, créer un log
+    if (Object.keys(dateChanges).length > 0) {
+      await createLogEntry({
+        action_type: 'UPDATE_DATES',
+        description: `Modification des dates pour la correction #${correctionId}`,
+        entity_type: 'correction',
+        entity_id: parseInt(correctionId),
+        user_id: user.id,
+        username: user.username,
+        metadata: {
+          changes: dateChanges,
+          activity_id: (oldCorrection as any).activity_id,
+          student_id: (oldCorrection as any).student_id
+        }
+      });
+    }
+
+    return NextResponse.json(updatedCorrection);
   } catch (error) {
-    console.error('Erreur lors de la mise à jour de la correction:', error);
-    return NextResponse.json({ error: 'Erreur serveur', details: String(error) }, { status: 500 });
+    console.error('Error updating correction:', error);
+    
+    return NextResponse.json(
+      { error: 'Erreur lors de la mise à jour de la correction' },
+      { status: 500 }
+    );
   }
 }

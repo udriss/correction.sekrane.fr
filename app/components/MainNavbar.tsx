@@ -35,6 +35,7 @@ import AssignmentIcon from '@mui/icons-material/Assignment';
 import CategoryIcon from '@mui/icons-material/Category';
 import SearchIcon from '@mui/icons-material/Search';
 import ThemeSwitcher from '@/components/layout/ThemeSwitcher';
+import SettingsIcon from '@mui/icons-material/Settings';
 
 interface User {
   id: number;
@@ -162,9 +163,19 @@ export default function MainNavbar() {
             }}
           >
             <Toolbar sx={{ justifyContent: 'space-between' }}>
-              {/* ThemeSwitcher on the left */}
-              <Box  sx={{ marginLeft: 2 }}>
-              <ThemeSwitcher />
+              {/* ThemeSwitcher and Settings icon on the left */}
+              <Box sx={{ marginLeft: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
+                <ThemeSwitcher />
+                <Tooltip title="Journaux d'activité">
+                  <IconButton 
+                    component={Link} 
+                    href="/logs" 
+                    size="small" 
+                    sx={{ color: 'text.secondary' }}
+                  >
+                    <SettingsIcon />
+                  </IconButton>
+                </Tooltip>
               </Box>
               {/* Logo et titre de l'app */}
               <Typography 
