@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { withConnection } from '@/lib/db';
+import { createLogEntry } from '@/lib/services/logsService';
 
 export async function GET(
   request: Request,
@@ -75,6 +76,30 @@ export async function GET(
 
       // Ajouter l'information que cette correction est accédée via un lien de partage
       correction.shared = true;
+
+      // Journaliser l'accès au feedback
+      const userAgent = (request as NextRequest).headers.get('user-agent') || 'unknown';
+      const ipAddress = (request as NextRequest).headers.get('x-forwarded-for') || 
+                        (request as NextRequest).headers.get('x-real-ip') || 'unknown';
+      const referer = (request as NextRequest).headers.get('referer') || 'direct';
+                        
+      await createLogEntry({
+        action_type: 'VIEW_FEEDBACK',
+        description: `Consultation de la correction partagée #${correctionId} pour ${correction.student_name}`,
+        entity_type: 'correction',
+        entity_id: correctionId,
+        ip_address: ipAddress,
+        metadata: {
+          share_code: code,
+          activity_name: correction.activity_name,
+          activity_id: correction.activity_id,
+          student_name: correction.student_name,
+          student_id: correction.student_id,
+          browser: userAgent,
+          referer: referer,
+          timestamp: new Date().toISOString()
+        }
+      });
 
       return NextResponse.json(correction);
     });

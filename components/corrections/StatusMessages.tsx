@@ -1,5 +1,5 @@
 import React from 'react';
-import { Paper, Alert } from '@mui/material';
+import { Snackbar, Alert } from '@mui/material';
 
 interface StatusMessagesProps {
   successMessage: string;
@@ -15,31 +15,37 @@ const StatusMessages: React.FC<StatusMessagesProps> = ({
   if (!successMessage && !copiedMessage && !error) return null;
   
   return (
-    <div className="mt-2">
-      {successMessage && (
-        <Paper className="shadow mt-2">
-          <Alert severity="success">
-            {successMessage}
-          </Alert>
-        </Paper>
-      )}
+    <>
+      <Snackbar 
+        open={!!successMessage} 
+        autoHideDuration={6000}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
+        <Alert severity="success" variant="filled" onClose={() => {}}>
+          {successMessage}
+        </Alert>
+      </Snackbar>
 
-      {copiedMessage && (
-        <Paper className="shadow mt-2">
-          <Alert severity="info">
-            {copiedMessage}
-          </Alert>
-        </Paper>
-      )}
+      <Snackbar 
+        open={!!copiedMessage} 
+        autoHideDuration={3000}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
+        <Alert severity="info" variant="filled" onClose={() => {}}>
+          {copiedMessage}
+        </Alert>
+      </Snackbar>
       
-      {error && (
-        <Paper className="shadow mt-2">
-          <Alert severity="error">
-            {error}
-          </Alert>
-        </Paper>
-      )}
-    </div>
+      <Snackbar 
+        open={!!error} 
+        autoHideDuration={6000}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
+        <Alert severity="error" variant="filled" onClose={() => {}}>
+          {error}
+        </Alert>
+      </Snackbar>
+    </>
   );
 };
 

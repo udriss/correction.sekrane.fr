@@ -4,7 +4,7 @@ import {
   FormControl, InputLabel, Select, MenuItem, TextField, 
   Typography, Box, Chip, Alert, CircularProgress,
   List, ListItem, ListItemText, IconButton, SelectChangeEvent, OutlinedInput, Switch,
-  alpha
+  alpha, InputAdornment
 } from '@mui/material';
 import { Timeline, TimelineItem, TimelineSeparator, TimelineConnector, TimelineContent, TimelineDot } from '@mui/lab';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
@@ -12,6 +12,7 @@ import SchoolIcon from '@mui/icons-material/School';
 import PersonIcon from '@mui/icons-material/Person';
 import LaunchIcon from '@mui/icons-material/Launch';
 import ClearIcon from '@mui/icons-material/Clear';
+import SearchIcon from '@mui/icons-material/Search';
 import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline'; // Import de l'icône d'alerte
 import Link from 'next/link';
 import { constructFromSymbol } from 'date-fns/constants';
@@ -78,6 +79,8 @@ export default function DuplicateCorrection({ correctionId }: DuplicateCorrectio
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [duplicationStatuses, setDuplicationStatuses] = useState<DuplicationStatus[]>([]);
+  // État pour la recherche d'étudiants
+  const [searchTerm, setSearchTerm] = useState<string>('');
   
   // États pour gérer les corrections existantes
   const [activityId, setActivityId] = useState<number | null>(null);
@@ -173,27 +176,30 @@ export default function DuplicateCorrection({ correctionId }: DuplicateCorrectio
   };
 
   // Update the filtered students list based on selected classes
-  const updateFilteredStudents = (students: Record<number, StudentWithClasses>, classIds: number[]) => {
+  const updateFilteredStudents = (students: Record<number, StudentWithClasses>, classIds: number[], searchTerm: string) => {
     // If no classes selected, show all students
-    if (classIds.length === 0) {
-      setFilteredStudents(Object.values(students)
-        .sort((a, b) => `${a.last_name} ${a.first_name}`.localeCompare(`${b.last_name} ${b.first_name}`)));
-      return;
+    let filtered = Object.values(students);
+    
+    if (classIds.length > 0) {
+      filtered = filtered.filter(student => 
+        student.classes.some(c => classIds.includes(c.id))
+      );
     }
     
-    // Filter students by selected classes using classes array
-    const filtered = Object.values(students).filter(student => 
-      student.classes.some(c => classIds.includes(c.id))
-    ).sort((a, b) => `${a.last_name} ${a.first_name}`.localeCompare(`${b.last_name} ${b.first_name}`));
+    if (searchTerm.trim() !== '') {
+      filtered = filtered.filter(student => 
+        `${student.first_name} ${student.last_name}`.toLowerCase().includes(searchTerm.toLowerCase())
+      );
+    }
     
-    setFilteredStudents(filtered);
+    setFilteredStudents(filtered.sort((a, b) => `${a.last_name} ${a.first_name}`.localeCompare(`${b.last_name} ${b.first_name}`)));
   };
 
   // Handle class selection change
   const handleClassChange = (event: SelectChangeEvent<number[]>) => {
     const newSelectedClasses = event.target.value as number[];
     setSelectedClassIds(newSelectedClasses);
-    updateFilteredStudents(allStudents, newSelectedClasses);
+    updateFilteredStudents(allStudents, newSelectedClasses, searchTerm);
   };
 
   // Handle student selection change
@@ -355,9 +361,9 @@ export default function DuplicateCorrection({ correctionId }: DuplicateCorrectio
   useEffect(() => {
     // Update filtered students when selected classes change
     if (open && Object.keys(allStudents).length > 0) {
-      updateFilteredStudents(allStudents, selectedClassIds);
+      updateFilteredStudents(allStudents, selectedClassIds, searchTerm);
     }
-  }, [selectedClassIds, allStudents, open]);
+  }, [selectedClassIds, allStudents, open, searchTerm]);
 
 
   // Effet pour vérifier les corrections existantes lorsque les étudiants sont sélectionnés
@@ -760,6 +766,25 @@ export default function DuplicateCorrection({ correctionId }: DuplicateCorrectio
                   {classes.length === 0 ? "Aucune classe n'a été trouvée" : "Sélectionnez une ou plusieurs classes pour filtrer les étudiants"}
                 </Typography>
               </FormControl>
+              
+              {/* Student search */}
+              <TextField
+                fullWidth
+                label="Rechercher des étudiants"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                placeholder="Rechercher par nom"
+                variant="outlined"
+                size="small"
+                sx={{ mb: 2 }}
+                InputProps={{
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <SearchIcon />
+                    </InputAdornment>
+                  ),
+                }}
+              />
               
               {/* Student selection */}
               <FormControl fullWidth sx={{ mb: 3 }}>

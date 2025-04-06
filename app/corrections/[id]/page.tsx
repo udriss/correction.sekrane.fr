@@ -382,7 +382,7 @@ export default function CorrectionDetail({ params }: { params: Promise<{ id: str
       setShowAddFragment(false);
       
       // Show success message
-      setSuccessMessage('Fragment créé avec succès');
+      setSuccessMessage('Fragment ajouté avec succès');
       setTimeout(() => setSuccessMessage(''), 3000);
     } catch (error: any) {
       console.error('Error creating fragment:', error);
