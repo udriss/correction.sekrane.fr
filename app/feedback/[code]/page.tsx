@@ -228,6 +228,20 @@ export default function FeedbackViewer({ params }: { params: Promise<{ code: str
   // Vérifier si des notes sont présentes
   const hasGrade = correction.grade !== null && correction.grade !== undefined;
   const hasPenalty = correction.penalty !== null && correction.penalty !== undefined && parseFloat(correction.penalty) > 0;
+  
+  // Vérifier si c'est un travail non rendu (pénalité de 15 points et note totale de 20 sans pénalité)
+  const isNeverSubmitted = hasPenalty && 
+                          parseFloat(correction.penalty) === 15 && 
+                          (parseFloat(correction.grade) === 20 || 
+                          (parseFloat(correction.experimental_points_earned || 0) + 
+                           parseFloat(correction.theoretical_points_earned || 0) === 20));
+  
+  // Format pour afficher "- -" au lieu des valeurs numériques pour les travaux non rendus
+  const formatGradeWithNonRendu = (value: number | string | null | undefined) => {
+    if (isNeverSubmitted) return "- -";
+    return formatGrade(value);
+  };
+  
   const finalGrade = hasGrade ? 
     (hasPenalty ? correction.final_grade : correction.grade) : 
     null;
@@ -400,7 +414,7 @@ export default function FeedbackViewer({ params }: { params: Promise<{ code: str
                                     alignItems: 'center', 
                                     justifyContent: 'center'
                                   }}>
-                                    {formatGrade(correction.experimental_points_earned)} 
+                                    {formatGradeWithNonRendu(correction.experimental_points_earned)} 
                                     <Box component="span" sx={{ color: 'text.secondary', fontSize: '1rem', ml: 0.5 }}>
                                       / {correction.experimental_points || '5'}
                                     </Box>
@@ -434,7 +448,7 @@ export default function FeedbackViewer({ params }: { params: Promise<{ code: str
                                     alignItems: 'center', 
                                     justifyContent: 'center'
                                   }}>
-                                    {formatGrade(correction.theoretical_points_earned)} 
+                                    {formatGradeWithNonRendu(correction.theoretical_points_earned)} 
                                     <Box component="span" sx={{ color: 'text.secondary', fontSize: '1rem', ml: 0.5 }}>
                                       / {correction.theoretical_points || '15'}
                                     </Box>
@@ -485,13 +499,22 @@ export default function FeedbackViewer({ params }: { params: Promise<{ code: str
                         }}
                       >
                         <Typography variant="overline" sx={{ letterSpacing: 1, color: `primary` }}>
-                          NOTE FINALE
+                          {isNeverSubmitted ? "STATUT" : "NOTE FINALE"}
                         </Typography>
-                        <Typography variant="h1" sx={{ fontSize: { xs: '3rem', sm: '4rem' }, fontWeight: 'bold', mb: 1 }}>
-                          {formatGrade(hasPenalty ? finalGrade : correction.grade)}
+                        <Typography variant="h1" sx={{ 
+                          fontSize: { xs: '2.5rem', sm: '3.5rem' }, 
+                          fontWeight: 'bold', 
+                          mb: 1, 
+                          textAlign: 'center',
+                          width: '100%' 
+                        }}>
+                          {isNeverSubmitted ? 
+                            "Travail non rendu" : 
+                            formatGradeWithNonRendu(hasPenalty ? finalGrade : correction.grade)
+                          }
                         </Typography>
                         <Typography variant="subtitle1">
-                          sur 20 points
+                          {!isNeverSubmitted && "sur 20 points"}
                         </Typography>
                       </Paper>
                     )}
@@ -630,7 +653,16 @@ export default function FeedbackViewer({ params }: { params: Promise<{ code: str
                       </Typography>
                       </Box>
                     {/* Badge de statut toujours visible dans l'en-tête */}
-                      {isMoreThanOneDayLate && (
+                      {isNeverSubmitted && (
+                        <Chip 
+                          label="Non rendu" 
+                          size="small" 
+                          color="error" 
+                          icon={<ScheduleIcon />} 
+                          sx={{ fontWeight: 500 }} 
+                        />
+                      )}
+                      {!isNeverSubmitted && isMoreThanOneDayLate && (
                         <Chip 
                           label="Rendu en retard" 
                           size="small" 
@@ -639,7 +671,7 @@ export default function FeedbackViewer({ params }: { params: Promise<{ code: str
                           sx={{ fontWeight: 500 }} 
                         />
                       )}
-                      {isOneDayLate && (
+                      {!isNeverSubmitted && isOneDayLate && (
                         <Chip 
                           label="Léger retard" 
                           size="small" 
@@ -648,7 +680,7 @@ export default function FeedbackViewer({ params }: { params: Promise<{ code: str
                           sx={{ fontWeight: 500 }} 
                         />
                       )}
-                      {isOnTime && (
+                      {!isNeverSubmitted && isOnTime && (
                         <Chip 
                           label="Rendu à temps" 
                           size="small" 
@@ -722,7 +754,7 @@ export default function FeedbackViewer({ params }: { params: Promise<{ code: str
                               Date de rendu
                             </Typography>
                             <Typography variant="h6" sx={{ fontWeight: 500 }}>
-                              {formatDate(correction.submission_date)}
+                              {isNeverSubmitted ? "Travail non rendu" : formatDate(correction.submission_date)}
                             </Typography>
                           </Box>
                         </Paper>

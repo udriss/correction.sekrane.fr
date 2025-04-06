@@ -8,11 +8,14 @@ import {
   Stack,
   Button,
   Grid,
+  Chip,
 } from '@mui/material';
 import EditIcon from '@mui/icons-material/Edit';
 import CheckIcon from '@mui/icons-material/Check';
 import CloseIcon from '@mui/icons-material/Close';
 import DeleteIcon from '@mui/icons-material/Delete';
+import SchoolIcon from '@mui/icons-material/School';
+import GroupsIcon from '@mui/icons-material/Groups';
 
 interface CorrectionHeaderProps {
   correction: any;
@@ -287,6 +290,31 @@ const CorrectionHeader: React.FC<CorrectionHeaderProps> = ({
                 </Button>
               </Link>
             </Typography>
+            
+            {/* Affichage des informations de classe et sous-classe */}
+            {correction.class_name && (
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 1 }}>
+                <Chip
+                  icon={<SchoolIcon />}
+                  label={correction.class_name}
+                  color="primary"
+                  size="small"
+                  sx={{ fontWeight: 'medium' }}
+                />
+                
+                {correction.sub_class !== null && correction.sub_class !== undefined && (
+                  <Chip
+                    icon={<GroupsIcon />}
+                    label={`Groupe ${correction.sub_class}`}
+                    color="secondary"
+                    size="small"
+                    variant="filled"
+                    sx={{ fontWeight: 'medium' }}
+                  />
+                )}
+              </Box>
+            )}
+            
             {correction.created_at && (
               <Typography variant="body2" sx={{ color: 'text.secondary', mt: 0.5 }}>
                 Ajoutée le {new Date(correction.created_at).toLocaleDateString('fr-FR', {

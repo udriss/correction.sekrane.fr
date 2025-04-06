@@ -46,6 +46,19 @@ const CorrectionsList: React.FC<CorrectionsListProps> = ({
     loadShareCodes();
   }, [filteredCorrections]);
 
+  // Calculate card grade with penalty consideration
+  const calculateCardGrade = (correction: ProviderCorrection) => {
+    // Vérifier s'il y a une pénalité à appliquer
+    const hasPenalty = correction.penality !== undefined && correction.penality !== null;
+    
+    // Calculer la note avec la pénalité si elle existe
+    const gradeWithPenalty = hasPenalty 
+      ? Math.max(0, correction.grade - (correction.penality || 0)) 
+      : correction.grade;
+      
+    return gradeWithPenalty;
+  };
+
   if (error) {
     return (
       <Alert severity="error" variant="filled">

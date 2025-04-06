@@ -1,5 +1,5 @@
-import React from 'react';
-import { Paper, Typography, Slider, Box, Grid, Divider } from '@mui/material';
+import React, { useState, useEffect } from 'react';
+import { Paper, Typography, Slider, Box, Grid, Divider, FormControlLabel, Checkbox, Alert } from '@mui/material';
 
 interface GradingSectionProps {
   experimentalGrade: string;
@@ -34,12 +34,85 @@ const GradingSection: React.FC<GradingSectionProps> = ({
   correctionsHook,
   correction
 }) => {
+  // État pour le checkbox "Travail non rendu"
+  const [neverSubmitted, setNeverSubmitted] = useState(false);
+  
+  // Vérifier si la pénalité actuelle correspond au cas "travail non rendu"
+  useEffect(() => {
+    // Si la pénalité est de 15 points et la note est de 5/20, c'est probablement un travail non rendu
+    const currentPenalty = parseFloat(penalty) || 0;
+    const expGrade = parseFloat(experimentalGrade) || 0;
+    const theoGrade = parseFloat(theoreticalGrade) || 0;
+    const totalWithoutPenalty = expGrade + theoGrade;
+    
+    // Si pénalité de 15 et note totale de 20, c'est un travail non rendu
+    if (isPenaltyEnabled && currentPenalty === 15 && totalWithoutPenalty === 20) {
+      setNeverSubmitted(true);
+    } else {
+      setNeverSubmitted(false);
+    }
+  }, [isPenaltyEnabled, penalty, experimentalGrade, theoreticalGrade]);
+  
+  // Fonction pour appliquer la notation "travail non rendu"
+  const handleNeverSubmittedChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const isChecked = event.target.checked;
+    setNeverSubmitted(isChecked);
+    
+    if (isChecked) {
+      // Appliquer la note de 5/20 (avec 15 points de pénalité)
+      const maxPoints = experimentalPoints + theoreticalPoints;
+      const expPoints = (experimentalPoints / maxPoints) * 20;
+      const theoPoints = (theoreticalPoints / maxPoints) * 20;
+      
+      // Mettre à jour les notes et la pénalité
+      setExperimentalGrade(expPoints.toFixed(1));
+      setTheoreticalGrade(theoPoints.toFixed(1));
+      setPenalty('15');
+      
+      // Sauvegarder les modifications
+      if (saveGradeTimeout) {
+        clearTimeout(saveGradeTimeout);
+      }
+      
+      const timeout = setTimeout(() => {
+        if (correction) {
+          correctionsHook.saveGradeAndPenalty(
+            expPoints,
+            theoPoints,
+            15
+          );
+        }
+      }, 500);
+      
+      setSaveGradeTimeout(timeout);
+    }
+  };
+  
   return (
     <>
       <Box sx={{ mb: 3 }}>
         <Typography variant="h6">
           Notation sur {experimentalPoints + theoreticalPoints} points
         </Typography>
+        
+        {/* Checkbox pour les travaux non rendus */}
+        <FormControlLabel
+          control={
+            <Checkbox
+              checked={neverSubmitted}
+              onChange={handleNeverSubmittedChange}
+              color="error"
+            />
+          }
+          label="Travail non rendu"
+          sx={{ mt: 1 }}
+        />
+        
+        {neverSubmitted && (
+          <Alert severity="warning" sx={{ mt: 1, mb: 2 }}>
+            Note automatique de 5/20 appliquée (pénalité de 15 points)
+          </Alert>
+        )}
       </Box>
 
       <Grid container spacing={4} justifyContent="center">
@@ -77,6 +150,7 @@ const GradingSection: React.FC<GradingSectionProps> = ({
               step={0.5}
               valueLabelDisplay="auto"
               marks
+              disabled={neverSubmitted}
               sx={{ 
                 width: "90%",
                 color: 'primary.main',
@@ -129,6 +203,7 @@ const GradingSection: React.FC<GradingSectionProps> = ({
               step={0.5}
               valueLabelDisplay="auto"
               marks
+              disabled={neverSubmitted}
               sx={{ 
                 width: "90%",
                 color: 'secondary.main', 
@@ -180,10 +255,11 @@ const GradingSection: React.FC<GradingSectionProps> = ({
                     setSaveGradeTimeout(timeout);
                   }}
                   min={0}
-                  max={14}
+                  max={16}
                   step={0.5}
                   valueLabelDisplay="auto"
                   marks
+                  disabled={neverSubmitted}
                   sx={{ 
                     width: "90%",
                     color: 'error.main',
@@ -215,7 +291,7 @@ const GradingSection: React.FC<GradingSectionProps> = ({
                   const theoGrade = parseFloat(theoreticalGrade) || 0;
                   const penaltyValue = isPenaltyEnabled ? (parseFloat(penalty) || 0) : 0;
                   const totalGrade = expGrade + theoGrade - penaltyValue;
-                  return isNaN(totalGrade) ? 0 : totalGrade;
+                  return isNaN(totalGrade) ? 0 : Math.max(0, totalGrade);
                 })()}
                 max={experimentalPoints + theoreticalPoints}
                 disabled

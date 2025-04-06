@@ -38,7 +38,7 @@ const FragmentList: React.FC<FragmentListProps> = ({
   
   return (
     <DndProvider backend={HTML5Backend}>
-      <Box sx={{ maxHeight: 500, overflowY: 'auto', p: 0.5, '& > *': { mb: 1.5 } }}>
+      <Box sx={{ maxHeight: 900, overflowY: 'auto', p: 0.5, '& > *': { mb: 1.5 } }}>
         {fragments.map((fragment, index) => (
           <FragmentCard
             key={`fragment-${fragment.id}`}

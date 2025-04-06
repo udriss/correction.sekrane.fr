@@ -73,6 +73,7 @@ export async function GET(request: NextRequest) {
         status: correction.status || 'pending',
         experimental_points: Number(correction.experimental_points) || 0,
         theoretical_points: Number(correction.theoretical_points) || 0,
+        penality: Number(correction.penalty) || null, // Ajout du champ penality (issu du champ penalty en DB)
         content: correction.content,
         created_at: correction.created_at,
         updated_at: correction.updated_at,

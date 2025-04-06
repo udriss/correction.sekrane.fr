@@ -39,7 +39,7 @@ const CorrectionCard: React.FC<CorrectionCardProps> = ({
   // Utiliser useEffect pour s'assurer que shareCode est mis à jour quand preloadedShareCode change
   const [shareCode, setShareCode] = useState<string | null>(null);
   const [shareModalOpen, setShareModalOpen] = useState(false);
-  
+  console.log('CorrectionCard props:', { correction });
   // S'assurer que shareCode est mis à jour lorsque preloadedShareCode change
   useEffect(() => {
     if (preloadedShareCode) {
@@ -71,9 +71,18 @@ const CorrectionCard: React.FC<CorrectionCardProps> = ({
     : 'Date inconnue';
     
   // Calculate normalized grade (0-20)
-  const normalizedGrade = correction.experimental_points && correction.theoretical_points
-    ? (correction.grade / (correction.theoretical_points + correction.experimental_points) * 20)
+  // Vérifier s'il y a une pénalité à appliquer
+  const hasPenalty = correction.penality !== undefined && correction.penality !== null;
+  
+  // Calculer la note avec la pénalité si elle existe
+  const gradeWithPenalty = hasPenalty && correction.penality !== undefined && correction.penality !== null
+    ? Math.max(0, correction.grade - correction.penality) 
     : correction.grade;
+    
+  // Normaliser la note sur 20
+  const normalizedGrade = correction.experimental_points && correction.theoretical_points
+    ? (gradeWithPenalty / (correction.theoretical_points + correction.experimental_points) * 20)
+    : gradeWithPenalty;
   
   const gradeColor = getGradeColor(normalizedGrade);
 
@@ -112,7 +121,7 @@ const CorrectionCard: React.FC<CorrectionCardProps> = ({
            p: 1, borderRadius: 2, 
            color: 'white' }}>
           <Typography variant="h5" component="div" fontWeight="bold">
-        {correction.grade.toFixed(1)}
+        {gradeWithPenalty.toFixed(1)}
           </Typography>
         <Typography variant="body2" sx={{ ml: 1, opacity: 0.9 }}>
         / {correction.experimental_points !== undefined && correction.theoretical_points !== undefined 
@@ -176,10 +185,43 @@ const CorrectionCard: React.FC<CorrectionCardProps> = ({
         {/* Display experimental vs theoretical grades if available */}
         {(correction.experimental_points !== undefined || correction.theoretical_points !== undefined) && (
           <Box sx={{ display: 'flex', gap: 1, mt: 2 }}>
+            {correction.penality !== undefined && correction.penality !== null && correction.penality > 0 && (
+              <Chip 
+                size="small" 
+                label={
+                  <>
+                  <Typography variant="caption" sx={{ color: 'error.main' }}>
+                  Pénalité :&nbsp;
+                  </Typography>
+                  <Typography variant="caption" sx={{ color: 'text.primary' }}>
+                    {correction.penality.toFixed(1)}
+                  </Typography>
+                  <Typography variant="caption" sx={{ color: 'error.main' }}>
+                  &nbsp;pts
+                </Typography>
+                </>
+                } 
+                color="error"
+                variant="outlined"
+              />
+            )}
+            
             {correction.experimental_points !== undefined && (
               <Chip 
                 size="small" 
-                label={`Exp : ${correction.experimental_points.toFixed(1)}`} 
+                label={
+                  <>
+                  <Typography variant="caption" sx={{ color: 'primary.dark' }}>
+                     Exp :&nbsp;
+                  </Typography>
+                  <Typography variant="caption" sx={{ color: 'text.primary' }}>
+                    {correction.experimental_points_earned.toFixed(1)}
+                  </Typography>
+                  <Typography variant="caption" sx={{ color: 'primary.dark' }}>
+                  &nbsp;/ {correction.experimental_points.toFixed(1)}
+                </Typography>
+                </>
+                }
                 color="info"
                 variant="outlined"
               />
@@ -187,7 +229,19 @@ const CorrectionCard: React.FC<CorrectionCardProps> = ({
             {correction.theoretical_points !== undefined && (
               <Chip 
                 size="small" 
-                label={`Theo : ${correction.theoretical_points.toFixed(1)}`} 
+                label={
+                  <>
+                  <Typography variant="caption" sx={{ color: 'secondary.dark' }}>
+                  Théo :&nbsp;
+                  </Typography>
+                  <Typography variant="caption" sx={{ color: 'text.primary' }}>
+                    {correction.theoretical_points_earned.toFixed(1)}
+                  </Typography>
+                  <Typography variant="caption" sx={{ color: 'secondary.dark' }}>
+                  &nbsp;/ {correction.theoretical_points.toFixed(1)}
+                </Typography>
+                </>
+                } 
                 color="secondary"
                 variant="outlined"
               />

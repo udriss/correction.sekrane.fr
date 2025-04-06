@@ -666,7 +666,7 @@ export default function ActivitiesPage() {
                                         color="success"
                                         variant="outlined"
                                         component={Link}
-                                        href={`/activities/${activity.id}?tab=corrections`}
+                                        href={`/activities/${activity.id}?tab=2`}
                                         clickable
                                         sx={{ 
                                           cursor: 'pointer', 

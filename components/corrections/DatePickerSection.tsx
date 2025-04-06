@@ -50,7 +50,7 @@ const DatePickerSection: React.FC<DatePickerSectionProps> = ({
                 <>
                   Rendu en retard de {submissionDate.diff(deadlineDate, 'day')} jour(s)
                   <strong className="ml-2">
-                    (Pénalité automatique de {Math.min(20, submissionDate.diff(deadlineDate, 'day') * 2)} points)
+                    (Pénalité automatique de {Math.min(15, submissionDate.diff(deadlineDate, 'day') * 2)} points)
                   </strong>
                 </>
               )}

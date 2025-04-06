@@ -489,7 +489,7 @@ export default function CorrectionDetail({ params }: { params: Promise<{ id: str
     
     // Apply penalty if more than 1 day late (2 points per day)
     if (daysLate > 1) {
-      const calculatedPenalty = Math.min(20, daysLate * 2); // Cap at 20 points
+      const calculatedPenalty = Math.min(15, daysLate * 2); // Cap at 15 points
       
       // Enable penalty and set its value
       setIsPenaltyEnabled(true);

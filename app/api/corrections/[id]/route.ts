@@ -28,30 +28,57 @@ export async function GET(
       return NextResponse.json({ error: 'Correction non trouvée' }, { status: 404 });
     }
 
-    // Récupérer les informations de l'étudiant si student_id existe
-    if (correction.student_id) {
-      return await withConnection(async (connection) => {
+    return await withConnection(async (connection) => {
+      // Récupérer les informations de classe si class_id existe
+      let classInfo = null;
+      let subClass = null;
+      
+      if (correction.class_id) {
+        // Récupérer les informations de la classe
+        const [classRows] = await connection.query(
+          'SELECT * FROM classes WHERE id = ?',
+          [correction.class_id]
+        );
+        
+        if (Array.isArray(classRows) && classRows.length > 0) {
+          classInfo = classRows[0] as any; // Ajouter un cast en any pour résoudre l'erreur de typage
+        }
+        
+        // Récupérer la sous-classe si student_id existe
+        if (correction.student_id) {
+          const [subClassRows] = await connection.query(
+            'SELECT sub_class FROM class_students WHERE class_id = ? AND student_id = ?',
+            [correction.class_id, correction.student_id]
+          );
+          
+          if (Array.isArray(subClassRows) && subClassRows.length > 0) {
+            // Ajouter un cast en any pour résoudre l'erreur de typage
+            subClass = (subClassRows[0] as any).sub_class;
+          }
+        }
+      }
+      
+      // Récupérer les informations de l'étudiant si student_id existe
+      let studentData = null;
+      if (correction.student_id) {
         const [studentRows] = await connection.query(
           'SELECT * FROM students WHERE id = ?',
           [correction.student_id]
         );
         
         if (Array.isArray(studentRows) && studentRows.length > 0) {
-          // Combiner les données de correction avec les données de l'étudiant
-          const student = studentRows[0];
-          return NextResponse.json({
-            ...correction,
-            student_data: student
-          });
+          studentData = studentRows[0];
         }
-        
-        // Si l'étudiant n'est pas trouvé, renvoyer simplement la correction
-        return NextResponse.json(correction);
+      }
+      
+      // Combiner toutes les données
+      return NextResponse.json({
+        ...correction,
+        class_name: classInfo ? classInfo.name : null,
+        sub_class: subClass,
+        student_data: studentData
       });
-    }
-
-    // Si pas de student_id, renvoyer simplement la correction
-    return NextResponse.json(correction);
+    });
   } catch (error) {
     console.error('Error fetching correction:', error);
     return NextResponse.json({ error: 'Erreur lors de la récupération de la correction' }, { status: 500 });

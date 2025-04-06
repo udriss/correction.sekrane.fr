@@ -10,7 +10,7 @@ interface ContentData {
   items: ContentItem[];
 }
 
-interface LocalCorrection extends Omit<Correction, 'activity_id'> {
+interface LocalCorrection extends Omit<Correction, 'activity_id' | 'class_id'> {
   studentName?: string;
   firstName?: string;
   lastName?: string;
@@ -24,6 +24,9 @@ interface LocalCorrection extends Omit<Correction, 'activity_id'> {
   student_name?: string;
   student_first_name?: string;
   student_last_name?: string;
+  class_id: number | null; // Removed optional modifier to match the base type
+  class_name?: string;
+  sub_class?: number | null;
   student_data?: {
     id?: number;
     first_name?: string;

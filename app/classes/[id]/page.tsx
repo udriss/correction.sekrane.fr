@@ -595,9 +595,20 @@ export default function ClassDetailPage({ params }: { params: Promise<{ id: stri
             ? (studentA?.first_name || '').localeCompare(studentB?.first_name || '')
             : (studentB?.first_name || '').localeCompare(studentA?.first_name || '');
         case 'grade':
-          const gradeA = a.grade || 0;
-          const gradeB = b.grade || 0;
-          return sortDirection === 'asc' ? gradeA - gradeB : gradeB - gradeA;
+          // Calcul des notes avec pénalité si elle existe
+          const gradeValueA = a.grade ?? 0; // Default to 0 if grade is undefined
+          const gradeValueB = b.grade ?? 0; // Default to 0 if grade is undefined
+          const penaltyA = a.penalty ?? 0; // Default to 0 if penalty is undefined
+          const penaltyB = b.penalty ?? 0; // Default to 0 if penalty is undefined
+          
+          const gradeA = (a.penalty !== undefined && a.penalty !== null) ? 
+            Math.max(0, gradeValueA - penaltyA) : gradeValueA;
+          const gradeB = (b.penalty !== undefined && b.penalty !== null) ? 
+            Math.max(0, gradeValueB - penaltyB) : gradeValueB;
+            
+          return sortDirection === 'asc' ? 
+            (gradeA || 0) - (gradeB || 0) : 
+            (gradeB || 0) - (gradeA || 0);
         case 'activity':
           return sortDirection === 'asc'
             ? (activityA?.name || '').localeCompare(activityB?.name || '')
