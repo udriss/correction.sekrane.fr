@@ -25,7 +25,7 @@ import ShareModal from '@/app/components/ShareModal';
 
 interface ChronologyListProps {
   filteredCorrections: ProviderCorrection[];
-  error: string | null;
+  error: Error | null;
   activeFilters: string[];
   handleClearAllFilters: () => void;
   getGradeColor: (grade: number) => string;
@@ -141,7 +141,7 @@ const ChronologyList: React.FC<ChronologyListProps> = ({
             }
           }}
         >
-          {error}
+          {error.message || String(error)}
         </Alert>
       ) : filteredCorrections.length === 0 ? (
         <Paper sx={{ p: 4, textAlign: 'center' }}>

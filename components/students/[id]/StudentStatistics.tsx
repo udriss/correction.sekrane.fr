@@ -83,7 +83,9 @@ export default function StudentStatistics({ corrections, stats }: StudentStatist
                       <TableCell align="center">
                         <Chip 
                           label={`${activity.averageGrade}/20`}
-                          color={getGradeColor(parseFloat(activity.averageGrade))}
+                          sx={{
+                            color:getGradeColor(parseFloat(activity.averageGrade))
+                          }}
                           size="small"
                         />
                       </TableCell>

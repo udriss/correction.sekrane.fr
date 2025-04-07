@@ -8,12 +8,17 @@ export type GradeColorBase =
   | 'primary' 
   | 'info' 
   | 'warning' 
-  | 'error';
+  | 'error'
+  | 'primary.light'
+  | 'warning.light'
+  | 'success.light'
+  | 'info.light'
+  | 'error.light';
 
 /**
  * Types incluant les variantes pour accéder via SX
  */
-export type GradeColorWithVariant = GradeColorBase | 'primary.light' | 'warning.light';
+export type GradeColorWithVariant = GradeColorBase;
 
 /**
  * Retourne la couleur correspondant à la note sur une échelle de 0 à 20
@@ -22,8 +27,8 @@ export type GradeColorWithVariant = GradeColorBase | 'primary.light' | 'warning.
  * @returns Identifiant de couleur MUI de base
  */
 export const getGradeColor = (grade: number): GradeColorBase => {
-  if (grade >= 16) return 'success';    // 16-20
-  if (grade >= 14) return 'primary';    // 14-16
+  if (grade >= 16) return 'success.light';    // 16-20
+  if (grade >= 14) return 'primary.light';    // 14-16
   if (grade >= 12) return 'info';       // 12-14
   if (grade >= 10) return 'warning';    // 10-12
   if (grade >= 5) return 'warning';     // 5-10
@@ -36,7 +41,7 @@ export const getGradeColor = (grade: number): GradeColorBase => {
  * @returns Couleur avec variante si nécessaire
  */
 export const getGradeColorWithVariant = (grade: number): GradeColorWithVariant => {
-  if (grade >= 16) return 'success';       // 16-20
+  if (grade >= 16) return 'success.light';       // 16-20
   if (grade >= 14) return 'primary.light'; // 14-16
   if (grade >= 12) return 'info';          // 12-14
   if (grade >= 10) return 'warning.light'; // 10-12

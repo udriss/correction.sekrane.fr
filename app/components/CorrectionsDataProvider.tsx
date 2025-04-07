@@ -23,6 +23,7 @@ export interface Correction {
   created_at: string;
   updated_at: string;
   sub_class?: string | null;
+  student_sub_class?: string | null; // Ajout de la propriété student_sub_class
 }
 
 // Définition de l'interface Student pour typer correctement les étudiants
@@ -65,7 +66,7 @@ interface ContextData {
   corrections: Correction[];
   filteredCorrections: Correction[];
   loading: boolean;
-  error: string | null;
+  error: Error | null;
   metaData: MetaData;
   filters: FilterState;
   setFilters: React.Dispatch<React.SetStateAction<FilterState>>;
@@ -77,6 +78,7 @@ interface ContextData {
   removeFilter: (filterName: string) => void;
   clearAllFilters: () => void;
   refreshData: () => Promise<void>;
+  refreshCorrections: () => Promise<void>; // Add this new method
 }
 
 // Créer le contexte
@@ -108,7 +110,7 @@ export const CorrectionsProvider: React.FC<CorrectionsProviderProps> = ({
   const [corrections, setCorrections] = useState<Correction[]>([]);
   const [filteredCorrections, setFilteredCorrections] = useState<Correction[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<Error | null>(null);
   
   // Meta-données
   const [metaData, setMetaData] = useState<MetaData>({
@@ -275,7 +277,7 @@ export const CorrectionsProvider: React.FC<CorrectionsProviderProps> = ({
     // Si un filtre de sous-groupe est actif et qu'une classe est sélectionnée
     if (filters.subClassId && activeFilters.includes('subClassId') && filters.classId) {
       const groupNumber = parseInt(filters.subClassId);
-      console.log('Selected subgroup:', filters.subClassId, 'Group number (as number):', groupNumber);
+      
       
       // Récupérer les étudiants de la classe
       fetch(`/api/classes/${filters.classId}/students`)
@@ -288,7 +290,7 @@ export const CorrectionsProvider: React.FC<CorrectionsProviderProps> = ({
           
           // Récupérer les IDs des étudiants dans ce sous-groupe
           const studentIdsInGroup = studentsInGroup.map((student: Student) => student.id);
-          console.log(`Trouvé ${studentIdsInGroup.length} étudiants dans le groupe ${groupNumber}`);
+          
           
           // Appliquer le filtrage sur les corrections
           if (corrections.length) {
@@ -391,7 +393,7 @@ export const CorrectionsProvider: React.FC<CorrectionsProviderProps> = ({
       
     } catch (err) {
       console.error('Error:', err);
-      setError(err instanceof Error ? err.message : 'Erreur inconnue');
+      setError(err instanceof Error ? err : new Error('Erreur inconnue'));
     } finally {
       setLoading(false);
     }
@@ -401,6 +403,22 @@ export const CorrectionsProvider: React.FC<CorrectionsProviderProps> = ({
   const refreshData = async () => {
     await fetchCorrections();
   };
+
+  // Implement the refresh function
+  const refreshCorrections = useCallback(async () => {
+    try {
+      setLoading(true);
+      // Fix: fetchCorrections() doesn't return a value, it updates state internally
+      await fetchCorrections();
+      // No need to set corrections here as fetchCorrections already does that
+      setError(null);
+    } catch (err) {
+      setError(err as Error);
+      console.error('Error refreshing corrections:', err);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
   
   // Valeur du contexte
   const contextValue: ContextData = {
@@ -418,7 +436,8 @@ export const CorrectionsProvider: React.FC<CorrectionsProviderProps> = ({
     applyFilter,
     removeFilter,
     clearAllFilters,
-    refreshData
+    refreshData,
+    refreshCorrections // Add the refresh function to the context
   };
   
   return (

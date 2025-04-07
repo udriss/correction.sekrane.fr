@@ -267,7 +267,9 @@ export default function StudentCorrections({ student, corrections }: StudentCorr
                       {correction.grade !== null ? (
                         <Chip 
                           label={`${correction.grade}/20`}
-                          color={getGradeColor(correction.grade)}
+                          sx={{
+                            color: getGradeColor(correction.grade || 0)
+                          }}
                           icon={<GradeIcon />}
                         />
                       ) : (

@@ -1,45 +1,52 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  Card, 
-  CardContent, 
-  Typography, 
-  Box, 
-  Chip, 
-  CardActions, 
-  IconButton,
-  Tooltip
-} from '@mui/material';
 import Link from 'next/link';
-import { Correction } from '@/app/components/CorrectionsDataProvider';
-import VisibilityIcon from '@mui/icons-material/Visibility';
+import { Box, Paper, Typography, Chip, IconButton, Checkbox, Tooltip } from '@mui/material';
+import { alpha } from '@mui/material/styles';
 import EditIcon from '@mui/icons-material/Edit';
-import SchoolIcon from '@mui/icons-material/School';
-import PersonIcon from '@mui/icons-material/Person';
 import ShareIcon from '@mui/icons-material/Share';
+import VisibilityIcon from '@mui/icons-material/Visibility';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
+import { Correction } from '@/app/components/CorrectionsDataProvider';
+import { useBatchDelete } from '@/hooks/useBatchDelete';
 import ShareModal from '@/app/components/ShareModal';
-import * as shareService from '@/lib/services/shareService';
+import SchoolIcon from '@mui/icons-material/School';
+import RecentActorsIcon from '@mui/icons-material/RecentActors';
+import CircularProgress from '@mui/material/CircularProgress';
 
 interface CorrectionCardProps {
   correction: Correction;
-  getGradeColor: (grade: number) => string;
+  getGradeColor: (grade: number) => "success" | "info" | "primary" | "warning" | "error";
+  preloadedShareCode?: string;
   highlighted?: boolean;
-  preloadedShareCode?: string; // Nouveau prop pour recevoir un code de partage pré-chargé
+  highlight?: boolean;
+  className?: string;
+  showTopLabel?: string;
+  showClass?: boolean;
+  showStudent?: boolean;
+  showActivity?: boolean;
 }
 
-
-
-const CorrectionCard: React.FC<CorrectionCardProps> = ({ 
-  correction, 
+const CorrectionCard: React.FC<CorrectionCardProps> = ({
+  correction,
   getGradeColor,
-  highlighted = false,
   preloadedShareCode,
+  highlighted = false,
+  highlight = false,
+  className = '',
+  showTopLabel,
+  showClass = true,
+  showStudent = true,
+  showActivity = true
 }) => {
-  // Utiliser useEffect pour s'assurer que shareCode est mis à jour quand preloadedShareCode change
+  const { batchDeleteMode, selectedCorrections, toggleCorrectionSelection, deletingCorrections } = useBatchDelete();
+  const isSelected = selectedCorrections.includes(correction.id?.toString() || '');
+  const isDeleting = deletingCorrections.has(correction.id?.toString() || '');
+  
+  // État local pour gérer le code de partage et la modale
   const [shareCode, setShareCode] = useState<string | null>(null);
   const [shareModalOpen, setShareModalOpen] = useState(false);
-  console.log('CorrectionCard props:', { correction });
+  
   // S'assurer que shareCode est mis à jour lorsque preloadedShareCode change
   useEffect(() => {
     if (preloadedShareCode) {
@@ -58,18 +65,21 @@ const CorrectionCard: React.FC<CorrectionCardProps> = ({
   
   const handleShareSuccess = (code: string) => {
     setShareCode(code);
+    handleCloseShareModal();
   };
   
-  const formattedDate = correction.submission_date 
-    ? format(
-        new Date(correction.submission_date), 
-        new Date(correction.submission_date).getHours() === 0 && new Date(correction.submission_date).getMinutes() === 0
-          ? 'PPP'
-          : 'PPP à HH:mm',
-        { locale: fr }
-      )
+  // Format submission date
+  const submissionDate = correction.submission_date
+    ? `Envoyée le ${format(new Date(correction.submission_date), 'dd MMMM yyyy', { locale: fr })}`
     : 'Date inconnue';
-    
+  // Format submission date
+  const modifiedDate = correction.updated_at
+    ? `Modifiée le ${format(new Date(correction.updated_at), 'dd MMMM yyyy à HH:mm', { locale: fr })}`
+    : '';
+
+  // Use either highlighted prop or highlight prop (for backward compatibility)
+  const isHighlighted = highlighted || highlight;
+
   // Calculate normalized grade (0-20)
   // Vérifier s'il y a une pénalité à appliquer
   const hasPenalty = correction.penality !== undefined && correction.penality !== null;
@@ -83,220 +93,323 @@ const CorrectionCard: React.FC<CorrectionCardProps> = ({
   const normalizedGrade = correction.experimental_points && correction.theoretical_points
     ? (gradeWithPenalty / (correction.theoretical_points + correction.experimental_points) * 20)
     : gradeWithPenalty;
+    
+  // Déterminer si on doit utiliser la variante light ou main de la couleur
+  const getColorVariant = (color: string): string => {
+    // Pour les notes success (généralement bonnes), utiliser la variante main pour les très bonnes notes
+    // et light pour les notes correctes mais pas excellentes
+    if (color === 'success') {
+      return normalizedGrade >= 16.5 ? `${color}.dark` : `${color}.light`;
+    }
+    // Pour les notes error (généralement mauvaises), utiliser la variante main pour les très mauvaises notes
+    // et light pour les notes médiocres mais pas catastrophiques
+    else if (color === 'error') {
+      return normalizedGrade <= 5 ? `${color}.dark` : `${color}.light`;
+    }
+    // Pour les autres couleurs, conserver le comportement par défaut
+    return `${color}.main`;
+  }
   
-  const gradeColor = getGradeColor(normalizedGrade);
-
-
+  // Solution de repli pour éviter l'erreur TypeScript lors de l'indexation du thème
+  // Fallback pour transformer la chaîne "error.light" en accès sécurisé à theme.palette.error.light
+  const getBoxColor = (theme: any, colorVariant: string) => {
+    const [colorName, variant = 'main'] = colorVariant.split('.');
+    
+    // Vérifier si la palette et la couleur existent
+    if (theme.palette && colorName in theme.palette) {
+      const colorObj = theme.palette[colorName];
+      // Vérifier si la variante existe
+      if (variant in colorObj) {
+        return colorObj[variant];
+      }
+      // Utiliser la variante main comme solution de repli
+      return colorObj.main;
+    }
+    
+    // Couleur de repli si rien ne correspond
+    return theme.palette.grey[500];
+  };
+  
   return (
-    <Card 
-      elevation={highlighted ? 2 : 1} 
+    <Paper
+      className={className}
       sx={{ 
-      padding: 1,
-      height: '100%', 
-      display: 'flex', 
-      flexDirection: 'column',
-      transition: 'transform 0.2s, box-shadow 0.2s',
-      position: 'relative',
-      overflow: 'visible',
+        position: 'relative',
+        borderRadius: 2,
+        overflow: 'hidden',
+        transition: 'all 0.2s ease-in-out',
+        border: '1px solid',
+        borderColor: theme => isHighlighted 
+          ? alpha(theme.palette.warning.main, 0.5) 
+          : (isSelected && batchDeleteMode)
+            ? alpha(theme.palette.error.main, 0.7)
+            : alpha(theme.palette.divider, 0.5),
+        boxShadow: theme => isHighlighted 
+          ? `0 0 15px ${alpha(theme.palette.warning.main, 0.4)}` 
+          : (isSelected && batchDeleteMode)
+            ? `0 0 15px ${alpha(theme.palette.error.main, 0.3)}`
+            : 'none',
         '&:hover': {
-          boxShadow: 3,
+          transform: 'translateY(-2px)',
+          boxShadow: theme => isHighlighted 
+            ? `0 5px 20px ${alpha(theme.palette.warning.main, 0.4)}` 
+            : (isSelected && batchDeleteMode)
+              ? `0 5px 20px ${alpha(theme.palette.error.main, 0.3)}`
+              : '0 5px 15px rgba(0,0,0,0.08)',
         },
-        border: highlighted ? 4 : 0,
-        borderColor: highlighted ? 'secondary.main' : 'transparent',
+        opacity: isDeleting ? 0.7 : 1,
+        pointerEvents: isDeleting ? 'none' : 'auto'
       }}
     >
-
+      {/* Deletion spinner overlay */}
+      {isDeleting && (
+        <Box sx={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          backgroundColor: 'rgba(0, 0, 0, 0.2)',
+          zIndex: 10,
+          borderRadius: 2
+        }}>
+          <CircularProgress color="error" size={40} />
+        </Box>
+      )}
       
-      <Box 
-        sx={{ 
-          display: 'flex', 
-          justifyContent: 'space-between', 
-          color: 'text.primary',
-        }}
-      >
+      {/* Top label if needed */}
+      {showTopLabel && (
+        <Box sx={{ 
+          bgcolor: 'primary.main', 
+          color: 'primary.contrastText',
+          py: 0.5, 
+          px: 1.5,
+          fontSize: '0.75rem',
+          fontWeight: 'bold',
+          position: 'absolute',
+          top: 0,
+          right: 0,
+          borderBottomLeftRadius: 8,
+          zIndex: 1
+        }}>
+          {showTopLabel}
+        </Box>
+      )}
+
+      {/* Batch Delete Checkbox */}
+      {batchDeleteMode && (
+        <Box sx={{ 
+          position: 'absolute', 
+          top: 0, 
+          right: 0, 
+          zIndex: 2,
+          mb:0.5,
+          p:0
+        }}>
+          <Checkbox 
+            checked={isSelected}
+            onChange={() => toggleCorrectionSelection(correction.id?.toString() || '')}
+            sx={{
+              mb:0.5,
+              color: 'error.light',
+              '&.Mui-checked': {
+                color: 'error.main',
+              },
+            }}
+          />
+        </Box>
+      )}
+
+      {/* Card Header */}
+      <Box sx={{ 
+        display: 'flex', 
+        justifyContent: 'space-between', 
+        alignItems: 'center',
+        p: 2,
+        pt: batchDeleteMode ? 3 : 2,
+        bgcolor: theme => isSelected && batchDeleteMode 
+          ? alpha(theme.palette.error.light, 0.1) 
+          : undefined
+      }}>
+        <Box sx={{ 
+          maxWidth: '65%',
+          overflow: 'hidden'
+        }}>
+          {showActivity && (
+            <Typography 
+              variant="subtitle1" 
+              fontWeight="bold" 
+              noWrap 
+              title={correction.activity_name} // Ajoute un tooltip natif sur hover
+              sx={{ mb: 0.5 }}
+            >
+              {correction.activity_name || 'Activité inconnue'}
+            </Typography>
+          )}
+          
+          {showStudent && (
+            <Typography 
+              variant="body2" 
+              color="text.secondary" 
+              noWrap
+              title={correction.student_name} // Ajoute un tooltip natif sur hover
+              sx={{ textOverflow: 'ellipsis' }}
+            >
+              {correction.student_name || 'Étudiant inconnu'}
+            </Typography>
+          )}
+          
+          {showClass && correction.class_name && (
+            <Box sx={{ display: 'flex', 
+            alignItems: 'start', 
+            mt: 0.75,
+            gap: 0.25,
+            flexDirection: 'column',
+            justifyContent: 'center',
+             }}>
+            <Typography 
+              variant="body2" 
+              color="text.secondary" 
+              component={'div'}
+              noWrap
+              title={correction.class_name} // Ajoute un tooltip natif sur hover
+              sx={{ textOverflow: 'ellipsis' }}
+            >
+              {correction.class_name} 
+            </Typography>
+            <Typography 
+              variant="body2" 
+              color="text.secondary" 
+              component={'div'}
+              noWrap
+              title={correction.class_name} // Ajoute un tooltip natif sur hover
+              sx={{ textOverflow: 'ellipsis' }}
+            >
+              {correction.student_sub_class ? 
+              <><RecentActorsIcon color="info" fontSize="small" sx={{ mr: .25 }} /> Groupe {correction.student_sub_class}</>
+               : ''}
+            </Typography>
+            </Box>
+
+          )}
+        </Box>
+        
         <Box sx={{ 
           display: 'flex', 
           alignItems: 'center',
-           bgcolor: `${gradeColor}.main`, 
-           p: 1, borderRadius: 2, 
-           color: 'white' }}>
+          bgcolor: theme => getBoxColor(theme, getColorVariant(getGradeColor(correction.grade as number))),
+          p: 1, borderRadius: 2, 
+          color: 'white' }}>
           <Typography variant="h5" component="div" fontWeight="bold">
-        {gradeWithPenalty.toFixed(1)}
+            {gradeWithPenalty.toFixed(1)}
           </Typography>
-        <Typography variant="body2" sx={{ ml: 1, opacity: 0.9 }}>
-        / {correction.experimental_points !== undefined && correction.theoretical_points !== undefined 
-          ? (correction.experimental_points + correction.theoretical_points).toFixed(1)
-          : '-'}
-        </Typography>
+          <Typography variant="body2" sx={{ ml: 1, opacity: 0.9 }}>
+            / {correction.experimental_points !== undefined && correction.theoretical_points !== undefined 
+              ? (correction.experimental_points + correction.theoretical_points).toFixed(1)
+              : '-'}
+          </Typography>
         </Box>
-        <Box sx={{
-          display: 'flex',
-          alignItems: 'flex-end',
-          justifyContent: 'flex-end',
-          flexGrow: 1,
-          flexDirection: 'column',
-        }}
-          >
-        <Typography variant="caption" sx={{ fontWeight: 500, opacity: 0.9 }}>
-          {formattedDate}
-        </Typography>
-        {highlighted && (
-        <Chip
-          label="Nouveau"
-          color="secondary"
-          size="small"
-          sx={{ 
-            fontWeight: 'bold',
-            zIndex: 1,
-            maxWidth: 'auto',
-            mt: 0.5
-          }}
-        />
-            )}
-            </Box>
       </Box>
       
-      <CardContent sx={{ flexGrow: 1, p:0, pt:1 }}>
-        <Typography variant="h6" gutterBottom noWrap title={correction.activity_name}>
-          {correction.activity_name || 'Activité sans nom'}
-        </Typography>
-        
-        <Box sx={{ mb: 2, display: 'flex', flexDirection: 'column' }}>
-          {correction.student_name && (
-            <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
-              <PersonIcon fontSize="small" sx={{ mr: 1, color: 'text.secondary' }} />
-              <Typography variant="body2" noWrap title={correction.student_name}>
-                {correction.student_name}
-              </Typography>
-            </Box>
-          )}
+      {/* Card Content */}
+      <Box sx={{ 
+        p: 2, 
+        pt: 0,
+        bgcolor: theme => isSelected && batchDeleteMode 
+          ? alpha(theme.palette.error.light, 0.1) 
+          : undefined 
+      }}>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', pt: 1 }}>
+        <Box sx={{ 
+          display: 'flex', 
+          justifyContent: 'space-between', 
+          justifyItems: 'center',
+          alignItems: 'start', 
+          pt: 1, 
+          gap: .25, 
+          flexDirection: 'column' 
+          }}>
+        <Typography variant="caption" color="text.secondary">
+            {submissionDate}
+          </Typography>
+          <Typography variant="caption" color="text.secondary">
+            {modifiedDate}
+          </Typography>
+        </Box>
           
-          {correction.class_name && (
-            <Box sx={{ display: 'flex', alignItems: 'center' }}>
-              <SchoolIcon fontSize="small" sx={{ mr: 1, color: 'text.secondary' }} />
-              <Typography variant="body2" noWrap title={correction.class_name}>
-                {correction.class_name}
-                {correction.sub_class && ` (Groupe ${correction.sub_class})`}
-              </Typography>
+          
+          {!batchDeleteMode && (
+            <Box sx={{ display: 'flex', gap: 1 }}>
+              {/* Bouton de partage ou de visualisation selon l'existence d'un code de partage */}
+              {shareCode ? (
+                <Tooltip title="Voir le feedback">
+                  <IconButton 
+                    component={Link} 
+                    href={`/feedback/${shareCode}`}
+                    color="primary"
+                    size="small"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    sx={{ 
+                      bgcolor: theme => alpha(theme.palette.success.main, 0.1),
+                      '&:hover': {
+                        bgcolor: theme => alpha(theme.palette.success.main, 0.2),
+                      }
+                    }}
+                  >
+                    <VisibilityIcon fontSize="small" />
+                  </IconButton>
+                </Tooltip>
+              ) : (
+                <Tooltip title="Partager la correction">
+                  <IconButton 
+                    onClick={handleOpenShareModal}
+                    color="primary"
+                    size="small"
+                    sx={{ 
+                      bgcolor: theme => alpha(theme.palette.info.main, 0.1),
+                      '&:hover': {
+                        bgcolor: theme => alpha(theme.palette.info.main, 0.2),
+                      }
+                    }}
+                  >
+                    <ShareIcon fontSize="small" />
+                  </IconButton>
+                </Tooltip>
+              )}
+              
+              {/* Bouton d'édition */}
+              <Link href={`/corrections/${correction.id}`} passHref>
+                <IconButton
+                  size="small"
+                  color="primary"
+                  aria-label="edit correction"
+                  sx={{ 
+                    bgcolor: theme => alpha(theme.palette.primary.main, 0.1),
+                    '&:hover': {
+                      bgcolor: theme => alpha(theme.palette.primary.main, 0.2),
+                    }
+                  }}
+                >
+                  <EditIcon fontSize="small" />
+                </IconButton>
+              </Link>
             </Box>
           )}
         </Box>
-        
-        {/* Display experimental vs theoretical grades if available */}
-        {(correction.experimental_points !== undefined || correction.theoretical_points !== undefined) && (
-          <Box sx={{ display: 'flex', gap: 1, mt: 2 }}>
-            {correction.penality !== undefined && correction.penality !== null && correction.penality > 0 && (
-              <Chip 
-                size="small" 
-                label={
-                  <>
-                  <Typography variant="caption" sx={{ color: 'error.main' }}>
-                  Pénalité :&nbsp;
-                  </Typography>
-                  <Typography variant="caption" sx={{ color: 'text.primary' }}>
-                    {correction.penality.toFixed(1)}
-                  </Typography>
-                  <Typography variant="caption" sx={{ color: 'error.main' }}>
-                  &nbsp;pts
-                </Typography>
-                </>
-                } 
-                color="error"
-                variant="outlined"
-              />
-            )}
-            
-            {correction.experimental_points !== undefined && (
-              <Chip 
-                size="small" 
-                label={
-                  <>
-                  <Typography variant="caption" sx={{ color: 'primary.dark' }}>
-                     Exp :&nbsp;
-                  </Typography>
-                  <Typography variant="caption" sx={{ color: 'text.primary' }}>
-                    {correction.experimental_points_earned.toFixed(1)}
-                  </Typography>
-                  <Typography variant="caption" sx={{ color: 'primary.dark' }}>
-                  &nbsp;/ {correction.experimental_points.toFixed(1)}
-                </Typography>
-                </>
-                }
-                color="info"
-                variant="outlined"
-              />
-            )}
-            {correction.theoretical_points !== undefined && (
-              <Chip 
-                size="small" 
-                label={
-                  <>
-                  <Typography variant="caption" sx={{ color: 'secondary.dark' }}>
-                  Théo :&nbsp;
-                  </Typography>
-                  <Typography variant="caption" sx={{ color: 'text.primary' }}>
-                    {correction.theoretical_points_earned.toFixed(1)}
-                  </Typography>
-                  <Typography variant="caption" sx={{ color: 'secondary.dark' }}>
-                  &nbsp;/ {correction.theoretical_points.toFixed(1)}
-                </Typography>
-                </>
-                } 
-                color="secondary"
-                variant="outlined"
-              />
-            )}
-          </Box>
-        )}
-      </CardContent>
+      </Box>
       
-      <CardActions sx={{ p: 0, justifyContent: 'flex-end' }}>
-        {shareCode ? (
-          <Tooltip title="Voir le feedback">
-            <IconButton 
-              component={Link} 
-              href={`/feedback/${shareCode}`}
-              color="primary"
-              size="medium"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              <VisibilityIcon fontSize='medium' />
-            </IconButton>
-          </Tooltip>
-        ) : (
-          <Tooltip title="Partager la correction">
-            <IconButton 
-              onClick={handleOpenShareModal}
-              color="primary"
-              size="medium"
-            >
-              <ShareIcon fontSize='medium' />
-            </IconButton>
-          </Tooltip>
-        )}
-        <Tooltip title="Modifier">
-          <IconButton 
-            component={Link} 
-            href={`/corrections/${correction.id}`}
-            color="secondary"
-            size="medium"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <EditIcon fontSize='medium' />
-          </IconButton>
-        </Tooltip>
-      </CardActions>
-      
-      {/* ShareModal component */}
+      {/* Modal de partage */}
       <ShareModal 
         open={shareModalOpen}
         onClose={handleCloseShareModal}
         correctionId={correction.id.toString()}
         onShareSuccess={handleShareSuccess}
       />
-    </Card>
+    </Paper>
   );
 };
 

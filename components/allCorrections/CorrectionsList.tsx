@@ -1,23 +1,17 @@
 import React, { useState, useEffect } from 'react';
-import {
-  Box, Alert, Paper, Typography, Button, Grid, Card, CardContent, Chip
-} from '@mui/material';
-import CorrectionCard from '@/components/allCorrections/CorrectionCard';
-import { alpha } from '@mui/material/styles';
-import EmptyState from '@/components/ui/EmptyState';
-import { Correction as ProviderCorrection } from '@/app/components/CorrectionsDataProvider';
-import dayjs from 'dayjs';
+import { Box, Typography, Button, Grid, Alert } from '@mui/material';
+import { Correction } from '@/app/components/CorrectionsDataProvider';
+import CorrectionCard from './CorrectionCard';
 import { getBatchShareCodes } from '@/lib/services/shareService';
 
-// Utiliser le type du provider ou ajuster votre interface
 interface CorrectionsListProps {
-  filteredCorrections: ProviderCorrection[];
-  error: string | null;
+  filteredCorrections: Correction[];
+  error: Error | null;
   activeFilters: string[];
   handleClearAllFilters: () => void;
-  getGradeColor: (grade: number) => string;
-  highlightedIds?: string[]; // IDs explicitement mis en évidence
-  recentFilter?: boolean; // Indique si le filtre "recent" est actif
+  getGradeColor: (grade: number) => "success" | "info" | "primary" | "warning" | "error";
+  highlightedIds: string[];
+  recentFilter: boolean;
 }
 
 const CorrectionsList: React.FC<CorrectionsListProps> = ({
@@ -26,15 +20,16 @@ const CorrectionsList: React.FC<CorrectionsListProps> = ({
   activeFilters,
   handleClearAllFilters,
   getGradeColor,
-  highlightedIds = [], // Valeur par défaut vide
-  recentFilter = false // Par défaut, le filtre recent n'est pas actif
+  highlightedIds,
+  recentFilter
 }) => {
+  // État pour stocker les codes de partage
   const [shareCodesMap, setShareCodesMap] = useState<Map<string, string>>(new Map());
   
   // Chargement en masse des codes de partage quand les corrections changent
   useEffect(() => {
     const loadShareCodes = async () => {
-      if (filteredCorrections.length > 0) {
+      if (filteredCorrections && filteredCorrections.length > 0) {
         const correctionIds = filteredCorrections.map(c => c.id.toString());
         const shareCodes = await getBatchShareCodes(correctionIds);
         setShareCodesMap(shareCodes);
@@ -46,84 +41,53 @@ const CorrectionsList: React.FC<CorrectionsListProps> = ({
     loadShareCodes();
   }, [filteredCorrections]);
 
-  // Calculate card grade with penalty consideration
-  const calculateCardGrade = (correction: ProviderCorrection) => {
-    // Vérifier s'il y a une pénalité à appliquer
-    const hasPenalty = correction.penality !== undefined && correction.penality !== null;
-    
-    // Calculer la note avec la pénalité si elle existe
-    const gradeWithPenalty = hasPenalty 
-      ? Math.max(0, correction.grade - (correction.penality || 0)) 
-      : correction.grade;
-      
-    return gradeWithPenalty;
-  };
-
   if (error) {
     return (
-      <Alert severity="error" variant="filled">
-        {error}
+      <Alert severity="error" sx={{ mt: 4 }}>
+        Erreur lors du chargement des corrections: {error.message}
       </Alert>
     );
   }
-
-  if (filteredCorrections.length === 0) {
+  
+  // Ensure filteredCorrections is always an array
+  const corrections = Array.isArray(filteredCorrections) ? filteredCorrections : [];
+  
+  if (corrections.length === 0) {
     return (
-      <EmptyState 
-        title="Aucune correction trouvée"
-        description={activeFilters.length > 0 
-          ? "Aucune correction ne correspond aux filtres appliqués." 
-          : "Il n'y a pas encore de corrections dans le système."}
-        action={activeFilters.length > 0 && (
-          <Button variant="outlined" onClick={handleClearAllFilters}>
-            Effacer les filtres
+      <Box sx={{ py: 4, textAlign: 'center' }}>
+        <Typography variant="h6" color="text.secondary" gutterBottom>
+          {activeFilters.length > 0 
+            ? "Aucune correction ne correspond aux filtres sélectionnés"
+            : "Aucune correction n'a été créée pour le moment"}
+        </Typography>
+        
+        {activeFilters.length > 0 && (
+          <Button 
+            variant="outlined" 
+            onClick={handleClearAllFilters}
+            sx={{ mt: 2 }}
+          >
+            Effacer tous les filtres
           </Button>
         )}
-      />
+      </Box>
     );
   }
-
-  // Fonction pour déterminer si une correction doit être mise en évidence
-  const shouldHighlight = (correction: ProviderCorrection) => {
-    // Si l'ID est explicitement dans la liste des IDs à mettre en évidence
-    if (highlightedIds.includes(correction.id.toString())) {
-      return true;
-    }
-    
-    // Si le filtre "recent" est actif, vérifier si c'est une correction récente (24h)
-    if (recentFilter) {
-      const recentDate = dayjs().subtract(24, 'hour');
-      const correctionDate = dayjs(correction.created_at || correction.submission_date);
-      return correctionDate.isAfter(recentDate);
-    }
-    
-    return false;
-  };
-
+  
   return (
-    <Box>
-      <Grid container spacing={2}>
-        {filteredCorrections.map((correction, index) => {
-          // Vérifier si cette correction doit être mise en évidence
-          const isHighlighted = shouldHighlight(correction);
-          // Récupérer le code de partage préchargé pour cette correction
-          const preloadedShareCode = shareCodesMap.get(correction.id.toString());
-          
-          return (
-            <Grid size={{ xs: 12, sm: 6, md: 4 }} key={correction.id}>
-                {/* Contenu de la carte avec le code de partage préchargé */}
-                <CorrectionCard 
-                  key={correction.id} 
-                  correction={correction} 
-                  getGradeColor={getGradeColor} 
-                  highlighted={isHighlighted}
-                  preloadedShareCode={preloadedShareCode}
-                />
-            </Grid>
-          );
-        })}
-      </Grid>
-    </Box>
+    <Grid container spacing={2}>
+      {corrections.map(correction => (
+        <Grid size={{ xs: 12, sm: 6, md: 4 }} key={correction.id}>
+          <CorrectionCard
+            correction={correction}
+            getGradeColor={getGradeColor}
+            preloadedShareCode={shareCodesMap.get(correction.id.toString())}
+            highlighted={highlightedIds.includes(correction.id?.toString() || '')}
+            showTopLabel={recentFilter && new Date(correction.submission_date).getTime() > Date.now() - 24 * 60 * 60 * 1000 ? '24h' : undefined}
+          />
+        </Grid>
+      ))}
+    </Grid>
   );
 };
 

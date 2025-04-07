@@ -6,7 +6,7 @@ import {
   Container, Paper, Typography, Box, Chip, Button, 
   IconButton, Menu, MenuItem, TextField, FormControl,
   InputLabel, Select, Badge, Divider, ListItemIcon, ListItemText,
-  SelectChangeEvent, InputAdornment, Tabs, Tab, 
+  SelectChangeEvent, InputAdornment, Tabs, Tab, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle
 } from '@mui/material';
 import Grid from '@mui/material/Grid';
 import { useSnackbar } from 'notistack';
@@ -41,6 +41,8 @@ import { generateQRCodePDF } from '@/utils/qrGeneratorPDF';
 import QrCodeIcon from '@mui/icons-material/QrCode';
 import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf';
 import GroupIcon from '@mui/icons-material/Group';
+import DeleteIcon from '@mui/icons-material/Delete';
+import { BatchDeleteProvider, useBatchDelete } from '@/hooks/useBatchDelete';
 
 // Composant principal qui utilise le provider
 export default function CorrectionsPage() {
@@ -66,7 +68,9 @@ export default function CorrectionsPage() {
   
   return (
     <CorrectionsProvider initialFilters={initialFilters} initialSort={initialSort}>
-      <CorrectionsContent />
+      <BatchDeleteProvider>
+        <CorrectionsContent />
+      </BatchDeleteProvider>
     </CorrectionsProvider>
   );
 }
@@ -92,7 +96,8 @@ function CorrectionsContent() {
     setActiveFilters,
     applyFilter,
     removeFilter,
-    clearAllFilters
+    clearAllFilters,
+    refreshCorrections // Add this new method from the context
   } = useCorrections();
   
   // State pour la gestion des menus
@@ -101,6 +106,24 @@ function CorrectionsContent() {
   
   // Add state for available sub-classes
   const [availableSubClasses, setAvailableSubClasses] = useState<{id: string, name: string}[]>([]);
+  
+  // Add state for scroll tracking
+  const [stickyButtons, setStickyButtons] = useState(false);
+  
+  // Track scroll position
+  useEffect(() => {
+    const handleScroll = () => {
+      // Determine if buttons should be sticky (when scrolled past 100px)
+      const tabsElement = document.getElementById('correction-tabs-container');
+      if (tabsElement) {
+        const tabsRect = tabsElement.getBoundingClientRect();
+        setStickyButtons(tabsRect.top < 0);
+      }
+    };
+    
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
   
   // Gérer l'initialisation des filtres actifs à partir de l'URL
   useEffect(() => {
@@ -304,12 +327,126 @@ function CorrectionsContent() {
   }
   
   // Get card status color based on grade
-  const getGradeColor = (grade: number) => {
+  const getGradeColor = (grade: number): "success" | "info" | "primary" | "warning" | "error" => {
     if (grade >= 16) return 'success';
     if (grade >= 12) return 'info';
     if (grade >= 10) return 'primary';
     if (grade >= 8) return 'warning';
     return 'error';
+  };
+
+  const { 
+    batchDeleteMode, 
+    setBatchDeleteMode, 
+    selectedCorrections, 
+    setSelectedCorrections,
+    deletingCorrections,
+    setDeletingCorrection
+  } = useBatchDelete();
+  
+  // Add state for delete confirmation modal
+  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
+  
+  // Function to cancel batch delete mode
+  const handleCancelBatchDelete = () => {
+    setBatchDeleteMode(false);
+    setSelectedCorrections([]);
+  };
+
+  // Function to handle batch deletion
+  const handleBatchDelete = async () => {
+    if (!selectedCorrections || selectedCorrections.length === 0) return;
+    
+    try {
+      // Close confirmation modal
+      setConfirmDeleteOpen(false);
+      
+      // Process deletions sequentially
+      let successCount = 0;
+      let failCount = 0;
+      const deletedIds: string[] = [];
+      
+      for (const correctionId of selectedCorrections) {
+        try {
+          // Set this correction as currently being deleted
+          setDeletingCorrection(correctionId, true);
+          
+          const response = await fetch(`/api/corrections/${correctionId}`, {
+            method: 'DELETE',
+            headers: {
+              'X-Batch-Delete': 'true', // Add a header to indicate batch delete
+              'X-Selected-Count': selectedCorrections.length.toString()
+            }
+          });
+          
+          if (response.ok) {
+            successCount++;
+            deletedIds.push(correctionId);
+          } else {
+            failCount++;
+          }
+        } catch (error) {
+          console.error(`Error deleting correction ${correctionId}:`, error);
+          failCount++;
+        } finally {
+          // Clear the deleting status regardless of success/failure
+          setDeletingCorrection(correctionId, false);
+        }
+      }
+      
+      // After all deletions, log the batch operation
+      if (successCount > 0) {
+        try {
+          await fetch('/api/logs', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              action_type: 'BATCH_DELETE_CORRECTIONS',
+              description: `Suppression groupée de ${successCount} correction(s)`,
+              metadata: {
+                success_count: successCount,
+                fail_count: failCount,
+                deleted_ids: deletedIds,
+                total_selected: selectedCorrections.length
+              }
+            })
+          });
+        } catch (logError) {
+          console.error('Error logging batch delete:', logError);
+        }
+        
+        // Show success message
+        enqueueSnackbar(`${successCount} correction(s) supprimée(s) avec succès`, { 
+          variant: 'success' 
+        });
+      }
+      
+      if (failCount > 0) {
+        enqueueSnackbar(`Échec de la suppression pour ${failCount} correction(s)`, { 
+          variant: 'error' 
+        });
+      }
+      
+      // Exit batch delete mode and clear selection
+      setBatchDeleteMode(false);
+      setSelectedCorrections([]);
+      
+      // Refresh the corrections data instead of reloading the page
+      if (refreshCorrections) {
+        await refreshCorrections();
+      }
+      
+    } catch (error) {
+      console.error('Error in batch delete operation:', error);
+      enqueueSnackbar('Une erreur est survenue lors de la suppression', { 
+        variant: 'error' 
+      });
+      
+      // Clear all deleting statuses in case of an error
+      selectedCorrections.forEach(id => setDeletingCorrection(id, false));
+    }
   };
 
   if (loading && !filteredCorrections.length) {
@@ -735,14 +872,19 @@ function CorrectionsContent() {
       </Paper>
       
       {/* Tabs for different views with filter & sort buttons */}
-      <Box sx={{ 
-        mb: 3, 
-        display: 'flex', 
-        justifyContent: 'space-between', 
-        alignItems: 'center',
-        borderBottom: 1,
-        borderColor: 'divider' 
-      }}>
+      <Box 
+        id="correction-tabs-container"
+        sx={{ 
+          mb: 3, 
+          display: 'flex', 
+          justifyContent: 'space-between', 
+          alignItems: 'center',
+          borderBottom: 1,
+          borderColor: 'divider',
+          position: 'relative',
+          zIndex: 10
+        }}
+      >
         <Tabs 
           value={tabValue} 
           onChange={handleTabChange}
@@ -765,38 +907,95 @@ function CorrectionsContent() {
           <Tab icon={<QrCodeIcon />} label="Export PDF" />
         </Tabs>
         
-        {/* Boutons de filtre et tri */}
+        {/* Boutons de filtre, tri et suppression en lot */}
         <Box sx={{ 
           display: 'flex', 
           gap: 1,
           ml: 2,
-          flexShrink: 0 // Empêche les boutons de se rétrécir
+          flexShrink: 0, // Empêche les boutons de se rétrécir
+          transition: 'all 0.3s ease',
         }}>
-          <Badge 
-            badgeContent={activeFilters.length} 
-            color="error" 
-            sx={{ '& .MuiBadge-badge': { top: 8, right: 8 } }}
-          >
-            <Button
-              variant="contained"
-              onClick={handleFilterClick}
-              startIcon={<FilterAltIcon />}
-              size="small"
-            >
-              Filtres
-            </Button>
-          </Badge>
-          
-          <Button
-            variant="contained"
-            onClick={handleSortClick}
-            startIcon={<SortIcon />}
-            size="small"
-          >
-            Trier
-          </Button>
+          {/* When not in batch delete mode, show normal buttons */}
+          {!batchDeleteMode ? (
+            <>
+              <Badge 
+                badgeContent={activeFilters.length} 
+                color="error" 
+                sx={{ '& .MuiBadge-badge': { top: 8, right: 8 } }}
+              >
+                <Button
+                  variant="contained"
+                  onClick={handleFilterClick}
+                  startIcon={<FilterAltIcon />}
+                  size="small"
+                >
+                  Filtres
+                </Button>
+              </Badge>
+              
+              <Button
+                variant="contained"
+                onClick={handleSortClick}
+                startIcon={<SortIcon />}
+                size="small"
+              >
+                Trier
+              </Button>
+              
+              <Button
+                variant="contained"
+                color="error"
+                onClick={() => setBatchDeleteMode(true)}
+                startIcon={<DeleteIcon />}
+                size="small"
+                disabled={filteredCorrections.length === 0}
+              >
+                Suppression en lot
+              </Button>
+            </>
+          ) : null}
         </Box>
       </Box>
+      
+      {/* Sticky Batch Delete Button Container */}
+      {batchDeleteMode && (
+        <Box 
+          sx={{
+            display: 'flex',
+            justifyContent: 'flex-end',
+            gap: 1,
+            position: stickyButtons ? 'fixed' : 'static',
+            top: stickyButtons ? '15px' : 'auto',
+            right: stickyButtons ? '15px' : 'auto',
+            zIndex: 1100,
+            transition: 'all 0.3s ease',
+            py: 1,
+            px: 2,
+            bgcolor: theme => stickyButtons ? alpha(theme.palette.background.paper, 0.9) : 'transparent',
+            backdropFilter: stickyButtons ? 'blur(8px)' : 'none',
+            borderRadius: stickyButtons ? 2 : 0,
+            boxShadow: stickyButtons ? 3 : 0,
+          }}
+        >
+          <Button
+            variant="contained"
+            color="error"
+            onClick={() => setConfirmDeleteOpen(true)}
+            startIcon={<DeleteIcon />}
+            size="small"
+            disabled={selectedCorrections.length === 0}
+          >
+            Supprimer ({selectedCorrections.length})
+          </Button>
+          <Button
+            variant="outlined"
+            onClick={handleCancelBatchDelete}
+            size="small"
+          >
+            Annuler
+          </Button>
+        </Box>
+      )}
       
       {/* Content based on selected tab */}
       {tabValue === 0 && (
@@ -1530,6 +1729,58 @@ function CorrectionsContent() {
           </Button>
         </Box>
       </Menu>
+      
+      {/* Delete Confirmation Dialog */}
+      <Dialog
+        open={confirmDeleteOpen}
+        onClose={() => setConfirmDeleteOpen(false)}
+        aria-labelledby="delete-dialog-title"
+        aria-describedby="delete-dialog-description"
+      >
+        <DialogTitle id="delete-dialog-title">
+          Confirmer la suppression
+        </DialogTitle>
+        <DialogContent>
+            <DialogContentText id="delete-dialog-description">
+            {selectedCorrections.length === 1 
+              ? "Vous êtes sur le point de supprimer 1 correction. " 
+              : `Vous êtes sur le point de supprimer ${selectedCorrections.length} corrections. `}
+            Cette action est irréversible. Voulez-vous continuer ?
+            </DialogContentText>
+          
+          {selectedCorrections.length > 0 && (
+            <Box sx={{ mt: 2, maxHeight: '200px', overflow: 'auto', border: '1px solid', borderColor: 'divider', borderRadius: 1, p: 1 }}>
+              <Typography variant="subtitle2" gutterBottom>
+                Corrections sélectionnées :
+              </Typography>
+              {selectedCorrections.map(id => {
+                const correction = filteredCorrections.find(c => c.id === parseInt(id));
+                const student = correction ? metaData.students.find(s => s.id === correction.student_id) : null;
+                const activity = correction ? metaData.activities.find(a => a.id === correction.activity_id) : null;
+                
+                return (
+                  <Box key={id} sx={{ mb: 1, pb: 1, borderBottom: '1px solid', borderColor: 'divider' }}>
+                    <Typography variant="body2" component="div">
+                      {student?.name || 'Étudiant inconnu'} - {activity?.name || 'Activité inconnue'}
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      ID: {id} {correction && ` - Note: ${correction.grade}`}
+                    </Typography>
+                  </Box>
+                );
+              })}
+            </Box>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setConfirmDeleteOpen(false)} color="primary">
+            Annuler
+          </Button>
+          <Button onClick={handleBatchDelete} color="error" variant="contained">
+            Supprimer
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Container>
   );
 }

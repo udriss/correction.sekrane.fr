@@ -180,7 +180,7 @@ export default function ActivityDetail({ params }: { params: Promise<{ id: strin
           const classesResponse = await fetch(`/api/activities/${activityId}/classes`);
           if (classesResponse.ok) {
             const classesData = await classesResponse.json();
-            console.log('Classes data:', classesData);
+            
             setClasses(classesData);
           }
         } catch (err) {
@@ -239,7 +239,7 @@ export default function ActivityDetail({ params }: { params: Promise<{ id: strin
   useEffect(() => {
     if (selectedClass && selectedClass !== null) {
       const selectedClassObj = classes.find(c => c.id === selectedClass);
-      console.log('Selected class object:', selectedClassObj);
+      
       
       if (selectedClassObj) {
         // Si la classe a déjà des sous-groupes prédéfinis, les utiliser
@@ -275,7 +275,7 @@ export default function ActivityDetail({ params }: { params: Promise<{ id: strin
       // Filtrer davantage par sous-groupe si sélectionné
       if (selectedSubGroup && selectedSubGroup !== '') {
         const groupNumber = parseInt(selectedSubGroup);
-        console.log('Selected subgroup:', selectedSubGroup, 'Group number (as number):', groupNumber);
+        
         
         filtered = filtered.filter(correction => {
           // Trouver l'étudiant associé à cette correction dans les étudiants de la classe

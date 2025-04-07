@@ -137,6 +137,17 @@ const commonSettings: Partial<ThemeOptions> = {
       light: '#FFC107', // Ambre clair
       main: '#FF9800',  // Orange standard
       dark: '#ED6C02',  // Orange foncé
+    },
+    error: {
+      light: '#EF5350', // Rouge clair
+      main: '#D32F2F',  // Rouge standard
+      dark: '#C62828',  // Rouge foncé
+    },
+    success: {
+      lighter: '#C8E6C9', // Vert très clair (plus doux)
+      light: '#66BB6A', // Vert clair
+      main: '#2E7D32',  // Vert standard
+      dark: '#1B5E20',  // Vert foncé
     }
   },
 };
@@ -173,6 +184,16 @@ export const defaultTheme = createTheme({
       main: '#FF9800',  // Orange standard
       dark: '#ED6C02',  // Orange foncé
     },
+    error: {
+      light: '#EF5350', // Rouge clair
+      main: '#D32F2F',  // Rouge standard
+      dark: '#C62828',  // Rouge foncé
+    },
+    success: {
+      light: '#66BB6A', // Vert clair
+      main: '#2E7D32',  // Vert standard
+      dark: '#1B5E20',  // Vert foncé
+    }
   },
   gradients: themeGradients.default,
 } as ThemeOptions);
@@ -213,6 +234,7 @@ export const lightTheme = createTheme({
       900: 'rgb(153, 72, 0)',
     },
     success: {
+      lighter: '#C8E6C9', // Vert très clair
       main: 'rgb(46, 125, 50)',
       light: 'rgb(102, 187, 106)',
       dark: 'rgb(27, 94, 32)',
@@ -241,6 +263,21 @@ export const lightTheme = createTheme({
       700: 'rgb(230, 81, 0)',
       800: 'rgb(211, 47, 47)',
       900: 'rgb(183, 28, 28)',
+    },
+    error: {
+      light: '#EF5350', // Rouge clair - pour les très mauvaises notes (plus visible)
+      main: '#D32F2F',  // Rouge standard - pour les mauvaises notes 
+      dark: '#C62828',  // Rouge foncé
+      50: 'rgb(254, 242, 242)',
+      100: 'rgb(254, 226, 226)',
+      200: 'rgb(254, 202, 202)',
+      300: 'rgb(252, 165, 165)',
+      400: 'rgb(248, 113, 113)',
+      500: 'rgb(239, 68, 68)',
+      600: 'rgb(220, 38, 38)',
+      700: 'rgb(185, 28, 28)',
+      800: 'rgb(153, 27, 27)',
+      900: 'rgb(127, 29, 29)',
     },
     background: {
       default: 'rgb(249, 250, 251)',
@@ -295,6 +332,7 @@ export const darkTheme = createTheme({
       900: 'rgb(88, 28, 135)',
     },
     success: {
+      lighter: '#B7DFCA', // Vert très clair pour le thème sombre
       main: 'rgb(16, 185, 129)', // Brighter green for dark theme for better contrast
       light: 'rgb(52, 211, 153)',
       dark: 'rgb(5, 150, 105)',
@@ -323,6 +361,21 @@ export const darkTheme = createTheme({
       700: 'rgb(255, 143, 0)',
       800: 'rgb(255, 111, 0)',
       900: 'rgb(255, 87, 34)',
+    },
+    error: {
+      light: '#EF9A9A', // Rouge plus clair pour le dark theme
+      main: '#F44336',  // Rouge standard pour le dark theme
+      dark: '#C62828',  // Rouge foncé pour le dark theme
+      50: 'rgb(254, 242, 242)',
+      100: 'rgb(254, 226, 226)',
+      200: 'rgb(254, 202, 202)',
+      300: 'rgb(252, 165, 165)',
+      400: 'rgb(248, 113, 113)',
+      500: 'rgb(239, 68, 68)',
+      600: 'rgb(220, 38, 38)',
+      700: 'rgb(185, 28, 28)',
+      800: 'rgb(153, 27, 27)',
+      900: 'rgb(127, 29, 29)',
     },
     background: {
       default: 'rgb(22, 28, 36)', 
@@ -410,6 +463,37 @@ export const intermediateTheme = createTheme({
       700: 'rgb(180, 83, 9)',
       800: 'rgb(146, 64, 14)',
       900: 'rgb(120, 53, 15)',
+    },
+    success: {
+      lighter: '#C8EDDE', // Vert très clair pour le thème intermédiaire
+      light: '#34D399', // Vert clair plus vif pour le thème intermédiaire
+      main: '#10B981', // Vert standard
+      dark: '#059669', // Vert foncé
+      50: 'rgb(236, 253, 245)',
+      100: 'rgb(209, 250, 229)',
+      200: 'rgb(167, 243, 208)',
+      300: 'rgb(110, 231, 183)',
+      400: 'rgb(52, 211, 153)',
+      500: 'rgb(16, 185, 129)',
+      600: 'rgb(5, 150, 105)',
+      700: 'rgb(4, 120, 87)',
+      800: 'rgb(6, 95, 70)',
+      900: 'rgb(6, 78, 59)',
+    },
+    error: {
+      light: '#F87171', // Rouge clair pour le thème intermédiaire
+      main: '#EF4444', // Rouge standard
+      dark: '#DC2626', // Rouge foncé
+      50: 'rgb(254, 242, 242)',
+      100: 'rgb(254, 226, 226)',
+      200: 'rgb(254, 202, 202)',
+      300: 'rgb(252, 165, 165)',
+      400: 'rgb(248, 113, 113)',
+      500: 'rgb(239, 68, 68)',
+      600: 'rgb(220, 38, 38)',
+      700: 'rgb(185, 28, 28)',
+      800: 'rgb(153, 27, 27)',
+      900: 'rgb(127, 29, 29)',
     },
     background: {
       default: 'rgb(249, 250, 252)',

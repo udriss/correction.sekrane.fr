@@ -154,17 +154,17 @@ export default function CorrectionDetail({ params }: { params: Promise<{ id: str
       }
       
       // Create an interval that runs every 70 seconds
-      console.log(`[Auto-save] Démarrage du système d'auto-sauvegarde (intervalle de 70 secondes)`);
+      
       
       // Set up interval timer - save every 70 seconds
       autoSaveTimerRef.current = setInterval(() => {
         // Only auto-save if there are unsaved changes
         if (history.length > 0 || contentItems.length > 0) {
-          console.log(`[Auto-save] Sauvegarde en cours...`);
+          
           handleSaveCorrection();
           setLastAutoSave(new Date());
         } else {
-          console.log(`[Auto-save] Aucune modification à sauvegarder`);
+          
         }
       }, 70000); // 70 seconds
     }

@@ -1,11 +1,28 @@
 import { NextResponse } from 'next/server';
 import { query } from '@/lib/db';
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
-    const classStudents = await query(
-      `SELECT * FROM class_students ORDER BY id DESC`
-    );
+    const url = new URL(request.url);
+    const studentId = url.searchParams.get('studentId');
+    const classId = url.searchParams.get('classId');
+    
+    let sql = 'SELECT * FROM class_students WHERE 1=1';
+    const params: (number | string)[] = [];
+    
+    if (studentId) {
+      sql += ' AND student_id = ?';
+      params.push(parseInt(studentId));
+    }
+    
+    if (classId) {
+      sql += ' AND class_id = ?';
+      params.push(parseInt(classId));
+    }
+    
+    sql += ' ORDER BY id DESC';
+    
+    const classStudents = await query(sql, params);
     
     return NextResponse.json(classStudents);
   } catch (error) {

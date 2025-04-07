@@ -18,7 +18,7 @@ export async function GET(request: NextRequest) {
     }
 
     return await withConnection(async (connection) => {
-      // Récupérer toutes les corrections avec les informations associées
+      // Récupérer toutes les corrections avec les informations associées, y compris les sous-classes
       const [rows] = await connection.query(`
         SELECT 
           c.*,
@@ -32,7 +32,8 @@ export async function GET(request: NextRequest) {
           cl.id AS class_id,
           c.created_at,
           c.updated_at,
-          sc.code AS share_code
+          sc.code AS share_code,
+          cs.sub_class AS student_sub_class
         FROM 
           corrections c
         LEFT JOIN 
@@ -43,6 +44,8 @@ export async function GET(request: NextRequest) {
           classes cl ON c.class_id = cl.id
         LEFT JOIN
           share_codes sc ON c.id = sc.correction_id
+        LEFT JOIN
+          class_students cs ON c.student_id = cs.student_id AND c.class_id = cs.class_id
         ORDER BY 
           c.submission_date DESC, c.created_at DESC
       `);
@@ -89,7 +92,8 @@ export async function GET(request: NextRequest) {
         })(),
         deadline: correction.deadline,
         sub_class: correction.sub_class || null,
-        shareCode: correction.share_code || null // Ajout du champ shareCode
+        shareCode: correction.share_code || null, // Ajout du champ shareCode
+        student_sub_class: correction.student_sub_class || null // Ajout du champ student_sub_class
       }));
 
       return NextResponse.json(formattedCorrections);
