@@ -1,12 +1,27 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { withConnection } from '@/lib/db';
 import { createLogEntry } from '@/lib/services/logsService';
+import { getServerSession } from "next-auth/next";
+import authOptions from "@/lib/auth";
+import { getUser } from '@/lib/auth';
 
 export async function GET(
   request: Request,
   { params }: { params: Promise<{ code: string }> }
 ) {
   try {
+
+    // Get the user from both auth systems
+    const session = await getServerSession(authOptions);
+    const customUser = await getUser();
+    
+    // Use either auth system, starting with custom auth
+    const userId = customUser?.id || session?.user?.id;
+    
+    if (!userId) {
+      return NextResponse.json({ error: 'utilisateur non authentifié' }, { status: 401 });
+    }
+
     // Get the code parameter using the new async pattern
     const { code } = await params;
     
@@ -77,29 +92,32 @@ export async function GET(
       // Ajouter l'information que cette correction est accédée via un lien de partage
       correction.shared = true;
 
-      // Journaliser l'accès au feedback
-      const userAgent = (request as NextRequest).headers.get('user-agent') || 'unknown';
-      const ipAddress = (request as NextRequest).headers.get('x-forwarded-for') || 
-                        (request as NextRequest).headers.get('x-real-ip') || 'unknown';
-      const referer = (request as NextRequest).headers.get('referer') || 'direct';
-                        
-      await createLogEntry({
-        action_type: 'VIEW_FEEDBACK',
-        description: `Consultation de la correction partagée #${correctionId} pour ${correction.student_name}`,
-        entity_type: 'correction',
-        entity_id: correctionId,
-        ip_address: ipAddress,
-        metadata: {
-          share_code: code,
-          activity_name: correction.activity_name,
-          activity_id: correction.activity_id,
-          student_name: correction.student_name,
-          student_id: correction.student_id,
-          browser: userAgent,
-          referer: referer,
-          timestamp: new Date().toISOString()
-        }
-      });
+      // Journaliser l'accès au feedback seulement si ce n'est pas l'administrateur
+      // Admin a userId = 1, on ne journalise pas ses vues pour éviter de polluer les logs
+      if (userId !== 1) {
+        const userAgent = (request as NextRequest).headers.get('user-agent') || 'unknown';
+        const ipAddress = (request as NextRequest).headers.get('x-forwarded-for') || 
+                          (request as NextRequest).headers.get('x-real-ip') || 'unknown';
+        const referer = (request as NextRequest).headers.get('referer') || 'direct';
+                          
+        await createLogEntry({
+          action_type: 'VIEW_FEEDBACK',
+          description: `Consultation de la correction partagée #${correctionId} pour ${correction.student_name}`,
+          entity_type: 'correction',
+          entity_id: correctionId,
+          ip_address: ipAddress,
+          metadata: {
+            share_code: code,
+            activity_name: correction.activity_name,
+            activity_id: correction.activity_id,
+            student_name: correction.student_name,
+            student_id: correction.student_id,
+            browser: userAgent,
+            referer: referer,
+            timestamp: new Date().toISOString()
+          }
+        });
+      }
 
       return NextResponse.json(correction);
     });

@@ -382,21 +382,23 @@ const CorrectionCard: React.FC<CorrectionCardProps> = ({
               )}
               
               {/* Bouton d'édition */}
-              <Link href={`/corrections/${correction.id}`} passHref>
+              <Tooltip title="Éditer la correction">
+                <Link href={`/corrections/${correction.id}`} passHref target="_blank" rel="noopener noreferrer">
                 <IconButton
                   size="small"
                   color="primary"
                   aria-label="edit correction"
                   sx={{ 
-                    bgcolor: theme => alpha(theme.palette.primary.main, 0.1),
-                    '&:hover': {
-                      bgcolor: theme => alpha(theme.palette.primary.main, 0.2),
-                    }
+                  bgcolor: theme => alpha(theme.palette.primary.main, 0.1),
+                  '&:hover': {
+                    bgcolor: theme => alpha(theme.palette.primary.main, 0.2),
+                  }
                   }}
                 >
                   <EditIcon fontSize="small" />
                 </IconButton>
               </Link>
+              </Tooltip>
             </Box>
           )}
         </Box>

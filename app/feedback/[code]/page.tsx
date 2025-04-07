@@ -475,6 +475,23 @@ export default function FeedbackViewer({ params }: { params: Promise<{ code: str
                                 )}
                               </Alert>
                             )}
+                            
+                            {/* Nouveau: Message d'indulgence pour les retards d'un jour */}
+                            {isOneDayLate && !hasPenalty && (
+                              <Alert 
+                                severity="warning" 
+                                variant="outlined"
+                                sx={{ mb: 1.5 }}
+                                icon={<CalendarTodayIcon />}
+                              >
+                                <Typography variant="subtitle2" sx={{ fontWeight: 'bold' }}>
+                                  Jour de grâce accordé
+                                </Typography>
+                                <Typography variant="caption">
+                                  La pénalité pour 1 jour de retard a été levée par indulgence.
+                                </Typography>
+                              </Alert>
+                            )}
                         </AccordionDetails>
                       </Accordion>
                     )}
@@ -673,7 +690,7 @@ export default function FeedbackViewer({ params }: { params: Promise<{ code: str
                       )}
                       {!isNeverSubmitted && isOneDayLate && (
                         <Chip 
-                          label="Léger retard" 
+                          label="Jour de grâce" 
                           size="small" 
                           color="warning" 
                           icon={<ScheduleIcon />} 
@@ -760,6 +777,35 @@ export default function FeedbackViewer({ params }: { params: Promise<{ code: str
                         </Paper>
                       </Grid>
                     </Grid>
+                    
+                    {/* Nouveau message pour les retards d'un jour avec indulgence */}
+                    {isOneDayLate && !hasPenalty && (
+                      <Alert 
+                        severity="warning"
+                        sx={{ mt: 2, mb: 1 }}
+                        icon={<CalendarTodayIcon />}
+                      >
+                        <Typography variant="body2">
+                          <strong>Jour de grâce accordé :</strong> bien que ce travail ait été rendu avec un retard d'un jour, 
+                          aucune pénalité n'a été appliquée par mesure d'indulgence. Les retards plus importants entraîneraient 
+                          une pénalité de 2 points par jour de retard.
+                        </Typography>
+                      </Alert>
+                    )}
+                    
+                    {/* Alerte explicative pour les pénalités de retard si applicable */}
+                    {isMoreThanOneDayLate && hasPenalty && (
+                      <Alert 
+                        severity="error"
+                        sx={{ mt: 2, mb: 1 }}
+                        icon={<ScheduleIcon />}
+                      >
+                        <Typography variant="body2">
+                          <strong>Pénalité de retard appliquée :</strong> Ce travail a été rendu avec {daysLate} jours de retard, 
+                          entraînant une pénalité de {correction.penalty} points sur la note finale.
+                        </Typography>
+                      </Alert>
+                    )}
                   </AccordionDetails>
                 </Accordion>
 

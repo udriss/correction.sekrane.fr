@@ -1,5 +1,5 @@
 import React from 'react';
-import { Box, Alert } from '@mui/material';
+import { Box, Alert, Typography } from '@mui/material';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import dayjs from 'dayjs';
 
@@ -24,7 +24,12 @@ const DatePickerSection: React.FC<DatePickerSectionProps> = ({
             label="Date limite de rendu"
             value={deadlineDate}
             onChange={handleDeadlineDateChange}
-            slotProps={{ textField: { size: 'small' } }}
+            slotProps={{ 
+              textField: { 
+                size: 'small',
+                helperText: "Date d'échéance du travail" 
+              }
+            }}
           />
         </Box>
         <Box>
@@ -32,7 +37,12 @@ const DatePickerSection: React.FC<DatePickerSectionProps> = ({
             label="Date de rendu effective"
             value={submissionDate}
             onChange={handleSubmissionDateChange}
-            slotProps={{ textField: { size: 'small' } }}
+            slotProps={{ 
+              textField: { 
+                size: 'small',
+                helperText: "Date réelle de rendu par l'étudiant" 
+              }
+            }}
           />
         </Box>
       </div>
@@ -44,16 +54,22 @@ const DatePickerSection: React.FC<DatePickerSectionProps> = ({
               severity={submissionDate.diff(deadlineDate, 'day') > 1 ? "error" : "warning"}
               sx={{ py: 0.5 }}
             >
-              {submissionDate.diff(deadlineDate, 'day') <= 1 ? (
-                `Rendu en retard de ${submissionDate.diff(deadlineDate, 'day')} jour(s)`
-              ) : (
-                <>
-                  Rendu en retard de {submissionDate.diff(deadlineDate, 'day')} jour(s)
-                  <strong className="ml-2">
-                    (Pénalité automatique de {Math.min(15, submissionDate.diff(deadlineDate, 'day') * 2)} points)
-                  </strong>
-                </>
-              )}
+              <div>
+                {submissionDate.diff(deadlineDate, 'day') === 1 ? (
+                  <Typography>
+                    Rendu en retard de 1 jour (jour de grâce accordé, sans pénalité)
+                  </Typography>
+                ) : (
+                  <>
+                    Rendu en retard de {submissionDate.diff(deadlineDate, 'day')} jours
+                    {submissionDate.diff(deadlineDate, 'day') > 1 && (
+                      <Typography component="span" fontWeight="bold" sx={{ ml: 1 }}>
+                        (Pénalité automatique de {Math.min(15, (submissionDate.diff(deadlineDate, 'day') - 1) * 2)} points)
+                      </Typography>
+                    )}
+                  </>
+                )}
+              </div>
             </Alert>
           </Box>
         )}

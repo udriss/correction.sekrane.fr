@@ -114,18 +114,25 @@ const GradingSection: React.FC<GradingSectionProps> = ({
     setNeverSubmitted(isChecked);
     
     if (isChecked) {
-      // Appliquer la note de 5/20 (avec 15 points de pénalité)
-      const maxPoints = experimentalPoints + theoreticalPoints;
-      const expPoints = (experimentalPoints / maxPoints) * 20;
-      const theoPoints = (theoreticalPoints / maxPoints) * 20;
+      // Pour travail non rendu, on garde les mêmes notes théorique et expérimentale
+      // mais on applique une pénalité maximale de 15 points
       
-      // Mettre à jour les notes et la pénalité
-      setExperimentalGrade(expPoints.toFixed(1));
-      setTheoreticalGrade(theoPoints.toFixed(1));
+      // Récupérer les notes actuelles
+      const currentExpGrade = parseFloat(experimentalGrade) || 0;
+      const currentTheoGrade = parseFloat(theoreticalGrade) || 0;
+      
+      // Appliquer la pénalité maximale
       setPenalty('15');
       
-      // Sauvegarder les modifications avec la fonction optimisée
-      saveGradeWithDebounce(expPoints, theoPoints, 15);
+      // Sauvegarder avec la pénalité, mais sans modifier les notes
+      saveGradeWithDebounce(currentExpGrade, currentTheoGrade, 15);
+    } else {
+      // Si on décoche, enlever la pénalité mais garder les notes
+      const currentExpGrade = parseFloat(experimentalGrade) || 0;
+      const currentTheoGrade = parseFloat(theoreticalGrade) || 0;
+      
+      setPenalty('0');
+      saveGradeWithDebounce(currentExpGrade, currentTheoGrade, 0);
     }
   };
   

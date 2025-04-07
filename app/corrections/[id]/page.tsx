@@ -614,45 +614,54 @@ export default function CorrectionDetail({ params }: { params: Promise<{ id: str
     
     // Apply penalty if more than 1 day late (2 points per day)
     if (daysLate > 1) {
-      const calculatedPenalty = Math.min(15, daysLate * 2); // Cap at 15 points
+      const calculatedPenalty = Math.min(15, (daysLate - 1) * 2); // Subtract 1 day of grace period, then 2 points per day
       
       // Enable penalty and set its value
       setIsPenaltyEnabled(true);
       setPenalty(calculatedPenalty.toFixed(1));
       
-      // Save grade with penalty - use both grades and add the penalty parameter
+      // Save ONLY the penalty without changing the grades
       if (correction) {
+        // Get the current experimental and theoretical grades (don't modify them)
+        const currentExpGrade = parseFloat(experimentalGrade || '0');
+        const currentTheoGrade = parseFloat(theoreticalGrade || '0');
+        
         correctionsHook.saveGradeAndPenalty(
-          parseFloat(experimentalGrade || '0'),
-          parseFloat(theoreticalGrade || '0'),
+          currentExpGrade,
+          currentTheoGrade,
           calculatedPenalty
         );
       }
       
       // Show notification about automatic penalty
-      setSuccessMessage(`Pénalité de ${calculatedPenalty} points appliquée pour ${daysLate} jours de retard`);
+      setSuccessMessage(`Pénalité de ${calculatedPenalty} points appliquée pour ${daysLate} jours de retard (1 jour de grâce accordé)`);
       setTimeout(() => setSuccessMessage(''), 5000);
     } else {
       // If submission is not late or only 1 day late, remove any existing automatic penalty
-      if (isPenaltyEnabled && correction?.penalty) {
-        // Only reset if penalty was previously set automatically (don't reset manual penalties)
+      if (isPenaltyEnabled) {
+        // Disable penalty checkbox and reset penalty value
+        setIsPenaltyEnabled(false);
+        setPenalty('');
         
-          // Disable penalty checkbox and reset penalty value
-          setIsPenaltyEnabled(false);
-          setPenalty('');
+        // Save the grade without penalty - preserve the current grades
+        if (correction) {
+          const currentExpGrade = parseFloat(experimentalGrade || '0');
+          const currentTheoGrade = parseFloat(theoreticalGrade || '0');
           
-          // Save the grade without penalty - use both grades and add 0 for the penalty
-          if (correction) {
-            correctionsHook.saveGradeAndPenalty(
-              parseFloat(experimentalGrade || '0'),
-              parseFloat(theoreticalGrade || '0'),
-              0
-            );
-          }
-          
-          // Show notification about penalty removal
-          setSuccessMessage('Pénalité de retard supprimée car le rendu est à temps ou avec un retard acceptable');
-          setTimeout(() => setSuccessMessage(''), 5000);
+          correctionsHook.saveGradeAndPenalty(
+            currentExpGrade,
+            currentTheoGrade,
+            0
+          );
+        }
+        
+        // Show notification about penalty removal
+        const message = daysLate === 1 
+          ? 'Jour de grâce accordé : 1 jour de retard sans pénalité' 
+          : 'Pénalité de retard supprimée car le rendu est à temps';
+        
+        setSuccessMessage(message);
+        setTimeout(() => setSuccessMessage(''), 5000);
       }
     }
   };
