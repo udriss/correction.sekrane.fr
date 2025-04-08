@@ -7,7 +7,7 @@ import { Correction as ProviderCorrection } from '@/app/components/CorrectionsDa
 import { getBatchShareCodes } from '@/lib/services/shareService';
 import dayjs from 'dayjs';
 import 'dayjs/locale/fr';
-
+import { useSnackbar } from 'notistack';
 
 interface ClassesListProps {
   filteredCorrections: ProviderCorrection[];
@@ -18,6 +18,7 @@ interface ClassesListProps {
   highlightedIds?: string[]; // IDs explicitement mis en évidence
   recentFilter?: boolean; // Indique si le filtre "recent" est actif
   subClassFilter?: string; // Make sure this is optional and of type string
+  refreshCorrections?: () => Promise<void>;
 }
 
 const ClassesList: React.FC<ClassesListProps> = ({
@@ -28,9 +29,11 @@ const ClassesList: React.FC<ClassesListProps> = ({
   getGradeColor,
   highlightedIds = [], // Valeur par défaut vide
   recentFilter = false, // Par défaut, le filtre recent n'est pas actif
-  subClassFilter // New prop
+  subClassFilter, // New prop
+  refreshCorrections
 }) => {
   const [shareCodesMap, setShareCodesMap] = useState<Map<string, string>>(new Map());
+  const { enqueueSnackbar } = useSnackbar();
   
   // The useEffect for loading shareCodes should depend on filteredCorrections
   useEffect(() => {
@@ -46,6 +49,43 @@ const ClassesList: React.FC<ClassesListProps> = ({
     
     loadShareCodes();
   }, [filteredCorrections]);
+  
+  // Handle toggling the active status of a correction
+  const handleToggleActive = async (correctionId: number, newActiveState: boolean) => {
+    try {
+      const response = await fetch(`/api/corrections/${correctionId}/toggle-active`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ active: newActiveState }),
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || 'Failed to update correction status');
+      }
+      
+      // Show success message
+      enqueueSnackbar(`Correction ${newActiveState ? 'activée' : 'désactivée'} avec succès`, {
+        variant: 'success',
+        autoHideDuration: 3000,
+      });
+      
+      // Refresh corrections data if a refresh function is provided
+      if (refreshCorrections) {
+        await refreshCorrections();
+      }
+      
+    } catch (error) {
+      console.error('Error toggling correction active status:', error);
+      enqueueSnackbar(`Erreur: ${error instanceof Error ? error.message : 'Échec de la mise à jour'}`, {
+        variant: 'error',
+        autoHideDuration: 5000,
+      });
+      throw error; // Re-throw to let the CorrectionCard component know there was an error
+    }
+  };
   
   // Fonction pour déterminer si une correction doit être mise en évidence
   const shouldHighlight = (correction: ProviderCorrection) => {
@@ -178,6 +218,7 @@ const ClassesList: React.FC<ClassesListProps> = ({
                   preloadedShareCode={shareCodesMap.get(correction.id.toString())}
                   highlighted={shouldHighlight(correction)}
                   showClass={false}
+                  onToggleActive={handleToggleActive}
                 />
               </Grid>
             ))}

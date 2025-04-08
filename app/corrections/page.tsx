@@ -6,7 +6,8 @@ import {
   Container, Paper, Typography, Box, Chip, Button, 
   IconButton, Menu, MenuItem, TextField, FormControl,
   InputLabel, Select, Badge, Divider, ListItemIcon, ListItemText,
-  SelectChangeEvent, InputAdornment, Tabs, Tab, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle
+  SelectChangeEvent, InputAdornment, Tabs, Tab, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle,
+  Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TablePagination
 } from '@mui/material';
 import Grid from '@mui/material/Grid';
 import { useSnackbar } from 'notistack';
@@ -40,6 +41,7 @@ import ChronologyList from '@/components/allCorrections/ChronologyList';
 import { generateQRCodePDF } from '@/utils/qrGeneratorPDF';
 import QrCodeIcon from '@mui/icons-material/QrCode';
 import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf';
+import VisibilityIcon from '@mui/icons-material/Visibility';
 import GroupIcon from '@mui/icons-material/Group';
 import DeleteIcon from '@mui/icons-material/Delete';
 import { BatchDeleteProvider, useBatchDelete } from '@/hooks/useBatchDelete';
@@ -157,19 +159,49 @@ function CorrectionsContent() {
                 })
               );
               setAvailableSubClasses(subClasses);
+              
+              // Vérifier si la valeur actuelle de subClassId est valide pour cette nouvelle liste
+              if (filters.subClassId) {
+                const isValidSubClassId = subClasses.some(sc => sc.id === filters.subClassId);
+                if (!isValidSubClassId) {
+                  // Si la valeur n'est pas valide, la réinitialiser
+                  setFilters(prev => ({ ...prev, subClassId: '' }));
+                  // Si le filtre était actif, le retirer
+                  if (activeFilters.includes('subClassId')) {
+                    removeFilter('subClassId');
+                  }
+                }
+              }
             } else {
               setAvailableSubClasses([]);
+              // Réinitialiser le subClassId si la classe n'a pas de sous-classes
+              if (filters.subClassId) {
+                setFilters(prev => ({ ...prev, subClassId: '' }));
+                if (activeFilters.includes('subClassId')) {
+                  removeFilter('subClassId');
+                }
+              }
             }
           }
         } catch (error) {
           console.error("Error fetching sub-classes:", error);
           setAvailableSubClasses([]);
+          // Réinitialiser en cas d'erreur
+          if (filters.subClassId) {
+            setFilters(prev => ({ ...prev, subClassId: '' }));
+            if (activeFilters.includes('subClassId')) {
+              removeFilter('subClassId');
+            }
+          }
         }
       } else {
         setAvailableSubClasses([]);
         // Clear subClassId if class is cleared
-        if (activeFilters.includes('subClassId')) {
-          handleRemoveFilter('subClassId');
+        if (filters.subClassId) {
+          setFilters(prev => ({ ...prev, subClassId: '' }));
+          if (activeFilters.includes('subClassId')) {
+            removeFilter('subClassId');
+          }
         }
       }
     };
@@ -419,13 +451,15 @@ function CorrectionsContent() {
         
         // Show success message
         enqueueSnackbar(`${successCount} correction(s) supprimée(s) avec succès`, { 
-          variant: 'success' 
+          variant: 'success',
+          autoHideDuration: 5000
         });
       }
       
       if (failCount > 0) {
         enqueueSnackbar(`Échec de la suppression pour ${failCount} correction(s)`, { 
-          variant: 'error' 
+          variant: 'error',
+          autoHideDuration: 5000
         });
       }
       
@@ -441,12 +475,28 @@ function CorrectionsContent() {
     } catch (error) {
       console.error('Error in batch delete operation:', error);
       enqueueSnackbar('Une erreur est survenue lors de la suppression', { 
-        variant: 'error' 
+        variant: 'error',
+        autoHideDuration: 5000
       });
       
       // Clear all deleting statuses in case of an error
       selectedCorrections.forEach(id => setDeletingCorrection(id, false));
     }
+  };
+
+  // États pour la pagination du tableau d'aperçu des corrections
+  const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(10);
+
+  // Gestion du changement de page
+  const handleChangePage = (event: unknown, newPage: number) => {
+    setPage(newPage);
+  };
+
+  // Gestion du changement du nombre d'éléments par page
+  const handleChangeRowsPerPage = (event: React.ChangeEvent<HTMLInputElement>) => {
+    setRowsPerPage(parseInt(event.target.value, 10));
+    setPage(0);
   };
 
   if (loading && !filteredCorrections.length) {
@@ -997,6 +1047,40 @@ function CorrectionsContent() {
         </Box>
       )}
       
+      <Box sx={{ mb: 2 }}>
+          <FormControl fullWidth>
+            <Typography variant="body2" color="text.secondary" gutterBottom>
+              Statut des corrections
+            </Typography>
+            <Button
+              fullWidth
+              variant={activeFilters.includes('showInactive') ? "outlined" : "outlined"}
+              sx={{
+                color: activeFilters.includes ('showInactive') ? "primary" : theme => theme.palette.warning.dark,
+                borderColor: activeFilters.includes ('showInactive') ? theme => alpha(theme.palette.primary.dark, 1) : theme => alpha(theme.palette.warning.dark, 1),
+                backgroundColor: activeFilters.includes ('showInactive') ? theme => alpha(theme.palette.primary.dark, 0.05) : theme => alpha(theme.palette.warning.dark, 0.1),
+                '&:hover': {
+                  backgroundColor: activeFilters.includes ('showInactive') ? theme => alpha(theme.palette.primary.dark, 0.2) : theme => alpha(theme.palette.warning.dark, 0.2),
+                  borderColor: activeFilters.includes ('showInactive') ? "transparent" : theme => alpha(theme.palette.warning.dark, 1),
+                },
+              }}
+              onClick={() => {
+                if (activeFilters.includes('showInactive')) {
+                  // Remove the filter if it's active
+                  handleRemoveFilter('showInactive');
+                } else {
+                  // Set showInactive to true and apply the filter
+                  setFilters(prev => ({ ...prev, showInactive: true }));
+                  handleApplyFilter('showInactive');
+                }
+              }}
+              startIcon={<VisibilityIcon />}
+            >
+              {activeFilters.includes('showInactive') ? "Toutes les corrections (actives et inactives)" : "Uniquement les corrections actives"}
+            </Button>
+          </FormControl>
+        </Box>
+        
       {/* Content based on selected tab */}
       {tabValue === 0 && (
         <CorrectionsList
@@ -1007,6 +1091,7 @@ function CorrectionsContent() {
           getGradeColor={getGradeColor}
           highlightedIds={searchParams?.get('highlight')?.split(',').filter(Boolean) || []}
           recentFilter={activeFilters.includes('recent')}
+          refreshCorrections={refreshCorrections}
         />
       )}
       
@@ -1019,6 +1104,7 @@ function CorrectionsContent() {
           highlightedIds={searchParams?.get('highlight')?.split(',').filter(Boolean) || []}
           getGradeColor={getGradeColor}
           subClassFilter={filters.subClassId} // Add subClassFilter prop
+          refreshCorrections={refreshCorrections}
         />
       )}
       
@@ -1031,6 +1117,7 @@ function CorrectionsContent() {
           getGradeColor={getGradeColor}
           highlightedIds={searchParams?.get('highlight')?.split(',').filter(Boolean) || []}
           recentFilter={activeFilters.includes('recent')}
+          refreshCorrections={refreshCorrections}
         />
       )}
       
@@ -1226,17 +1313,17 @@ function CorrectionsContent() {
                     });
                     
                     if (pdfFileName) {
-                      enqueueSnackbar(`PDF généré avec succès : ${pdfFileName}`, { variant: 'success' });
+                      enqueueSnackbar(`PDF généré avec succès : ${pdfFileName}`, { variant: 'success', autoHideDuration: 5000 });
                     } else {
                       throw new Error('Erreur lors de la génération du PDF');
                     }
                   } catch (error) {
                     console.error('Erreur:', error);
-                    enqueueSnackbar(`Erreur lors de l'export PDF: ${(error as Error).message}`, { variant: 'error' });
+                    enqueueSnackbar(`Erreur lors de l'export PDF: ${(error as Error).message}`, { variant: 'error', autoHideDuration: 5000 });
                   }
                 }}
               >
-                Générer le PDF
+                Générer PDF
               </Button>
             </Box>
             
@@ -1245,37 +1332,60 @@ function CorrectionsContent() {
                 <Typography variant="subtitle2" gutterBottom>
                   Aperçu des corrections sélectionnées:
                 </Typography>
-                <Box sx={{ maxHeight: 300, overflow: 'auto', bgcolor: 'background.paper', border: '1px solid', borderColor: 'divider', borderRadius: 1 }}>
-                  <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                    <thead style={{ position: 'sticky', top: 0, backgroundColor: '#f5f5f5', zIndex: 1 }}>
-                      <tr>
-                        <th style={{ padding: '8px', textAlign: 'left', borderBottom: '1px solid #ddd' }}>Étudiant</th>
-                        <th style={{ padding: '8px', textAlign: 'left', borderBottom: '1px solid #ddd' }}>Activité</th>
-                        <th style={{ padding: '8px', textAlign: 'left', borderBottom: '1px solid #ddd' }}>Classe</th>
-                        <th style={{ padding: '8px', textAlign: 'center', borderBottom: '1px solid #ddd' }}>Note</th>
-                        <th style={{ padding: '8px', textAlign: 'center', borderBottom: '1px solid #ddd' }}>Lien de partage</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {filteredCorrections.map((correction) => {
+                <TableContainer component={Paper} sx={{ maxHeight: 400, overflow: 'auto' }}>
+                  <Table stickyHeader size="small">
+                    <TableHead>
+                      <TableRow>
+                        <TableCell>Étudiant</TableCell>
+                        <TableCell>Activité</TableCell>
+                        <TableCell>Classe</TableCell>
+                        <TableCell align="center">Note</TableCell>
+                        <TableCell align="center">Lien de partage</TableCell>
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {filteredCorrections
+                        .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
+                        .map((correction) => {
                         const student = metaData.students.find(s => s.id === correction.student_id);
                         const activity = metaData.activities.find(a => a.id === correction.activity_id);
                         const classInfo = metaData.classes.find(c => c.id === correction.class_id);
+                        const isActive = correction.active !== 0; // Considère la correction comme active par défaut (0 = inactive, 1 = active)
                         
                         return (
-                          <tr key={correction.id} style={{ borderBottom: '1px solid #f0f0f0' }}>
-                            <td style={{ padding: '8px' }}>{student?.name || `ID: ${correction.student_id}`}</td>
-                            <td style={{ padding: '8px' }}>{activity?.name || `ID: ${correction.activity_id}`}</td>
-                            <td style={{ padding: '8px' }}>{classInfo?.name || `ID: ${correction.class_id}`}</td>
-                            <td style={{ padding: '8px', textAlign: 'center' }}>
-                              <Chip 
-                                label={`${correction.grade}/20`} 
-                                size="small"
-                                color={getGradeColor(correction.grade)}
-                                variant="outlined"
-                              />
-                            </td>
-                            <td style={{ padding: '8px', textAlign: 'center' }}>
+                          <TableRow 
+                            key={correction.id} 
+                            hover
+                            sx={{ 
+                              '&:last-child td, &:last-child th': { border: 0 },
+                              bgcolor: !isActive ? alpha('#f5f5f5', 0.4) : 'inherit'
+                            }}
+                          >
+                            <TableCell>{student?.name || `ID: ${correction.student_id}`}</TableCell>
+                            <TableCell>{activity?.name || `ID: ${correction.activity_id}`}</TableCell>
+                            <TableCell>{classInfo?.name || `ID: ${correction.class_id}`}</TableCell>
+                            <TableCell align="center">
+                              {isActive ? (
+                                <Chip 
+                                  label={`${correction.grade}/20`} 
+                                  size="small"
+                                  color={getGradeColor(correction.grade)}
+                                  variant="outlined"
+                                />
+                              ) : (
+                                <Chip 
+                                  label="Correction inactive" 
+                                  size="small"
+                                  color="warning"
+                                  sx={{ 
+                                    bgcolor: theme => alpha(theme.palette.warning.dark, 0.1),
+                                    color: theme => theme.palette.warning.dark,
+                                    borderColor: theme => theme.palette.warning.dark,
+                                  }}
+                                />
+                              )}
+                            </TableCell>
+                            <TableCell align="center">
                               {((correction as unknown) as CorrectionWithShareCode).shareCode ? (
                                 <Chip
                                   size="small"
@@ -1293,13 +1403,24 @@ function CorrectionsContent() {
                                   variant="outlined"
                                 />
                               )}
-                            </td>
-                          </tr>
+                            </TableCell>
+                          </TableRow>
                         );
                       })}
-                    </tbody>
-                  </table>
-                </Box>
+                    </TableBody>
+                  </Table>
+                </TableContainer>
+                <TablePagination
+                  rowsPerPageOptions={[5, 10, 25, 50]}
+                  component="div"
+                  count={filteredCorrections.length}
+                  rowsPerPage={rowsPerPage}
+                  page={page}
+                  onPageChange={handleChangePage}
+                  onRowsPerPageChange={handleChangeRowsPerPage}
+                  labelRowsPerPage="Lignes par page:"
+                  labelDisplayedRows={({ from, to, count }) => `${from}-${to} sur ${count}`}
+                />
               </Box>
             )}
           </Paper>

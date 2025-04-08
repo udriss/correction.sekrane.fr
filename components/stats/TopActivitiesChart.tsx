@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, LabelList } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, LabelList } from 'recharts';
 
 interface TopActivityData {
   activity_id: number;
@@ -17,52 +17,54 @@ interface TopActivitiesChartProps {
 const COLORS = ['#8884d8', '#83a6ed', '#8dd1e1', '#82ca9d', '#a4de6c', '#d0ed57', '#ffc658'];
 
 export default function TopActivitiesChart({ data }: TopActivitiesChartProps) {
-  // Préparer les données pour le graphique et gérer les valeurs null/undefined
-  const chartData = data.map(item => ({
+  // Limiter aux 10 premières activités pour la lisibilité et formatter les données
+  const displayData = data.slice(0, 10).map(item => ({
     ...item,
-    name: item.activity_name.length > 25 ? item.activity_name.substring(0, 25) + '...' : item.activity_name,
-    // S'assurer que average_grade est un nombre valide
-    average_grade: typeof item.average_grade === 'number' ? item.average_grade : 0
+    name: item.activity_name.length > 20 ? item.activity_name.substring(0, 20) + '...' : item.activity_name,
+    // S'assurer que average_grade est traité correctement
+    average_grade: 
+      (item.average_grade === null || item.average_grade === undefined || item.average_grade === 0) 
+        ? null
+        : (typeof item.average_grade === 'string' 
+            ? parseFloat(item.average_grade) 
+            : item.average_grade),
   }));
-
-  const formatValue = (value: any): string => {
-    // Vérifier si la valeur est un nombre valide
-    if (value === undefined || value === null || isNaN(Number(value))) {
-      return 'N/A';
-    }
-    return `${Number(value).toFixed(2)}/20`;
-  };
 
   return (
     <ResponsiveContainer width="100%" height="100%">
       <BarChart
-        data={chartData}
+        data={displayData}
         layout="vertical"
         margin={{
           top: 20,
-          right: 90,
-          left: 90,
+          right: 30,
+          left: 120,
           bottom: 5,
         }}
       >
-        <CartesianGrid strokeDasharray="3 3" />
-        <XAxis type="number" domain={[0, 20]} label={{ value: 'Note moyenne (/20)', position: 'insideBottom', offset: -5 }} />
-        <YAxis type="category" dataKey="name" width={150} tick={{ fontSize: 12 }} />
-        <Tooltip
-          formatter={(value, name) => {
-            if (value === undefined || value === null) return ['Non évalué', 'Note moyenne'];
-            return [`${Number(value).toFixed(2)}/20`, 'Note moyenne'];
-          }}
-          labelFormatter={(label) => `Activité: ${label}`}
+        <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} />
+        <XAxis type="number" domain={[0, 20]} />
+        <YAxis 
+          dataKey="name" 
+          type="category" 
+          width={120}
+          tick={{ fontSize: 11 }}
         />
-        <Bar dataKey="average_grade" barSize={20}>
-          {chartData.map((entry, index) => (
-            <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-          ))}
+        <Tooltip 
+          formatter={(value, name) => {
+            if (value === undefined || value === null) {
+              return ['- -', name];
+            }
+            if (name === 'Corrections') return [`${value}`, name];
+            return [`${Number(value).toFixed(2)}/20`, name];
+          }}
+        />
+        <Legend />
+        <Bar dataKey="average_grade" name="Note moyenne" fill="#8884d8">
           <LabelList 
             dataKey="average_grade" 
             position="right" 
-            formatter={(value: any) => formatValue(value)} 
+            formatter={(value: any) => value === null ? "- -" : `${Number(value).toFixed(1)}/20`}
           />
         </Bar>
       </BarChart>

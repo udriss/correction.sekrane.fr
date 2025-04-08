@@ -47,9 +47,8 @@ const CorrectionsList: React.FC<CorrectionsListProps> = ({
   onConfirmDelete,
   onCancelDelete,
   // Inclure getStudentFullName avec une valeur par défaut
-  getStudentFullName = (studentId) => "Sans nom", // Fonction par défaut si non fournie
+  getStudentFullName = (studentId) => "Sans nomnom", // Fonction par défaut si non fournie
 }) => {
-
   return (
     <>
       <div className="flex justify-end items-center mb-4">

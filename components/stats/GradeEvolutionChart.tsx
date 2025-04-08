@@ -1,66 +1,79 @@
 'use client';
 
 import React from 'react';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Area, ComposedChart, Bar } from 'recharts';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Bar, BarChart, Label } from 'recharts';
 
-interface GradeEvolutionData {
+interface GradeData {
   month: string;
   correction_count: number;
   average_grade: number;
 }
 
 interface GradeEvolutionChartProps {
-  data: GradeEvolutionData[];
+  data: GradeData[];
 }
 
 export default function GradeEvolutionChart({ data }: GradeEvolutionChartProps) {
-  // Formater les mois pour affichage et gérer les valeurs null/undefined
-  const formattedData = data.map(item => {
+  // Formater les données pour afficher correctement les mois et gérer les valeurs nulles
+  const displayData = data.map(item => {
+    // Formater le mois pour un affichage plus lisible
     const [year, month] = item.month.split('-');
-    const date = new Date(parseInt(year), parseInt(month) - 1);
+    const dateObj = new Date(parseInt(year), parseInt(month) - 1);
+    const monthName = new Intl.DateTimeFormat('fr', { month: 'short' }).format(dateObj);
+    
     return {
       ...item,
-      // S'assurer que average_grade est un nombre valide
-      average_grade: typeof item.average_grade === 'number' ? item.average_grade : 0,
-      monthDisplay: date.toLocaleDateString('fr-FR', { month: 'short', year: 'numeric' })
+      name: `${monthName} ${year}`,
+      // Assurer que average_grade est correctement traitée
+      average_grade: 
+        (item.average_grade === null || item.average_grade === undefined || item.average_grade === 0) 
+          ? null 
+          : (typeof item.average_grade === 'string' 
+              ? parseFloat(item.average_grade) 
+              : item.average_grade),
     };
   });
 
+  // Combiner les graphiques de tendance de notes et de nombre de corrections
   return (
     <ResponsiveContainer width="100%" height="100%">
-      <ComposedChart
-        data={formattedData}
+      <LineChart
+        data={displayData}
         margin={{
           top: 20,
           right: 30,
           left: 20,
-          bottom: 20,
+          bottom: 30,
         }}
       >
-        <CartesianGrid strokeDasharray="3 3" />
-        <XAxis dataKey="monthDisplay" />
-        <YAxis 
-          yAxisId="left" 
-          orientation="left"
-          domain={[0, 20]}
-          label={{ value: 'Note moyenne', angle: -90, position: 'insideLeft' }}
+        <CartesianGrid strokeDasharray="3 3" vertical={false} />
+        <XAxis 
+          dataKey="name" 
+          angle={-45} 
+          textAnchor="end" 
+          height={70}
+          tick={{ fontSize: 10 }}
+        />
+        <YAxis yAxisId="left" 
+          domain={[0, 20]} 
+          tickCount={5}
+          label={{ value: 'Note moyenne (/20)', angle: -90, position: 'insideLeft' }}
         />
         <YAxis 
           yAxisId="right" 
-          orientation="right" 
+          orientation="right"
           label={{ value: 'Nombre de corrections', angle: 90, position: 'insideRight' }}
         />
         <Tooltip 
           formatter={(value, name) => {
             if (value === undefined || value === null) {
-              return ['Non évalué', name];
+              return ['- -', name];
             }
-            if (name === 'Nombre de corrections') return [value, name];
+            if (name === 'Nombre de corrections') return [`${value}`, name];
             return [`${Number(value).toFixed(2)}/20`, name];
           }}
-          labelFormatter={(label) => `Période: ${label}`}
         />
-        <Legend verticalAlign="top" height={36} />
+        <Legend />
         <Line
           yAxisId="left"
           type="monotone"
@@ -70,15 +83,19 @@ export default function GradeEvolutionChart({ data }: GradeEvolutionChartProps) 
           strokeWidth={2}
           dot={{ r: 4 }}
           activeDot={{ r: 6 }}
+          connectNulls={true}
         />
-        <Bar
+        <Line
           yAxisId="right"
+          type="monotone"
           dataKey="correction_count"
           name="Nombre de corrections"
-          fill="#82ca9d"
-          opacity={0.6}
+          stroke="#82ca9d"
+          strokeWidth={2}
+          dot={{ r: 4 }}
+          activeDot={{ r: 6 }}
         />
-      </ComposedChart>
+      </LineChart>
     </ResponsiveContainer>
   );
 }

@@ -27,7 +27,9 @@ import {
   Tabs,
   Tab,
   Alert,
-  SelectChangeEvent
+  SelectChangeEvent,
+  Dialog,
+  DialogTitle
 } from '@mui/material';
 import PersonIcon from '@mui/icons-material/Person';
 import PersonAddIcon from '@mui/icons-material/PersonAdd';
@@ -58,8 +60,7 @@ import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
 import EmailIcon from '@mui/icons-material/Email';
 import FileDownloadIcon from '@mui/icons-material/FileDownload';
 import FileUploadIcon from '@mui/icons-material/FileUpload';
-import { saveAs } from 'file-saver';
-import Papa from 'papaparse';
+
 
 interface AllStudentsManagerProps {
   students: Student[];
@@ -119,6 +120,17 @@ const AllStudentsManagerNEW: React.FC<AllStudentsManagerProps> = ({
   const [activeManagerTab, setActiveManagerTab] = useState(0);
   const [showExportTab, setShowExportTab] = useState(false);
   const [showImportTab, setShowImportTab] = useState(false);
+
+  // State for result modal
+  const [resultModal, setResultModal] = useState<{
+    open: boolean;
+    message: string;
+    success: boolean;
+  }>({
+    open: false,
+    message: '',
+    success: true
+  });
 
   // Fonction pour gérer le changement de sous-classe
   const handleSubClassFilterChange = (event: SelectChangeEvent<string>) => {
@@ -294,15 +306,40 @@ const AllStudentsManagerNEW: React.FC<AllStudentsManagerProps> = ({
         method: 'DELETE',
       });
 
+      // Lire la réponse
+      const data = await response.json();
+
       if (!response.ok) {
-        throw new Error('Error deleting student');
+        // Afficher l'erreur dans le modal
+        setResultModal({
+          open: true,
+          message: data.error || 'Erreur lors de la suppression de l\'étudiant',
+          success: false
+        });
+        setConfirmingDelete(null);
+        return;
       }
 
-      onStudentUpdate(); // Refresh student list
+      // Afficher le message de succès dans le modal
+      setResultModal({
+        open: true,
+        message: data.message || 'L\'étudiant a été supprimé avec succès',
+        success: true
+      });
+      
+      // Une fois le modal affiché, on peut mettre à jour la liste
+      onStudentUpdate();
       setConfirmingDelete(null);
     } catch (err) {
       console.error('Error:', err);
-      onError('Error deleting student');
+      
+      // Afficher l'erreur dans le modal
+      setResultModal({
+        open: true,
+        message: err instanceof Error ? err.message : 'Erreur lors de la suppression de l\'étudiant',
+        success: false
+      });
+      
       setConfirmingDelete(null);
     }
   };
@@ -636,6 +673,43 @@ const AllStudentsManagerNEW: React.FC<AllStudentsManagerProps> = ({
     setShowImportTab(prev => !prev);
     if (showExportTab) setShowExportTab(false);
     if (!showImportTab) setActiveManagerTab(1);
+  };
+
+  // Modal de confirmation de résultat après suppression
+  const ResultModal = () => {
+    return (
+      <Dialog
+        open={resultModal.open}
+        onClose={() => setResultModal({...resultModal, open: false})}
+        aria-labelledby="result-dialog-title"
+      >
+        <Box sx={{ 
+          borderTop: 5, 
+          borderColor: resultModal.success ? 'success.main' : 'error.main',
+          p: 0 
+        }}>
+          <DialogTitle id="result-dialog-title" sx={{ pb: 1 }}>
+            {resultModal.success ? 'Opération réussie' : 'Erreur'}
+          </DialogTitle>
+          <Divider />
+          <Box sx={{ px: 3, py: 2 }}>
+            <Typography variant="body1">
+              {resultModal.message}
+            </Typography>
+          </Box>
+          <Box sx={{ display: 'flex', justifyContent: 'flex-end', p: 2 }}>
+            <Button 
+              onClick={() => setResultModal({...resultModal, open: false})}
+              variant="contained" 
+              color={resultModal.success ? "success" : "primary"}
+              autoFocus
+            >
+              OK
+            </Button>
+          </Box>
+        </Box>
+      </Dialog>
+    );
   };
 
   return (
@@ -1200,6 +1274,9 @@ const AllStudentsManagerNEW: React.FC<AllStudentsManagerProps> = ({
           <Alert severity="error">{editError}</Alert>
         </Box>
       )}
+
+      {/* Result modal */}
+      <ResultModal />
     </Paper>
   );
 };

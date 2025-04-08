@@ -59,7 +59,6 @@ export default function StudentEvolution({ corrections }: StudentEvolutionProps)
 
   const evolutionData = getGradeEvolutionData();
 
-  // Ajouter un log pour déboguer (à supprimer en production)
   // 
 
   const CustomTooltip = ({ active, payload, label }: any) => {

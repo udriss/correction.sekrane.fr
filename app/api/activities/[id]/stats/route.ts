@@ -16,14 +16,31 @@ export async function GET(
         { status: 400 }
       );
     }
-
-    // Use the existing function from lib/correction.ts
-    const stats = await getCorrectionStatsByActivity(activityId);
+    
+    // Get query parameters
+    const url = new URL(request.url);
+    const includeInactive = url.searchParams.get('includeInactive') === 'true';
+    
+    // Use the updated function with the includeInactive parameter
+    const stats = await getCorrectionStatsByActivity(activityId, includeInactive);
     return NextResponse.json(stats);
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error fetching activity stats:', error);
+    
+    // Préparer les détails d'erreur pour les inclure dans la réponse
+    const errorDetails = {
+      message: error.message || 'Error fetching activity statistics',
+      code: error.code || 'UNKNOWN_ERROR',
+      sql: error.sql,
+      sqlMessage: error.sqlMessage,
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    };
+    
     return NextResponse.json(
-      { error: 'Error fetching activity statistics' },
+      { 
+        error: 'Error fetching activity statistics', 
+        details: errorDetails
+      },
       { status: 500 }
     );
   }

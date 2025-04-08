@@ -452,11 +452,17 @@ export default function CorrectionGroupDetailPage() {
         throw new Error('Erreur lors de la suppression du groupe');
       }
       
-      enqueueSnackbar('Groupe supprimé avec succès', { variant: 'success' });
+      enqueueSnackbar('Groupe supprimé avec succès', { 
+        variant: 'success',
+        autoHideDuration: 5000
+      });
       router.push(`/activities/${activityId}`);
     } catch (error) {
       console.error('Erreur:', error);
-      enqueueSnackbar(`Erreur: ${(error as Error).message}`, { variant: 'error' });
+      enqueueSnackbar(`Erreur: ${(error as Error).message}`, { 
+        variant: 'error',
+        autoHideDuration: 5000
+      });
     } finally {
       setGroupDeleteDialogOpen(false);
       setIsDeleting(false);

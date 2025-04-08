@@ -24,6 +24,7 @@ export interface Correction {
   updated_at: string;
   sub_class?: string | null;
   student_sub_class?: string | null; // Ajout de la propriété student_sub_class
+  active?: number; // Ajout du champ active pour identifier les corrections actives/inactives
 }
 
 // Définition de l'interface Student pour typer correctement les étudiants
@@ -49,6 +50,7 @@ interface FilterState {
   recent: boolean;
   correctionId: string; // Nouvel ajout pour filtrer par ID de correction
   subClassId: string; // Add this property
+  showInactive: boolean; // Ajout du filtre pour afficher les corrections inactives
 }
 
 interface SortOption {
@@ -131,7 +133,8 @@ export const CorrectionsProvider: React.FC<CorrectionsProviderProps> = ({
     maxGrade: initialFilters.maxGrade || '',
     recent: initialFilters.recent || false,
     correctionId: initialFilters.correctionId || '', // Initialiser avec la valeur fournie ou vide
-    subClassId: initialFilters.subClassId || '' // Initialiser avec la valeur fournie ou vide
+    subClassId: initialFilters.subClassId || '', // Initialiser avec la valeur fournie ou vide
+    showInactive: initialFilters.showInactive !== undefined ? initialFilters.showInactive : true // Par défaut, afficher les corrections inactives
   });
   
   const [sortOptions, setSortOptions] = useState<SortOption>({
@@ -140,19 +143,55 @@ export const CorrectionsProvider: React.FC<CorrectionsProviderProps> = ({
   });
   
   const [activeFilters, setActiveFilters] = useState<string[]>([]);
+  const [subClassStudentIds, setSubClassStudentIds] = useState<number[]>([]); // Pour stocker les IDs des étudiants du sous-groupe
   
   // Charger les données initiales
   useEffect(() => {
+    // Initialiser les filtres actifs en premier si des filtres initiaux sont fournis
+    const initialActiveFilters = [];
+    if (initialFilters.search) initialActiveFilters.push('search');
+    if (initialFilters.classId) initialActiveFilters.push('classId');
+    if (initialFilters.studentId) initialActiveFilters.push('studentId');
+    if (initialFilters.activityId) initialActiveFilters.push('activityId');
+    if (initialFilters.dateFrom) initialActiveFilters.push('dateFrom');
+    if (initialFilters.dateTo) initialActiveFilters.push('dateTo');
+    if (initialFilters.minGrade) initialActiveFilters.push('minGrade');
+    if (initialFilters.maxGrade) initialActiveFilters.push('maxGrade');
+    if (initialFilters.recent) initialActiveFilters.push('recent');
+    if (initialFilters.correctionId) initialActiveFilters.push('correctionId');
+    if (initialFilters.subClassId) initialActiveFilters.push('subClassId');
+    if (initialFilters.showInactive !== undefined) {
+      initialActiveFilters.push('showInactive');
+    } else {
+      // Par défaut, afficher toutes les corrections (y compris inactives)
+      initialActiveFilters.push('showInactive');
+    }
+    
+    setActiveFilters(initialActiveFilters);
+    
+    // Puis charger les corrections
     fetchCorrections();
   }, []);
   
-  // Appliquer les filtres et le tri
-  useEffect(() => {
-    if (!corrections.length) return;
+  // Fonction pour appliquer tous les filtres (sauf subClassId qui est traité séparément)
+  const applyAllFiltersExceptSubClass = (data: Correction[]) => {
+    let filtered = [...data];
     
-    let filtered = [...corrections];
     
-    // Appliquer tous les filtres actifs
+    // Filtrer les corrections inactives, sauf si showInactive est activé
+    if (!filters.showInactive || !activeFilters.includes('showInactive')) {
+      
+      filtered = filtered.filter(correction => {
+        // Avec tinyint(1), la valeur 1 est représentée comme 1 (number) et non true (boolean)
+        // La valeur 0 est représentée comme 0 (number) et non false (boolean)
+        // Considérer la correction comme active si active est 1 ou undefined/null
+        return correction.active === 1 || correction.active === undefined || correction.active === null;
+      });
+      
+    } else {
+      
+    }
+    
     if (filters.search && activeFilters.includes('search')) {
       const searchLower = filters.search.toLowerCase();
       filtered = filtered.filter(correction =>
@@ -163,24 +202,48 @@ export const CorrectionsProvider: React.FC<CorrectionsProviderProps> = ({
     }
     
     if (filters.classId && activeFilters.includes('classId')) {
-      filtered = filtered.filter(correction => 
-        correction.class_id === parseInt(filters.classId)
-      );
+      
+      
+      
+      // Convertir en string pour la comparaison afin d'éviter les problèmes de type
+      const classIdStr = filters.classId.toString();
+      
+      filtered = filtered.filter(correction => {
+        // Vérifier si class_id est null et le convertir en string pour la comparaison
+        const correctionClassId = correction.class_id !== null ? correction.class_id.toString() : null;
+        return correctionClassId === classIdStr;
+      });
+      
+      
+      
     }
     
-    // Le filtrage par sous-groupe (subClassId) est traité dans un effet séparé ci-dessous
-    // pour permettre la récupération asynchrone des étudiants du sous-groupe
-    
     if (filters.studentId && activeFilters.includes('studentId')) {
+      
+      
+      
+      // Convertir en string pour la comparaison
+      const studentIdStr = filters.studentId.toString();
+      
       filtered = filtered.filter(correction => 
-        correction.student_id === parseInt(filters.studentId)
+        correction.student_id.toString() === studentIdStr
       );
+      
+      
     }
     
     if (filters.activityId && activeFilters.includes('activityId')) {
+      
+      
+      
+      // Convertir en string pour la comparaison
+      const activityIdStr = filters.activityId.toString();
+      
       filtered = filtered.filter(correction => 
-        correction.activity_id === parseInt(filters.activityId)
+        correction.activity_id.toString() === activityIdStr
       );
+      
+      
     }
     
     if (filters.dateFrom && activeFilters.includes('dateFrom')) {
@@ -207,29 +270,32 @@ export const CorrectionsProvider: React.FC<CorrectionsProviderProps> = ({
       );
     }
 
-    // Filtre par ID de correction
     if (filters.correctionId && activeFilters.includes('correctionId')) {
-      // Si l'ID contient des virgules, c'est une liste d'IDs
+      
+      
+      
       if (filters.correctionId.includes(',')) {
+        // Si plusieurs IDs séparés par des virgules
         const ids = filters.correctionId.split(',').map(id => id.trim());
         filtered = filtered.filter(correction => 
           ids.includes(correction.id.toString())
         );
       } else {
+        // Si un seul ID
+        const correctionIdStr = filters.correctionId.toString();
         filtered = filtered.filter(correction => 
-          correction.id.toString() === filters.correctionId
+          correction.id.toString() === correctionIdStr
         );
       }
+      
+      
     }
     
-    // Filtre des corrections récentes
     if (activeFilters.includes('recent')) {
-      // Obtenir la date de maintenant et soustraire 24 heures
       const recentDate = new Date();
       recentDate.setHours(recentDate.getHours() - 24);
       
       filtered = filtered.filter(correction => {
-        // Si la correction a une date de création/soumission
         if (correction.created_at || correction.submission_date) {
           const correctionDate = new Date(correction.created_at || correction.submission_date);
           return correctionDate >= recentDate;
@@ -238,8 +304,12 @@ export const CorrectionsProvider: React.FC<CorrectionsProviderProps> = ({
       });
     }
     
-    // Appliquer le tri
-    filtered.sort((a, b) => {
+    return filtered;
+  };
+  
+  // Fonction pour appliquer le tri
+  const applySorting = (data: Correction[]) => {
+    return [...data].sort((a, b) => {
       let comparison = 0;
       
       switch (sortOptions.field) {
@@ -253,7 +323,6 @@ export const CorrectionsProvider: React.FC<CorrectionsProviderProps> = ({
           comparison = a.class_name.localeCompare(b.class_name);
           break;
         case 'grade':
-          // Calcul des notes avec pénalité si elle existe
           const gradeA = a.penality !== undefined && a.penality !== null ? 
             Math.max(0, a.grade - a.penality) : a.grade;
           const gradeB = b.penality !== undefined && b.penality !== null ? 
@@ -268,18 +337,57 @@ export const CorrectionsProvider: React.FC<CorrectionsProviderProps> = ({
       
       return sortOptions.direction === 'asc' ? comparison : -comparison;
     });
-    
-    setFilteredCorrections(filtered);
-  }, [corrections, filters, activeFilters, sortOptions]);
-
-  // Effet pour récupérer les étudiants du sous-groupe quand le filtre change
+  };
+  
+  // Effet principal pour le filtrage et le tri
   useEffect(() => {
-    // Si un filtre de sous-groupe est actif et qu'une classe est sélectionnée
+    if (!corrections.length) return;
+    
+    // Étape 1: Appliquer tous les filtres sauf le filtre par sous-classe
+    let filtered = applyAllFiltersExceptSubClass(corrections);
+    // Étape 2: Appliquer le filtre de sous-classe si nécessaire
+    if (filters.subClassId && activeFilters.includes('subClassId') && subClassStudentIds.length > 0) {
+      filtered = filtered.filter(correction => 
+        subClassStudentIds.includes(correction.student_id)
+      );
+    }
+    
+    // Étape 3: Appliquer le tri
+    filtered = applySorting(filtered);
+    
+    // Mettre à jour l'état des corrections filtrées
+    setFilteredCorrections(filtered);
+    
+    // Mise à jour des métadonnées basée sur les corrections filtrées
+    // Cela garantit que les listes déroulantes de filtres contiennent uniquement les valeurs pertinentes
+    if (activeFilters.includes('classId') && !activeFilters.includes('studentId')) {
+      // Si un filtre de classe est actif mais pas de filtre étudiant,
+      // mettre à jour la liste des étudiants disponibles pour cette classe
+      const students = new Map();
+      
+      
+      filtered.forEach((correction: Correction) => {
+        if (correction.student_id) {
+          students.set(correction.student_id, {
+            id: correction.student_id,
+            name: correction.student_name
+          });
+        }
+      });
+      
+      // Mettre à jour seulement la liste des étudiants, garder les autres métadonnées inchangées
+      setMetaData(prev => ({
+        ...prev,
+        students: Array.from(students.values())
+      }));
+    }
+  }, [corrections, filters, activeFilters, sortOptions, subClassStudentIds]);
+
+  // Effet pour récupérer les étudiants du sous-groupe
+  useEffect(() => {
     if (filters.subClassId && activeFilters.includes('subClassId') && filters.classId) {
       const groupNumber = parseInt(filters.subClassId);
       
-      
-      // Récupérer les étudiants de la classe
       fetch(`/api/classes/${filters.classId}/students`)
         .then(response => response.json())
         .then(students => {
@@ -291,22 +399,15 @@ export const CorrectionsProvider: React.FC<CorrectionsProviderProps> = ({
           // Récupérer les IDs des étudiants dans ce sous-groupe
           const studentIdsInGroup = studentsInGroup.map((student: Student) => student.id);
           
-          
-          // Appliquer le filtrage sur les corrections
-          if (corrections.length) {
-            const filtered = corrections.filter(correction => {
-              // Ne garder que les corrections des étudiants de ce sous-groupe
-
-              return studentIdsInGroup.includes(correction.student_id);
-            });
-            
-            // Appliquer les autres filtres à ces corrections filtrées
-            setFilteredCorrections(filtered);
-          }
+          // Stocker ces IDs pour être utilisés dans l'effet principal
+          setSubClassStudentIds(studentIdsInGroup);
         })
         .catch(err => console.error('Erreur lors de la récupération des étudiants:', err));
+    } else {
+      // Réinitialiser si le filtre est désactivé
+      setSubClassStudentIds([]);
     }
-  }, [filters.subClassId, filters.classId, activeFilters, corrections]);
+  }, [filters.subClassId, filters.classId, activeFilters]);
   
   // Appliquer un filtre
   const applyFilter = (filterName: string) => {
@@ -322,7 +423,8 @@ export const CorrectionsProvider: React.FC<CorrectionsProviderProps> = ({
     // Aussi effacer la valeur du filtre
     setFilters(prev => ({
       ...prev,
-      [filterName]: filterName.includes('date') ? null : ''
+      [filterName]: filterName.includes('date') ? null : 
+                   filterName === 'showInactive' ? false : ''
     }));
   };
   
@@ -340,7 +442,8 @@ export const CorrectionsProvider: React.FC<CorrectionsProviderProps> = ({
       maxGrade: '',
       recent: false,
       correctionId: '',
-      subClassId: ''
+      subClassId: '',
+      showInactive: false
     });
   };
   
@@ -408,9 +511,7 @@ export const CorrectionsProvider: React.FC<CorrectionsProviderProps> = ({
   const refreshCorrections = useCallback(async () => {
     try {
       setLoading(true);
-      // Fix: fetchCorrections() doesn't return a value, it updates state internally
       await fetchCorrections();
-      // No need to set corrections here as fetchCorrections already does that
       setError(null);
     } catch (err) {
       setError(err as Error);
@@ -437,7 +538,7 @@ export const CorrectionsProvider: React.FC<CorrectionsProviderProps> = ({
     removeFilter,
     clearAllFilters,
     refreshData,
-    refreshCorrections // Add the refresh function to the context
+    refreshCorrections
   };
   
   return (

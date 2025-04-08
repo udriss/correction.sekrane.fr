@@ -3,6 +3,8 @@
 import React from 'react';
 import { SnackbarProvider } from 'notistack';
 import { ThemeProvider } from '@/theme/ThemeContext';
+import IconButton from '@mui/material/IconButton';
+import CloseIcon from '@mui/icons-material/Close';
 
 export function Providers({ children }: { children: React.ReactNode }) {
   return (
@@ -16,6 +18,16 @@ export function Providers({ children }: { children: React.ReactNode }) {
           maxWidth: '80vw', 
           wordBreak: 'break-word' 
         }}
+        // Ensure all snackbars have a close button
+        action={(key) => (
+          <React.Fragment>
+            <IconButton size="small" onClick={() => {/* @ts-ignore */ 
+              globalThis.notistack?.closeSnackbar(key)
+            }} sx={{ color: 'white' }}>
+              <CloseIcon fontSize="small" />
+            </IconButton>
+          </React.Fragment>
+        )}
       >
         {children}
       </SnackbarProvider>

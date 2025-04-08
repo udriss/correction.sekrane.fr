@@ -21,17 +21,22 @@ export async function GET(request: NextRequest) {
     // Récupérer les paramètres de filtre
     const url = new URL(request.url);
     const classId = url.searchParams.get('classId');
-    const subClassId = url.searchParams.get('subClassId'); // Ajout du filtre de sous-classe
+    const subClassId = url.searchParams.get('subClassId');
     const activityId = url.searchParams.get('activityId');
     const studentId = url.searchParams.get('studentId');
+    const showInactive = url.searchParams.get('showInactive') === 'true';
     
     // Create filter objects for different queries
     const filters = {
       classId,
-      subClassId, // Ajout du filtre de sous-classe
+      subClassId,
       activityId,
-      studentId
+      studentId,
+      showInactive
     };
+
+    // Condition pour filtrer les corrections inactives
+    const activeCondition = showInactive ? '' : 'c.active = 1';
 
     // 1. Récupération des statistiques globales des corrections
     // For global stats, we need to join with other tables to apply class filter
@@ -49,8 +54,14 @@ export async function GET(request: NextRequest) {
         corrections c
     `;
 
+
     let globalWhereConditions = [];
     let globalParams: any[] = [];
+
+    // Ajout du filtre d'activité
+    if (!showInactive) {
+      globalWhereConditions.push('c.active = 1');
+    }
 
     // For global stats, we need to add joins if filtering by class
     if (classId) {
@@ -103,6 +114,11 @@ export async function GET(request: NextRequest) {
 
     let gradeDistWhereConditions = [];
     let gradeDistParams: any[] = [];
+
+    // Ajout du filtre d'activité
+    if (!showInactive) {
+      gradeDistWhereConditions.push('c.active = 1');
+    }
 
     // Add joins if filtering by class
     if (classId) {
@@ -169,18 +185,23 @@ export async function GET(request: NextRequest) {
     let activityWhereConditions = [];
     let activityParams: any[] = [];
 
+    // Filtre pour les corrections actives
+    if (!showInactive) {
+      activityWhereConditions.push('(c.active = 1 OR c.active IS NULL)');
+    }
+
     // Add joins if filtering by class
     if (classId) {
       activityStatsQuery += `
         LEFT JOIN students s ON c.student_id = s.id
         LEFT JOIN class_students cs ON s.id = cs.student_id
       `;
-      activityWhereConditions.push('cs.class_id = ?');
+      activityWhereConditions.push('(cs.class_id = ? OR c.id IS NULL)');
       activityParams.push(classId);
       
       // Add sub-class filter if provided
       if (subClassId) {
-        activityWhereConditions.push('cs.sub_class = ?');
+        activityWhereConditions.push('(cs.sub_class = ? OR c.id IS NULL)');
         activityParams.push(subClassId);
       }
     }
@@ -191,7 +212,7 @@ export async function GET(request: NextRequest) {
     }
 
     if (studentId) {
-      activityWhereConditions.push('c.student_id = ?');
+      activityWhereConditions.push('(c.student_id = ? OR c.id IS NULL)');
       activityParams.push(studentId);
     }
 
@@ -229,6 +250,11 @@ export async function GET(request: NextRequest) {
     let classWhereConditions = [];
     let classParams: any[] = [];
 
+    // Filtre pour les corrections actives
+    if (!showInactive) {
+      classWhereConditions.push('(c.active = 1 OR c.id IS NULL)');
+    }
+
     if (classId) {
       classWhereConditions.push('cl.id = ?');
       classParams.push(classId);
@@ -241,12 +267,12 @@ export async function GET(request: NextRequest) {
     }
 
     if (activityId) {
-      classWhereConditions.push('c.activity_id = ?');
+      classWhereConditions.push('(c.activity_id = ? OR c.id IS NULL)');
       classParams.push(activityId);
     }
 
     if (studentId) {
-      classWhereConditions.push('c.student_id = ?');
+      classWhereConditions.push('(c.student_id = ? OR c.id IS NULL)');
       classParams.push(studentId);
     }
 
@@ -275,6 +301,11 @@ export async function GET(request: NextRequest) {
 
     let gradeEvolWhereConditions = ['c.submission_date IS NOT NULL'];
     let gradeEvolParams: any[] = [];
+
+    // Filtre pour les corrections actives
+    if (!showInactive) {
+      gradeEvolWhereConditions.push('c.active = 1');
+    }
 
     // Add joins if filtering by class
     if (classId) {
@@ -327,6 +358,11 @@ export async function GET(request: NextRequest) {
 
     let topActWhereConditions = [];
     let topActParams: any[] = [];
+
+    // Filtre pour les corrections actives
+    if (!showInactive) {
+      topActWhereConditions.push('c.active = 1');
+    }
 
     // Add joins if filtering by class
     if (classId) {
@@ -419,6 +455,44 @@ export async function GET(request: NextRequest) {
       students = await query<any[]>(studentsQuery, studentsParams);
     }
 
+    // 8. Récupérer le nombre total d'activités inactives
+    let inactiveCountQuery = `
+      SELECT COUNT(*) as count
+      FROM corrections
+      WHERE active = 0
+    `;
+    
+    let inactiveCountParams: any[] = [];
+    
+    if (classId) {
+      inactiveCountQuery += `
+        AND student_id IN (
+          SELECT student_id 
+          FROM class_students 
+          WHERE class_id = ?
+      `;
+      inactiveCountParams.push(classId);
+      
+      if (subClassId) {
+        inactiveCountQuery += ` AND sub_class = ?`;
+        inactiveCountParams.push(subClassId);
+      }
+      
+      inactiveCountQuery += `)`;
+    }
+    
+    if (activityId) {
+      inactiveCountQuery += ` AND activity_id = ?`;
+      inactiveCountParams.push(activityId);
+    }
+    
+    if (studentId) {
+      inactiveCountQuery += ` AND student_id = ?`;
+      inactiveCountParams.push(studentId);
+    }
+    
+    const inactiveCount = await query<any[]>(inactiveCountQuery, inactiveCountParams);
+
     return NextResponse.json({
       globalStats: globalStats[0] || {},
       gradeDistribution,
@@ -426,11 +500,13 @@ export async function GET(request: NextRequest) {
       classStats,
       gradeEvolution,
       topActivities,
+      inactiveCount: inactiveCount[0]?.count || 0,
       metaData: {
         classes,
         activities,
         subClasses,
-        students // Include students in the response
+        students,
+        showInactive // Ajouter l'état actuel du filtre
       }
     });
   } catch (error) {

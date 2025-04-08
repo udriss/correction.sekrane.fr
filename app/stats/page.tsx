@@ -23,6 +23,14 @@ import {
   SelectChangeEvent,
   Badge,
   Menu,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  FormControlLabel,
+  Switch,
 } from '@mui/material';
 import SchoolIcon from '@mui/icons-material/School';
 import PeopleIcon from '@mui/icons-material/People';
@@ -89,11 +97,13 @@ interface StatsData {
     correction_count: number;
     average_grade: number;
   }>;
+  inactiveCount: number; // Nombre de corrections inactives
   metaData?: {
     classes: Array<{id: number, name: string}>;
     activities: Array<{id: number, name: string}>;
     subClasses?: Array<{id: number, name: string}>; // This will now be dynamically generated
     students?: Array<{id: number, name: string}>; // Add students to metaData
+    showInactive?: boolean; // Option pour afficher les corrections inactives
   };
 }
 
@@ -111,6 +121,7 @@ interface FiltersState {
   subClassId: string; // Ajout du filtre de sous-classe
   activityId: string;
   studentId: string;
+  showInactive: boolean; // Nouvel état pour les corrections inactives
 }
 
 export default function StatsPage() {
@@ -127,6 +138,7 @@ export default function StatsPage() {
     subClassId: searchParams?.get('subClassId') || '', // Ajout du filtre de sous-classe
     activityId: searchParams?.get('activityId') || '',
     studentId: searchParams?.get('studentId') || '',
+    showInactive: searchParams?.get('showInactive') === 'true' || false, // Initialiser showInactive
   });
   
   const [activeFilters, setActiveFilters] = useState<string[]>([]);
@@ -148,6 +160,7 @@ export default function StatsPage() {
     if (searchParams?.get('subClassId')) newActiveFilters.push('subClassId'); // Ajout du filtre de sous-classe
     if (searchParams?.get('activityId')) newActiveFilters.push('activityId');
     if (searchParams?.get('studentId')) newActiveFilters.push('studentId');
+    if (searchParams?.get('showInactive') === 'true') newActiveFilters.push('showInactive'); // Ajouter showInactive aux filtres actifs
     
     setActiveFilters(newActiveFilters);
     
@@ -218,13 +231,27 @@ export default function StatsPage() {
     
     // Mise à jour de l'URL
     const newParams = new URLSearchParams(searchParams?.toString());
-    newParams.set(filterName, filters[filterName as keyof FiltersState]);
+    
+    // Gérer correctement la conversion du type booléen en string
+    if (filterName === 'showInactive') {
+      newParams.set(filterName, String(filters.showInactive));
+    } else {
+      // Pour les autres valeurs qui sont déjà des strings
+      newParams.set(filterName, filters[filterName as keyof FiltersState] as string);
+    }
+    
     router.push(`/stats?${newParams.toString()}`);
     
-    handleFilterClose();
-    
-    // Recharger les données avec les nouveaux filtres
-    fetchData();
+    // Ne pas fermer le menu si une classe est sélectionnée pour permettre la sélection de sous-classe
+    if (filterName === 'classId') {
+      // Recharger les données avec les nouveaux filtres mais garder le menu ouvert
+      fetchData();
+    } else {
+      // Fermer le menu seulement si ce n'est pas un filtre de classe
+      handleFilterClose();
+      // Recharger les données avec les nouveaux filtres
+      fetchData();
+    }
   };
   
   // Supprimer un filtre
@@ -266,6 +293,7 @@ export default function StatsPage() {
       subClassId: '',
       activityId: '',
       studentId: '',
+      showInactive: false, // Réinitialiser showInactive
     });
     
     // Mise à jour de l'URL
@@ -288,6 +316,7 @@ export default function StatsPage() {
       if (filters.subClassId) queryParams.append('subClassId', filters.subClassId); // Ajout du filtre de sous-classe
       if (filters.activityId) queryParams.append('activityId', filters.activityId);
       if (filters.studentId) queryParams.append('studentId', filters.studentId);
+      if (filters.showInactive) queryParams.append('showInactive', 'true'); // Ajouter showInactive aux paramètres de requête
       
       const queryString = queryParams.toString();
       if (queryString) {
@@ -527,6 +556,38 @@ export default function StatsPage() {
                       }}
                     />
                   )}
+                  
+                  {/* Affichage du filtre des activités inactives */}
+                  {activeFilters.includes('showInactive') && (
+                    <Chip 
+                      label="Incluant les activités inactives"
+                      onDelete={() => {
+                        // Supprimer le filtre
+                        setFilters(prev => ({...prev, showInactive: false}));
+                        setActiveFilters(activeFilters.filter(f => f !== 'showInactive'));
+                        
+                        // Mettre à jour l'URL
+                        const newParams = new URLSearchParams(searchParams?.toString());
+                        newParams.delete('showInactive');
+                        router.push(`/stats?${newParams.toString()}`);
+                        
+                        // Recharger les données
+                        fetchData();
+                      }}
+                      color="warning"
+                      variant="outlined"
+                      sx={{ 
+                        borderRadius: 3, 
+                        '& .MuiChip-deleteIcon': { 
+                          color: 'warning.light',
+                          '&:hover': { color: 'error.main' } 
+                        },
+                        py: 0.5,
+                        fontWeight: 500,
+                        borderWidth: 1.5
+                      }}
+                    />
+                  )}
                 </Box>
               </Box>
             )}
@@ -686,6 +747,52 @@ export default function StatsPage() {
           </Box>
         )}
         
+        {/* Filtre pour inclure les activités inactives */}
+        <Box sx={{ mb: 2 }}>
+          <FormControlLabel
+            control={
+              <Switch 
+                checked={filters.showInactive}
+                onChange={(e) => {
+                  // Mettre à jour l'état local
+                  setFilters(prev => ({...prev, showInactive: e.target.checked}));
+                  
+                  // Mettre à jour l'URL et recharger les données
+                  const newParams = new URLSearchParams(searchParams?.toString());
+                  if (e.target.checked) {
+                    newParams.set('showInactive', 'true');
+                    if (!activeFilters.includes('showInactive')) {
+                      setActiveFilters([...activeFilters, 'showInactive']);
+                    }
+                  } else {
+                    newParams.delete('showInactive');
+                    setActiveFilters(activeFilters.filter(f => f !== 'showInactive'));
+                  }
+                  
+                  // Naviguer avec la nouvelle URL
+                  router.push(`/stats?${newParams.toString()}`);
+                  
+                  // Fermer le menu
+                  handleFilterClose();
+                  
+                  // Recharger les données
+                  setTimeout(() => fetchData(), 100);
+                }}
+              />
+            }
+            label={
+              <Box sx={{ display: 'flex', flexDirection: 'column' }}>
+                <Typography variant="body2">Inclure les activités inactives</Typography>
+                {(stats?.inactiveCount ?? 0) > 0 && (
+                  <Typography variant="caption" color="text.secondary">
+                    ({stats?.inactiveCount ?? 0} correction{(stats?.inactiveCount ?? 0) > 1 ? 's' : ''} inactive{(stats?.inactiveCount ?? 0) > 1 ? 's' : ''})
+                  </Typography>
+                )}
+              </Box>
+            }
+          />
+        </Box>
+        
         <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 2 }}>
           <Button variant="text" onClick={clearAllFilters}>
             Tout effacer
@@ -702,67 +809,67 @@ export default function StatsPage() {
           <>
             {/* Cartes des KPIs */}
             <Grid container spacing={3} className="mb-6">
-              <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+              <Grid size={{ xs: 12, sm: 6, md: 3.5 }}>
                 <Card className="h-full">
                   <CardContent>
-                    <Typography color="textSecondary" gutterBottom>
-                      Corrections
+                  <Typography variant="overline" color="text.secondary">
+                        Total des corrections effectuées
                     </Typography>
                     <Typography variant="h4" component="div" fontWeight="bold">
                       {stats?.globalStats.total_corrections || 0}
                     </Typography>
-                    <Typography variant="body2" color="text.secondary">
-                      Total des corrections effectuées
-                    </Typography>
+                    <Box sx={{ display: 'flex', flexDirection: 'column' }}>
+                      {(stats?.inactiveCount ?? 0) > 0 && !filters.showInactive && (
+                        <Typography variant="caption" color="warning.main" sx={{ mt: 0.5 }}>
+                          + {stats?.inactiveCount} correction{(stats?.inactiveCount ?? 0) > 1 ? 's' : ''} inactive{(stats?.inactiveCount ?? 0) > 1 ? 's' : ''} non comptabilisée{(stats?.inactiveCount ?? 0) > 1 ? 's' : ''}
+                        </Typography>
+                      )}
+                      {filters.showInactive && (stats?.inactiveCount ?? 0) > 0 && (
+                        <Typography variant="caption" color="warning.main" sx={{ mt: 0.5 }}>
+                          (incluant {stats?.inactiveCount} correction{(stats?.inactiveCount ?? 0) > 1 ? 's' : ''} inactive{(stats?.inactiveCount ?? 0) > 1 ? 's' : ''})
+                        </Typography>
+                      )}
+                    </Box>
                   </CardContent>
                 </Card>
               </Grid>
               
-              <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+              <Grid size={{ xs: 12, sm: 6, md: 2.5 }}>
                 <Card className="h-full">
                   <CardContent>
-                    <Typography color="textSecondary" gutterBottom>
-                      Note moyenne
+                  <Typography variant="overline" color="text.secondary">
+                      Moyenne générale
                     </Typography>
                     <Typography variant="h4" component="div" fontWeight="bold">
                       {stats?.globalStats.average_grade !== undefined && stats?.globalStats.average_grade !== null 
                         ? formatNumber(stats.globalStats.average_grade) 
                         : "N/A"}/20
                     </Typography>
-                    <Typography variant="body2" color="text.secondary">
-                      Moyenne générale
-                    </Typography>
                   </CardContent>
                 </Card>
               </Grid>
               
-              <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+              <Grid size={{ xs: 12, sm: 6, md: 2.5 }}>
                 <Card className="h-full">
                   <CardContent>
-                    <Typography color="textSecondary" gutterBottom>
-                      Étudiants
+                  <Typography variant="overline" color="text.secondary">
+                      Nombre total d'étudiants
                     </Typography>
                     <Typography variant="h4" component="div" fontWeight="bold">
                       {stats?.globalStats.total_students || 0}
                     </Typography>
-                    <Typography variant="body2" color="text.secondary">
-                      Nombre total d'étudiants
-                    </Typography>
                   </CardContent>
                 </Card>
               </Grid>
               
-              <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+              <Grid size={{ xs: 12, sm: 6, md: 2.5 }}>
                 <Card className="h-full">
                   <CardContent>
-                    <Typography color="textSecondary" gutterBottom>
-                      Activités
+                  <Typography variant="overline" color="text.secondary">
+                      Nombre d'activités uniques
                     </Typography>
                     <Typography variant="h4" component="div" fontWeight="bold">
                       {stats?.globalStats.total_activities || 0}
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary">
-                      Nombre total d'activités
                     </Typography>
                   </CardContent>
                 </Card>
@@ -800,7 +907,7 @@ export default function StatsPage() {
                 Comparaison des activités
               </Typography>
               <Box sx={{ height: 400 }}>
-                {stats && <ActivityComparisonChart data={stats.activityStats} />}
+                {stats && <ActivityComparisonChart activityStats={stats.activityStats} />}
               </Box>
             </Paper>
 
@@ -810,34 +917,36 @@ export default function StatsPage() {
                 Détails des activités
               </Typography>
               <Box sx={{ overflowX: 'auto' }}>
-                <table className="min-w-full divide-y divide-gray-200">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Activité</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Corrections</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Note moyenne</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Note max</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Note min</th>
-                    </tr>
-                  </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
-                    {stats?.activityStats.map((activity) => (
-                      <tr key={activity.activity_id}>
-                        <td className="px-6 py-4 whitespace-nowrap">{activity.activity_name}</td>
-                        <td className="px-6 py-4 whitespace-nowrap">{activity.correction_count}</td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          {formatNumber(activity.average_grade)}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          {formatNumber(activity.highest_grade)}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          {formatNumber(activity.lowest_grade)}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+                <TableContainer>
+                  <Table size="small">
+                    <TableHead>
+                      <TableRow>
+                        <TableCell>Activité</TableCell>
+                        <TableCell>Corrections</TableCell>
+                        <TableCell>Note moyenne</TableCell>
+                        <TableCell>Note max</TableCell>
+                        <TableCell>Note min</TableCell>
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {stats?.activityStats.map((activity) => (
+                        <TableRow key={activity.activity_id}>
+                          <TableCell>{activity.activity_name}</TableCell>
+                          <TableCell>{activity.correction_count}</TableCell>
+                          <TableCell>
+                            {formatNumber(activity.average_grade)}
+                          </TableCell>
+                          <TableCell>
+                            {formatNumber(activity.highest_grade)}
+                          </TableCell>
+                          <TableCell>
+                            {formatNumber(activity.lowest_grade)}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </TableContainer>
               </Box>
             </Paper>
           </>
@@ -862,28 +971,30 @@ export default function StatsPage() {
                 Détails des classes
               </Typography>
               <Box sx={{ overflowX: 'auto' }}>
-                <table className="min-w-full divide-y divide-gray-200">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Classe</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Étudiants</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Corrections</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Note moyenne</th>
-                    </tr>
-                  </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
-                    {stats?.classStats.map((cls) => (
-                      <tr key={cls.class_id}>
-                        <td className="px-6 py-4 whitespace-nowrap">{cls.class_name}</td>
-                        <td className="px-6 py-4 whitespace-nowrap">{cls.student_count}</td>
-                        <td className="px-6 py-4 whitespace-nowrap">{cls.correction_count}</td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          {formatNumber(cls.average_grade)}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+                <TableContainer>
+                  <Table size="small">
+                    <TableHead>
+                      <TableRow>
+                        <TableCell>Classe</TableCell>
+                        <TableCell>Étudiants</TableCell>
+                        <TableCell>Corrections</TableCell>
+                        <TableCell>Note moyenne</TableCell>
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {stats?.classStats.map((cls) => (
+                        <TableRow key={cls.class_id}>
+                          <TableCell>{cls.class_name}</TableCell>
+                          <TableCell>{cls.student_count}</TableCell>
+                          <TableCell>{cls.correction_count}</TableCell>
+                          <TableCell>
+                            {formatNumber(cls.average_grade)}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </TableContainer>
               </Box>
             </Paper>
           </>

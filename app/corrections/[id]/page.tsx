@@ -46,6 +46,9 @@ import { FragmentsSidebar } from '@/components/fragments';
 // Importez le composant DuplicateCorrection
 import DuplicateCorrection from '@/components/corrections/DuplicateCorrection';
 
+// Importer le composant CorrectionNotFound
+import CorrectionNotFound from '@/components/corrections/CorrectionNotFound';
+
 export default function CorrectionDetail({ params }: { params: Promise<{ id: string }> }) {
   // Unwrap the Promise for params using React.use in client components
   const { id } = React.use(params);
@@ -91,6 +94,7 @@ export default function CorrectionDetail({ params }: { params: Promise<{ id: str
     editedName,
     isEditingName,
     confirmingDelete,
+    correctionNotFound, // État pour les corrections non trouvées
     setContentItems,
     setError,
     setSuccessMessage,
@@ -701,6 +705,13 @@ export default function CorrectionDetail({ params }: { params: Promise<{ id: str
         error={error} 
         successMessage={''} 
       />
+    );
+  }
+
+  if (correctionNotFound) {
+    console.log('Correction not found');
+    return (
+      <CorrectionNotFound />
     );
   }
 

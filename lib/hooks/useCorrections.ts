@@ -46,6 +46,7 @@ export function useCorrections(correctionId: string) {
   const [saving, setSaving] = useState(false);
   const [savingGrade, setSavingGrade] = useState(false);
   const [error, setError] = useState('');
+  const [correctionNotFound, setCorrectionNotFound] = useState(false); // Nouvel état pour suivre si la correction existe
   const [successMessage, setSuccessMessage] = useState('');
   const [editedName, setEditedName] = useState('');
   const [firstName, setFirstName] = useState('');
@@ -73,12 +74,29 @@ export function useCorrections(correctionId: string) {
   // Load the correction and its content
   const fetchCorrectionData = useCallback(async (onActivityIdCallback?: (activityId: number) => void) => {
     setLoading(true);
+    setCorrectionNotFound(false); // Réinitialiser l'état
     try {
       const response = await fetch(`/api/corrections/${correctionId}`);
-      if (!response.ok) {
-        throw new Error('Failed to fetch correction');
+      
+      // Vérifier si la correction existe
+      if (response.status === 404) {
+        setCorrectionNotFound(true);
+        //setError('Correction introuvable');
+        return;
       }
+      
+      if (!response.ok) {
+        throw new Error('Échec de récupération de la correction');
+      }
+      
       const data = await response.json();
+      
+      // Vérifier si la réponse contient une correction valide
+      if (!data || !data.id) {
+        setCorrectionNotFound(true);
+        //setError('Correction introuvable ou invalide');
+        return;
+      }
       
       setCorrection(data);
       // Extract and set student data from the new structure
@@ -109,7 +127,7 @@ export function useCorrections(correctionId: string) {
       }
     } catch (error) {
       console.error('Error fetching correction:', error);
-      setError('Failed to load correction data.');
+      setError('Échec du chargement des données de correction.');
     } finally {
       setLoading(false);
     }
@@ -286,7 +304,7 @@ export function useCorrections(correctionId: string) {
       });
       
       if (!response.ok) {
-        throw new Error('Failed to update grade');
+        throw new Error('Échec de mise à jour de la note');
       }
       
       const updatedData = await response.json();
@@ -342,7 +360,7 @@ export function useCorrections(correctionId: string) {
   
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.message || 'Failed to save dates');
+        throw new Error(errorData.message || 'Échec de sauvegarde des dates');
       }
   
       const updatedCorrection = await response.json();
@@ -416,6 +434,7 @@ export function useCorrections(correctionId: string) {
     email,
     isEditingName,
     confirmingDelete,
+    correctionNotFound, // Exposer le nouvel état
     setContentItems,
     setError,
     setSuccessMessage,

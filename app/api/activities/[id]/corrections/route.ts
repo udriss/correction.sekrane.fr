@@ -31,11 +31,13 @@ export async function GET(
       const [rows] = await connection.query(
         `SELECT c.*, a.name as activity_name, 
          s.first_name, s.last_name,
-         sc.code as shareCode
+         sc.code as shareCode,
+         cl.name as class_name
          FROM corrections c 
          JOIN activities a ON c.activity_id = a.id 
          LEFT JOIN students s ON c.student_id = s.id
          LEFT JOIN share_codes sc ON c.id = sc.correction_id AND sc.is_active = 1
+         LEFT JOIN classes cl ON c.class_id = cl.id
          WHERE c.activity_id = ? 
          ORDER BY c.created_at DESC`,
         [activityId]

@@ -588,6 +588,8 @@ export default function FAQPage() {
         </Box>
       </Paper>
 
+      <Divider sx={{ my: 6 }} />
+
       {searchTerm && (
         <Box sx={{ mb: 3 }}>
           <Typography variant="subtitle2" color="text.secondary">
@@ -650,29 +652,14 @@ export default function FAQPage() {
                         {item.question}
                       </Typography>
                       {item.underConstruction && (
-                        <Badge 
-                          badgeContent={
-                            <ConstructionIcon 
-                              fontSize="small" 
-                              sx={{ color: 'warning.main' }} 
-                            />
-                          }
-                          sx={{ 
-                            '& .MuiBadge-badge': { 
-                              backgroundColor: 'warning.light',
-                              padding: '4px',
-                              borderRadius: '50%'
-                            } 
-                          }}
-                        >
-                          <Chip 
-                            label="En chantier" 
-                            size="small" 
-                            color="warning" 
-                            variant="outlined"
-                            sx={{ mr: 1 }}
-                          />
-                        </Badge>
+                        <Chip 
+                          icon={<ConstructionIcon fontSize="small" sx={{ color: 'warning.main' }} />}
+                          label="En chantier" 
+                          size="small" 
+                          color="warning" 
+                          variant="outlined"
+                          sx={{ mr: 1 }}
+                        />
                       )}
                     </Box>
                   </AccordionSummary>

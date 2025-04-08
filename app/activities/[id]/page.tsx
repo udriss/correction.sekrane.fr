@@ -13,8 +13,6 @@ import {
   Typography, 
   TextField, 
   CircularProgress, 
-  Alert, 
-  Tooltip, 
   Container, 
   Tabs, 
   Tab, 
@@ -28,10 +26,15 @@ import {
   Box, 
   Grid,
   Divider,
-  List,
-  ListItem,
-  ListItemText,
-  Chip
+  Chip,
+  TableContainer,
+  Table,
+  TableHead,
+  TableRow,
+  TableCell,
+  TableBody,
+  TableFooter,
+  TablePagination
 } from '@mui/material';
 import EditIcon from '@mui/icons-material/Edit';
 import SaveIcon from '@mui/icons-material/Save';
@@ -45,19 +48,22 @@ import RefreshIcon from '@mui/icons-material/Refresh';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import QrCodeIcon from '@mui/icons-material/QrCode';
 import ClassIcon from '@mui/icons-material/Class';
-import GroupsIcon from '@mui/icons-material/Groups';
 import GroupIcon from '@mui/icons-material/Group';
 import ActivityStatsGraphs from '@/components/ActivityStatsGraphs';
 // Import components
 import FragmentsList from '@/components/FragmentsList';
 import CorrectionsList from '@/components/CorrectionsList';
 import ActivityDetails from '@/components/ActivityDetails';
-import H1Title from '@/components/ui/H1Title';
 import GradientBackground from '@/components/ui/GradientBackground';
 // Import the Fragment type from FragmentEditModal
-import FragmentEditModal, { Fragment as EditModalFragment } from '@/components/FragmentEditModal';
+import { Fragment as EditModalFragment } from '@/components/FragmentEditModal';
 // Import QR Code Generator utility
 import { generateQRCodePDF } from '@/utils/qrGeneratorPDF';
+import FirstPageIcon from '@mui/icons-material/FirstPage';
+import KeyboardArrowLeft from '@mui/icons-material/KeyboardArrowLeft';
+import KeyboardArrowRight from '@mui/icons-material/KeyboardArrowRight';
+import LastPageIcon from '@mui/icons-material/LastPage';
+import { useTheme } from '@mui/material/styles';
 
 // Type guard pour vérifier si une correction a un shareCode
 function hasShareCode(correction: Correction): correction is CorrectionWithShareCode {
@@ -146,6 +152,26 @@ export default function ActivityDetail({ params }: { params: Promise<{ id: strin
   // Add state for class students
   const [classStudents, setClassStudents] = useState<Student[]>([]);
   
+  // Pagination states for the corrections table in export tab
+  const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(5);
+  
+  // Calculate empty rows for consistent table height
+  const emptyRows = rowsPerPage > 0 
+    ? Math.max(0, (page + 1) * rowsPerPage - filteredCorrections.length)
+    : 0;
+
+  // Handle page changes
+  const handleChangePage = (event: React.MouseEvent<HTMLButtonElement> | null, newPage: number) => {
+    setPage(newPage);
+  };
+
+  // Handle rows per page changes
+  const handleChangeRowsPerPage = (event: React.ChangeEvent<HTMLInputElement>) => {
+    setRowsPerPage(parseInt(event.target.value, 10));
+    setPage(0);
+  };
+
   useEffect(() => {
     const fetchActivityAndCorrections = async () => {
       try {
@@ -287,9 +313,14 @@ export default function ActivityDetail({ params }: { params: Promise<{ id: strin
       }
     }
     
-    // Ajouter class_name à chaque correction basé sur le class_id
+    // Ajouter class_name à chaque correction basé sur le class_id seulement si non défini
     filtered = filtered.map(correction => {
-      // Rechercher la classe correspondante pour obtenir le nom
+      // Si class_name est déjà défini, le conserver
+      if (correction.class_name) {
+        return correction;
+      }
+      
+      // Sinon, rechercher la classe correspondante pour obtenir le nom
       const classObj = correction.class_id ? classes.find(c => c.id === correction.class_id) : null;
       // Retourner la correction avec class_name ajouté
       return {
@@ -874,6 +905,10 @@ export default function ActivityDetail({ params }: { params: Promise<{ id: strin
                 onDeleteCorrection={handleDeleteCorrection}
                 onConfirmDelete={confirmDeleteCorrection}
                 onCancelDelete={cancelDelete}
+                getStudentFullName={(studentId) => {
+                  const student = students.find(s => s.id === studentId);
+                  return student ? `${student.first_name} ${student.last_name}` : `Étudiant #${studentId}`;
+                }}
               />
             </Box>
           )}
@@ -984,42 +1019,101 @@ export default function ActivityDetail({ params }: { params: Promise<{ id: strin
                     <Typography variant="subtitle2" gutterBottom>
                       Aperçu des corrections sélectionnées:
                     </Typography>
-                    <List dense sx={{ maxHeight: 200, overflow: 'auto', bgcolor: 'background.paper' }}>
-                      {filteredCorrections.slice(0, 10).map((correction) => {
-                        const student = students.find(s => s.id === correction.student_id);
-                        return (
-                          <ListItem key={correction.id} divider>
-                            <ListItemText
-                              primary={student ? `${student.first_name} ${student.last_name}` : `Étudiant #${correction.student_id}`}
-                              secondary={correction.grade !== undefined ? `Note: ${correction.grade}/20` : 'Note non disponible'}
+                    <TableContainer component={Paper} variant="outlined" sx={{ maxHeight: 400, overflow: 'auto' }}>
+                      <Table size="small" stickyHeader>
+                        <TableHead>
+                          <TableRow>
+                            <TableCell sx={{ fontWeight: 'bold' }}>Étudiant</TableCell>
+                            <TableCell sx={{ fontWeight: 'bold' }}>Note</TableCell>
+                            <TableCell sx={{ fontWeight: 'bold' }}>Classe</TableCell>
+                            <TableCell sx={{ fontWeight: 'bold' }}>Sous-groupe</TableCell>
+                            <TableCell sx={{ fontWeight: 'bold' }} align="center">Lien de partage</TableCell>
+                          </TableRow>
+                        </TableHead>
+                        <TableBody>
+                          {(rowsPerPage > 0
+                            ? filteredCorrections.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
+                            : filteredCorrections
+                          ).map((correction) => {
+                            const student = students.find(s => s.id === correction.student_id);
+                            const studentClass = classStudents.find(cs => cs.id === correction.student_id);
+                            
+                            return (
+                              <TableRow key={correction.id} hover>
+                                <TableCell component="th" scope="row">
+                                  {student 
+                                    ? `${student.first_name} ${student.last_name}` 
+                                    : `Étudiant #${correction.student_id}`}
+                                </TableCell>
+                                <TableCell>
+                                  {correction.grade !== undefined 
+                                    ? <Chip 
+                                        size="small" 
+                                        label={`${correction.grade}/20`} 
+                                        color={Number(correction.grade) >= 10 ? "success" : "error"} 
+                                        variant="outlined"
+                                      /> 
+                                    : 'Non noté'}
+                                </TableCell>
+                                <TableCell>
+                                  {correction.class_name || (selectedClass && classes.find(c => c.id === selectedClass)?.name) || '-'}
+                                </TableCell>
+                                <TableCell>
+                                  {studentClass?.sub_class ? `Groupe ${studentClass.sub_class}` : '-'}
+                                </TableCell>
+                                <TableCell align="center">
+                                  {hasShareCode(correction) ? (
+                                    <Chip
+                                      size="small"
+                                      icon={<QrCodeIcon />}
+                                      label="Disponible"
+                                      color="success"
+                                      variant="outlined"
+                                    />
+                                  ) : (
+                                    <Chip
+                                      size="small"
+                                      icon={<QrCodeIcon />}
+                                      label="À générer"
+                                      color="warning"
+                                      variant="outlined"
+                                    />
+                                  )}
+                                </TableCell>
+                              </TableRow>
+                            );
+                          })}
+                          
+                          {/* Ajouter des lignes vides si nécessaire pour maintenir la hauteur constante */}
+                          {rowsPerPage > 0 && filteredCorrections.length > 0 && 
+                            emptyRows > 0 && (
+                            <TableRow style={{ height: 53 * emptyRows }}>
+                              <TableCell colSpan={5} />
+                            </TableRow>
+                          )}
+                        </TableBody>
+                        <TableFooter>
+                          <TableRow>
+                            <TablePagination
+                              rowsPerPageOptions={[5, 10, 25, { label: 'Tous', value: -1 }]}
+                              colSpan={5}
+                              count={filteredCorrections.length}
+                              rowsPerPage={rowsPerPage}
+                              page={page}
+                              SelectProps={{
+                                inputProps: {'aria-label': 'lignes par page'},
+                                native: true,
+                              }}
+                              onPageChange={handleChangePage}
+                              onRowsPerPageChange={handleChangeRowsPerPage}
+                              labelRowsPerPage="Lignes par page"
+                              labelDisplayedRows={({ from, to, count }) => `${from}-${to} sur ${count}`}
+                              ActionsComponent={TablePaginationActions}
                             />
-                            {/* Utiliser une assertion de type ou vérification de propriété pour éviter l'erreur TypeScript */}
-                            {hasShareCode(correction) ? (
-                              <Chip
-                                size="small"
-                                icon={<QrCodeIcon />}
-                                label="Lien de partage prêt"
-                                color="success"
-                                variant="outlined"
-                              />
-                            ) : (
-                              <Chip
-                                size="small"
-                                icon={<QrCodeIcon />}
-                                label="Lien de partage manquant"
-                                color="warning"
-                                variant="outlined"
-                              />
-                            )}
-                          </ListItem>
-                        );
-                      })}
-                      {filteredCorrections.length > 10 && (
-                        <ListItem>
-                          <ListItemText primary={`+ ${filteredCorrections.length - 10} autres corrections...`} />
-                        </ListItem>
-                      )}
-                    </List>
+                          </TableRow>
+                        </TableFooter>
+                      </Table>
+                    </TableContainer>
                   </Box>
                 )}
               </Paper>
@@ -1028,5 +1122,66 @@ export default function ActivityDetail({ params }: { params: Promise<{ id: strin
         </Box>
       </Paper>
     </Container>
+  );
+}
+
+// Composant pour les actions de pagination du tableau
+function TablePaginationActions(props: {
+  count: number;
+  page: number;
+  rowsPerPage: number;
+  onPageChange: (event: React.MouseEvent<HTMLButtonElement> | null, newPage: number) => void;
+}) {
+  const theme = useTheme();
+  const { count, page, rowsPerPage, onPageChange } = props;
+
+  // Fonctions pour la navigation entre les pages
+  const handleFirstPageButtonClick = (event: React.MouseEvent<HTMLButtonElement>) => {
+    onPageChange(event, 0);
+  };
+
+  const handleBackButtonClick = (event: React.MouseEvent<HTMLButtonElement>) => {
+    onPageChange(event, page - 1);
+  };
+
+  const handleNextButtonClick = (event: React.MouseEvent<HTMLButtonElement>) => {
+    onPageChange(event, page + 1);
+  };
+
+  const handleLastPageButtonClick = (event: React.MouseEvent<HTMLButtonElement>) => {
+    onPageChange(event, Math.max(0, Math.ceil(count / rowsPerPage) - 1));
+  };
+
+  return (
+    <Box sx={{ flexShrink: 0, ml: 2.5 }}>
+      <IconButton
+        onClick={handleFirstPageButtonClick}
+        disabled={page === 0}
+        aria-label="première page"
+      >
+        {theme.direction === 'rtl' ? <LastPageIcon /> : <FirstPageIcon />}
+      </IconButton>
+      <IconButton
+        onClick={handleBackButtonClick}
+        disabled={page === 0}
+        aria-label="page précédente"
+      >
+        {theme.direction === 'rtl' ? <KeyboardArrowRight /> : <KeyboardArrowLeft />}
+      </IconButton>
+      <IconButton
+        onClick={handleNextButtonClick}
+        disabled={page >= Math.ceil(count / rowsPerPage) - 1}
+        aria-label="page suivante"
+      >
+        {theme.direction === 'rtl' ? <KeyboardArrowLeft /> : <KeyboardArrowRight />}
+      </IconButton>
+      <IconButton
+        onClick={handleLastPageButtonClick}
+        disabled={page >= Math.ceil(count / rowsPerPage) - 1}
+        aria-label="dernière page"
+      >
+        {theme.direction === 'rtl' ? <FirstPageIcon /> : <LastPageIcon />}
+      </IconButton>
+    </Box>
   );
 }

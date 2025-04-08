@@ -151,21 +151,84 @@ export async function generateCorrectionName(activityId: number): Promise<string
 }
 
 // Nouvelle fonction pour obtenir les statistiques des corrections par activité
-export async function getCorrectionStatsByActivity(activityId: number): Promise<any> {
+export async function getCorrectionStatsByActivity(activityId: number, includeInactive: boolean = false): Promise<any[]> {
   return withConnection(async (connection) => {
-    const [stats] = await connection.query<RowDataPacket[]>(
-      `SELECT 
-        COUNT(*) as total_corrections,
-        AVG(grade) as average_grade,
-        MIN(grade) as min_grade,
-        MAX(grade) as max_grade,
-        SUM(CASE WHEN grade IS NOT NULL THEN 1 ELSE 0 END) as graded_corrections
-      FROM corrections 
-      WHERE activity_id = ?`,
-      [activityId]
-    );
-    
-    return stats[0];
+    // Build the query with class and group data
+    // Note: Nous donnons priorité à class_id quand il est défini, et traitons le groupe 0 comme spécial
+    const query = `
+      SELECT 
+        -- Si class_id est défini, nous utilisons un groupId "spécial" pour indiquer que c'est une classe
+        CASE 
+          WHEN c.class_id IS NOT NULL THEN -1
+          ELSE COALESCE(cg.id, 0)
+        END as groupId,
+        
+        -- Nom du groupe ou indication de classe
+        CASE 
+          WHEN c.class_id IS NOT NULL THEN 
+            CASE 
+              WHEN cs.sub_class IS NOT NULL THEN CONCAT(cl.name, ' - Groupe ', cs.sub_class)
+              ELSE cl.name
+            END
+          WHEN cg.id IS NULL OR cg.id = 0 THEN 'Sans groupe'
+          ELSE cg.name
+        END as groupName,
+        
+        cl.id as classId,
+        cl.name as className,
+        cs.sub_class as subClass,
+        ROUND(AVG(c.grade), 2) as averageGrade,
+        MAX(c.grade) as maxGrade,
+        MIN(c.grade) as minGrade,
+        COUNT(c.id) as count
+      FROM 
+        corrections c
+      LEFT JOIN 
+        correction_groups cg ON c.group_id = cg.id
+      LEFT JOIN 
+        classes cl ON c.class_id = cl.id
+      LEFT JOIN 
+        students s ON c.student_id = s.id
+      LEFT JOIN 
+        class_students cs ON (s.id = cs.student_id AND c.class_id = cs.class_id)
+      WHERE 
+        c.activity_id = ? 
+        ${includeInactive ? '' : 'AND c.active = 1'}
+      GROUP BY 
+        -- Regrouper d'abord par la règle spéciale de priorité
+        CASE 
+          WHEN c.class_id IS NOT NULL THEN -1
+          ELSE COALESCE(cg.id, 0)
+        END,
+        
+        -- Puis le nom de groupe/classe adapté
+        CASE 
+          WHEN c.class_id IS NOT NULL THEN 
+            CASE 
+              WHEN cs.sub_class IS NOT NULL THEN CONCAT(cl.name, ' - Groupe ', cs.sub_class)
+              ELSE cl.name
+            END
+          WHEN cg.id IS NULL OR cg.id = 0 THEN 'Sans groupe'
+          ELSE cg.name
+        END,
+        
+        cl.id, 
+        cl.name,
+        cs.sub_class
+      ORDER BY 
+        -- Les classes d'abord, puis les groupes, puis "Sans groupe" en utilisant les alias du SELECT
+        CASE 
+          WHEN groupId = -1 THEN 1
+          WHEN groupId = 0 THEN 3
+          ELSE 2
+        END,
+        className,
+        subClass,
+        groupName
+    `;
+
+    const [stats] = await connection.query<RowDataPacket[]>(query, [activityId]);
+    return stats as any[];
   });
 }
 

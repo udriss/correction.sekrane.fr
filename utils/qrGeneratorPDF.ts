@@ -1,7 +1,6 @@
 import { jsPDF } from 'jspdf';
 import QRCode from 'qrcode';
 import { Correction, Student, CorrectionWithShareCode } from '@/lib/types';
-import { createLogEntry } from '@/lib/services/logsService';
 
 // Ajout d'une interface pour les activités
 interface Activity {
@@ -37,7 +36,7 @@ function getStudentFullName(studentId: number | null, students: (Student | Simpl
   return `${student.first_name} ${student.last_name}`;
 }
 
-// Fonction utilitaire pour récupérer le nom d'une activité
+// Fonction utilitaire pour récupérer le nom d'une vité
 function getActivityName(activityId: number | null, activities: Activity[]): string {
   if (!activityId) return 'Activité inconnue';
   const activity = activities.find(a => a.id === activityId);
@@ -133,7 +132,25 @@ export async function generateQRCodePDF({
       year: 'numeric'
     });
     doc.text(`${formattedDate}`, 105, 42, { align: 'center' });
-    doc.text(`${corrections.length} corrections`, 105, 48, { align: 'center' });
+    
+    // Compter les corrections actives et inactives
+    const activeCorrections = corrections.filter(c => c.active !== false);
+    const inactiveCorrections = corrections.filter(c => c.active === false);
+    let statusText = `${corrections.length} corrections`;
+    if (inactiveCorrections.length > 0) {
+      statusText += ` (dont ${inactiveCorrections.length} inactives)`;
+    }
+    doc.text(statusText, 105, 48, { align: 'center' });
+    
+    // Ajouter une légende pour les corrections inactives si nécessaire
+    if (inactiveCorrections.length > 0) {
+      doc.setFont('helvetica', 'italic');
+      doc.setFontSize(10);
+      doc.setTextColor(204, 102, 0); // Couleur orange warning
+      doc.text("Les corrections inactives sont marquées \"INACTIVE\"", 105, 55, { align: 'center' });
+      doc.setTextColor(0, 0, 0); // Remettre la couleur noire
+      doc.setFont('helvetica', 'normal');
+    }
     
     // Page dimensions
     const pageWidth = doc.internal.pageSize.getWidth();
@@ -145,7 +162,7 @@ export async function generateQRCodePDF({
     const rowHeight = qrSize + 55; // QR code + espace pour le texte
     
     // Hauteur de l'en-tête sur la première page
-    const headerHeight = 75;
+    const headerHeight = inactiveCorrections.length > 0 ? 80 : 75; // Ajuster si légende présente
     
     // Calcul de l'espace vertical disponible sur la première page
     const availableSpaceFirstPage = pageHeight - headerHeight - margin;
@@ -186,9 +203,20 @@ export async function generateQRCodePDF({
         doc.setFont('helvetica', 'normal');
         doc.setFontSize(12);
         doc.text(subtitle, 105, 28, { align: 'center' });
+        
+        // Ajouter une légende pour les corrections inactives sur chaque page si nécessaire
+        if (inactiveCorrections.length > 0) {
+          doc.setFont('helvetica', 'italic');
+          doc.setFontSize(10);
+          doc.setTextColor(204, 102, 0); // Couleur orange warning
+          doc.text("Les corrections inactives sont marquées \"INACTIVE\"", 105, 38, { align: 'center' });
+          doc.setTextColor(0, 0, 0); // Remettre la couleur noire
+          doc.setFont('helvetica', 'normal');
+        }
       }
       
       const correction = corrections[i];
+      const isActive = correction.active !== 0; // Considérer la correction comme active par défaut
       
       // Get share code for this correction
       let shareCode;
@@ -256,6 +284,40 @@ export async function generateQRCodePDF({
       // Add QR code to PDF
       doc.addImage(qrCodeDataURL, 'PNG', x, y, qrSize, qrSize);
       
+      // Pour les corrections inactives, ajouter un badge distinctif
+      if (!isActive) {
+        // Ajouter un fond orange clair transparent
+        doc.setFillColor(255, 233, 204); // Fond orange très clair
+        doc.roundedRect(x - 2, y - 2, qrSize + 4, qrSize + 4, 2, 2, 'F');
+        
+        // Ajouter une bordure orange
+        doc.setDrawColor(204, 102, 0); // Couleur orange warning
+        doc.setLineWidth(0.5);
+        doc.roundedRect(x - 2, y - 2, qrSize + 4, qrSize + 4, 2, 2, 'S');
+        
+        // Ajouter un badge "INACTIVE"
+        const badgeWidth = 30;
+        const badgeHeight = 8;
+        
+        // Position du badge en bas à droite du QR code
+        const badgeX = x + qrSize - badgeWidth + 2;
+        const badgeY = y + qrSize - badgeHeight + 2;
+        
+        // Dessiner le badge
+        doc.setFillColor(204, 102, 0); // Couleur orange warning
+        doc.roundedRect(badgeX, badgeY, badgeWidth, badgeHeight, 2, 2, 'F');
+        
+        // Ajouter le texte "INACTIVE"
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(8);
+        doc.setTextColor(255, 255, 255); // Texte blanc
+        doc.text("INACTIVE", badgeX + badgeWidth/2, badgeY + badgeHeight/2 + 1, { align: 'center', baseline: 'middle' });
+        
+        // Remettre les couleurs par défaut
+        doc.setDrawColor(0, 0, 0);
+        doc.setTextColor(0, 0, 0);
+      }
+      
       // Add text below QR code
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(12);
@@ -263,14 +325,47 @@ export async function generateQRCodePDF({
       // Récupérer le nom de l'étudiant à partir de son ID et de la liste des étudiants
       const studentName = getStudentFullName(correction.student_id, students);
       
+      // Ajouter une indication visuelle pour les corrections inactives dans le nom
+      if (!isActive) {
+        doc.setTextColor(204, 102, 0); // Couleur orange warning
+      }
+      
       doc.text(studentName, x + qrSize / 2, y + qrSize + 10, { align: 'center' });
       
+      // Remettre la couleur de texte normale
+      doc.setTextColor(0, 0, 0);
       doc.setFont('helvetica', 'normal');
       doc.setFontSize(10);
       
       // Remove http://, https://, and www. prefixes from qrData for display
       const displayUrl = qrData.replace(/^(https?:\/\/)?(www\.)?/i, '');
       doc.text(displayUrl, x + qrSize / 2, y + qrSize + 18, { align: 'center' });
+      
+      // Afficher la note pour les corrections actives
+      if (isActive && correction.grade !== undefined) {
+        const grade = typeof correction.grade === 'number' ? correction.grade.toFixed(1) : correction.grade;
+        doc.setFont('helvetica', 'bold');
+        
+        // Choisir la couleur en fonction de la note
+        if (parseFloat(grade) >= 14) {
+          doc.setTextColor(46, 125, 50); // Vert pour les bonnes notes
+        } else if (parseFloat(grade) >= 10) {
+          doc.setTextColor(25, 118, 210); // Bleu pour les notes moyennes
+        } else {
+          doc.setTextColor(211, 47, 47); // Rouge pour les notes basses
+        }
+        
+        doc.text(`Note: ${grade}/20`, x + qrSize / 2, y + qrSize + 25, { align: 'center' });
+        doc.setTextColor(0, 0, 0); // Remettre la couleur noire
+        doc.setFont('helvetica', 'normal');
+      } else if (!isActive) {
+        // Pour les corrections inactives, afficher un message
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(204, 102, 0); // Couleur orange warning
+        doc.text("Correction inactive", x + qrSize / 2, y + qrSize + 25, { align: 'center' });
+        doc.setTextColor(0, 0, 0); // Remettre la couleur noire
+        doc.setFont('helvetica', 'normal');
+      }
     }
     
     // Add page numbers in French
@@ -305,24 +400,32 @@ export async function generateQRCodePDF({
         .filter(c => c.id !== undefined)
         .map(c => c.id);
       
-      // Créer l'entrée de log
-      await createLogEntry({
-        action_type: 'EXPORT_PDF_QR_CODES',
-        description: `Export PDF des QR codes pour ${corrections.length} corrections - ${activityName} ${subtitle}`,
-        entity_type: 'pdf_export',
-        user_id: userId,
-        username: username,
-        metadata: {
-          file_name: fileName,
-          activity_id: activityId,
-          activity_name: activityName,
-          class_id: classId,
-          class_name: className,
-          corrections_count: corrections.length,
-          correction_ids: correctionIds,
-          pages_count: pageNumber,
-          group_name: group?.name || null
-        }
+      // Créer l'entrée de log via l'API au lieu d'utiliser createLogEntry directement
+      await fetch('/api/logs', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          action_type: 'EXPORT_PDF_QR_CODES',
+          description: `Export PDF des QR codes pour ${corrections.length} corrections - ${activityName} ${subtitle}`,
+          entity_type: 'pdf_export',
+          user_id: userId,
+          username: username,
+          metadata: {
+            file_name: fileName,
+            activity_id: activityId,
+            activity_name: activityName,
+            class_id: classId,
+            class_name: className,
+            corrections_count: corrections.length,
+            active_count: activeCorrections.length,
+            inactive_count: inactiveCorrections.length,
+            correction_ids: correctionIds,
+            pages_count: pageNumber,
+            group_name: group?.name || null
+          }
+        })
       });
     } catch (logError) {
       // Ne pas bloquer l'exécution en cas d'erreur de journalisation

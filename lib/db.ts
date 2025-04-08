@@ -47,7 +47,7 @@ export async function withConnection<T>(
 export default pool;
 
 // Fonction utilitaire pour les requêtes simples
-export async function query<T>(sql: string, params?: any[]): Promise<T> {
+export async function query<T = any[]>(sql: string, params?: any[]): Promise<T> {
   try {
     const [results] = await pool.execute(sql, params);
     // Fix pour l'erreur "Type 'unknown' is not an array type"
@@ -55,6 +55,7 @@ export async function query<T>(sql: string, params?: any[]): Promise<T> {
     if (Array.isArray(results)) {
       return results as T;
     }
+    // Si ce n'est pas un tableau, c'est probablement un objet de résultat
     return results as unknown as T;
   } catch (error) {
     console.error('Database query error:', error);

@@ -1,16 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { Box, Paper, Typography, Chip, IconButton, Checkbox, Tooltip } from '@mui/material';
+import { Box, Paper, Typography, IconButton, Checkbox, Tooltip } from '@mui/material';
 import { alpha } from '@mui/material/styles';
 import EditIcon from '@mui/icons-material/Edit';
 import ShareIcon from '@mui/icons-material/Share';
 import VisibilityIcon from '@mui/icons-material/Visibility';
+import ToggleOnIcon from '@mui/icons-material/ToggleOn';
+import ToggleOffIcon from '@mui/icons-material/ToggleOff';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { Correction } from '@/app/components/CorrectionsDataProvider';
 import { useBatchDelete } from '@/hooks/useBatchDelete';
 import ShareModal from '@/app/components/ShareModal';
-import SchoolIcon from '@mui/icons-material/School';
 import RecentActorsIcon from '@mui/icons-material/RecentActors';
 import CircularProgress from '@mui/material/CircularProgress';
 
@@ -25,6 +26,7 @@ interface CorrectionCardProps {
   showClass?: boolean;
   showStudent?: boolean;
   showActivity?: boolean;
+  onToggleActive?: (correctionId: number, newActiveState: boolean) => Promise<void>;
 }
 
 const CorrectionCard: React.FC<CorrectionCardProps> = ({
@@ -37,7 +39,8 @@ const CorrectionCard: React.FC<CorrectionCardProps> = ({
   showTopLabel,
   showClass = true,
   showStudent = true,
-  showActivity = true
+  showActivity = true,
+  onToggleActive
 }) => {
   const { batchDeleteMode, selectedCorrections, toggleCorrectionSelection, deletingCorrections } = useBatchDelete();
   const isSelected = selectedCorrections.includes(correction.id?.toString() || '');
@@ -47,12 +50,37 @@ const CorrectionCard: React.FC<CorrectionCardProps> = ({
   const [shareCode, setShareCode] = useState<string | null>(null);
   const [shareModalOpen, setShareModalOpen] = useState(false);
   
+  // État pour suivre le statut actif et l'état de chargement
+  const [isActive, setIsActive] = useState<boolean>(correction.active !== undefined ? !!correction.active : true);
+  const [isToggling, setIsToggling] = useState<boolean>(false);
+  
   // S'assurer que shareCode est mis à jour lorsque preloadedShareCode change
   useEffect(() => {
     if (preloadedShareCode) {
       setShareCode(preloadedShareCode);
     }
   }, [preloadedShareCode]);
+  
+  // Update isActive when correction changes
+  useEffect(() => {
+    setIsActive(correction.active !== undefined ? !!correction.active : true);
+  }, [correction.active]);
+  
+  // Handle toggle active status
+  const handleToggleActive = async () => {
+    if (!onToggleActive || !correction.id) return;
+    
+    setIsToggling(true);
+    try {
+      await onToggleActive(correction.id, !isActive);
+      setIsActive(!isActive);
+    } catch (error) {
+      console.error('Error toggling active status:', error);
+      // The state will be updated by the parent component if the API call is successful
+    } finally {
+      setIsToggling(false);
+    }
+  };
   
   // Handle share modal events
   const handleOpenShareModal = () => {
@@ -143,22 +171,29 @@ const CorrectionCard: React.FC<CorrectionCardProps> = ({
           ? alpha(theme.palette.warning.main, 0.5) 
           : (isSelected && batchDeleteMode)
             ? alpha(theme.palette.error.main, 0.7)
-            : alpha(theme.palette.divider, 0.5),
+            : !isActive
+              ? alpha(theme.palette.error.main, 0.7) // Bordure rouge pour les corrections inactives
+              : alpha(theme.palette.divider, 0.5),
         boxShadow: theme => isHighlighted 
           ? `0 0 15px ${alpha(theme.palette.warning.main, 0.4)}` 
           : (isSelected && batchDeleteMode)
             ? `0 0 15px ${alpha(theme.palette.error.main, 0.3)}`
-            : 'none',
+            : !isActive
+              ? `0 0 8px ${alpha(theme.palette.error.light, 0.3)}` // Ajout d'une ombre rouge pour les inactives
+              : 'none',
         '&:hover': {
           transform: 'translateY(-2px)',
           boxShadow: theme => isHighlighted 
             ? `0 5px 20px ${alpha(theme.palette.warning.main, 0.4)}` 
             : (isSelected && batchDeleteMode)
               ? `0 5px 20px ${alpha(theme.palette.error.main, 0.3)}`
-              : '0 5px 15px rgba(0,0,0,0.08)',
+              : !isActive
+                ? `0 5px 15px ${alpha(theme.palette.error.light, 0.4)}` // Ombre au survol pour les inactives
+                : '0 5px 15px rgba(0,0,0,0.08)',
         },
-        opacity: isDeleting ? 0.7 : 1,
-        pointerEvents: isDeleting ? 'none' : 'auto'
+        opacity: isDeleting ? 0.7 : !isActive ? 0.9 : 1, // Augmentation légère de l'opacité pour les inactives
+        pointerEvents: isDeleting ? 'none' : 'auto',
+        bgcolor: theme => !isActive ? alpha(theme.palette.grey[200], 0.7) : undefined, // Fond légèrement plus visible
       }}
     >
       {/* Deletion spinner overlay */}
@@ -196,6 +231,25 @@ const CorrectionCard: React.FC<CorrectionCardProps> = ({
           zIndex: 1
         }}>
           {showTopLabel}
+        </Box>
+      )}
+
+      {/* Inactive label */}
+      {!isActive && (
+        <Box sx={{ 
+          bgcolor: 'grey.500', 
+          color: 'white',
+          py: 0.5, 
+          px: 1.5,
+          fontSize: '0.75rem',
+          fontWeight: 'bold',
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          borderBottomRightRadius: 8,
+          zIndex: 1
+        }}>
+          Inactive
         </Box>
       )}
 
@@ -377,6 +431,30 @@ const CorrectionCard: React.FC<CorrectionCardProps> = ({
                     }}
                   >
                     <ShareIcon fontSize="small" />
+                  </IconButton>
+                </Tooltip>
+              )}
+              
+              {/* Activation toggle button */}
+              {onToggleActive && (
+                <Tooltip title={isActive ? "Désactiver cette correction" : "Activer cette correction"}>
+                  <IconButton
+                    onClick={handleToggleActive}
+                    color={isActive ? "success" : "default"}
+                    size="small"
+                    disabled={isToggling}
+                    sx={{ 
+                      bgcolor: theme => alpha(isActive ? theme.palette.success.main : theme.palette.grey[500], 0.1),
+                      '&:hover': {
+                        bgcolor: theme => alpha(isActive ? theme.palette.success.main : theme.palette.grey[500], 0.2),
+                      }
+                    }}
+                  >
+                    {isToggling ? (
+                      <CircularProgress size={18} color={isActive ? "success" : "inherit"} />
+                    ) : (
+                      isActive ? <ToggleOnIcon fontSize="small" /> : <ToggleOffIcon fontSize="small" />
+                    )}
                   </IconButton>
                 </Tooltip>
               )}

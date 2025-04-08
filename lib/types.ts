@@ -49,6 +49,7 @@ export interface Fragment {
 
 export interface CorrectionWithShareCode extends Correction {
   shareCode?: string | null;
+  class_name?: string; // Ajout de la propriété class_name
 }
 
 export interface Student {

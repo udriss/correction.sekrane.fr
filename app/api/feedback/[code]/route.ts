@@ -18,9 +18,9 @@ export async function GET(
     // Use either auth system, starting with custom auth
     const userId = customUser?.id || session?.user?.id;
     
-    if (!userId) {
-      return NextResponse.json({ error: 'utilisateur non authentifié' }, { status: 401 });
-    }
+    //if (!userId) {
+    //  return NextResponse.json({ error: 'utilisateur non authentifié' }, { status: 401 });
+    //}
 
     // Get the code parameter using the new async pattern
     const { code } = await params;

@@ -3,6 +3,7 @@ import { withConnection } from '@/lib/db';
 import { getServerSession } from "next-auth/next";
 import authOptions from "@/lib/auth";
 import { getUser } from '@/lib/auth';
+import { act } from 'react';
 
 export async function GET(request: NextRequest) {
   try {
@@ -93,8 +94,10 @@ export async function GET(request: NextRequest) {
         deadline: correction.deadline,
         sub_class: correction.sub_class || null,
         shareCode: correction.share_code || null, // Ajout du champ shareCode
-        student_sub_class: correction.student_sub_class || null // Ajout du champ student_sub_class
+        student_sub_class: correction.student_sub_class || null, // Ajout du champ student_sub_class
+        active: correction.active !== undefined ? correction.active : undefined,
       }));
+
 
       return NextResponse.json(formattedCorrections);
     });

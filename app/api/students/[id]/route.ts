@@ -3,6 +3,7 @@ import { query } from '@/lib/db';
 import { getServerSession } from 'next-auth';
 import authOptions from '@/lib/auth';
 import { getUser } from '@/lib/auth';
+import { createLogEntry } from '@/lib/services/logsService';
 
 // Ajouter la méthode GET
 export async function GET(
@@ -103,6 +104,53 @@ export async function DELETE(
       return NextResponse.json({ error: 'Student not found' }, { status: 404 });
     }
 
+    // Get student info for logging
+    const student = students[0];
+    const studentName = `${student.first_name} ${student.last_name}`;
+
+    // Get related corrections before deleting them (for logging purposes)
+    const relatedCorrections = await query<any[]>(`
+      SELECT c.id, c.activity_id, a.name as activity_name, c.grade, c.class_id
+      FROM corrections c
+      LEFT JOIN activities a ON c.activity_id = a.id
+      WHERE c.student_id = ?
+    `, [studentId]);
+    
+    // Delete student's corrections if any
+    if (relatedCorrections && relatedCorrections.length > 0) {
+      // Get correction IDs
+      const correctionIds = relatedCorrections.map(c => c.id);
+      
+      // Delete corrections
+      await query(`
+        DELETE FROM corrections WHERE student_id = ?
+      `, [studentId]);
+      
+      // Log the deletion of corrections
+      await createLogEntry({
+        action_type: 'DELETE_STUDENT_CORRECTIONS',
+        description: `Suppression de ${relatedCorrections.length} correction(s) associée(s) à l'étudiant ${studentName} (ID: ${studentId})`,
+        entity_type: 'student',
+        entity_id: studentId,
+        user_id: typeof userId === 'string' ? parseInt(userId) : userId,
+        username: customUser?.username || session?.user?.name,
+        ip_address: req.headers.get('x-forwarded-for') || req.headers.get('x-real-ip') || 'unknown',
+        metadata: {
+          student_id: studentId,
+          student_name: studentName,
+          deleted_corrections_count: relatedCorrections.length,
+          deleted_correction_ids: correctionIds,
+          correction_details: relatedCorrections.map(c => ({
+            id: c.id,
+            activity_id: c.activity_id,
+            activity_name: c.activity_name,
+            grade: c.grade,
+            class_id: c.class_id
+          }))
+        }
+      });
+    }
+
     // Delete student's class associations first (due to foreign key constraints)
     await query(`
       DELETE FROM class_students WHERE student_id = ?
@@ -113,7 +161,33 @@ export async function DELETE(
       DELETE FROM students WHERE id = ?
     `, [studentId]);
     
-    return NextResponse.json({ success: true });
+    // Log the deletion of the student
+    await createLogEntry({
+      action_type: 'DELETE_STUDENT',
+      description: `Suppression de l'étudiant ${studentName} (ID: ${studentId})`,
+      entity_type: 'student',
+      entity_id: studentId,
+      user_id: typeof userId === 'string' ? parseInt(userId) : userId,
+      username: customUser?.username || session?.user?.name,
+      ip_address: req.headers.get('x-forwarded-for') || req.headers.get('x-real-ip') || 'unknown',
+      metadata: {
+        student_id: studentId,
+        student_name: studentName,
+        student_email: student.email,
+        associated_corrections_count: relatedCorrections?.length || 0
+      }
+    });
+    
+    return NextResponse.json({ 
+      success: true,
+      message: `L'étudiant ${studentName} a été supprimé avec succès, ${
+      relatedCorrections?.length === 0 
+        ? "aucune correction associée" 
+        : relatedCorrections?.length === 1 
+        ? "ainsi qu'une correction associée" 
+        : `ainsi que ${relatedCorrections?.length} corrections associées`
+      }.`
+    });
   } catch (error) {
     console.error('Error deleting student:', error);
     return NextResponse.json(

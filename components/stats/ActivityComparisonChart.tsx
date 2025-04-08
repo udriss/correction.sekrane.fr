@@ -1,72 +1,165 @@
 'use client';
 
 import React from 'react';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, LabelList } from 'recharts';
+import { Bar } from 'react-chartjs-2';
+import {
+  Chart as ChartJS,
+  CategoryScale,
+  LinearScale,
+  BarElement,
+  Title,
+  Tooltip,
+  Legend
+} from 'chart.js';
+import { Box, Paper, Typography, useTheme } from '@mui/material';
 
-interface ActivityData {
-  activity_id: number;
-  activity_name: string;
-  correction_count: number;
-  average_grade: number;
-  highest_grade: number;
-  lowest_grade: number;
-}
+ChartJS.register(
+  CategoryScale,
+  LinearScale,
+  BarElement,
+  Title,
+  Tooltip,
+  Legend
+);
 
 interface ActivityComparisonChartProps {
-  data: ActivityData[];
+  activityStats: Array<{
+    activity_id: number;
+    activity_name: string;
+    correction_count: number;
+    average_grade: number;
+    highest_grade: number;
+    lowest_grade: number;
+  }>;
+  height?: number;
 }
 
-export default function ActivityComparisonChart({ data }: ActivityComparisonChartProps) {
-  // Limiter aux 10 premières activités pour la lisibilité et gérer les valeurs null/undefined
-  const displayData = data.slice(0, 10).map(item => ({
-    ...item,
-    name: item.activity_name.length > 20 ? item.activity_name.substring(0, 20) + '...' : item.activity_name,
-    // S'assurer que toutes les valeurs numériques sont valides
-    average_grade: typeof item.average_grade === 'number' ? item.average_grade : 0,
-    highest_grade: typeof item.highest_grade === 'number' ? item.highest_grade : 0,
-    lowest_grade: typeof item.lowest_grade === 'number' ? item.lowest_grade : 0
-  }));
+const ActivityComparisonChart: React.FC<ActivityComparisonChartProps> = ({ 
+  activityStats,
+  height = 400
+}) => {
+  const theme = useTheme();
+  
+  // Only use the top 10 activities by correction count
+  const topActivities = [...activityStats]
+    .sort((a, b) => b.correction_count - a.correction_count)
+    .slice(0, 10);
+  
+  const chartData = {
+    labels: topActivities.map(activity => {
+      // Truncate activity name if too long
+      const name = activity.activity_name;
+      return name.length > 20 ? name.substring(0, 20) + '...' : name;
+    }),
+    datasets: [
+      {
+        label: 'Note moyenne',
+        data: topActivities.map(activity => activity.average_grade),
+        backgroundColor: theme.palette.primary.main,
+        borderColor: theme.palette.primary.dark,
+        borderWidth: 1,
+      },
+      {
+        label: 'Note maximale',
+        data: topActivities.map(activity => activity.highest_grade),
+        backgroundColor: theme.palette.success.light,
+        borderColor: theme.palette.success.main,
+        borderWidth: 1,
+      },
+      {
+        label: 'Note minimale',
+        data: topActivities.map(activity => activity.lowest_grade),
+        backgroundColor: theme.palette.error.light,
+        borderColor: theme.palette.error.main,
+        borderWidth: 1,
+      }
+    ]
+  };
+
+  const options = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: {
+        position: 'top' as const,
+      },
+      title: {
+        display: true,
+        text: 'Comparaison des notes par activité',
+        font: {
+          size: 16
+        }
+      },
+      tooltip: {
+        callbacks: {
+          label: function(context: any) {
+            let label = context.dataset.label || '';
+            if (label) {
+              label += ': ';
+            }
+            if (context.parsed.y !== null) {
+              label += context.parsed.y.toFixed(2) + '/20';
+            }
+            return label;
+          },
+          title: function(tooltipItems: any) {
+            return tooltipItems[0].label;
+          },
+          afterBody: function(tooltipItems: any) {
+            const idx = tooltipItems[0].dataIndex;
+            const activity = topActivities[idx];
+            return `Nombre de corrections: ${activity.correction_count}`;
+          }
+        }
+      }
+    },
+    scales: {
+      x: {
+        ticks: {
+          autoSkip: false,
+          maxRotation: 45,
+          minRotation: 45
+        }
+      },
+      y: {
+        min: 0,
+        max: 20,
+        ticks: {
+          stepSize: 5
+        },
+        title: {
+          display: true,
+          text: 'Note (/20)'
+        }
+      }
+    }
+  };
+
+  if (!activityStats || activityStats.length === 0) {
+    return (
+      <Paper 
+        sx={{ 
+          p: 3, 
+          height: height, 
+          display: 'flex', 
+          alignItems: 'center', 
+          justifyContent: 'center'
+        }}
+      >
+        <Typography variant="body1" color="text.secondary">
+          Aucune donnée disponible pour les activités
+        </Typography>
+      </Paper>
+    );
+  }
 
   return (
-    <ResponsiveContainer width="100%" height="100%">
-      <BarChart
-        data={displayData}
-        margin={{
-          top: 20,
-          right: 30,
-          left: 20,
-          bottom: 70,
-        }}
-        barGap={0}
-        barSize={25}
-      >
-        <CartesianGrid strokeDasharray="3 3" />
-        <XAxis 
-          dataKey="name" 
-          angle={-45} 
-          textAnchor="end" 
-          tick={{ fontSize: 10 }}
-          height={70}
-        />
-        <YAxis yAxisId="left" orientation="left" label={{ value: 'Note (/20)', angle: -90, position: 'insideLeft' }} domain={[0, 20]} />
-        <YAxis yAxisId="right" orientation="right" label={{ value: 'Nombre', angle: 90, position: 'insideRight' }} />
-        <Tooltip 
-          formatter={(value, name) => {
-            if (value === undefined || value === null) {
-              return ['Non évalué', name];
-            }
-            if (name === 'Corrections') return [`${value}`, name];
-            return [`${Number(value).toFixed(2)}/20`, name];
-          }}
-        />
-        <Legend />
-        <Bar yAxisId="left" dataKey="average_grade" name="Note moyenne" fill="#8884d8" />
-        <Bar yAxisId="left" dataKey="highest_grade" name="Note max" fill="#4CAF50" />
-        <Bar yAxisId="left" dataKey="lowest_grade" name="Note min" fill="#FF5722" />
-        <Bar yAxisId="right" dataKey="correction_count" name="Corrections" fill="#2196F3">
-          <LabelList dataKey="correction_count" position="top" />
-        </Bar>
-      </BarChart>
-    </ResponsiveContainer>
+    <Paper sx={{ p: 3, height: height }}>
+      <Box sx={{ height: '100%', position: 'relative' }}>
+        <Bar data={chartData} options={options} />
+      </Box>
+    </Paper>
   );
-}
+};
+
+export default ActivityComparisonChart;
