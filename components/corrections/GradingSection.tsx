@@ -17,6 +17,8 @@ interface GradingSectionProps {
     saveGradeAndPenalty: (exp: number, theo: number, penalty: number) => void;
   };
   correction: any;
+  // Nouvel argument pour mettre à jour uniquement la pénalité
+  handleUpdatePenalty?: (penalty: number) => Promise<any>;
 }
 
 const GradingSection: React.FC<GradingSectionProps> = ({
@@ -32,7 +34,8 @@ const GradingSection: React.FC<GradingSectionProps> = ({
   saveGradeTimeout,
   setSaveGradeTimeout,
   correctionsHook,
-  correction
+  correction,
+  handleUpdatePenalty
 }) => {
   // État pour le checkbox "Travail non rendu"
   const [neverSubmitted, setNeverSubmitted] = useState(false);
@@ -75,7 +78,7 @@ const GradingSection: React.FC<GradingSectionProps> = ({
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({ 
-            grade: exp + theo,
+            grade: exp + theo - pen,
             experimental_points_earned: exp,
             theoretical_points_earned: theo,
             penalty: pen
@@ -108,6 +111,29 @@ const GradingSection: React.FC<GradingSectionProps> = ({
     setSaveGradeTimeout(timeout);
   };
 
+  // Fonction pour mettre à jour uniquement la pénalité
+  const updatePenaltyOnly = (newPenaltyValue: number) => {
+    // Si la fonction handleUpdatePenalty est disponible, l'utiliser
+    if (handleUpdatePenalty) {
+      handleUpdatePenalty(newPenaltyValue)
+        .then(() => {
+          // Pas besoin de mettre à jour l'UI car le composant parent le fera
+          const event = new CustomEvent('penaltyUpdated', { 
+            detail: { message: 'Pénalité mise à jour' } 
+          });
+          window.dispatchEvent(event);
+        })
+        .catch(err => {
+          console.error('Erreur lors de la mise à jour de la pénalité:', err);
+        });
+    } else {
+      // Fallback à l'ancienne méthode
+      const currentExpGrade = parseFloat(experimentalGrade) || 0;
+      const currentTheoGrade = parseFloat(theoreticalGrade) || 0;
+      saveGradeWithDebounce(currentExpGrade, currentTheoGrade, newPenaltyValue);
+    }
+  };
+
   // Fonction pour appliquer la notation "travail non rendu"
   const handleNeverSubmittedChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const isChecked = event.target.checked;
@@ -124,15 +150,12 @@ const GradingSection: React.FC<GradingSectionProps> = ({
       // Appliquer la pénalité maximale
       setPenalty('15');
       
-      // Sauvegarder avec la pénalité, mais sans modifier les notes
-      saveGradeWithDebounce(currentExpGrade, currentTheoGrade, 15);
+      // Utiliser la fonction dédiée à la mise à jour de la pénalité
+      updatePenaltyOnly(15);
     } else {
       // Si on décoche, enlever la pénalité mais garder les notes
-      const currentExpGrade = parseFloat(experimentalGrade) || 0;
-      const currentTheoGrade = parseFloat(theoreticalGrade) || 0;
-      
       setPenalty('0');
-      saveGradeWithDebounce(currentExpGrade, currentTheoGrade, 0);
+      updatePenaltyOnly(0);
     }
   };
   
@@ -220,8 +243,6 @@ const GradingSection: React.FC<GradingSectionProps> = ({
               onChange={(_, newValue) => {
                 const newGrade = String(newValue);
                 setTheoreticalGrade(newGrade);
-                
-                // Utiliser la nouvelle fonction de sauvegarde optimisée
                 saveGradeWithDebounce(
                   parseFloat(experimentalGrade || '0'),
                   parseFloat(newGrade),
@@ -254,7 +275,6 @@ const GradingSection: React.FC<GradingSectionProps> = ({
 
         {/* Right Side - Penalty and Total */}
         <Grid size={{ xs: 12, md: 4 }}>
-          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3, alignItems: 'center' }}>
             {/* Penalty Section */}
             {isPenaltyEnabled && (
               <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
@@ -267,13 +287,7 @@ const GradingSection: React.FC<GradingSectionProps> = ({
                   onChange={(_, newValue) => {
                     const newPenalty = String(newValue);
                     setPenalty(newPenalty);
-                    
-                    // Utiliser la nouvelle fonction de sauvegarde optimisée
-                    saveGradeWithDebounce(
-                      parseFloat(experimentalGrade || '0'),
-                      parseFloat(theoreticalGrade || '0'),
-                      parseFloat(newPenalty)
-                    );
+                    updatePenaltyOnly(parseFloat(newPenalty));
                   }}
                   min={0}
                   max={16}
@@ -298,7 +312,6 @@ const GradingSection: React.FC<GradingSectionProps> = ({
                 </Typography>
               </Box>
             )}
-          </Box>
         </Grid>
             {/* Total Grade Section */}
             <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
@@ -312,7 +325,7 @@ const GradingSection: React.FC<GradingSectionProps> = ({
                   const theoGrade = parseFloat(theoreticalGrade) || 0;
                   const penaltyValue = isPenaltyEnabled ? (parseFloat(penalty) || 0) : 0;
                   const totalGrade = expGrade + theoGrade - penaltyValue;
-                  return isNaN(totalGrade) ? 0 : Math.max(0, totalGrade);
+                  return isNaN(totalGrade) ? 0 : Math.max(6, totalGrade);
                 })()}
                 max={experimentalPoints + theoreticalPoints}
                 disabled
@@ -334,7 +347,7 @@ const GradingSection: React.FC<GradingSectionProps> = ({
                   const theoGrade = parseFloat(theoreticalGrade) || 0;
                   const penaltyValue = isPenaltyEnabled ? (parseFloat(penalty) || 0) : 0;
                   const totalGrade = expGrade + theoGrade - penaltyValue;
-                  return isNaN(totalGrade) ? 0 : Math.max(0, totalGrade).toFixed(1);
+                  return isNaN(totalGrade) ? 0 : Math.max(6, totalGrade).toFixed(1);
                 })()} / {experimentalPoints + theoreticalPoints}
               </Typography>
             </Box>

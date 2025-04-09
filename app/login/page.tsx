@@ -2,8 +2,9 @@
 
 import React, { useState, FormEvent, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { TextField, Button, Paper, Typography, Box, Alert, CircularProgress } from '@mui/material';
+import { TextField, Button, Paper, Typography, Box, CircularProgress } from '@mui/material';
 import LockOutlinedIcon from '@mui/icons-material/LockOutlined';
+import ErrorDisplay from '@/components/ui/ErrorDisplay';
 
 export default function LoginPage() {
   const [username, setUsername] = useState('');
@@ -91,17 +92,13 @@ export default function LoginPage() {
           Connexion
         </Typography>
 
-        {error && (
-          <Alert severity="error" sx={{ width: '100%', mb: 2 }}>
-            {error}
-          </Alert>
-        )}
+        <ErrorDisplay error={error} onRefresh={() => setError('')} />
 
         <Box 
           component="form" 
           onSubmit={handleSubmit} 
           sx={{ width: '100%' }}
-          method="post" // Ajout explicite de l'attribut method="post"
+          method="post"
         >
           <TextField
             margin="normal"

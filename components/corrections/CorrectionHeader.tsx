@@ -289,7 +289,7 @@ const CorrectionHeader: React.FC<CorrectionHeaderProps> = ({
               <IconButton
                 onClick={handleToggleActive}
                 color={isActive ? "primary" : "default"}
-                title={isActive ? "Désactiver la correction" : "Activer la correction"}
+                // Suppression du title qui est en conflit avec le Tooltip parent
                 size="small"
                 sx={{ ml: 1 }}
               >

@@ -49,6 +49,9 @@ import DuplicateCorrection from '@/components/corrections/DuplicateCorrection';
 // Importer le composant CorrectionNotFound
 import CorrectionNotFound from '@/components/corrections/CorrectionNotFound';
 
+// Import ErrorDisplay component
+import ErrorDisplay from '@/components/ui/ErrorDisplay';
+
 export default function CorrectionDetail({ params }: { params: Promise<{ id: string }> }) {
   // Unwrap the Promise for params using React.use in client components
   const { id } = React.use(params);
@@ -97,6 +100,7 @@ export default function CorrectionDetail({ params }: { params: Promise<{ id: str
     correctionNotFound, // État pour les corrections non trouvées
     setContentItems,
     setError,
+    clearError, // Ajout de clearError
     setSuccessMessage,
     setEditedName,
     setIsEditingName,
@@ -401,6 +405,23 @@ export default function CorrectionDetail({ params }: { params: Promise<{ id: str
     });
   };
 
+  // Add fragment to correction (use this handler with the new component)
+  const handleAddFragmentToCorrection = (fragment: any) => {
+    saveToHistory();
+    
+    // Create completely new items by deep copying the fragment data
+    const newItems = fragment.content.split("\n\n").filter((text: string) => text.trim()).map((text: string) => ({
+      id: `item-${Date.now()}-${Math.random().toString(36).substring(2, 10)}`,
+      type: 'text' as const,
+      content: text.trim(),
+      isFromFragment: true, // Marquer ces items comme provenant d'un fragment
+      originalFragmentId: fragment.id, // Stocker l'ID original du fragment
+      originalContent: text.trim() // Garder une copie du contenu original
+    }));
+    
+    setContentItems(prev => [...prev, ...newItems]);
+  };
+
   // Move an item (for drag and drop)
   const moveItem = (dragIndex: number, hoverIndex: number) => {
     saveToHistory();
@@ -561,7 +582,75 @@ export default function CorrectionDetail({ params }: { params: Promise<{ id: str
     return totalGrade;
   }, [experimentalGrade, theoreticalGrade]);
 
-  // Modify the date change handlers to auto-calculate penalties
+  // Fonction séparée pour gérer uniquement les dates sans toucher aux notes
+  const handleSaveDates = async (deadline: string | null, submission: string | null) => {
+    try {
+      // Appel API dédié aux dates
+      const response = await fetch(`/api/corrections/${correctionId}/dates`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          deadline: deadline,
+          submission_date: submission
+        }),
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to update dates');
+      }
+      
+      const result = await response.json();
+      
+      // Si des dates ont été changées, recalculer la pénalité automatique
+      if (deadline && submission) {
+        calculateAndApplyLatePenalty(dayjs(deadline), dayjs(submission));
+      }
+      
+      // Montrer un message de succès éphémère
+      setSuccessMessage('Dates mises à jour');
+      setTimeout(() => setSuccessMessage(''), 3000);
+      
+      return result;
+    } catch (error) {
+      console.error("Erreur lors de la mise à jour des dates:", error);
+      setError("Erreur lors de la mise à jour des dates");
+      setTimeout(() => setError(''), 5000);
+      throw error;
+    }
+  };
+  
+  // Fonction séparée pour mettre à jour uniquement la pénalité
+  const handleUpdatePenalty = async (penaltyValue: number) => {
+    try {
+      // Appel API dédié à la pénalité
+      const response = await fetch(`/api/corrections/${correctionId}/penalty`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          penalty: penaltyValue
+        }),
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to update penalty');
+      }
+      
+      // Pas besoin de mettre à jour la page complète, juste l'état de la pénalité
+      setPenalty(penaltyValue.toString());
+      setIsPenaltyEnabled(penaltyValue > 0);
+      
+      return await response.json();
+    } catch (error) {
+      console.error("Erreur lors de la mise à jour de la pénalité:", error);
+      throw error;
+    }
+  };
+
+  // Modify the date change handlers to auto-calculate penalties without touching grades
   const handleDeadlineDateChange = (newDate: dayjs.Dayjs | null) => {
     setDeadlineDate(newDate);
     
@@ -573,15 +662,16 @@ export default function CorrectionDetail({ params }: { params: Promise<{ id: str
     // Set a new timeout to save after 1 second of inactivity
     const timeout = setTimeout(() => {
       if (correction) {
-        correctionsHook.saveDates(
+        // Utiliser la nouvelle fonction qui ne touche pas aux notes
+        handleSaveDates(
           newDate ? newDate.format('YYYY-MM-DD') : null,
           submissionDate ? submissionDate.format('YYYY-MM-DD') : null
-        );
-        
-        // Calculate penalty if both dates are set
-        if (newDate && submissionDate) {
-          calculateAndApplyLatePenalty(newDate, submissionDate);
-        }
+        ).then(() => {
+          // Calculate penalty if both dates are set
+          if (newDate && submissionDate) {
+            calculateAndApplyLatePenalty(newDate, submissionDate);
+          }
+        });
       }
     }, 1000);
     
@@ -599,22 +689,23 @@ export default function CorrectionDetail({ params }: { params: Promise<{ id: str
     // Set a new timeout to save after 1 second of inactivity
     const timeout = setTimeout(() => {
       if (correction) {
-        correctionsHook.saveDates(
+        // Utiliser la nouvelle fonction qui ne touche pas aux notes
+        handleSaveDates(
           deadlineDate ? deadlineDate.format('YYYY-MM-DD') : null,
           newDate ? newDate.format('YYYY-MM-DD') : null
-        );
-        
-        // Calculate penalty if both dates are set
-        if (deadlineDate && newDate) {
-          calculateAndApplyLatePenalty(deadlineDate, newDate);
-        }
+        ).then(() => {
+          // Calculate penalty if both dates are set
+          if (deadlineDate && newDate) {
+            calculateAndApplyLatePenalty(deadlineDate, newDate);
+          }
+        });
       }
     }, 1000);
     
     setSaveDateTimeout(timeout);
   };
 
-  // Add a function to calculate and apply late penalty
+  // Modify the function to calculate and apply late penalty to use the new API endpoint
   const calculateAndApplyLatePenalty = (deadlineDate: dayjs.Dayjs, submissionDate: dayjs.Dayjs) => {
     // Calculate days late
     const daysLate = submissionDate.diff(deadlineDate, 'day');
@@ -623,71 +714,39 @@ export default function CorrectionDetail({ params }: { params: Promise<{ id: str
     if (daysLate > 1) {
       const calculatedPenalty = Math.min(15, (daysLate - 1) * 2); // Subtract 1 day of grace period, then 2 points per day
       
-      // Enable penalty and set its value
-      setIsPenaltyEnabled(true);
-      setPenalty(calculatedPenalty.toFixed(1));
-      
-      // Save ONLY the penalty without changing the grades
-      if (correction) {
-        // Get the current experimental and theoretical grades (don't modify them)
-        const currentExpGrade = parseFloat(experimentalGrade || '0');
-        const currentTheoGrade = parseFloat(theoreticalGrade || '0');
-        
-        correctionsHook.saveGradeAndPenalty(
-          currentExpGrade,
-          currentTheoGrade,
-          calculatedPenalty
-        );
-      }
-      
-      // Show notification about automatic penalty
-      setSuccessMessage(`Pénalité de ${calculatedPenalty} points appliquée pour ${daysLate} jours de retard (1 jour de grâce accordé)`);
-      setTimeout(() => setSuccessMessage(''), 5000);
+      // Update only the penalty using the new dedicated endpoint
+      handleUpdatePenalty(calculatedPenalty)
+        .then(() => {
+          // Show notification about automatic penalty
+          setSuccessMessage(`Pénalité de ${calculatedPenalty} points appliquée pour ${daysLate} jours de retard (1 jour de grâce accordé)`);
+          setTimeout(() => setSuccessMessage(''), 5000);
+        })
+        .catch(err => {
+          console.error("Erreur lors de l'application de la pénalité:", err);
+          setError("Erreur lors de l'application de la pénalité");
+          setTimeout(() => setError(''), 5000);
+        });
     } else {
       // If submission is not late or only 1 day late, remove any existing automatic penalty
       if (isPenaltyEnabled) {
-        // Disable penalty checkbox and reset penalty value
-        setIsPenaltyEnabled(false);
-        setPenalty('');
-        
-        // Save the grade without penalty - preserve the current grades
-        if (correction) {
-          const currentExpGrade = parseFloat(experimentalGrade || '0');
-          const currentTheoGrade = parseFloat(theoreticalGrade || '0');
-          
-          correctionsHook.saveGradeAndPenalty(
-            currentExpGrade,
-            currentTheoGrade,
-            0
-          );
-        }
-        
-        // Show notification about penalty removal
-        const message = daysLate === 1 
-          ? 'Jour de grâce accordé : 1 jour de retard sans pénalité' 
-          : 'Pénalité de retard supprimée car le rendu est à temps';
-        
-        setSuccessMessage(message);
-        setTimeout(() => setSuccessMessage(''), 5000);
+        // Update only the penalty to zero using the new dedicated endpoint
+        handleUpdatePenalty(0)
+          .then(() => {
+            // Show notification about penalty removal
+            const message = daysLate === 1 
+              ? 'Jour de grâce accordé : 1 jour de retard sans pénalité' 
+              : 'Pénalité de retard supprimée car le rendu est à temps';
+            
+            setSuccessMessage(message);
+            setTimeout(() => setSuccessMessage(''), 5000);
+          })
+          .catch(err => {
+            console.error("Erreur lors de la suppression de la pénalité:", err);
+            setError("Erreur lors de la suppression de la pénalité");
+            setTimeout(() => setError(''), 5000);
+          });
       }
     }
-  };
-
-  // Add fragment to correction (use this handler with the new component)
-  const handleAddFragmentToCorrection = (fragment: any) => {
-    saveToHistory();
-    
-    // Create completely new items by deep copying the fragment data
-    const newItems = fragment.content.split("\n\n").filter((text: string) => text.trim()).map((text: string) => ({
-      id: `item-${Date.now()}-${Math.random().toString(36).substring(2, 10)}`,
-      type: 'text' as const,
-      content: text.trim(),
-      isFromFragment: true, // Marquer ces items comme provenant d'un fragment
-      originalFragmentId: fragment.id, // Stocker l'ID original du fragment
-      originalContent: text.trim() // Garder une copie du contenu original
-    }));
-    
-    setContentItems(prev => [...prev, ...newItems]);
   };
 
   // Check for loading and error conditions directly
@@ -756,6 +815,12 @@ export default function CorrectionDetail({ params }: { params: Promise<{ id: str
     <DndProvider backend={HTML5Backend}>
       <LocalizationProvider dateAdapter={AdapterDayjs}>
         <Container maxWidth="xl" sx={{ py: 4, px: { xs: 2, sm: 3, md: 4 } }}>
+          {/* Utilisation du composant ErrorDisplay */}
+          <ErrorDisplay 
+            error={error} 
+            onRefresh={clearError}
+          />
+          
           <Zoom in={true} timeout={500}>
             <Paper 
               elevation={3} 
@@ -881,11 +946,17 @@ export default function CorrectionDetail({ params }: { params: Promise<{ id: str
                     />
                   </Box>
                   
+                  {/* Remplacer l'ancien affichage d'erreur par ErrorDisplay */}
+                  <ErrorDisplay 
+                    error={error} 
+                    onRefresh={clearError}
+                  />
+                  
                   {/* Status messages component */}
                   <StatusMessages
                     successMessage={successMessage}
                     copiedMessage={copiedMessage}
-                    error={error}
+                    error={''} // Remplacer error par une chaîne vide puisque nous utilisons ErrorDisplay
                   />
                   {/* Titre de section */}
                   <Typography variant="h6" fontWeight="bold" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
@@ -928,6 +999,8 @@ export default function CorrectionDetail({ params }: { params: Promise<{ id: str
                       setSaveGradeTimeout={setSaveGradeTimeout}
                       correctionsHook={correctionsHook}
                       correction={correction}
+                      // Passer la fonction pour mettre à jour uniquement la pénalité
+                      handleUpdatePenalty={handleUpdatePenalty}
                     />
                   </Card>
                 </Box>

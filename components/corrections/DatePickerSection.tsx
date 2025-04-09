@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Box, Alert, Typography } from '@mui/material';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import dayjs from 'dayjs';
@@ -16,6 +16,29 @@ const DatePickerSection: React.FC<DatePickerSectionProps> = ({
   handleDeadlineDateChange,
   handleSubmissionDateChange,
 }) => {
+  // État local pour suivre si les dates ont été modifiées depuis le dernier rendu
+  const [datesChanged, setDatesChanged] = useState(false);
+
+  // Wrapper pour le changement de deadline qui marque les dates comme modifiées
+  const onDeadlineChange = (newDate: dayjs.Dayjs | null) => {
+    setDatesChanged(true);
+    handleDeadlineDateChange(newDate);
+  };
+
+  // Wrapper pour le changement de date de rendu qui marque les dates comme modifiées
+  const onSubmissionChange = (newDate: dayjs.Dayjs | null) => {
+    setDatesChanged(true);
+    handleSubmissionDateChange(newDate);
+  };
+
+  // Calculer le nombre de jours de retard (pour l'affichage uniquement)
+  const daysLate = React.useMemo(() => {
+    if (deadlineDate && submissionDate) {
+      return submissionDate.diff(deadlineDate, 'day');
+    }
+    return 0;
+  }, [deadlineDate, submissionDate]);
+
   return (
     <>
       <div className="flex flex-wrap justify-around gap-4 mb-2">
@@ -23,7 +46,7 @@ const DatePickerSection: React.FC<DatePickerSectionProps> = ({
           <DatePicker
             label="Date limite de rendu"
             value={deadlineDate}
-            onChange={handleDeadlineDateChange}
+            onChange={onDeadlineChange}
             slotProps={{ 
               textField: { 
                 size: 'small',
@@ -36,7 +59,7 @@ const DatePickerSection: React.FC<DatePickerSectionProps> = ({
           <DatePicker
             label="Date de rendu effective"
             value={submissionDate}
-            onChange={handleSubmissionDateChange}
+            onChange={onSubmissionChange}
             slotProps={{ 
               textField: { 
                 size: 'small',
@@ -51,20 +74,20 @@ const DatePickerSection: React.FC<DatePickerSectionProps> = ({
         {deadlineDate && submissionDate && submissionDate.isAfter(deadlineDate) && (
           <Box className="flex items-center">
             <Alert 
-              severity={submissionDate.diff(deadlineDate, 'day') > 1 ? "error" : "warning"}
+              severity={daysLate > 1 ? "error" : "warning"}
               sx={{ py: 0.5 }}
             >
               <div>
-                {submissionDate.diff(deadlineDate, 'day') === 1 ? (
+                {daysLate === 1 ? (
                   <Typography>
                     Rendu en retard de 1 jour (jour de grâce accordé, sans pénalité)
                   </Typography>
                 ) : (
                   <>
-                    Rendu en retard de {submissionDate.diff(deadlineDate, 'day')} jours
-                    {submissionDate.diff(deadlineDate, 'day') > 1 && (
+                    Rendu en retard de {daysLate} jours
+                    {daysLate > 1 && (
                       <Typography component="span" fontWeight="bold" sx={{ ml: 1 }}>
-                        (Pénalité automatique de {Math.min(15, (submissionDate.diff(deadlineDate, 'day') - 1) * 2)} points)
+                        (Pénalité automatique de {Math.min(15, (daysLate - 1) * 2)} points)
                       </Typography>
                     )}
                   </>

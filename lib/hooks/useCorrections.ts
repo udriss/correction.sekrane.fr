@@ -3,6 +3,8 @@ import { Correction } from '@/lib/types';
 import { ContentItem } from '@/types/correction';
 import * as correctionService from '../services/correctionService';
 import { useRouter } from 'next/navigation';
+// Import du composant ErrorDisplay
+import ErrorDisplay from '@/components/ui/ErrorDisplay';
 
 // Define the ContentData interface here or import it to ensure consistency
 interface ContentData {
@@ -163,6 +165,7 @@ export function useCorrections(correctionId: string) {
       }, 3000);
     } catch (err) {
       console.error('Erreur:', err);
+      // Utilisation du composant ErrorDisplay au lieu de setError
       setError('Erreur lors de la sauvegarde de la correction');
     } finally {
       setSaving(false);
@@ -464,6 +467,11 @@ export function useCorrections(correctionId: string) {
     setEditedName(`${first} ${last}`.trim());
   }, []);
 
+  // Fonction pour effacer l'erreur (nécessaire pour ErrorDisplay)
+  const clearError = useCallback(() => {
+    setError('');
+  }, []);
+
   return {
     correction,
     contentItems,
@@ -499,5 +507,6 @@ export function useCorrections(correctionId: string) {
     handleCancelDelete,
     saveGradeAndPenalty,
     saveDates,
+    clearError, // Ajout de la fonction clearError
   };
 }

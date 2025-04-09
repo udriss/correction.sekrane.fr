@@ -285,6 +285,9 @@ export default function FeedbackViewer({ params }: { params: Promise<{ code: str
   const isMoreThanOneDayLate = daysLate > 1;
   const isOnTime = !isLate && correction.deadline && correction.submission_date;
 
+
+  console.log(correction);
+  
   return (
     <Box 
       className={inter.className} 

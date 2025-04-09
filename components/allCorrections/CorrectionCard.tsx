@@ -114,7 +114,7 @@ const CorrectionCard: React.FC<CorrectionCardProps> = ({
   
   // Calculer la note avec la pénalité si elle existe
   const gradeWithPenalty = hasPenalty && correction.penality !== undefined && correction.penality !== null
-    ? Math.max(0, correction.grade - correction.penality) 
+    ? Math.max(0, correction.grade) 
     : correction.grade;
     
   // Normaliser la note sur 20

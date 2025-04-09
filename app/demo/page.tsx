@@ -68,7 +68,7 @@ export default function DemoPage() {
   const [experimentalGrade, setExperimentalGrade] = useState('3.5');
   const [theoreticalGrade, setTheoreticalGrade] = useState('12.5');
   const [isPenaltyEnabled, setIsPenaltyEnabled] = useState(true);
-  const [penalty, setPenalty] = useState('6.0');
+  const [penalty, setPenalty] = useState('0.0');
   const [saveGradeTimeout, setSaveGradeTimeout] = useState<NodeJS.Timeout | null>(null);
   
   const experimentalPoints = 5;
@@ -83,7 +83,7 @@ export default function DemoPage() {
   const calculateFinalGrade = () => {
     const totalGrade = calculateTotalGrade();
     const penaltyValue = isPenaltyEnabled ? parseFloat(penalty || '0') : 0;
-    return Math.max(0, totalGrade - penaltyValue).toFixed(1);
+    return Math.max(6, totalGrade - penaltyValue).toFixed(1);
   };
 
   // Mock functions that do nothing

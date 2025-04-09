@@ -1,126 +1,159 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { withConnection } from '@/lib/db';
-import authOptions from "@/lib/auth";
 import { getUser } from '@/lib/auth';
-import { getServerSession } from "next-auth/next";
+import { createLogEntry } from '@/lib/services/logsService';
+import { RowDataPacket } from 'mysql2';
 
+// Définir une interface pour le type Correction
+interface CorrectionRow extends RowDataPacket {
+  id: number;
+  experimental_points_earned: number | null | string;
+  theoretical_points_earned: number | null | string;
+  penalty: number | null | string;
+  grade: number | null | string;
+  activity_id?: number;
+  student_id?: number;
+  [key: string]: any;
+}
 
 export async function PUT(
   request: NextRequest,
-  { params }: { params: Promise<Record<string, string>> }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const user = await getUser(request);
+    if (!user) {
+      return NextResponse.json({ error: 'Non autorisé' }, { status: 401 });
+    }
 
-    // Get the user from both auth systems
-    const session = await getServerSession(authOptions);
-    const customUser = await getUser();
+    // Récupérer l'ID de la correction à dupliquer
+    const { id } = await params;
+    const correctionId = parseInt(id);
     
-    // Use either auth system, starting with custom auth
-    const userId = customUser?.id || session?.user?.id;
-    
-    if (!userId) {
-      return NextResponse.json({ error: 'utilisateur non authentifié' }, { status: 401 });
+    const data = await request.json();
+    const { experimental_points_earned, theoretical_points_earned, penalty, grade } = data;
+
+    // Vérifier que les valeurs sont valides
+    if ((experimental_points_earned === undefined || isNaN(parseFloat(String(experimental_points_earned)))) && 
+        (theoretical_points_earned === undefined || isNaN(parseFloat(String(theoretical_points_earned)))) &&
+        (grade === undefined || isNaN(parseFloat(String(grade))))) {
+      return NextResponse.json({ error: 'Données de notation invalides' }, { status: 400 });
     }
 
-    const { id } = await Promise.resolve(params);
-    const correctionId = parseInt(id, 10);
-    
-    const body = await request.json();
-    const { 
-      grade, 
-      experimental_points_earned,
-      theoretical_points_earned,
-      penalty 
-    } = body;
-
-
-        // Validate the data
-    if (
-      (grade === undefined || grade === null) && 
-      (experimental_points_earned === undefined || experimental_points_earned === null) &&
-      (theoretical_points_earned === undefined || theoretical_points_earned === null)
-    ) {
-      return NextResponse.json(
-        { error: 'At least one of grade, experimental_points_earned, or theoretical_points_earned must be provided' },
-        { status: 400 }
-      );
-    }
-
-    // S'assurer que toutes les valeurs sont des nombres valides
-    const gradeValue = parseFloat(Number(grade).toFixed(1));
-    const expPoints = parseFloat(Number(experimental_points_earned).toFixed(1));
-    const theoPoints = parseFloat(Number(theoretical_points_earned).toFixed(1));
-    const penaltyValue = parseFloat(Number(penalty).toFixed(1));
-
-    // Prepare update fields and values for MySQL style query (using ? placeholders)
-    const updateFields: string[] = [];
-    const values: (number | string | null)[] = [];
-
-    // Only update fields that are provided in the request
-    if (expPoints !== undefined && !isNaN(expPoints)) {
-      updateFields.push(`experimental_points_earned = ?`);
-      values.push(expPoints);
-    }
-
-    if (theoPoints !== undefined && !isNaN(theoPoints)) {
-      updateFields.push(`theoretical_points_earned = ?`);
-      values.push(theoPoints);
-    }
-
-    // Always update the total grade if valid
-    if (gradeValue !== undefined && !isNaN(gradeValue)) {
-      updateFields.push(`grade = ?`);
-      values.push(gradeValue);
-    }
-
-    // Handle penalty separately - could be 0 which is falsy
-    if (penaltyValue !== undefined) {
-      if (penaltyValue <= 0 || isNaN(penaltyValue)) {
-        // If penalty is 0, negative, or invalid, set it to NULL
-        updateFields.push(`penalty = NULL`);
-      } else {
-        // Otherwise set it to the provided value
-        updateFields.push(`penalty = ?`);
-        values.push(penaltyValue);
-      }
-    }
-
-    // Always update the timestamp
-    updateFields.push(`updated_at = NOW()`);
-
-    // Build the SQL query for MySQL
-    const updateQuery = `
-      UPDATE corrections
-      SET ${updateFields.join(', ')}
-      WHERE id = ?
-    `;
-    
-    // Add the correction ID to the values array at the end (for the WHERE clause)
-    values.push(correctionId);
-    
     return await withConnection(async (connection) => {
-      // Use the updateQuery and values array we built above
-      await connection.query(updateQuery, values);
+      // Récupérer l'ancienne correction pour le logging et les calculs
+      const [oldCorrectionResult] = await connection.query<CorrectionRow[]>(
+        'SELECT * FROM corrections WHERE id = ?',
+        [id]
+      );
+      
+      const oldCorrection = Array.isArray(oldCorrectionResult) && oldCorrectionResult.length > 0
+        ? oldCorrectionResult[0]
+        : null;
+        
+      if (!oldCorrection) {
+        return NextResponse.json({ error: 'Correction non trouvée' }, { status: 404 });
+      }
+
+      // Déterminer les champs à mettre à jour
+      const fieldsToUpdate: string[] = [];
+      const params: any[] = [];
+      
+      // Fonction utilitaire pour extraire un nombre depuis une valeur potentiellement null
+      const parseNumberSafely = (value: number | string | null | undefined): number => {
+        if (value === null || value === undefined) return 0;
+        return typeof value === 'number' ? value : parseFloat(String(value)) || 0;
+      };
+      
+      // Note expérimentale
+      if (experimental_points_earned !== undefined && !isNaN(parseFloat(String(experimental_points_earned)))) {
+        fieldsToUpdate.push('experimental_points_earned = ?');
+        params.push(parseFloat(String(experimental_points_earned)));
+      }
+      
+      // Note théorique
+      if (theoretical_points_earned !== undefined && !isNaN(parseFloat(String(theoretical_points_earned)))) {
+        fieldsToUpdate.push('theoretical_points_earned = ?');
+        params.push(parseFloat(String(theoretical_points_earned)));
+      }
+      
+      // Pénalité
+      if (penalty !== undefined && !isNaN(parseFloat(String(penalty)))) {
+        fieldsToUpdate.push('penalty = ?');
+        params.push(parseFloat(String(penalty)));
+      }
+      
+      // Calculer la note finale en utilisant notre fonction utilitaire
+      const expPoints = experimental_points_earned !== undefined 
+        ? parseNumberSafely(experimental_points_earned) 
+        : parseNumberSafely(oldCorrection.experimental_points_earned);
+      
+      const theoPoints = theoretical_points_earned !== undefined 
+        ? parseNumberSafely(theoretical_points_earned)
+        : parseNumberSafely(oldCorrection.theoretical_points_earned);
+      
+      const penaltyPoints = penalty !== undefined 
+        ? parseNumberSafely(penalty)
+        : parseNumberSafely(oldCorrection.penalty);
+      
+      // Calculer la note totale (minimum 0)
+      const finalGrade = Math.max(0, expPoints + theoPoints - penaltyPoints);
+      
+      fieldsToUpdate.push('grade = ?');
+      params.push(finalGrade);
+      
+      // Ajouter l'ID à la fin des paramètres
+      params.push(id);
+      
+      // Exécuter la mise à jour si des champs sont à modifier
+      if (fieldsToUpdate.length === 0) {
+        return NextResponse.json({ error: 'Aucune donnée à mettre à jour' }, { status: 400 });
+      }
+
+      await connection.query(
+        `UPDATE corrections SET ${fieldsToUpdate.join(', ')} WHERE id = ?`,
+        params
+      );
+
+      // Créer un log pour la mise à jour des notes
+      await createLogEntry({
+        action_type: 'UPDATE_GRADE',
+        description: `Modification des notes pour la correction #${id}`,
+        entity_type: 'correction',
+        entity_id: parseInt(id),
+        user_id: user.id,
+        username: user.username,
+        metadata: {
+          old_experimental: oldCorrection.experimental_points_earned,
+          new_experimental: experimental_points_earned !== undefined ? experimental_points_earned : oldCorrection.experimental_points_earned,
+          old_theoretical: oldCorrection.theoretical_points_earned,
+          new_theoretical: theoretical_points_earned !== undefined ? theoretical_points_earned : oldCorrection.theoretical_points_earned,
+          old_penalty: oldCorrection.penalty,
+          new_penalty: penalty !== undefined ? penalty : oldCorrection.penalty,
+          old_total: oldCorrection.grade,
+          new_total: finalGrade
+        }
+      });
       
       // Récupérer la correction mise à jour
-      const [rows] = await connection.query(
-        `SELECT * FROM corrections WHERE id = ?`,
-        [correctionId]
+      const [updatedResult] = await connection.query<CorrectionRow[]>(
+        'SELECT * FROM corrections WHERE id = ?',
+        [id]
       );
       
-      if (!Array.isArray(rows) || rows.length === 0) {
-        return NextResponse.json(
-          { error: 'Correction non trouvée après mise à jour' },
-          { status: 404 }
-        );
-      }
-      
-      return NextResponse.json(rows[0]);
+      const updatedCorrection = Array.isArray(updatedResult) && updatedResult.length > 0
+        ? updatedResult[0]
+        : null;
+
+      return NextResponse.json({
+        success: true,
+        data: updatedCorrection
+      });
     });
   } catch (error) {
-    console.error('Erreur lors de la mise à jour de la note:', error);
+    console.error('Error updating grade:', error);
     return NextResponse.json(
-      { error: 'Erreur lors de la mise à jour de la note' },
+      { error: 'Erreur lors de la mise à jour des notes' },
       { status: 500 }
     );
   }

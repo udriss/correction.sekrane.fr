@@ -74,22 +74,30 @@ export async function GET(
       // S'assurer que la propriété 'active' est incluse dans la réponse
       // Pour être sûr d'avoir la valeur la plus à jour, on peut la récupérer directement depuis la base
       const [activeStatusResult] = await connection.query(
-        'SELECT active FROM corrections WHERE id = ?',
+        'SELECT active, grade, penalty FROM corrections WHERE id = ?',
         [idNumber]
       );
       
       let activeStatus = true; // Par défaut, une correction est active
+      let finalGrade = null; // Initialiser la note finale à null
+      
       if (Array.isArray(activeStatusResult) && activeStatusResult.length > 0) {
         // La valeur peut être 0, 1, true, false ou null
         const activeValue = (activeStatusResult[0] as any).active;
         // Convertir en booléen: false si activeValue est 0, false ou null, true sinon
         activeStatus = !(activeValue === 0 || activeValue === false || activeValue === null);
+        
+        // Calculer la note finale
+        const grade = parseFloat((activeStatusResult[0] as any).grade) || 0;
+        const penalty = parseFloat((activeStatusResult[0] as any).penalty) || 0;
+        finalGrade = Math.max(grade - penalty, 6);
       }
       
       // Combiner toutes les données
       return NextResponse.json({
         ...correction,
         active: activeStatus,
+        final_grade: finalGrade, // Ajouter le champ final_grade
         class_name: classInfo ? classInfo.name : null,
         sub_class: subClass,
         student_data: studentData

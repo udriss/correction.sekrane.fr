@@ -1,86 +1,38 @@
-import React, { useEffect, useState } from 'react';
-import { Snackbar, Alert } from '@mui/material';
+import React from 'react';
+import { Alert, Box } from '@mui/material';
+import { Fade } from '@mui/material';
 
 interface StatusMessagesProps {
   successMessage: string;
   copiedMessage: string;
-  error: string;
+  error?: string; // Gardons-le optionnel pour la compatibilité
 }
 
 const StatusMessages: React.FC<StatusMessagesProps> = ({
-  successMessage: propSuccessMessage,
+  successMessage,
   copiedMessage,
-  error: propError
+  error,
 }) => {
-  // États locaux pour gérer les messages déclenchés par les événements personnalisés
-  const [localSuccessMessage, setLocalSuccessMessage] = useState('');
-  const [localError, setLocalError] = useState('');
-  
-  // Utilisation des messages des props ou des messages locaux (pour les événements)
-  const successMessage = propSuccessMessage || localSuccessMessage;
-  const error = propError || localError;
-
-  // Écouteurs d'événements pour les mises à jour de notes
-  useEffect(() => {
-    // Gestionnaire pour l'événement de mise à jour de note réussie
-    const handleGradeUpdated = (event: CustomEvent) => {
-      setLocalSuccessMessage(event.detail?.message || 'Note mise à jour');
-      // Effacer le message après quelques secondes
-      setTimeout(() => setLocalSuccessMessage(''), 3000);
-    };
-    
-    // Gestionnaire pour l'événement d'erreur de mise à jour de note
-    const handleGradeError = (event: CustomEvent) => {
-      setLocalError(event.detail?.message || 'Erreur lors de la mise à jour de la note');
-      // Effacer le message d'erreur après quelques secondes
-      setTimeout(() => setLocalError(''), 5000);
-    };
-    
-    // Ajouter les écouteurs d'événements
-    window.addEventListener('gradeUpdated', handleGradeUpdated as EventListener);
-    window.addEventListener('gradeError', handleGradeError as EventListener);
-    
-    // Nettoyage des écouteurs lors du démontage du composant
-    return () => {
-      window.removeEventListener('gradeUpdated', handleGradeUpdated as EventListener);
-      window.removeEventListener('gradeError', handleGradeError as EventListener);
-    };
-  }, []);
-
-  if (!successMessage && !copiedMessage && !error) return null;
-  
   return (
-    <>
-      <Snackbar 
-        open={!!successMessage} 
-        autoHideDuration={6000}
-        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
-      >
-        <Alert severity="success" variant="filled" onClose={() => {}}>
-          {successMessage}
-        </Alert>
-      </Snackbar>
+    <Box sx={{ mt: 2, mb: 2 }}>
+      {successMessage && (
+        <Fade in={!!successMessage}>
+          <Alert severity="success" sx={{ mb: 2 }}>
+            {successMessage}
+          </Alert>
+        </Fade>
+      )}
 
-      <Snackbar 
-        open={!!copiedMessage} 
-        autoHideDuration={3000}
-        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
-      >
-        <Alert severity="info" variant="filled" onClose={() => {}}>
-          {copiedMessage}
-        </Alert>
-      </Snackbar>
+      {copiedMessage && (
+        <Fade in={!!copiedMessage}>
+          <Alert severity="info" sx={{ mb: 2 }}>
+            {copiedMessage}
+          </Alert>
+        </Fade>
+      )}
       
-      <Snackbar 
-        open={!!error} 
-        autoHideDuration={6000}
-        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
-      >
-        <Alert severity="error" variant="filled" onClose={() => {}}>
-          {error}
-        </Alert>
-      </Snackbar>
-    </>
+      {/* Nous ne montrons plus l'erreur ici puisqu'elle est affichée par ErrorDisplay */}
+    </Box>
   );
 };
 

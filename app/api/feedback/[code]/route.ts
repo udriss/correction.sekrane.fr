@@ -54,13 +54,15 @@ export async function GET(
             CONCAT(s.first_name, ' ', LEFT(s.last_name, 1), '.') as student_name,
             IFNULL(c.grade, (c.experimental_points_earned + c.theoretical_points_earned)) as grade, 
             IFNULL(c.penalty, 0) as penalty,
-            (IFNULL(c.grade, (c.experimental_points_earned + c.theoretical_points_earned)) - IFNULL(c.penalty, 0)) as final_grade
+            ((c.experimental_points_earned + c.theoretical_points_earned) - IFNULL(c.penalty, 0)) as final_grade
          FROM corrections c 
          JOIN activities a ON c.activity_id = a.id 
          LEFT JOIN students s ON c.student_id = s.id
          WHERE c.id = ?`,
         [correctionId]
       );
+
+      console.log('rows', rows);
 
       if (!Array.isArray(rows) || rows.length === 0) {
         return NextResponse.json(
