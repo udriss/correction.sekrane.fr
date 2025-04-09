@@ -4,6 +4,7 @@ import { Correction } from '@/app/components/CorrectionsDataProvider';
 import CorrectionCard from './CorrectionCard';
 import { getBatchShareCodes } from '@/lib/services/shareService';
 import { useSnackbar } from 'notistack';
+import ErrorDisplay from '@/components/ui/ErrorDisplay';
 
 interface CorrectionsListProps {
   filteredCorrections: Correction[];
@@ -84,11 +85,7 @@ const CorrectionsList: React.FC<CorrectionsListProps> = ({
   };
 
   if (error) {
-    return (
-      <Alert severity="error" sx={{ mt: 4 }}>
-        Erreur lors du chargement des corrections: {error.message}
-      </Alert>
-    );
+    return <ErrorDisplay error={error} />;
   }
   
   // Ensure filteredCorrections is always an array

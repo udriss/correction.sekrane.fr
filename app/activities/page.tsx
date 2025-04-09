@@ -55,7 +55,7 @@ import PatternBackground from 'components/ui/PatternBackground';
 export interface Activity {
   id?: number;
   name: string;
-  description?: string;
+  content?: string;
   type?: string;
   experimental_points: number;
   theoretical_points: number;
@@ -64,6 +64,7 @@ export interface Activity {
   updatedAt?: string;
   associated_classes?: number;
   correction_count?: number;
+  inactive_corrections_count?: number;
 }
 
 export default function ActivitiesPage() {
@@ -107,24 +108,35 @@ export default function ActivitiesPage() {
             }
             
             // Get correction stats
-            const statsResponse = await fetch(`/api/activities/${activity.id}/stats`);
+            const statsResponse = await fetch(`/api/activities/${activity.id}/stats?includeInactive=true`);
             let correctionCount = 0;
+            let inactiveCorrectionsCount = 0;
             if (statsResponse.ok) {
               const statsData = await statsResponse.json();
-              correctionCount = statsData?.total_corrections || 0;
+              console.log(statsData);
+              // Sum up counts from all sub-groups
+              if (Array.isArray(statsData)) {
+                correctionCount = statsData.reduce((total, group) => total + (Number(group.count) || 0), 0);
+                inactiveCorrectionsCount = statsData.reduce((total, group) => total + (Number(group.inactive_count) || 0), 0);
+              } else {
+                correctionCount = statsData?.count ? Number(statsData.count) : 0;
+                inactiveCorrectionsCount = statsData?.inactive_count ? Number(statsData.inactive_count) : 0;
+              }
             }
             
             return {
               ...activity,
               associated_classes: associatedClassesCount,
-              correction_count: correctionCount
+              correction_count: correctionCount,
+              inactive_corrections_count: inactiveCorrectionsCount
             };
           } catch (error) {
             console.error(`Error enhancing activity ${activity.id}:`, error);
             return {
               ...activity,
               associated_classes: 0,
-              correction_count: 0
+              correction_count: 0,
+              inactive_corrections_count: 0
             };
           }
         }));
@@ -296,6 +308,8 @@ export default function ActivitiesPage() {
                   startIcon={<AddIcon />} 
                   component={Link} 
                   href="/activities/new"
+                  target="_blank"
+                  rel="noopener noreferrer"
                   className="bg-gradient-to-r from-amber-500 to-amber-600 shadow-lg"
                 >
                   Nouvelle activité
@@ -308,7 +322,7 @@ export default function ActivitiesPage() {
         {/* Stats summary */}
         <Box sx={{ p: 2 }}>
           <Grid container spacing={2} sx={{ display: 'flex', justifyContent: 'space-around' }}>
-            <Grid size={{ xs: 12, sm: 6, md: 2 }}>
+            <Grid size={{ xs: 12, sm: 6, md: 2 }} key="total-activities">
               <Paper sx={{ 
                 p: 2, 
                 textAlign: 'center', 
@@ -325,7 +339,7 @@ export default function ActivitiesPage() {
               </Paper>
             </Grid>
             
-            <Grid size={{ xs: 12, sm: 6, md: 2 }}>
+            <Grid size={{ xs: 12, sm: 6, md: 2 }} key="total-with-classes">
               <Paper sx={{ 
                 p: 2, 
                 textAlign: 'center', 
@@ -342,7 +356,7 @@ export default function ActivitiesPage() {
               </Paper>
             </Grid>
             
-            <Grid size={{ xs: 12, sm: 6, md: 2 }}>
+            <Grid size={{ xs: 12, sm: 6, md: 2 }} key="total-with-corrections">
               <Paper sx={{ 
                 p: 2, 
                 textAlign: 'center', 
@@ -359,7 +373,7 @@ export default function ActivitiesPage() {
               </Paper>
             </Grid>
             
-            <Grid size={{ xs: 12, sm: 6, md: 2 }}>
+            <Grid size={{ xs: 12, sm: 6, md: 2 }} key="total-points">
               <Paper sx={{ 
                 p: 2, 
                 textAlign: 'center', 
@@ -476,6 +490,8 @@ export default function ActivitiesPage() {
             startIcon={<AddIcon />}
             component={Link}
             href="/activities/new"
+            target="_blank"
+            rel="noopener noreferrer"
           >
             Nouvelle activité
           </Button>
@@ -508,6 +524,8 @@ export default function ActivitiesPage() {
               startIcon={<AddIcon />}
               component={Link}
               href="/activities/new"
+              target="_blank"
+              rel="noopener noreferrer"
               size="large"
               className="shadow-lg"
             >
@@ -533,9 +551,9 @@ export default function ActivitiesPage() {
             ) : (
               <Grid container spacing={5}>
                 {filteredActivities.map((activity) => (
-                  <Grid size={{ xs: 12, md: 12 }} key={activity.id}>
-                    <Card className="hover:shadow-lg transition-shadow" sx={{ p: 3 }}>
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 1, }}>
+                    <Grid size={{ xs:12 }}  key={activity.id}>
+                      <Card className="hover:shadow-lg transition-shadow" sx={{ p: 3 }}>
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 1, }}>
                             <Typography variant="h6" component="h3" className="font-bold">
                               {activity.name}
                             </Typography>
@@ -573,200 +591,241 @@ export default function ActivitiesPage() {
                               )}
                             </Box>
                           </Box>
-                      <Box sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' } }}>
-                        <CardContent sx={{ flex: '1 1 auto' }}>                          
-                          {/* Activity details */}
-                          <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', alignItems: 'flex-start' }}>
-                            {/* Left side - Points information and stats */}
-                            <Box sx={{ flex: '1 1 auto', minWidth: '200px' }}>
-                              {/* Total points indicator */}
-                              <Box sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
-                                <AssessmentIcon color="primary" />
-                                <Typography variant="h6" color="primary.main">
-                                  {activity.experimental_points + activity.theoretical_points} points au total
-                                </Typography>
-                              </Box>
-                              
-                              {/* Points breakdown */}
-                              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1, mt: 2 }}>
-                                <Tooltip title="Voir les détails de cette activité">
-                                  <Chip 
-                                    icon={<ScienceIcon />}
-                                    label={`${activity.experimental_points} pts exp.`}
-                                    size="small"
-                                    color="primary"
-                                    variant="outlined" 
-                                    component={Link}
-                                    href={`/activities/${activity.id}`}
-                                    clickable
-                                    sx={{ 
-                                      cursor: 'pointer',
-                                      '&:hover': { 
-                                        boxShadow: '0 1px 3px rgba(0,0,0,0.12)',
-                                        backgroundColor: 'rgba(25, 118, 210, 0.08)'
-                                      }
-                                    }}
-                                  />
-                                </Tooltip>
-                                <Tooltip title="Voir les détails de cette activité">
-                                  <Chip 
-                                    icon={<MenuBookIcon />}
-                                    label={`${activity.theoretical_points} pts théo.`}
-                                    size="small"
-                                    variant="outlined"
-                                    component={Link}
-                                    href={`/activities/${activity.id}`}
-                                    clickable
-                                    sx={{ 
-                                      cursor: 'pointer',
-                                      color: theme => theme.palette.secondary.dark, 
-                                      bgcolor: alpha(theme.palette.secondary.main, 0.02), 
-                                      '&:hover': { bgcolor: alpha(theme.palette.secondary.main, 0.2)
-                                      }
-                                    }}
-                                  />
-                                </Tooltip>
-                              </Box>
-                              
-                              {/* Usage stats */}
-                              <Box sx={{ mt: 3 }}>
-                                {activity.associated_classes && activity.associated_classes > 0 ? (
-                                  <Tooltip title="Voir les classes associées">
-                                    <Chip
-                                      icon={<SchoolIcon />}
-                                      label={`${activity.associated_classes} classe${activity.associated_classes > 1 ? 's' : ''}`}
-                                      size="small"
-                                      color="info"
-                                      variant="outlined"
-                                      component={Link}
-                                      href={`/activities/${activity.id}?tab=classes`}
-                                      clickable
-                                      sx={{ 
-                                        cursor: 'pointer',
-                                        '&:hover': { 
-                                          boxShadow: '0 1px 3px rgba(0,0,0,0.12)',
-                                          backgroundColor: 'rgba(2, 136, 209, 0.08)'
-                                        }
-                                      }}
-                                    />
-                                  </Tooltip>
-                                ) : (
-                                  <Typography variant="body2" color="text.secondary" sx={{ mt: 1, display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                                    <SchoolIcon fontSize="small" color="disabled" /> Non associée à une classe
-                                  </Typography>
-                                )}
-                                
-                                <Box sx={{ mt: 1 }}>
-                                  {activity.correction_count !== undefined && activity.correction_count > 0 ? (
-                                    <Tooltip title="Voir les corrections existantes">
-                                      <Chip
-                                        icon={<RateReviewIcon />}
-                                        label={`${activity.correction_count} correction${activity.correction_count > 1 ? 's' : ''}`}
+                        <Grid container sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' } }}>
+                          <Grid size={{ xs: 12, md: 8 }}>
+                            <CardContent sx={{ flex: '1 1 auto' }}>                          
+                              {/* Activity details */}
+                              <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', alignItems: 'flex-start' }}>
+                                {/* Left side - Points information and stats */}
+                                <Box sx={{ flex: '1 1 auto', minWidth: '200px' }}>
+                                  {/* Total points indicator */}
+                                  <Box sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
+                                    <AssessmentIcon color="primary" />
+                                    <Typography variant="h6" color="primary.main">
+                                      {activity.experimental_points + activity.theoretical_points} points au total
+                                    </Typography>
+                                  </Box>
+                                  
+                                  {/* Points breakdown */}
+                                  <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1, mt: 2 }}>
+                                    <Tooltip title="Voir les détails de cette activité">
+                                      <Chip 
+                                        icon={<ScienceIcon />}
+                                        label={`${activity.experimental_points} pts exp.`}
                                         size="small"
-                                        color="success"
-                                        variant="outlined"
+                                        color="primary"
+                                        variant="outlined" 
                                         component={Link}
-                                        href={`/activities/${activity.id}?tab=2`}
+                                        href={`/activities/${activity.id}`}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
                                         clickable
                                         sx={{ 
-                                          cursor: 'pointer', 
+                                          cursor: 'pointer',
                                           '&:hover': { 
                                             boxShadow: '0 1px 3px rgba(0,0,0,0.12)',
-                                            backgroundColor: 'rgba(46, 125, 50, 0.08)'
+                                            backgroundColor: 'rgba(25, 118, 210, 0.08)'
                                           }
                                         }}
                                       />
                                     </Tooltip>
+                                    <Tooltip title="Voir les détails de cette activité">
+                                      <Chip 
+                                        icon={<MenuBookIcon />}
+                                        label={`${activity.theoretical_points} pts théo.`}
+                                        size="small"
+                                        variant="outlined"
+                                        component={Link}
+                                        href={`/activities/${activity.id}`}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        clickable
+                                        sx={{ 
+                                          cursor: 'pointer',
+                                          color: theme => theme.palette.secondary.dark, 
+                                          bgcolor: alpha(theme.palette.secondary.main, 0.02), 
+                                          '&:hover': { bgcolor: alpha(theme.palette.secondary.main, 0.2)
+                                          }
+                                        }}
+                                      />
+                                    </Tooltip>
+                                  </Box>
+                                  
+                                  {/* Last updated */}
+                                  {activity.updatedAt && (
+                                    <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 3 }}>
+                                      Dernière mise à jour: {new Date(activity.updatedAt).toLocaleDateString('fr-FR')}
+                                    </Typography>
+                                  )}
+                                </Box>
+                                
+                                {/* Right side - Activity description */}
+                                <Box sx={{ flex: '1 1 auto', minWidth: '200px' }}>
+                                  {activity.content ? (
+                                    <>
+                                      <Typography variant="subtitle2" color="text.secondary" gutterBottom>
+                                        Description :
+                                      </Typography>
+                                      <Typography variant="body2" color="text.secondary">
+                                        {activity.content}
+                                      </Typography>
+                                    </>
                                   ) : (
-                                    <Typography variant="body2" color="text.secondary" sx={{ mt: 1, display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                                      <RateReviewIcon fontSize="small" color="disabled" /> Aucune correction
+                                    <Typography variant="body2" color="text.disabled" sx={{ fontStyle: 'italic' }}>
+                                      Aucune description disponible
                                     </Typography>
                                   )}
                                 </Box>
                               </Box>
-                              
-                              {/* Last updated */}
-                              {activity.updatedAt && (
-                                <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 3 }}>
-                                  Dernière mise à jour: {new Date(activity.updatedAt).toLocaleDateString('fr-FR')}
-                                </Typography>
-                              )}
+                            </CardContent>
+                          </Grid>
+                          
+                          <Divider orientation="vertical" flexItem sx={{ display: { xs: 'none', sm: 'block' } }} />
+                          
+                          <Grid size={{ xs: 12, md: 3.9 }}>
+                            <Box sx={{ 
+                              display: 'flex', 
+                              flexDirection: 'column', 
+                              justifyContent: 'center',
+                              p: 2,
+                              gap: 1
+                            }}>
+                              <Button 
+                                variant="outlined" 
+                                color="primary" 
+                                href={`/activities/${activity.id}`} 
+                                component={Link}
+                                startIcon={<VisibilityIcon />}
+                                size="small"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                fullWidth
+                              >
+                                Détails
+                              </Button>
+                              <Button 
+                                variant="outlined" 
+                                color='primary'
+                                href={`/activities/${activity.id}/corrections/`} 
+                                component={Link}
+                                startIcon={<RateReviewIcon />}
+                                size="small"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                fullWidth
+                                sx={{color: theme => theme.palette.success.dark, 
+                                  bgcolor: alpha(theme.palette.success.main, 0.02), 
+                                  '&:hover': { bgcolor: alpha(theme.palette.success.main, 0.2) }}}
+                              >
+                                Nouvelle correction
+                              </Button>
+                              <Button 
+                                variant="outlined" 
+                                color='success'
+                                href={`/activities/${activity.id}/corrections/multiples`} 
+                                component={Link}
+                                startIcon={<RateReviewIcon />}
+                                size="small"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                fullWidth
+                                sx={{color: theme => theme.palette.success.dark, 
+                                  bgcolor: alpha(theme.palette.success.main, 0.02), 
+                                  '&:hover': { bgcolor: alpha(theme.palette.success.main, 0.2) }}}
+                              >
+                                Corrections en lot
+                              </Button>
                             </Box>
-                            
-                            {/* Right side - Activity description */}
-                            <Box sx={{ flex: '1 1 auto', minWidth: '200px' }}>
-                              {activity.description ? (
-                                <>
-                                  <Typography variant="subtitle2" color="text.secondary" gutterBottom>
-                                    Description:
-                                  </Typography>
-                                  <Typography variant="body2" color="text.secondary">
-                                    {activity.description}
-                                  </Typography>
-                                </>
-                              ) : (
-                                <Typography variant="body2" color="text.disabled" sx={{ fontStyle: 'italic' }}>
-                                  Aucune description disponible
-                                </Typography>
-                              )}
-                            </Box>
-                          </Box>
-                        </CardContent>
-                        
-                        <Divider orientation="vertical" flexItem sx={{ display: { xs: 'none', sm: 'block' } }} />
-                        <Divider sx={{ display: { xs: 'block', sm: 'none' } }} />
-                        
-                        <Box sx={{ 
-                          flex: '0 1 auto',
-                          display: 'flex', 
-                          flexDirection: 'column', 
-                          justifyContent: 'center',
-                          p: 2,
-                          gap: 1
-                        }}>
-                          <Button 
-                            variant="outlined" 
-                            color="primary" 
-                            href={`/activities/${activity.id}`} 
-                            component={Link}
-                            startIcon={<VisibilityIcon />}
-                            size="small"
-                            fullWidth
-                          >
-                            Détails
-                          </Button>
-                          <Button 
-                            variant="outlined" 
-                            color='primary'
-                            href={`/activities/${activity.id}/corrections/`} 
-                            component={Link}
-                            startIcon={<RateReviewIcon />}
-                            size="small"
-                            fullWidth
-                            sx={{color: theme => theme.palette.success.dark, 
-                              bgcolor: alpha(theme.palette.success.main, 0.02), 
-                              '&:hover': { bgcolor: alpha(theme.palette.success.main, 0.2) }}}
-                          >
-                            Nouvelle correction
-                          </Button>
-                          <Button 
-                            variant="outlined" 
-                            color='success'
-                            href={`/activities/${activity.id}/corrections/multiples`} 
-                            component={Link}
-                            startIcon={<RateReviewIcon />}
-                            size="small"
-                            fullWidth
-                            sx={{color: theme => theme.palette.success.dark, 
-                              bgcolor: alpha(theme.palette.success.main, 0.02), 
-                              '&:hover': { bgcolor: alpha(theme.palette.success.main, 0.2) }}}
-                          >
-                            Corrections en lot
-                          </Button>
-                        </Box>
-                      </Box>
-                    </Card>
-                  </Grid>
+                            <Box sx={{ mt: 1, display: 'flex', 
+                            alignItems: 'center', 
+                            gap: 1, 
+                            justifyContent: 'center', 
+                            flexDirection: 'column' }}> 
+                                      {activity.correction_count !== undefined && activity.correction_count > 0 ? (
+                                        <Tooltip title="Voir les corrections existantes">
+                                          <Chip
+                                            icon={<RateReviewIcon />}
+                                            label={`${activity.correction_count} correction${activity.correction_count > 1 ? 's' : ''}`}
+                                            size="small"
+                                            color="success"
+                                            variant="outlined"
+                                            component={Link}
+                                            href={`/activities/${activity.id}?tab=2`}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            clickable
+                                            sx={{ 
+                                              cursor: 'pointer', 
+                                              '&:hover': { 
+                                                boxShadow: '0 1px 3px rgba(0,0,0,0.12)',
+                                                backgroundColor: 'rgba(46, 125, 50, 0.08)'
+                                              }
+                                            }}
+                                          />
+                                        </Tooltip>
+                                      ) : (
+                                        <Typography variant="body2" color="text.secondary" sx={{ mt: 1, display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                                          <RateReviewIcon fontSize="small" color="disabled" /> Aucune correction
+                                        </Typography>
+                                      )}
+                                      
+                                      {/* Display inactive corrections if any */}
+                                      {activity.inactive_corrections_count && activity.inactive_corrections_count > 0 ? (
+                                        <Tooltip title="Corrections inactives">
+                                          <Chip
+                                            icon={<CloseIcon />}
+                                            label={`${activity.inactive_corrections_count} inactive${activity.inactive_corrections_count > 1 ? 's' : ''}`}
+                                            size="small"
+                                            color="error"
+                                            variant="outlined"
+                                            sx={{ ml: 1, cursor: 'pointer' }}
+                                            component={Link}
+                                            href={`/activities/${activity.id}?tab=2&showInactive=true`}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            clickable
+                                          />
+                                        </Tooltip>
+                                      ) : null}
+                              </Box>
+                                  {/* Usage stats */}
+                                  <Box sx={{ mt: 1, 
+                                  display: 'flex',
+                                    alignItems: 'center', 
+                                    justifyContent: 'center',
+                                     flexDirection: 'column' }}>
+                                    {activity.associated_classes && activity.associated_classes > 0 ? (
+                                      <Tooltip title="Voir les classes associées">
+                                        <Chip
+                                          icon={<SchoolIcon />}
+                                          label={`${activity.associated_classes} classe${activity.associated_classes > 1 ? 's' : ''}`}
+                                          size="small"
+                                          color="info"
+                                          variant="outlined"
+                                          component={Link}
+                                          href={`/activities/${activity.id}?tab=2`}
+                                          target="_blank"
+                                          rel="noopener noreferrer"
+                                          clickable
+                                          sx={{ 
+                                            cursor: 'pointer',
+                                            '&:hover': { 
+                                              boxShadow: '0 1px 3px rgba(0,0,0,0.12)',
+                                              backgroundColor: 'rgba(2, 136, 209, 0.08)'
+                                            }
+                                          }}
+                                        />
+                                      </Tooltip>
+                                    ) : (
+                                      <Typography variant="body2" color="text.secondary" sx={{ mt: 1, display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                                        <SchoolIcon fontSize="small" color="disabled" /> Non associée à une classe
+                                      </Typography>
+                                    )}
+                                  </Box>
+                          </Grid>
+                        </Grid>
+                      </Card>
+                    </Grid>
                 ))}
               </Grid>
             )}

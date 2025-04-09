@@ -1,6 +1,8 @@
 'use client';
 
 import React from 'react';
+import { Box, Typography, CircularProgress, useTheme, alpha } from '@mui/material';
+import { keyframes } from '@mui/system';
 
 interface LoadingSpinnerProps {
   /** Size of the spinner - sm: small, md: medium, lg: large, xl: extra large */
@@ -18,30 +20,49 @@ interface LoadingSpinnerProps {
  */
 const LoadingSpinner: React.FC<LoadingSpinnerProps> = ({ 
   size = 'md',
-  color = 'blue',
+  color = 'primary',
   text = 'Chargement en cours',
   hideText = false
 }) => {
-  // Map size to specific pixel values
+  const theme = useTheme();
+  
+  // Map size to specific pixel values for Material UI
   const sizeMap = {
-    sm: 'w-6 h-6',
-    md: 'w-10 h-10',
-    lg: 'w-16 h-16',
-    xl: 'w-24 h-24'
+    sm: 24,
+    md: 40,
+    lg: 64,
+    xl: 80
   };
 
-  // Map color names to tailwind color classes
-  const colorMap = {
-    blue: 'border-blue-500',
-    red: 'border-red-500',
-    green: 'border-green-500',
-    yellow: 'border-yellow-500',
-    purple: 'border-purple-500',
-    gray: 'border-gray-500'
+  // Map color names to theme colors
+  const getThemeColor = (colorName: string) => {
+    switch (colorName) {
+      case 'primary': return theme.palette.primary.main;
+      case 'secondary': return theme.palette.secondary.main;
+      case 'error': return theme.palette.error.main;
+      case 'warning': return theme.palette.warning.main;
+      case 'info': return theme.palette.info.main;
+      case 'success': return theme.palette.success.main;
+      default: return theme.palette.primary.main;
+    }
   };
 
-  const spinnerSize = sizeMap[size];
-  const spinnerColor = colorMap[color as keyof typeof colorMap] || 'border-blue-500';
+  const spinnerSize = sizeMap[size as keyof typeof sizeMap];
+  const spinnerColor = getThemeColor(color);
+  
+  // Create pulse animation
+  const pulseAnimation = keyframes`
+    0% { opacity: 0.2; transform: scale(0.95); }
+    50% { opacity: 0.5; transform: scale(1.05); }
+    100% { opacity: 0.2; transform: scale(0.95); }
+  `;
+
+  // Loading bar animation
+  const loadingBarAnimation = keyframes`
+    0% { transform: translateX(-100%); }
+    50% { transform: translateX(0); }
+    100% { transform: translateX(100%); }
+  `;
   
   // Dynamic dots for animation
   const [dots, setDots] = React.useState('.');
@@ -58,33 +79,109 @@ const LoadingSpinner: React.FC<LoadingSpinnerProps> = ({
   const displayText = text !== null ? text : 'Chargement en cours';
 
   return (
-    <div className="flex flex-col items-center justify-center p-4 w-full">
-      <div className="relative">
-        {/* Main spinner */}
-        <div className={`${spinnerSize} border-4 border-gray-200 rounded-full animate-spin`}>
-          <div className={`${spinnerSize} border-t-4 ${spinnerColor} rounded-full`}></div>
-        </div>
-        
+    <Box sx={{ 
+      display: 'flex', 
+      flexDirection: 'column', 
+      alignItems: 'center', 
+      justifyContent: 'center', 
+      p: 2, 
+      width: '100%'
+    }}>
+      <Box sx={{ 
+        position: 'relative',
+        display: 'flex',
+        justifyContent: 'center',
+        alignItems: 'center'
+      }}>
         {/* Background glow effect */}
-        <div className={`absolute inset-0 ${spinnerSize} bg-${color.split('-')[0]}-400 rounded-full opacity-25 blur-md animate-pulse`}></div>
-      </div>
+        <Box sx={{
+          position: 'absolute',
+          width: spinnerSize + 16,
+          height: spinnerSize + 16,
+          borderRadius: '50%',
+          bgcolor: alpha(spinnerColor, 0.15),
+          animation: `${pulseAnimation} 2s ease-in-out infinite`,
+          filter: 'blur(8px)'
+        }} />
+        
+        {/* Secondary spinner (optional decorative layer) */}
+        <Box sx={{
+          position: 'absolute',
+          width: spinnerSize + 8,
+          height: spinnerSize + 8,
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+        }}>
+          <CircularProgress
+            variant="determinate"
+            value={30}
+            size={spinnerSize + 8}
+            thickness={2}
+            sx={{ 
+              color: alpha(spinnerColor, 0.3),
+              animationDuration: '3s'
+            }}
+          />
+        </Box>
+        
+        {/* Main spinner */}
+        <CircularProgress 
+          size={spinnerSize}
+          thickness={4}
+          sx={{ 
+            color: spinnerColor,
+            zIndex: 1
+          }} 
+        />
+      </Box>
       
       {!hideText && displayText && (
-        <div className="mt-4 text-center w-full">
-          {/* Fixed height container for the text to prevent layout shifts */}
-          <div className="h-6 flex items-center justify-center">
-            <p className="text-gray-700 font-medium">
-              {/* Ensure consistent width with non-breaking space after text */}
+        <Box sx={{ 
+          mt: 2, 
+          textAlign: 'center', 
+          width: '100%',
+          maxWidth: 300
+        }}>
+          {/* Text container with fixed height to prevent layout shifts */}
+          <Box sx={{ 
+            height: 32, 
+            display: 'flex', 
+            alignItems: 'center', 
+            justifyContent: 'center' 
+          }}>
+            <Typography variant="body1" sx={{ color: theme => theme.palette.text.primary, fontWeight: 500 }}>
               <span>{displayText}</span>
-              <span className="inline-block w-9 text-left">{dots}</span>
-            </p>
-          </div>
-          <div className="mt-1 h-1 w-full bg-gray-200 rounded-full overflow-hidden">
-            <div className="h-full w-full bg-red-500 animate-loadingBar rounded-full"></div>
-          </div>
-        </div>
+              <Box component="span" sx={{ 
+                display: 'inline-block', 
+                width: 28, 
+                textAlign: 'left' 
+              }}>
+                {dots}
+              </Box>
+            </Typography>
+          </Box>
+          
+          {/* Progress bar */}
+          <Box sx={{ 
+            mt: 1,
+            height: 4,
+            width: '100%',
+            bgcolor: alpha(theme.palette.primary.main, 0.1),
+            borderRadius: 1,
+            overflow: 'hidden'
+          }}>
+            <Box sx={{ 
+              height: '100%',
+              width: '100%',
+              bgcolor: spinnerColor,
+              animation: `${loadingBarAnimation} 2s linear infinite`,
+              borderRadius: 'inherit'
+            }} />
+          </Box>
+        </Box>
       )}
-    </div>
+    </Box>
   );
 };
 

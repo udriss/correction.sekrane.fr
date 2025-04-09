@@ -34,7 +34,8 @@ import {
   TableCell,
   TableBody,
   TableFooter,
-  TablePagination
+  TablePagination,
+  Switch
 } from '@mui/material';
 import EditIcon from '@mui/icons-material/Edit';
 import SaveIcon from '@mui/icons-material/Save';
@@ -661,6 +662,40 @@ export default function ActivityDetail({ params }: { params: Promise<{ id: strin
     // Utiliser router.replace pour éviter d'ajouter une entrée dans l'historique
     router.replace(`/activities/${activityId}?${params.toString()}`, { scroll: false });
   };
+
+  // Ajouter les états manquants pour la gestion des fragments
+  const [fragmentsError, setFragmentsError] = useState<string>('');
+  const [favoriteFragments, setFavoriteFragments] = useState<Fragment[]>([]);
+  const [isFavoriteLoading, setIsFavoriteLoading] = useState<boolean>(false);
+
+  // Ajouter la fonction fetchFragmentsForActivity qui était manquante
+  const fetchFragmentsForActivity = async (activityId: string | number) => {
+    if (!activityId) return;
+    
+    setLoadingFragments(true);
+    try {
+      const response = await fetch(`/api/activities/${activityId}/fragments`);
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(`Erreur (${response.status}): ${errorData.message || response.statusText}`);
+      }
+      const data = await response.json();
+      setFragments(data);
+    } catch (err) {
+      console.error('Erreur lors du chargement des fragments:', err);
+      setFragmentsError((err as Error).message);
+      enqueueSnackbar(`Erreur lors du chargement des fragments: ${(err as Error).message}`, { 
+        variant: 'error' 
+      });
+    } finally {
+      setLoadingFragments(false);
+    }
+  };
+
+  // Fonction pour rediriger vers la page de création de correction
+  const handleNewCorrection = () => {
+    router.push(`/activities/${activityId}/corrections/new`);
+  };
   
   if (loading) {
     return (
@@ -669,6 +704,7 @@ export default function ActivityDetail({ params }: { params: Promise<{ id: strin
       </div>
     );
   }
+  
   
   if (error) {
     return (
@@ -854,6 +890,7 @@ export default function ActivityDetail({ params }: { params: Promise<{ id: strin
         
         {/* Tab Content */}
         <Box sx={{ mt: 3 }}>
+          {/* Premier onglet: détails de l'activité */}
           {tabValue === 0 && (
             <Box>
               <ActivityDetails 
@@ -871,6 +908,7 @@ export default function ActivityDetail({ params }: { params: Promise<{ id: strin
             </Box>
           )}
           
+          {/* Deuxième onglet: fragments */}
           {tabValue === 1 && (
             <Box>
               <Typography variant="body2" color="textSecondary">
@@ -881,36 +919,52 @@ export default function ActivityDetail({ params }: { params: Promise<{ id: strin
                   <LoadingSpinner size="md" text="Chargement des fragments" />
                 </div>
               ) : (
-                <FragmentsList 
-                  fragments={fragments} 
-                  activityId={parseInt(activityId)} 
-                  onAddFragment={handleAddFragment}
-                  onUpdateFragment={handleUpdateFragment}
-                  onDeleteFragment={handleDeleteFragment}
+                <FragmentsList
+                  fragments={fragments}
+                  onUpdate={fetchFragmentsForActivity}
+                  activityId={parseInt(activityId)}
+                  error={fragmentsError}
+                  showTitle={true}
+                  showIcon={true}
+                  showEmpty={true}
                 />
               )}
             </Box>
           )}
           
+          {/* Troisième onglet: corrections */}
           {tabValue === 2 && (
-            <Box>
-              <CorrectionsList 
+            <>
+              <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 2 }}>
+                <FormControlLabel 
+                  control={
+                    <Switch 
+                      checked={includeUncorrected} 
+                      onChange={(e) => setIncludeUncorrected(e.target.checked)}
+                      color="primary"
+                    />
+                  } 
+                  label="Inclure les devoirs sans correction" 
+                  labelPlacement="start"
+                />
+              </Box>
+              <CorrectionsList
                 corrections={corrections}
                 activity={activity}
                 activityId={activityId}
-                isEditing={isEditing}
+                isEditing={false}
                 isProcessing={isProcessing}
                 correctionToDelete={correctionToDelete}
-                onNewCorrection={handleNewCorrectionClick}
-                onDeleteCorrection={handleDeleteCorrection}
-                onConfirmDelete={confirmDeleteCorrection}
-                onCancelDelete={cancelDelete}
+                onNewCorrection={handleNewCorrection}
+                onDeleteCorrection={setCorrectionToDelete}
+                onConfirmDelete={handleConfirmDelete}
+                onCancelDelete={() => setCorrectionToDelete(null)}
                 getStudentFullName={(studentId) => {
                   const student = students.find(s => s.id === studentId);
-                  return student ? `${student.first_name} ${student.last_name}` : `Étudiant #${studentId}`;
+                  return student ? `${student.first_name} ${student.last_name}` : "Sans nom";
                 }}
               />
-            </Box>
+            </>
           )}
           
           {tabValue === 3 && (

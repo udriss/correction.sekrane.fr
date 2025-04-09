@@ -1,6 +1,6 @@
 import React from 'react';
 import Link from 'next/link';
-import { Correction } from '@/lib/types';
+// Remplacer l'import spécifique du type Correction par un type plus générique
 import { Activity } from '@/lib/activity';
 import { useRouter } from 'next/navigation';
 import { 
@@ -10,6 +10,7 @@ import {
   Box, 
   CircularProgress, 
   Tooltip, 
+  Chip
 } from '@mui/material';
 import Grid from '@mui/material/Grid';
 
@@ -19,9 +20,20 @@ import CheckIcon from '@mui/icons-material/Check';
 import DeleteForeverIcon from '@mui/icons-material/DeleteForever';
 import PeopleAltIcon from '@mui/icons-material/PeopleAlt';
 import GroupsIcon from '@mui/icons-material/Groups';
+import WarningIcon from '@mui/icons-material/Warning';
+
+// Créer un type générique compatible avec tous les types de Correction
+interface BaseCorrection {
+  id: number;
+  student_id?: number | null;
+  is_active?: boolean;
+  active?: number | boolean | null;
+  grade?: number | null;
+  created_at?: string | Date;
+}
 
 interface CorrectionsListProps {
-  corrections: Correction[];
+  corrections: BaseCorrection[];
   activity: Activity | null;
   activityId: string;
   isEditing: boolean;
@@ -123,19 +135,32 @@ const CorrectionsList: React.FC<CorrectionsListProps> = ({
                   }
                 }}
               >
-                {/* Grade display in top right */}
-                {correction.grade !== null && correction.grade !== undefined && (
+                {/* Grade display or inactive warning in top right */}
+                {correction.active !== 0 ? (
+                  // Affichage de la note pour les corrections actives
+                  correction.grade !== null && correction.grade !== undefined && (
+                    <Box sx={{ position: 'absolute', top: 12, right: 12 }}>
+                      <Typography variant="subtitle2">
+                        {correction.grade} / {(activity?.experimental_points ?? 5) + (activity?.theoretical_points ?? 15)}
+                      </Typography>
+                    </Box>
+                  )
+                ) : (
+                  // Affichage du chip d'avertissement pour les corrections inactives
                   <Box sx={{ position: 'absolute', top: 12, right: 12 }}>
-                    <Typography variant="subtitle2">
-                      {correction.grade} / {(activity?.experimental_points ?? 5) + (activity?.theoretical_points ?? 15)}
-                    </Typography>
+                    <Chip
+                      icon={<WarningIcon />}
+                      label="Inactive"
+                      color="warning"
+                      size="small"
+                    />
                   </Box>
                 )}
                 
                 <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1, mb: 2, pr: 5 }}>
                   <Typography variant="subtitle1" fontWeight="bold" noWrap>
                     {/* Utiliser getStudentFullName à la place de student_name */}
-                    {getStudentFullName(correction.student_id) || `${activity?.name} - Sans nom`}
+                    {getStudentFullName(correction.student_id ?? null) || `${activity?.name} - Sans nom`}
                   </Typography>
                   <Typography variant="body2" color="text.primary">
                     Ajoutée le {new Date(correction.created_at!).toLocaleString('fr-FR')}

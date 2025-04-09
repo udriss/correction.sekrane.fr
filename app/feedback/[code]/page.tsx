@@ -35,6 +35,7 @@ import ScheduleIcon from '@mui/icons-material/Schedule';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import GradientBackground from '@/components/ui/GradientBackground';
 import PatternBackground from '@/components/ui/PatternBackground';
+import ErrorDisplay from '@/components/ui/ErrorDisplay';
 
 // Initialiser la police Inter
 const inter = Inter({ subsets: ['latin'] });
@@ -85,45 +86,46 @@ export default function FeedbackViewer({ params }: { params: Promise<{ code: str
     }
   };
 
+  // Extraire la fonction fetchSharedCorrection pour qu'elle soit accessible en dehors du useEffect
+  const fetchSharedCorrection = async () => {
+    setLoading(true);
+    try {
+      const response = await fetch(`/api/feedback/${code}`);
+      
+      if (!response.ok) {
+        if (response.status === 404) {
+          throw new Error('Ce lien de partage est invalide ou a expiré');
+        }
+        throw new Error('Erreur lors du chargement de la correction');
+      }
+      
+      const data = await response.json();
+      setCorrection(data);
+      
+      // Initialiser le contenu de la correction et les fragments d'éditeur
+      setCorrectionContent(data.content || '');
+      
+      // Vérifier si content_data existe et contient des fragments
+      if (data.content_data && data.content_data.fragments) {
+        setEditorContent(data.content_data.fragments);
+      } else {
+        setEditorContent([]);
+      }
+      
+      // Générer le HTML à partir des items de contenu
+      const contentItems = parseContentItems(data);
+      const html = generateHtmlFromItems(contentItems);
+      setRenderedHtml(html);
+    } catch (err: any) {
+      console.error('Erreur:', err);
+      setError(err.message || 'Une erreur est survenue');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // Récupérer la correction partagée
   useEffect(() => {
-    const fetchSharedCorrection = async () => {
-      setLoading(true);
-      try {
-        const response = await fetch(`/api/feedback/${code}`);
-        
-        if (!response.ok) {
-          if (response.status === 404) {
-            throw new Error('Ce lien de partage est invalide ou a expiré');
-          }
-          throw new Error('Erreur lors du chargement de la correction');
-        }
-        
-        const data = await response.json();
-        setCorrection(data);
-        
-        // Initialiser le contenu de la correction et les fragments d'éditeur
-        setCorrectionContent(data.content || '');
-        
-        // Vérifier si content_data existe et contient des fragments
-        if (data.content_data && data.content_data.fragments) {
-          setEditorContent(data.content_data.fragments);
-        } else {
-          setEditorContent([]);
-        }
-        
-        // Générer le HTML à partir des items de contenu
-        const contentItems = parseContentItems(data);
-        const html = generateHtmlFromItems(contentItems);
-        setRenderedHtml(html);
-      } catch (err: any) {
-        console.error('Erreur:', err);
-        setError(err.message || 'Une erreur est survenue');
-      } finally {
-        setLoading(false);
-      }
-    };
-    
     fetchSharedCorrection();
   }, [code]);
 
@@ -185,14 +187,21 @@ export default function FeedbackViewer({ params }: { params: Promise<{ code: str
                 Erreur
               </Typography>
             </Box>
-            <Alert severity="error" sx={{ mb: 3 }}>
-              {error}
-            </Alert>
+            <ErrorDisplay 
+              error={error} 
+              withRefreshButton={true}
+              onRefresh={() => {
+                setLoading(true);
+                setError('');
+                fetchSharedCorrection();
+              }}
+            />
             <Button
               variant="contained"
               color="primary"
               startIcon={<ArrowBackIcon />}
               onClick={() => router.push('/')}
+              sx={{ mt: 3 }}
             >
               Retour à l'accueil
             </Button>

@@ -180,7 +180,8 @@ export async function getCorrectionStatsByActivity(activityId: number, includeIn
         ROUND(AVG(c.grade), 2) as averageGrade,
         MAX(c.grade) as maxGrade,
         MIN(c.grade) as minGrade,
-        COUNT(c.id) as count
+        COUNT(c.id) as count,
+        SUM(CASE WHEN c.active = 0 THEN 1 ELSE 0 END) as inactive_count
       FROM 
         corrections c
       LEFT JOIN 

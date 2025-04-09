@@ -4,6 +4,7 @@ import { Correction } from '@/app/components/CorrectionsDataProvider';
 import CorrectionCard from './CorrectionCard';
 import { getBatchShareCodes } from '@/lib/services/shareService';
 import { useSnackbar } from 'notistack';
+import ErrorDisplay from '@/components/ui/ErrorDisplay';
 
 interface StudentsListProps {
   filteredCorrections: Correction[];
@@ -116,11 +117,7 @@ const StudentsList: React.FC<StudentsListProps> = ({
   }, [corrections]);
   
   if (error) {
-    return (
-      <Alert severity="error" sx={{ mt: 4 }}>
-        Erreur lors du chargement des corrections: {error.message}
-      </Alert>
-    );
+    return <ErrorDisplay error={error} />;
   }
   
   if (corrections.length === 0) {

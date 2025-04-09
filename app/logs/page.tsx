@@ -686,13 +686,14 @@ export default function LogsPage() {
               <Grid container spacing={2}>
                 <Grid size={{ xs: 12, sm: 6, }}>
                   <Typography variant="overline" color="text.secondary">Type d'action</Typography>
-                  <Typography variant="body1" gutterBottom>
+                  {/* Retrait du Typography qui causait l'erreur d'hydratation */}
+                  <Box sx={{ mt: 1, mb: 2 }}>
                     <Chip 
                       label={selectedLog.action_type} 
                       size="small" 
                       color={getActionTypeColor(selectedLog.action_type) as any}
                     />
-                  </Typography>
+                  </Box>
                 </Grid>
                 
                 <Grid size={{ xs: 12, sm: 6, }}>

@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import ClassStudentsManager from '@/components/classes/ClassStudentsManager';
 import LoadingSpinner from '@/components/LoadingSpinner';
+import ErrorDisplay from '@/components/ui/ErrorDisplay';
 import { 
   Button,
   Box,
@@ -56,6 +57,50 @@ export default function ClassStudentsManagerModal({
   const theme = useTheme();
   const fullScreen = useMediaQuery(theme.breakpoints.down('md'));
 
+  // Extraire la fonction fetchClassData pour qu'elle soit accessible en dehors du useEffect
+  const fetchClassData = async () => {
+    try {
+      setLoading(true);
+      
+      // Fetch class details
+      const classResponse = await fetch(`/api/classes/${classId}`);
+      
+      if (classResponse.status === 404) {
+        setError('Classe non trouvée');
+        setLoading(false);
+        return;
+      }
+      
+      if (classResponse.status === 401) {
+        // Redirection handled by middleware
+        return;
+      }
+      
+      if (!classResponse.ok) {
+        throw new Error('Erreur lors du chargement des données de la classe');
+      }
+      
+      const classDataResponse = await classResponse.json();
+      setClassData(classDataResponse);
+      
+      // Fetch students stats
+      const statsResponse = await fetch(`/api/classes/${classId}/stats`);
+      
+      if (statsResponse.ok) {
+        const statsData = await statsResponse.json();
+        setStudentStats({
+          total: statsData?.total_students || 0,
+          withCorrections: statsData?.students_with_corrections || 0
+        });
+      }
+    } catch (err) {
+      console.error('Erreur:', err);
+      setError('Une erreur est survenue lors du chargement des données.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // Reset state when modal closes
   useEffect(() => {
     if (!open) {
@@ -68,50 +113,6 @@ export default function ClassStudentsManagerModal({
   // Fetch class data when modal opens
   useEffect(() => {
     if (!classId || !open) return;
-
-    const fetchClassData = async () => {
-      try {
-        setLoading(true);
-        
-        // Fetch class details
-        const classResponse = await fetch(`/api/classes/${classId}`);
-        
-        if (classResponse.status === 404) {
-          setError('Classe non trouvée');
-          setLoading(false);
-          return;
-        }
-        
-        if (classResponse.status === 401) {
-          // Redirection handled by middleware
-          return;
-        }
-        
-        if (!classResponse.ok) {
-          throw new Error('Erreur lors du chargement des données de la classe');
-        }
-        
-        const classDataResponse = await classResponse.json();
-        setClassData(classDataResponse);
-        
-        // Fetch students stats
-        const statsResponse = await fetch(`/api/classes/${classId}/stats`);
-        
-        if (statsResponse.ok) {
-          const statsData = await statsResponse.json();
-          setStudentStats({
-            total: statsData?.total_students || 0,
-            withCorrections: statsData?.students_with_corrections || 0
-          });
-        }
-      } catch (err) {
-        console.error('Erreur:', err);
-        setError('Une erreur est survenue lors du chargement des données.');
-      } finally {
-        setLoading(false);
-      }
-    };
-
     fetchClassData();
   }, [classId, open]);
 
@@ -134,7 +135,17 @@ export default function ClassStudentsManagerModal({
           </Box>
         </DialogTitle>
         <DialogContent>
-          <Alert severity="error">{error}</Alert>
+          <ErrorDisplay 
+            error={error}
+            withRefreshButton={true}
+            onRefresh={() => {
+              setError(null);
+              if (classId && open) {
+                setLoading(true);
+                fetchClassData();
+              }
+            }}
+          />
         </DialogContent>
         <DialogActions>
           <Button onClick={onClose} color="primary">Fermer</Button>

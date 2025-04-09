@@ -8,6 +8,7 @@ import { getBatchShareCodes } from '@/lib/services/shareService';
 import dayjs from 'dayjs';
 import 'dayjs/locale/fr';
 import { useSnackbar } from 'notistack';
+import ErrorDisplay from '@/components/ui/ErrorDisplay';
 
 interface ClassesListProps {
   filteredCorrections: ProviderCorrection[];
@@ -148,11 +149,7 @@ const ClassesList: React.FC<ClassesListProps> = ({
   }, [subClassFilter, filteredCorrections]);
 
   if (error) {
-    return (
-      <Alert severity="error" sx={{ mt: 4 }}>
-        Erreur lors du chargement des corrections: {error.message || String(error)}
-      </Alert>
-    );
+    return <ErrorDisplay error={error} />;
   }
   
   if (filteredCorrections.length === 0) {

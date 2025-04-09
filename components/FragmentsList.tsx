@@ -15,7 +15,8 @@ import {
   CardActions,
   Tooltip,
   Divider,
-  Chip
+  Chip,
+  Alert
 } from '@mui/material';
 import Grid from '@mui/material/Grid';
 
@@ -37,17 +38,33 @@ type Fragment = EditModalFragment;
 interface FragmentsListProps {
   fragments: Fragment[];
   activityId: number;
-  onAddFragment: (fragmentData: Omit<EditModalFragment, 'id' | 'activity_id' | 'created_at' | 'updated_at'>) => Promise<void>;
-  onUpdateFragment: (id: number, fragmentData: Partial<EditModalFragment>) => Promise<void>;
-  onDeleteFragment: (id: number) => Promise<void>;
+  // Props d'origine
+  onAddFragment?: (fragmentData: Omit<EditModalFragment, 'id' | 'activity_id' | 'created_at' | 'updated_at'>) => Promise<void>;
+  onUpdateFragment?: (id: number, fragmentData: Partial<EditModalFragment>) => Promise<void>;
+  onDeleteFragment?: (id: number) => Promise<void>;
+  // Nouvelles props
+  onUpdate?: (activityId: string | number) => Promise<void>;
+  error?: string;
+  favoriteFragments?: Fragment[];
+  isFavoriteLoading?: boolean;
+  showTitle?: boolean;
+  showIcon?: boolean;
+  showEmpty?: boolean;
 }
 
 const FragmentsList: React.FC<FragmentsListProps> = ({ 
   fragments, 
-  activityId, 
+  activityId,
   onAddFragment, 
   onUpdateFragment, 
-  onDeleteFragment 
+  onDeleteFragment,
+  onUpdate,
+  error,
+  favoriteFragments,
+  isFavoriteLoading,
+  showTitle = false,
+  showIcon = false,
+  showEmpty = false
 }) => {
   // Modal and fragment state
   const [editModalOpen, setEditModalOpen] = useState(false);
@@ -121,12 +138,21 @@ const FragmentsList: React.FC<FragmentsListProps> = ({
   const handleSaveFragment = async (fragment: EditModalFragment): Promise<void> => {
     if (editingFragment) {
       const { content, category } = fragment;
-      await onUpdateFragment(editingFragment.id, { content, category } as Partial<EditModalFragment>);
+      if (onUpdateFragment) {
+        await onUpdateFragment(editingFragment.id, { content, category } as Partial<EditModalFragment>);
+      }
     } else {
       const { content, category } = fragment;
-      await onAddFragment({ content, category } as Omit<EditModalFragment, 'id' | 'activity_id' | 'created_at' | 'updated_at'>);
+      if (onAddFragment) {
+        await onAddFragment({ content, category } as Omit<EditModalFragment, 'id' | 'activity_id' | 'created_at' | 'updated_at'>);
+      }
     }
     setEditModalOpen(false);
+    
+    // Utiliser onUpdate si fourni pour actualiser la liste des fragments
+    if (onUpdate) {
+      await onUpdate(activityId);
+    }
   };
 
   // Delete handlers
@@ -141,7 +167,14 @@ const FragmentsList: React.FC<FragmentsListProps> = ({
   const handleConfirmDelete = async (fragmentId: number) => {
     try {
       setIsProcessingDelete(true);
-      await onDeleteFragment(fragmentId);
+      if (onDeleteFragment) {
+        await onDeleteFragment(fragmentId);
+      }
+      
+      // Utiliser onUpdate si fourni pour actualiser la liste des fragments
+      if (onUpdate) {
+        await onUpdate(activityId);
+      }
     } finally {
       setIsProcessingDelete(false);
       setFragmentToDelete(null);
@@ -159,6 +192,20 @@ const FragmentsList: React.FC<FragmentsListProps> = ({
 
   return (
     <Box>
+      {/* Afficher l'erreur si elle existe */}
+      {error && (
+        <Alert severity="error" sx={{ mb: 3 }}>
+          {error}
+        </Alert>
+      )}
+      
+      {/* Afficher le titre si showTitle est à true */}
+      {showTitle && (
+        <Typography variant="h5" gutterBottom>
+          Fragments pour cette activité
+        </Typography>
+      )}
+      
       {/* Search and filter bar */}
       <Paper sx={{ p: 2, mb: 3 }}>
         <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2 }}>
@@ -209,6 +256,13 @@ const FragmentsList: React.FC<FragmentsListProps> = ({
           }
         </Typography>
       </Box>
+
+      {/* Display a message if no fragments are found and showEmpty is true */}
+      {fragments.length === 0 && showEmpty && (
+        <Alert severity="info" sx={{ mb: 3 }}>
+          Aucun fragment n'a encore été créé pour cette activité. Vous pouvez ajouter des fragments pour réutiliser rapidement du texte dans vos corrections.
+        </Alert>
+      )}
 
       {/* Fragments grid */}
       <Grid container spacing={2}>

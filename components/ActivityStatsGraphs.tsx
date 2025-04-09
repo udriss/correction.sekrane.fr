@@ -42,6 +42,7 @@ import {
   LineElement
 } from 'chart.js';
 import { Bar, Pie, Line } from 'react-chartjs-2';
+import ErrorDisplay from '@/components/ui/ErrorDisplay';
 
 // Register ChartJS components
 ChartJS.register(
@@ -132,153 +133,154 @@ const ActivityStatsGraphs: React.FC<ActivityStatsGraphsProps> = ({ activityId })
     return colors;
   };
 
-  useEffect(() => {
-    const fetchData = async () => {
-      setLoading(true);
-      setError(null);
-      setErrorDetails(null);
+  // Extrait la fonction fetchData pour qu'elle soit accessible en dehors du useEffect
+  const fetchData = async () => {
+    setLoading(true);
+    setError(null);
+    setErrorDetails(null);
 
+    try {
+      // Fetch associated classes for this activity
+      const classesResponse = await fetch(`/api/activities/${activityId}/classes`);
+      if (!classesResponse.ok) {
+        throw new Error('Failed to fetch classes');
+      }
+      
+      let classesData;
       try {
-        // Fetch associated classes for this activity
-        const classesResponse = await fetch(`/api/activities/${activityId}/classes`);
-        if (!classesResponse.ok) {
-          throw new Error('Failed to fetch classes');
+        classesData = await classesResponse.json();
+        if (!Array.isArray(classesData)) {
+          classesData = [];
         }
-        
-        let classesData;
-        try {
-          classesData = await classesResponse.json();
-          if (!Array.isArray(classesData)) {
-            classesData = [];
-          }
-          setClasses(classesData);
-        } catch (error) {
-          console.error('Error parsing classes data:', error);
-          setClasses([]);
-        }
+        setClasses(classesData);
+      } catch (error) {
+        console.error('Error parsing classes data:', error);
+        setClasses([]);
+      }
 
-        // Fetch groups for this activity (manual grouping)
-        const groupsResponse = await fetch(`/api/activities/${activityId}/groups`);
-        if (!groupsResponse.ok) {
-          throw new Error('Failed to fetch groups');
+      // Fetch groups for this activity (manual grouping)
+      const groupsResponse = await fetch(`/api/activities/${activityId}/groups`);
+      if (!groupsResponse.ok) {
+        throw new Error('Failed to fetch groups');
+      }
+      
+      let groupsData;
+      try {
+        groupsData = await groupsResponse.json();
+        if (!Array.isArray(groupsData)) {
+          groupsData = [];
         }
-        
-        let groupsData;
-        try {
-          groupsData = await groupsResponse.json();
-          if (!Array.isArray(groupsData)) {
-            groupsData = [];
-          }
-          setGroups(groupsData);
-        } catch (error) {
-          console.error('Error parsing groups data:', error);
-          setGroups([]);
-        }
+        setGroups(groupsData);
+      } catch (error) {
+        console.error('Error parsing groups data:', error);
+        setGroups([]);
+      }
 
-        // Generate sub-classes data based on classes
-        const subClassesData: SubClass[] = [];
-        classesData.forEach((classItem: any) => {
-          if (classItem.nbre_subclasses) {
-            for (let i = 1; i <= classItem.nbre_subclasses; i++) {
-              subClassesData.push({
-                id: i,
-                name: `Groupe ${i}`,
-                classId: classItem.id,
-                className: classItem.name
-              });
-            }
-          }
-        });
-        
-        // On crée un Map pour dédupliquer sur l'id tout en conservant l'information de classe
-        const subClassMap = new Map();
-        subClassesData.forEach(item => {
-          const key = item.id;
-          if (!subClassMap.has(key)) {
-            subClassMap.set(key, item);
-          } else {
-            // Si ce sous-groupe existe déjà, on ajoute un indicateur qu'il appartient à plusieurs classes
-            const existing = subClassMap.get(key);
-            existing.multipleClasses = true;
-          }
-        });
-        
-        setSubClasses(Array.from(subClassMap.values()));
-
-        // Fetch grade statistics for this activity with all categorization
-        const statsResponse = await fetch(
-          `/api/activities/${activityId}/stats?includeInactive=${includeInactive}`
-        );
-        if (!statsResponse.ok) {
-          const errorData = await statsResponse.json();
-          throw new Error(
-            errorData.details?.message || 
-            errorData.error || 
-            'Failed to fetch statistics'
-          );
-        }
-        
-        let statsData;
-        try {
-          statsData = await statsResponse.json();
-          if (!Array.isArray(statsData)) {
-            statsData = [];
-          }
-          
-          // Make sure we have the "Sans groupe" category if needed
-          const noGroupStats = statsData.find(stat => stat.groupId === 0);
-          if (!noGroupStats && statsData.some(stat => stat.groupId === 0)) {
-            statsData.push({
-              groupId: 0,
-              groupName: 'Sans groupe',
-              averageGrade: 0,
-              maxGrade: 0,
-              minGrade: 0,
-              count: 0
+      // Generate sub-classes data based on classes
+      const subClassesData: SubClass[] = [];
+      classesData.forEach((classItem: any) => {
+        if (classItem.nbre_subclasses) {
+          for (let i = 1; i <= classItem.nbre_subclasses; i++) {
+            subClassesData.push({
+              id: i,
+              name: `Groupe ${i}`,
+              classId: classItem.id,
+              className: classItem.name
             });
           }
-          
-          setStats(statsData);
-          setFilteredStats(statsData); // Initialize filtered stats with all stats
-        } catch (error) {
-          console.error('Error parsing stats data:', error);
-          setStats([]);
-          setFilteredStats([]);
         }
-      } catch (err: any) {
-        console.error('Error fetching activity statistics:', err);
+      });
+      
+      // On crée un Map pour dédupliquer sur l'id tout en conservant l'information de classe
+      const subClassMap = new Map();
+      subClassesData.forEach(item => {
+        const key = item.id;
+        if (!subClassMap.has(key)) {
+          subClassMap.set(key, item);
+        } else {
+          // Si ce sous-groupe existe déjà, on ajoute un indicateur qu'il appartient à plusieurs classes
+          const existing = subClassMap.get(key);
+          existing.multipleClasses = true;
+        }
+      });
+      
+      setSubClasses(Array.from(subClassMap.values()));
+
+      // Fetch grade statistics for this activity with all categorization
+      const statsResponse = await fetch(
+        `/api/activities/${activityId}/stats?includeInactive=${includeInactive}`
+      );
+      if (!statsResponse.ok) {
+        const errorData = await statsResponse.json();
+        throw new Error(
+          errorData.details?.message || 
+          errorData.error || 
+          'Failed to fetch statistics'
+        );
+      }
+      
+      let statsData;
+      try {
+        statsData = await statsResponse.json();
+        if (!Array.isArray(statsData)) {
+          statsData = [];
+        }
         
-        // Récupérer et traiter à la fois l'erreur simple et les détails complets
-        const errorMessage = err.message || 'Failed to load statistics';
-        setError(errorMessage);
-        
-        // Si l'erreur contient des détails (comme c'est le cas pour une réponse d'API avec détails)
-        if (err.cause?.details) {
-          setErrorDetails(err.cause.details);
-        } else if (typeof err === 'object' && err !== null) {
-          // Récupérer toutes les informations sur l'erreur pour affichage
-          setErrorDetails({
-            message: err.message,
-            stack: err.stack,
-            // Pour les erreurs network ou Response, récupérer ce qu'on peut
-            status: err.status,
-            statusText: err.statusText,
-            // Autres propriétés potentielles d'erreur
-            code: err.code,
-            sqlMessage: err.sqlMessage,
-            sql: err.sql
+        // Make sure we have the "Sans groupe" category if needed
+        const noGroupStats = statsData.find(stat => stat.groupId === 0);
+        if (!noGroupStats && statsData.some(stat => stat.groupId === 0)) {
+          statsData.push({
+            groupId: 0,
+            groupName: 'Sans groupe',
+            averageGrade: 0,
+            maxGrade: 0,
+            minGrade: 0,
+            count: 0
           });
         }
-
-        setGroups([]);
-        setClasses([]);
+        
+        setStats(statsData);
+        setFilteredStats(statsData); // Initialize filtered stats with all stats
+      } catch (error) {
+        console.error('Error parsing stats data:', error);
         setStats([]);
         setFilteredStats([]);
-      } finally {
-        setLoading(false);
       }
-    };
+    } catch (err: any) {
+      console.error('Error fetching activity statistics:', err);
+      
+      // Récupérer et traiter à la fois l'erreur simple et les détails complets
+      const errorMessage = err.message || 'Failed to load statistics';
+      setError(errorMessage);
+      
+      // Si l'erreur contient des détails (comme c'est le cas pour une réponse d'API avec détails)
+      if (err.cause?.details) {
+        setErrorDetails(err.cause.details);
+      } else if (typeof err === 'object' && err !== null) {
+        // Récupérer toutes les informations sur l'erreur pour affichage
+        setErrorDetails({
+          message: err.message,
+          stack: err.stack,
+          // Pour les erreurs network ou Response, récupérer ce qu'on peut
+          status: err.status,
+          statusText: err.statusText,
+          // Autres propriétés potentielles d'erreur
+          code: err.code,
+          sqlMessage: err.sqlMessage,
+          sql: err.sql
+        });
+      }
 
+      setGroups([]);
+      setClasses([]);
+      setStats([]);
+      setFilteredStats([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
     if (activityId) {
       fetchData();
     }
@@ -649,114 +651,20 @@ const ActivityStatsGraphs: React.FC<ActivityStatsGraphsProps> = ({ activityId })
     );
   }
 
+  // Remplacer la condition if (error) par notre composant ErrorDisplay
   if (error) {
     return (
-      <Alert 
-        severity="error" 
-        sx={{ 
-          mb: 2,
-          '& .MuiAlert-message': { width: '100%' } 
+      <ErrorDisplay 
+        error={error}
+        errorDetails={errorDetails}
+        withRefreshButton={true}
+        onRefresh={() => {
+          setLoading(true);
+          setError(null);
+          setErrorDetails(null);
+          fetchData();
         }}
-        action={
-          errorDetails && (
-            <Button 
-              color="inherit" 
-              size="small"
-              onClick={() => setShowFullError(!showFullError)}
-            >
-              {showFullError ? 'Masquer les détails' : 'Voir les détails'}
-            </Button>
-          )
-        }
-      >
-        <Typography variant="body1" sx={{ mb: errorDetails ? 1 : 0 }}>
-          <strong>Erreur lors du chargement des statistiques :</strong> {error}
-        </Typography>
-        
-        {showFullError && errorDetails && (
-          <Paper 
-            elevation={0} 
-            sx={{ 
-              bgcolor: 'rgba(0,0,0,0.04)', 
-              p: 2, 
-              mt: 1, 
-              maxHeight: '400px',
-              overflow: 'auto',
-              fontSize: '0.85rem',
-              fontFamily: 'monospace'
-            }}
-          >
-            <Typography variant="subtitle2" gutterBottom>
-              Détails de l'erreur:
-            </Typography>
-            
-            {errorDetails.sqlMessage && (
-              <Box sx={{ mb: 1 }}>
-                <Typography variant="caption" component="div" color="error.dark" sx={{ fontWeight: 'bold' }}>
-                  SQL Message:
-                </Typography>
-                <Typography variant="caption" component="div" sx={{ ml: 1 }}>
-                  {errorDetails.sqlMessage}
-                </Typography>
-              </Box>
-            )}
-            
-            {errorDetails.code && (
-              <Box sx={{ mb: 1 }}>
-                <Typography variant="caption" component="div" color="error.dark" sx={{ fontWeight: 'bold' }}>
-                  Code:
-                </Typography>
-                <Typography variant="caption" component="div" sx={{ ml: 1 }}>
-                  {errorDetails.code}
-                </Typography>
-              </Box>
-            )}
-            
-            {errorDetails.sql && (
-              <Box sx={{ mb: 1 }}>
-                <Typography variant="caption" component="div" color="error.dark" sx={{ fontWeight: 'bold' }}>
-                  Requête SQL:
-                </Typography>
-                <Typography 
-                  variant="caption" 
-                  component="pre" 
-                  sx={{ 
-                    ml: 1, 
-                    whiteSpace: 'pre-wrap', 
-                    wordBreak: 'break-word',
-                    bgcolor: 'background.paper',
-                    p: 1,
-                    borderRadius: 1,
-                    border: '1px solid',
-                    borderColor: 'divider'
-                  }}
-                >
-                  {errorDetails.sql}
-                </Typography>
-              </Box>
-            )}
-            
-            {errorDetails.stack && (
-              <Box sx={{ mb: 1 }}>
-                <Typography variant="caption" component="div" color="error.dark" sx={{ fontWeight: 'bold' }}>
-                  Stack Trace:
-                </Typography>
-                <Typography 
-                  variant="caption" 
-                  component="pre" 
-                  sx={{ 
-                    ml: 1, 
-                    whiteSpace: 'pre-wrap', 
-                    wordBreak: 'break-word' 
-                  }}
-                >
-                  {errorDetails.stack}
-                </Typography>
-              </Box>
-            )}
-          </Paper>
-        )}
-      </Alert>
+      />
     );
   }
   
