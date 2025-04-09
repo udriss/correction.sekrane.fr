@@ -127,7 +127,7 @@ const FragmentForm: React.FC<FragmentFormProps> = ({
   };
   
   return (
-    <Box component="form" onSubmit={handleSubmit}>
+    <Box sx={{ mt: 2 }} component="form" onSubmit={handleSubmit}>
       {error && (
         <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>
           {error}

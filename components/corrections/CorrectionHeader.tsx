@@ -10,6 +10,7 @@ import {
   Grid,
   Chip,
   alpha,
+  Tooltip,
 } from '@mui/material';
 import { rgbToHex } from '@mui/material/styles';
 import EditIcon from '@mui/icons-material/Edit';
@@ -18,6 +19,8 @@ import CloseIcon from '@mui/icons-material/Close';
 import DeleteIcon from '@mui/icons-material/Delete';
 import SchoolIcon from '@mui/icons-material/School';
 import GroupsIcon from '@mui/icons-material/Groups';
+import VisibilityIcon from '@mui/icons-material/Visibility';
+import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
 import { th } from 'date-fns/locale';
 
 interface CorrectionHeaderProps {
@@ -35,6 +38,7 @@ interface CorrectionHeaderProps {
   handleSaveName: (firstName: string, lastName: string, email?: string) => void;
   handleDelete: () => void;
   handleCancelDelete: () => void;
+  handleToggleActive?: () => void; // Ajout de la fonction pour activer/désactiver
   email?: string;
   setEmail?: (email: string) => void;
 }
@@ -54,6 +58,7 @@ const CorrectionHeader: React.FC<CorrectionHeaderProps> = ({
   handleSaveName,
   handleDelete,
   handleCancelDelete,
+  handleToggleActive,
   email = '',
   setEmail = () => {},
 }) => {
@@ -80,6 +85,8 @@ const CorrectionHeader: React.FC<CorrectionHeaderProps> = ({
   // Add type guards around student_name usage
   const displayName = correction.student_name || `${correction.activity_name || 'Activité'} - Sans nom`;
   const displayEmail = correction?.student_data?.email || '';
+  // Déterminer si la correction est active
+  const isActive = correction.active !== 0 && correction.active !== false;
 
   // Update parent state and handle form submission
   const handleFormSubmit = () => {
@@ -277,6 +284,18 @@ const CorrectionHeader: React.FC<CorrectionHeaderProps> = ({
                 <DeleteIcon fontSize="large" />
               </IconButton>
             )}
+            {/* Bouton d'activation/désactivation */}
+            <Tooltip title={isActive ? "Désactiver la correction" : "Activer la correction"}>
+              <IconButton
+                onClick={handleToggleActive}
+                color={isActive ? "primary" : "default"}
+                title={isActive ? "Désactiver la correction" : "Activer la correction"}
+                size="small"
+                sx={{ ml: 1 }}
+              >
+                {isActive ? <VisibilityIcon fontSize="large" /> : <VisibilityOffIcon fontSize="large" />}
+              </IconButton>
+            </Tooltip>
           </Box>
         )}
         
@@ -285,7 +304,11 @@ const CorrectionHeader: React.FC<CorrectionHeaderProps> = ({
             <Typography sx={{ color: 'text.primary', mt: 1 }}>
               Activité : 
               
-              <Link href={`/activities/${correction.activity_id}`} style={{ color: 'primary.dark', textDecoration: 'none' , fontWeight: 'bold' }}>
+              <Link 
+              href={`/activities/${correction.activity_id}`}
+              style={{ color: 'primary.dark', textDecoration: 'none' , fontWeight: 'bold' }}
+              target="_blank"
+              rel="noopener noreferrer">
                 <Button variant="text" sx={{
                    textTransform: 'none', p: 0, minWidth: 0, verticalAlign: 'baseline',
                    fontWeight: 'bold',}}>

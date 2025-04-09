@@ -106,7 +106,8 @@ export default function CorrectionDetail({ params }: { params: Promise<{ id: str
     handleSaveCorrection,
     handleSaveName,
     handleDelete,
-    handleCancelDelete
+    handleCancelDelete,
+    handleToggleActive
   } = correctionsHook;
 
   // Add state for experimental and theoretical grades
@@ -151,35 +152,37 @@ export default function CorrectionDetail({ params }: { params: Promise<{ id: str
   // Effect to handle auto-save functionality
   useEffect(() => {
     // Only set up auto-save if correction exists and auto-save is active
-        if (correction && autoSaveActive) {
+    if (correction && autoSaveActive) {
       // Clear any existing timer
       if (autoSaveTimerRef.current) {
         clearInterval(autoSaveTimerRef.current);
       }
       
-      // Create an interval that runs every 70 seconds
-      
-      
       // Set up interval timer - save every 70 seconds
       autoSaveTimerRef.current = setInterval(() => {
         // Only auto-save if there are unsaved changes
         if (history.length > 0 || contentItems.length > 0) {
-          
-          handleSaveCorrection();
-          setLastAutoSave(new Date());
-        } else {
-          
+          console.log('Auto-saving correction...');
+          handleSaveCorrection()
+            .then(() => {
+              setLastAutoSave(new Date());
+              console.log('Auto-save completed successfully');
+            })
+            .catch(err => {
+              console.error('Auto-save failed:', err);
+            });
         }
       }, 70000); // 70 seconds
     }
     
-    // Clean up timer on component unmount
+    // Clean up timer on component unmount or when dependencies change
     return () => {
       if (autoSaveTimerRef.current) {
         clearInterval(autoSaveTimerRef.current);
+        autoSaveTimerRef.current = null;
       }
     };
-  }, [correction, autoSaveActive]);
+  }, [correction, autoSaveActive, history.length, contentItems.length, handleSaveCorrection]);
 
   // Effect to handle beforeunload event to warn about unsaved changes
   useEffect(() => {
@@ -795,6 +798,7 @@ export default function CorrectionDetail({ params }: { params: Promise<{ id: str
                     handleSaveName={handleSaveName}
                     handleDelete={handleDelete}
                     handleCancelDelete={handleCancelDelete}
+                    handleToggleActive={handleToggleActive}
                     firstName={correction.student_data?.first_name || correction.student_first_name || ''}
                     lastName={correction.student_data?.last_name || correction.student_last_name || ''}
                     setFirstName={(value) => correctionsHook.setFirstName?.(value)}

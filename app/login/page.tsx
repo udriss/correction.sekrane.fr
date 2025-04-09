@@ -97,7 +97,12 @@ export default function LoginPage() {
           </Alert>
         )}
 
-        <Box component="form" onSubmit={handleSubmit} sx={{ width: '100%' }}>
+        <Box 
+          component="form" 
+          onSubmit={handleSubmit} 
+          sx={{ width: '100%' }}
+          method="post" // Ajout explicite de l'attribut method="post"
+        >
           <TextField
             margin="normal"
             required

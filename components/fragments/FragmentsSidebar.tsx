@@ -338,7 +338,8 @@ const FragmentsSidebar: React.FC<FragmentsSidebarProps> = ({
 
       {/* Formulaire d'ajout de fragment */}
       {showAddForm && canAddNewFragments && (
-        <FragmentForm 
+        <FragmentForm
+        
           activityId={selectedActivityId || undefined}
           categories={categories}
           onSuccess={(newFragment) => {

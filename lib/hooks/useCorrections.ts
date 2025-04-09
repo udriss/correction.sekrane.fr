@@ -18,6 +18,7 @@ interface LocalCorrection extends Omit<Correction, 'activity_id' | 'class_id'> {
   deadline?: string;
   submission_date?: string;
   grade?: number;
+  active?: number | boolean;
   experimental_points_earned?: number;
   theoretical_points_earned?: number;
   penalty?: number;
@@ -26,7 +27,7 @@ interface LocalCorrection extends Omit<Correction, 'activity_id' | 'class_id'> {
   student_last_name?: string;
   class_id: number | null; // Removed optional modifier to match the base type
   class_name?: string;
-  sub_class?: number | null;
+  sub_class?: number;
   student_data?: {
     id?: number;
     first_name?: string;
@@ -407,6 +408,50 @@ export function useCorrections(correctionId: string) {
     }
   }, [confirmingDelete, correction, router, correctionId]);
 
+  // Toggle active status for a correction
+  const handleToggleActive = useCallback(async () => {
+    if (!correction) return;
+    
+    setSaving(true);
+    setError('');
+    
+    try {
+      const newActiveState = !(correction.active === 1 || correction.active === true);
+      
+      const response = await fetch(`/api/corrections/${correctionId}/toggle-active`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ active: newActiveState }),
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Erreur lors de la modification du statut');
+      }
+      
+      const updatedCorrection = await response.json();
+      
+      // Mettre à jour la correction locale avec le nouveau statut
+      setCorrection(prev => {
+        if (!prev) return null;
+        return {
+          ...prev,
+          active: newActiveState ? 1 : 0
+        };
+      });
+      
+      setSuccessMessage(`Correction ${newActiveState ? 'activée' : 'désactivée'} avec succès`);
+      setTimeout(() => setSuccessMessage(''), 3000);
+    } catch (err) {
+      console.error('Erreur:', err);
+      setError('Erreur lors de la modification du statut de la correction');
+    } finally {
+      setSaving(false);
+    }
+  }, [correction, correctionId]);
+
   // Cancel delete confirmation
   const handleCancelDelete = useCallback(() => {
     setConfirmingDelete(false);
@@ -450,6 +495,7 @@ export function useCorrections(correctionId: string) {
     handleSaveCorrection,
     handleSaveName,
     handleDelete,
+    handleToggleActive,
     handleCancelDelete,
     saveGradeAndPenalty,
     saveDates,

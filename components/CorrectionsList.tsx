@@ -26,7 +26,6 @@ import WarningIcon from '@mui/icons-material/Warning';
 interface BaseCorrection {
   id: number;
   student_id?: number | null;
-  is_active?: boolean;
   active?: number | boolean | null;
   grade?: number | null;
   created_at?: string | Date;
@@ -59,7 +58,7 @@ const CorrectionsList: React.FC<CorrectionsListProps> = ({
   onConfirmDelete,
   onCancelDelete,
   // Inclure getStudentFullName avec une valeur par défaut
-  getStudentFullName = (studentId) => "Sans nomnom", // Fonction par défaut si non fournie
+  getStudentFullName = (studentId) => "Sans nom", // Fonction par défaut si non fournie
 }) => {
   return (
     <>
