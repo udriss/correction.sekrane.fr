@@ -13,6 +13,7 @@ interface CorrectionRow extends RowDataPacket {
   experimental_points_earned?: number | null;
   theoretical_points_earned?: number | null;
   grade?: number | null;
+  final_grade?: number | null;
   [key: string]: any; // Pour les autres propriétés
 }
 
@@ -67,12 +68,21 @@ export async function PUT(
       
       // Calculer la nouvelle note totale en appliquant la pénalité
       const totalWithoutPenalty = experimental + theoretical;
-      const finalGrade = Math.max(0, totalWithoutPenalty - penaltyValue);
+      
+      // Appliquer la nouvelle règle pour final_grade
+      let finalGrade;
+      if (totalWithoutPenalty < 6) {
+        // Si la note est déjà inférieure à 6, garder cette note
+        finalGrade = totalWithoutPenalty;
+      } else {
+        // Sinon, appliquer le maximum entre note-pénalité et 6
+        finalGrade = Math.max(totalWithoutPenalty - penaltyValue, 6);
+      }
 
       // Mettre à jour uniquement la pénalité et la note finale
       await connection.query(
-        'UPDATE corrections SET penalty = ? WHERE id = ?',
-        [penaltyValue, id]
+        'UPDATE corrections SET penalty = ?, final_grade = ? WHERE id = ?',
+        [penaltyValue, finalGrade, id]
       );
 
       // Créer un log pour la mise à jour de la pénalité
@@ -87,7 +97,8 @@ export async function PUT(
           old_penalty: oldCorrection.penalty,
           new_penalty: penaltyValue,
           old_grade: oldCorrection.grade,
-          //new_grade: finalGrade,
+          old_final_grade: oldCorrection.final_grade,
+          new_final_grade: finalGrade,
           activity_id: oldCorrection.activity_id,
           student_id: oldCorrection.student_id
         }

@@ -101,6 +101,7 @@ export async function POST(request: NextRequest) {
         content_data: data.content_data ? JSON.stringify(data.content_data) : null,
         grade: null as number | null, // Will calculate below
         penalty: data.penalty || null,
+        final_grade: null as number | null, // Will calculate below
         deadline: data.deadline || new Date().toISOString().split('T')[0],
         submission_date: data.submission_date || new Date().toISOString(), // Now includes time
         experimental_points_earned: parseFloat(data.experimental_points_earned) || 0,
@@ -120,6 +121,16 @@ export async function POST(request: NextRequest) {
       // Calculate grade
       const grade = (correctionData.experimental_points_earned + correctionData.theoretical_points_earned);
       correctionData.grade = grade;
+      
+      // Calculate final_grade using the new rule
+      const penaltyValue = parseFloat(data.penalty) || 0;
+      if (grade < 6) {
+        // If the grade is already below 6, keep the original grade
+        correctionData.final_grade = grade;
+      } else {
+        // Otherwise apply the maximum rule
+        correctionData.final_grade = Math.max(grade - penaltyValue, 6);
+      }
       
       // Check if student_id is valid before inserting
       let studentId = data.student_id || null;
@@ -158,10 +169,10 @@ export async function POST(request: NextRequest) {
       // Insert correction with validated student_id and numeric activity_id
       const [result] = await connection.query(
         `INSERT INTO corrections 
-         (activity_id, student_id, content, content_data, grade, penalty, deadline, 
+         (activity_id, student_id, content, content_data, grade, penalty, final_grade, deadline, 
           submission_date, experimental_points_earned, theoretical_points_earned, 
           class_id, group_id, created_at, updated_at )
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
         [
           numericActivityId, // Use numeric value
           studentId, // Use the validated student ID
@@ -169,6 +180,7 @@ export async function POST(request: NextRequest) {
           correctionData.content_data,
           correctionData.grade,
           correctionData.penalty,
+          correctionData.final_grade,
           correctionData.deadline,
           correctionData.submission_date,
           correctionData.experimental_points_earned,
@@ -196,6 +208,7 @@ export async function POST(request: NextRequest) {
           student_name: studentName,
           class_id: correctionData.class_id,
           grade: correctionData.grade,
+          final_grade: correctionData.final_grade,
           has_penalty: correctionData.penalty !== null && correctionData.penalty > 0,
           experimental_points: correctionData.experimental_points_earned,
           theoretical_points: correctionData.theoretical_points_earned

@@ -87,10 +87,18 @@ export async function GET(
         // Convertir en booléen: false si activeValue est 0, false ou null, true sinon
         activeStatus = !(activeValue === 0 || activeValue === false || activeValue === null);
         
-        // Calculer la note finale
+        // Calculer la note finale selon la nouvelle règle
         const grade = parseFloat((activeStatusResult[0] as any).grade) || 0;
         const penalty = parseFloat((activeStatusResult[0] as any).penalty) || 0;
-        finalGrade = Math.max(grade - penalty, 6);
+        
+        // Nouvelle logique pour final_grade
+        if (grade < 6) {
+          // Si la note est déjà inférieure à 6, on garde la note originale
+          finalGrade = grade;
+        } else {
+          // Sinon on prend le max entre grade-penalty et 6
+          finalGrade = Math.max(grade - penalty, 6);
+        }
       }
       
       // Combiner toutes les données
@@ -155,6 +163,7 @@ export async function PUT(
       let theoGradeUpdated = false;
       let expGrade = 0;
       let theoGrade = 0;
+      let penaltyValue = 0;
       
       if (body.experimental_points_earned !== undefined) {
         expGrade = parseFloat(body.experimental_points_earned) || 0;
@@ -168,6 +177,22 @@ export async function PUT(
         updateFields.push('theoretical_points_earned = ?');
         updateValues.push(theoGrade);
         theoGradeUpdated = true;
+      }
+      
+      // Gérer la pénalité
+      if (body.penalty !== undefined) {
+        penaltyValue = parseFloat(body.penalty) || 0;
+        updateFields.push('penalty = ?');
+        updateValues.push(penaltyValue);
+      } else {
+        // Récupérer la pénalité actuelle si nécessaire pour le calcul
+        const [currentPenalty] = await connection.query(
+          'SELECT penalty FROM corrections WHERE id = ?',
+          [idNumber]
+        );
+        if (Array.isArray(currentPenalty) && currentPenalty.length > 0) {
+          penaltyValue = parseFloat((currentPenalty[0] as any).penalty) || 0;
+        }
       }
       
       // Si l'une des notes a changé, récupérer les valeurs actuelles si nécessaire
@@ -195,6 +220,39 @@ export async function PUT(
         updateFields.push('grade = ?');
         updateValues.push(totalGrade);
         
+        // Calculer la note finale selon la nouvelle règle
+        let finalGrade;
+        if (totalGrade < 6) {
+          // Si la note est déjà inférieure à 6, on garde la note originale
+          finalGrade = totalGrade;
+        } else {
+          // Sinon on prend le max entre grade-penalty et 6
+          finalGrade = Math.max(totalGrade - penaltyValue, 6);
+        }
+        
+        updateFields.push('final_grade = ?');
+        updateValues.push(finalGrade);
+      } else if (body.penalty !== undefined) {
+        // Si seule la pénalité a changé, recalculer la note finale
+        const [currentGrade] = await connection.query(
+          'SELECT grade FROM corrections WHERE id = ?',
+          [idNumber]
+        );
+        
+        if (Array.isArray(currentGrade) && currentGrade.length > 0) {
+          const grade = parseFloat((currentGrade[0] as any).grade) || 0;
+          
+          // Appliquer la nouvelle règle de calcul
+          let finalGrade;
+          if (grade < 6) {
+            finalGrade = grade;
+          } else {
+            finalGrade = Math.max(grade - penaltyValue, 6);
+          }
+          
+          updateFields.push('final_grade = ?');
+          updateValues.push(finalGrade);
+        }
       }
       
       if (body.content !== undefined) {
@@ -289,6 +347,19 @@ export async function PUT(
         }
       } catch (e) {
         console.error('Erreur de parsing content_data après mise à jour:', e);
+      }
+      
+      // Si final_grade n'est pas disponible, le calculer
+      if (updatedCorrection.final_grade === undefined || updatedCorrection.final_grade === null) {
+        const grade = parseFloat(updatedCorrection.grade) || 0;
+        const penalty = parseFloat(updatedCorrection.penalty) || 0;
+        
+        // Appliquer la nouvelle règle
+        if (grade < 6) {
+          updatedCorrection.final_grade = grade;
+        } else {
+          updatedCorrection.final_grade = Math.max(grade - penalty, 6);
+        }
       }
       
       return NextResponse.json(updatedCorrection);
@@ -403,7 +474,6 @@ export async function PATCH(
     const { id } = await params;
     const correctionId = id;
 
-
     const data = await request.json();
 
     // Valider les données et récupérer l'ancienne correction pour comparaison
@@ -456,21 +526,64 @@ export async function PATCH(
         params.push(JSON.stringify(data.content));
       }
       
-      // Calculer la note totale si les points expérimentaux et théoriques sont fournis
-      if (data.experimental_points_earned !== undefined && data.theoretical_points_earned !== undefined) {
-        const totalGrade = data.experimental_points_earned + data.theoretical_points_earned;
-        
-        // Si une pénalité est définie, l'appliquer à la note
-        const finalGrade = data.penalty !== undefined && data.penalty > 0
-          ? Math.max(0, totalGrade - data.penalty)
-          : totalGrade;
-          
+      // Variables pour calculer la note finale
+      let expGrade = parseFloat((oldCorrection as any).experimental_points_earned) || 0;
+      let theoGrade = parseFloat((oldCorrection as any).theoretical_points_earned) || 0;
+      let penalty = parseFloat((oldCorrection as any).penalty) || 0;
+      let calculatedGrade = false;
+      
+      // Mettre à jour les valeurs en fonction des paramètres fournis
+      if (data.experimental_points_earned !== undefined) {
+        expGrade = parseFloat(data.experimental_points_earned) || 0;
+        calculatedGrade = true;
+      }
+      
+      if (data.theoretical_points_earned !== undefined) {
+        theoGrade = parseFloat(data.theoretical_points_earned) || 0;
+        calculatedGrade = true;
+      }
+      
+      if (data.penalty !== undefined) {
+        penalty = parseFloat(data.penalty) || 0;
+        calculatedGrade = true;
+      }
+      
+      // Calculer la note totale si nécessaire
+      if (calculatedGrade) {
+        const totalGrade = expGrade + theoGrade;
         fieldsToUpdate.push('grade = ?');
+        params.push(totalGrade);
+        
+        // Calculer la note finale selon la nouvelle règle
+        let finalGrade;
+        if (totalGrade < 6) {
+          // Si la note est déjà inférieure à 6, on garde la note originale
+          finalGrade = totalGrade;
+        } else {
+          // Sinon on applique la règle du maximum
+          finalGrade = Math.max(totalGrade - penalty, 6);
+        }
+        
+        fieldsToUpdate.push('final_grade = ?');
         params.push(finalGrade);
       } else if (data.grade !== undefined) {
         // Permettre également de mettre à jour directement la note
+        const grade = parseFloat(data.grade) || 0;
         fieldsToUpdate.push('grade = ?');
-        params.push(data.grade);
+        params.push(grade);
+        
+        // Calculer la note finale selon la nouvelle règle
+        let finalGrade;
+        if (grade < 6) {
+          // Si la note est inférieure à 6, garder cette note
+          finalGrade = grade;
+        } else {
+          // Sinon appliquer la règle du maximum avec 6
+          finalGrade = Math.max(grade - penalty, 6);
+        }
+        
+        fieldsToUpdate.push('final_grade = ?');
+        params.push(finalGrade);
       }
       
       if (fieldsToUpdate.length === 0) {
@@ -548,6 +661,8 @@ export async function PATCH(
           changes,
           old_grade: (oldCorrection as any).grade,
           new_grade: (updatedCorrection as any).grade,
+          old_final_grade: (oldCorrection as any).final_grade,
+          new_final_grade: (updatedCorrection as any).final_grade,
           activity_id: (oldCorrection as any).activity_id,
           student_id: (oldCorrection as any).student_id
         }
@@ -588,6 +703,24 @@ export async function PATCH(
           student_id: (oldCorrection as any).student_id
         }
       });
+    }
+
+    // Si final_grade n'est pas disponible, le calculer
+    // Vérifier si updatedCorrection existe et le traiter comme un objet typé
+    if (updatedCorrection && typeof updatedCorrection === 'object') {
+      const correctionData = updatedCorrection as any;
+      
+      if (!correctionData.final_grade) {
+        const grade = parseFloat(correctionData.grade) || 0;
+        const penalty = parseFloat(correctionData.penalty) || 0;
+        
+        // Appliquer la nouvelle règle
+        if (grade < 6) {
+          correctionData.final_grade = grade;
+        } else {
+          correctionData.final_grade = Math.max(grade - penalty, 6);
+        }
+      }
     }
 
     return NextResponse.json(updatedCorrection);

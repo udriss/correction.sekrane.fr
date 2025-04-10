@@ -37,6 +37,9 @@ interface StudentData {
 interface EmailFeedbackProps { 
   correctionId: string;
   studentData?: StudentData;
+  experimental_points_earned?: number | string | null;
+  theoretical_points_earned?: number | string | null;
+  penalty?: number | string | null;
 }
 
 const MESSAGE_TYPES = {
@@ -75,7 +78,10 @@ interface StudentWithCustomEmail extends Student {
 
 export default function EmailFeedback({ 
   correctionId,
-  studentData 
+  studentData,
+  experimental_points_earned,
+  theoretical_points_earned,
+  penalty
 }: EmailFeedbackProps) {
   const [open, setOpen] = useState(false);
   const [sending, setSending] = useState(false);
@@ -241,9 +247,71 @@ export default function EmailFeedback({
     setShareUrl(url);
   };
 
-
   // Fonction pour générer le message prédéfini avec HTML formatting
   const generateDefaultMessage = (studentName: string, url: string) => {
+    // Récupérer les informations de la correction pour l'explication des pénalités
+    let expGrade = 0;
+    let theoGrade = 0;
+    let penaltyValue = 0;
+    let rawTotal = 0;
+    let finalGrade = 0;
+
+    
+      // Function to safely parse floats from various inputs
+  const parseNumberSafely = (value: number | string | null | undefined): number => {
+    if (value === null || value === undefined) return 0;
+    return typeof value === 'number' ? value : parseFloat(String(value)) || 0;
+  };
+  
+
+    if (student && correctionId) {
+      // Utiliser les données de la correction pour l'explication
+      expGrade = parseNumberSafely(experimental_points_earned);
+      theoGrade = parseNumberSafely(theoretical_points_earned);
+      penaltyValue = parseNumberSafely(penalty);
+      rawTotal = expGrade + theoGrade;
+      
+      // Calculer la note finale selon la règle
+      if (rawTotal < 6) {
+        finalGrade = rawTotal;
+      } else {
+        finalGrade = Math.max(rawTotal - penaltyValue, 6);
+      }
+    }
+
+    // Déterminer le texte d'explication de la pénalité en fonction des valeurs
+    let penaltyExplanation = '';
+    
+    if (penaltyValue > 0) {
+      if (rawTotal >= 6) {
+        const calculatedGrade = rawTotal - penaltyValue;
+        if (calculatedGrade < 6) {
+          penaltyExplanation = `
+          <div style="margin: 15px 0; padding: 15px; border-left: 4px solid #FFD700; background-color: #FFFDF0;">
+            <p style="margin-top: 0; font-weight: bold;">💡 À propos de votre note :</p>
+            <p>Sans pénalité, votre note brute aurait été de <strong>${rawTotal.toFixed(1)}/20</strong>.</p>
+            <p>Une pénalité de <strong>${penaltyValue} points</strong> a été appliquée, ce qui aurait normalement donné une note de <strong>${calculatedGrade.toFixed(1)}/20</strong>.</p>
+            <p>Cependant, pour les notes ≥ 6/20, nous appliquons un seuil minimum de 6/20 après pénalité. <strong>Votre note finale est donc de 6/20</strong>.</p>
+          </div>`;
+        } else {
+          penaltyExplanation = `
+          <div style="margin: 15px 0; padding: 15px; border-left: 4px solid #FFD700; background-color: #FFFDF0;">
+            <p style="margin-top: 0; font-weight: bold;">💡 À propos de votre note :</p>
+            <p>Sans pénalité, votre note brute aurait été de <strong>${rawTotal.toFixed(1)}/20</strong>.</p>
+            <p>Une pénalité de <strong>${penaltyValue} points</strong> a été appliquée, donnant une note finale de <strong>${finalGrade.toFixed(1)}/20</strong>.</p>
+            <p>Pour rappel, si la pénalité avait fait descendre votre note en dessous de 6/20, vous auriez bénéficié du seuil minimum de 6/20.</p>
+          </div>`;
+        }
+      } else {
+        penaltyExplanation = `
+        <div style="margin: 15px 0; padding: 15px; border-left: 4px solid #FFD700; background-color: #FFFDF0;">
+          <p style="margin-top: 0; font-weight: bold;">💡 À propos de votre note :</p>
+          <p>Votre note brute est de <strong>${rawTotal.toFixed(1)}/20</strong>, ce qui est inférieur au seuil de 6/20.</p>
+          <p>La pénalité de <strong>${penaltyValue} points</strong> n'a donc pas été appliquée, conformément à nos règles qui préservent les notes inférieures à 6/20.</p>
+        </div>`;
+      }
+    }
+
     const template = `
 <div style="font-family: Arial, sans-serif; line-height: 1.6;">
   <p>Bonjour ${studentName},</p>
@@ -252,6 +320,8 @@ export default function EmailFeedback({
   Vous pouvez la consulter en cliquant sur le lien suivant :</p>
   
   <p><a href="${url}">${url}</a></p>
+
+  ${penaltyExplanation}
 
   <p><strong>Points importants à retenir :</strong></p>
   <ul>

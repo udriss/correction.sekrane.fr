@@ -7,7 +7,8 @@ import {
   IconButton, Menu, MenuItem, TextField, FormControl,
   InputLabel, Select, Badge, Divider, ListItemIcon, ListItemText,
   SelectChangeEvent, InputAdornment, Tabs, Tab, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle,
-  Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TablePagination
+  Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TablePagination,
+  ToggleButton, ToggleButtonGroup
 } from '@mui/material';
 import Grid from '@mui/material/Grid';
 import { useSnackbar } from 'notistack';
@@ -862,17 +863,10 @@ function CorrectionsContent() {
                 <Typography variant="h3" fontWeight="bold" color="text.primary">
                   {filteredCorrections.length 
                     ? (filteredCorrections.reduce((sum, c) => {
-                        // Trouver l'activité correspondante pour obtenir le barème total
-                        const activity = metaData.activities.find(a => a.id === c.activity_id);
-                        const totalPoints = activity 
-                          ? ((activity as Activity).experimental_points || 0) + ((activity as Activity).theoretical_points || 0) 
-                          : 20;
-                        
-                        // Normaliser la note sur 20 points
-                        const grade = typeof c.grade === 'string' ? parseFloat(c.grade) : c.grade;
-                        const normalizedGrade = totalPoints > 0 ? (grade / totalPoints) * 20 : grade;
-                        
-                        return sum + normalizedGrade;
+                        // Utiliser final_grade s'il est disponible, sinon utiliser grade
+                        const gradeValue = c.final_grade !== undefined ? c.final_grade : c.grade;
+                        const grade = typeof gradeValue === 'string' ? parseFloat(gradeValue) : (gradeValue ?? 0);
+                        return sum + grade;
                       }, 0) / filteredCorrections.length).toFixed(1)
                     : '-'}
                 </Typography>
@@ -1048,38 +1042,61 @@ function CorrectionsContent() {
       )}
       
       <Box sx={{ mb: 2 }}>
-          <FormControl fullWidth>
-            <Typography variant="body2" color="text.secondary" gutterBottom>
-              Statut des corrections
-            </Typography>
-            <Button
-              fullWidth
-              variant={activeFilters.includes('showInactive') ? "outlined" : "outlined"}
-              sx={{
-                color: activeFilters.includes ('showInactive') ? "primary" : theme => theme.palette.warning.dark,
-                borderColor: activeFilters.includes ('showInactive') ? theme => alpha(theme.palette.primary.dark, 1) : theme => alpha(theme.palette.warning.dark, 1),
-                backgroundColor: activeFilters.includes ('showInactive') ? theme => alpha(theme.palette.primary.dark, 0.05) : theme => alpha(theme.palette.warning.dark, 0.1),
-                '&:hover': {
-                  backgroundColor: activeFilters.includes ('showInactive') ? theme => alpha(theme.palette.primary.dark, 0.2) : theme => alpha(theme.palette.warning.dark, 0.2),
-                  borderColor: activeFilters.includes ('showInactive') ? "transparent" : theme => alpha(theme.palette.warning.dark, 1),
-                },
-              }}
-              onClick={() => {
-                if (activeFilters.includes('showInactive')) {
-                  // Remove the filter if it's active
-                  handleRemoveFilter('showInactive');
-                } else {
-                  // Set showInactive to true and apply the filter
+        <FormControl fullWidth>
+          <Typography variant="body2" color="text.secondary" gutterBottom>
+            Statut des corrections
+          </Typography>
+          <ToggleButtonGroup
+            value={activeFilters.includes('showInactive') ? 'all' : 'active'}
+            exclusive
+            onChange={(_, newValue) => {
+              if (newValue !== null) {
+                if (newValue === 'all') {
                   setFilters(prev => ({ ...prev, showInactive: true }));
                   handleApplyFilter('showInactive');
+                } else {
+                  handleRemoveFilter('showInactive');
                 }
+              }
+            }}
+            size="small"
+            color="primary"
+            sx={{
+              boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+              '& .MuiToggleButtonGroup-grouped': {
+                px: 3,
+                py: 1
+              }
+            }}
+          >
+            <ToggleButton 
+              value="active"
+              sx={{
+                fontWeight: !activeFilters.includes('showInactive') ? 'medium' : 'normal',
+                transition: 'all 0.2s'
               }}
-              startIcon={<VisibilityIcon />}
             >
-              {activeFilters.includes('showInactive') ? "Toutes les corrections (actives et inactives)" : "Uniquement les corrections actives"}
-            </Button>
-          </FormControl>
-        </Box>
+              <VisibilityIcon sx={{ mr: 1, fontSize: '1rem' }} />
+              Actives uniquement
+            </ToggleButton>
+            <ToggleButton 
+              value="all"
+              sx={{
+                fontWeight: activeFilters.includes('showInactive') ? 'medium' : 'normal',
+                transition: 'all 0.2s'
+              }}
+            >
+              <FilterAltIcon sx={{ mr: 1, fontSize: '1rem' }} />
+              Toutes les corrections
+            </ToggleButton>
+          </ToggleButtonGroup>
+          <Typography variant="caption" sx={{ mt: 1, display: 'block', color: theme => theme.palette.error.dark }}>
+            {activeFilters.includes('showInactive') 
+              ? 'Affiche toutes les corrections, y compris celles qui sont inactives' 
+              : 'Affiche uniquement les corrections actives'}
+          </Typography>
+        </FormControl>
+      </Box>
         
       {/* Content based on selected tab */}
       {tabValue === 0 && (
@@ -1367,9 +1384,15 @@ function CorrectionsContent() {
                             <TableCell align="center">
                               {isActive ? (
                                 <Chip 
-                                  label={`${correction.grade}/20`} 
+                                  label={`${correction.final_grade !== undefined ? correction.final_grade : correction.grade}/20`} 
                                   size="small"
-                                  color={getGradeColor(correction.grade)}
+                                  color={getGradeColor(
+                                    correction.final_grade !== undefined && correction.final_grade !== null 
+                                      ? Number(correction.final_grade) 
+                                      : correction.grade !== undefined && correction.grade !== null 
+                                        ? Number(correction.grade) 
+                                        : 0
+                                  )}
                                   variant="outlined"
                                 />
                               ) : (

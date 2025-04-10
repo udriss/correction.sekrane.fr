@@ -48,6 +48,8 @@ const StudentsList: React.FC<StudentsListProps> = ({
     
     loadShareCodes();
   }, [corrections]);
+
+  
   
   // Handle toggling the active status of a correction
   const handleToggleActive = async (correctionId: number, newActiveState: boolean) => {
@@ -185,6 +187,7 @@ const StudentsList: React.FC<StudentsListProps> = ({
             {studentGroup.corrections.map(correction => (
               <Grid key={correction.id} size={{ xs: 12, sm: 6, md: 4 }}>
                 <CorrectionCard
+                  preloadedShareCode={shareCodesMap.get(correction.id.toString())}
                   correction={correction}
                   getGradeColor={getGradeColor}
                   highlight={highlightedIds.includes(correction.id?.toString() || '')}

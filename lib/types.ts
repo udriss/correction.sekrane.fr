@@ -11,7 +11,7 @@ export interface Correction {
   created_at?: Date | string;
   updated_at?: Date | string;
   penalty?: number | null;
-  final_grade?: number | null; // Note finale calculée : max(grade - penalty, 6)
+  final_grade?: number | null; // Note finale: si (grade-penalty) < 6 et grade >= 6 alors 6, si grade < 6 alors grade, sinon (grade-penalty)
   deadline?: Date | string | null;
   group_id: number | null;
   class_id: number | null;

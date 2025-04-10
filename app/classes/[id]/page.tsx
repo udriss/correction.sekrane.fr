@@ -1595,7 +1595,7 @@ export default function ClassDetailPage({ params }: { params: Promise<{ id: stri
               
               {tableEditMode && (
                 <Button
-                  variant="contained"
+                  variant="outlined"
                   color="success"
                   onClick={saveAllCorrections}
                   startIcon={<SaveIcon />}
@@ -1607,7 +1607,7 @@ export default function ClassDetailPage({ params }: { params: Promise<{ id: stri
               
               {!deleteMode && (
                 <Button
-                  variant={tableEditMode ? "outlined" : "contained"}
+                  variant={tableEditMode ? "outlined" : "outlined"}
                   color={tableEditMode ? "error" : "primary"}
                   onClick={toggleTableEditMode}
                   startIcon={tableEditMode ? <CloseIcon /> : <EditIcon />}
@@ -1621,7 +1621,7 @@ export default function ClassDetailPage({ params }: { params: Promise<{ id: stri
               {!tableEditMode && !deleteMode && (
                 <Button
                   variant="outlined"
-                  color="error"
+                  color="error"tab
                   onClick={toggleDeleteMode}
                   startIcon={<DeleteIcon />}
                   size="small"

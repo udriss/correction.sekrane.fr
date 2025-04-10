@@ -29,6 +29,7 @@ interface BaseCorrection {
   active?: number | boolean | null;
   grade?: number | null;
   created_at?: string | Date;
+  final_grade?: number | null;
 }
 
 interface CorrectionsListProps {
@@ -140,7 +141,9 @@ const CorrectionsList: React.FC<CorrectionsListProps> = ({
                   correction.grade !== null && correction.grade !== undefined && (
                     <Box sx={{ position: 'absolute', top: 12, right: 12 }}>
                       <Typography variant="subtitle2">
-                        {correction.grade} / {(activity?.experimental_points ?? 5) + (activity?.theoretical_points ?? 15)}
+                        {correction.final_grade !== undefined && correction.final_grade !== null
+                          ? correction.final_grade
+                          : correction.grade} / {(activity?.experimental_points ?? 5) + (activity?.theoretical_points ?? 15)}
                       </Typography>
                     </Box>
                   )

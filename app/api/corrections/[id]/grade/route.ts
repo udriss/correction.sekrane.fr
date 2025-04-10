@@ -13,6 +13,7 @@ interface CorrectionRow extends RowDataPacket {
   grade: number | null | string;
   activity_id?: number;
   student_id?: number;
+  final_grade?: number | null | string;
   [key: string]: any;
 }
 
@@ -31,7 +32,7 @@ export async function PUT(
     const correctionId = parseInt(id);
     
     const data = await request.json();
-    const { experimental_points_earned, theoretical_points_earned, penalty, grade } = data;
+    const { experimental_points_earned, theoretical_points_earned, penalty, grade, final_grade } = data;
 
     // Vérifier que les valeurs sont valides
     if ((experimental_points_earned === undefined || isNaN(parseFloat(String(experimental_points_earned)))) && 
@@ -66,40 +67,47 @@ export async function PUT(
       };
       
       // Note expérimentale
+      let expGrade = parseNumberSafely(oldCorrection.experimental_points_earned);
       if (experimental_points_earned !== undefined && !isNaN(parseFloat(String(experimental_points_earned)))) {
+        expGrade = parseFloat(String(experimental_points_earned));
         fieldsToUpdate.push('experimental_points_earned = ?');
-        params.push(parseFloat(String(experimental_points_earned)));
+        params.push(expGrade);
       }
       
       // Note théorique
+      let theoGrade = parseNumberSafely(oldCorrection.theoretical_points_earned);
       if (theoretical_points_earned !== undefined && !isNaN(parseFloat(String(theoretical_points_earned)))) {
+        theoGrade = parseFloat(String(theoretical_points_earned));
         fieldsToUpdate.push('theoretical_points_earned = ?');
-        params.push(parseFloat(String(theoretical_points_earned)));
+        params.push(theoGrade);
       }
       
       // Pénalité
+      let penaltyPoints = parseNumberSafely(oldCorrection.penalty);
       if (penalty !== undefined && !isNaN(parseFloat(String(penalty)))) {
+        penaltyPoints = parseFloat(String(penalty));
         fieldsToUpdate.push('penalty = ?');
-        params.push(parseFloat(String(penalty)));
+        params.push(penaltyPoints);
       }
       
-      // Calculer la note finale en utilisant notre fonction utilitaire
-      const expPoints = experimental_points_earned !== undefined 
-        ? parseNumberSafely(experimental_points_earned) 
-        : parseNumberSafely(oldCorrection.experimental_points_earned);
-      
-      const theoPoints = theoretical_points_earned !== undefined 
-        ? parseNumberSafely(theoretical_points_earned)
-        : parseNumberSafely(oldCorrection.theoretical_points_earned);
-      
-      const penaltyPoints = penalty !== undefined 
-        ? parseNumberSafely(penalty)
-        : parseNumberSafely(oldCorrection.penalty);
-      
       // Calculer la note totale (minimum 0)
-      const finalGrade = Math.max(0, expPoints + theoPoints - penaltyPoints);
+      const totalGrade = Math.max(0, expGrade + theoGrade);
       
+      // Mettre à jour la note totale
       fieldsToUpdate.push('grade = ?');
+      params.push(totalGrade);
+      
+      // Calculer la note finale selon la nouvelle règle
+      let finalGrade;
+      if (totalGrade < 6) {
+          // Si la note est inférieure à 6, on garde la note originale
+          finalGrade = totalGrade;
+      } else {
+          // Sinon on applique la règle du maximum
+          finalGrade = Math.max(totalGrade - penaltyPoints, 6);
+      }
+
+      fieldsToUpdate.push('final_grade = ?');
       params.push(finalGrade);
       
       // Ajouter l'ID à la fin des paramètres
@@ -110,11 +118,12 @@ export async function PUT(
         return NextResponse.json({ error: 'Aucune donnée à mettre à jour' }, { status: 400 });
       }
 
+
       await connection.query(
         `UPDATE corrections SET ${fieldsToUpdate.join(', ')} WHERE id = ?`,
         params
       );
-
+      console.log('Correction mise à jour avec succès:', params);
       // Créer un log pour la mise à jour des notes
       await createLogEntry({
         action_type: 'UPDATE_GRADE',
@@ -131,7 +140,9 @@ export async function PUT(
           old_penalty: oldCorrection.penalty,
           new_penalty: penalty !== undefined ? penalty : oldCorrection.penalty,
           old_total: oldCorrection.grade,
-          new_total: finalGrade
+          new_total: totalGrade,
+          old_final_grade: oldCorrection.final_grade,
+          new_final_grade: finalGrade
         }
       });
       

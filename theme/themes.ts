@@ -62,6 +62,7 @@ declare module '@mui/material/styles' {
   
   // Étendre l'interface PaletteColor pour inclure plus de nuances
   interface PaletteColor {
+    lighter?: string; // Add the 'lighter' property to support our custom shade
     50?: string;
     100?: string;
     200?: string;
@@ -144,7 +145,7 @@ const commonSettings: Partial<ThemeOptions> = {
       dark: '#C62828',  // Rouge foncé
     },
     success: {
-      lighter: '#C8E6C9', // Vert très clair (plus doux)
+      // lighter: '#C8E6C9', // Vert très clair (plus doux)
       light: '#66BB6A', // Vert clair
       main: '#2E7D32',  // Vert standard
       dark: '#1B5E20',  // Vert foncé
@@ -190,6 +191,7 @@ export const defaultTheme = createTheme({
       dark: '#C62828',  // Rouge foncé
     },
     success: {
+      lighter: '#C8E6C9', // Vert très clair (plus doux)
       light: '#66BB6A', // Vert clair
       main: '#2E7D32',  // Vert standard
       dark: '#1B5E20',  // Vert foncé

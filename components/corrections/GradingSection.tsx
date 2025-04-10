@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Paper, Typography, Slider, Box, Grid, Divider, FormControlLabel, Checkbox, Alert } from '@mui/material';
+import { useSnackbar } from 'notistack';
 
 interface GradingSectionProps {
   experimentalGrade: string;
@@ -41,6 +42,10 @@ const GradingSection: React.FC<GradingSectionProps> = ({
   const [neverSubmitted, setNeverSubmitted] = useState(false);
   // Référence pour stocker la dernière requête API
   const apiCallInProgressRef = useRef(false);
+  // État pour désactiver les sliders pendant la mise à jour
+  const [isUpdating, setIsUpdating] = useState(false);
+  // Hook pour les notifications
+  const { enqueueSnackbar } = useSnackbar();
   
   // Vérifier si la pénalité actuelle correspond au cas "travail non rendu"
   useEffect(() => {
@@ -65,11 +70,12 @@ const GradingSection: React.FC<GradingSectionProps> = ({
       clearTimeout(saveGradeTimeout);
     }
     
-    // Configurer un nouveau timeout pour la sauvegarde différée
+    // Configurer un nouveau timeout pour la sauvegarde différée (2 secondes au lieu de 500ms)
     const timeout = setTimeout(() => {
       // Vérifier si une requête API est déjà en cours
       if (!apiCallInProgressRef.current && correction) {
         apiCallInProgressRef.current = true; // Marquer une requête en cours
+        setIsUpdating(true); // Désactiver les sliders pendant la mise à jour
         
         // Appeler l'API directement au lieu d'utiliser correctionsHook
         fetch(`/api/corrections/${correction.id}/grade`, {
@@ -78,7 +84,8 @@ const GradingSection: React.FC<GradingSectionProps> = ({
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({ 
-            grade: exp + theo - pen,
+            grade: exp + theo,
+            final_grade: getFinalGrade(),
             experimental_points_earned: exp,
             theoretical_points_earned: theo,
             penalty: pen
@@ -89,6 +96,9 @@ const GradingSection: React.FC<GradingSectionProps> = ({
             return response.json();
           })
           .then(() => {
+            // Notification de succès avec enqueueSnackbar
+            enqueueSnackbar('Note mise à jour avec succès', { variant: 'success' });
+            
             // Mise à jour des messages de statut uniquement, pas de mise à jour de l'état global
             const event = new CustomEvent('gradeUpdated', { 
               detail: { message: 'Note mise à jour' } 
@@ -97,6 +107,9 @@ const GradingSection: React.FC<GradingSectionProps> = ({
           })
           .catch(err => {
             console.error('Erreur lors de la mise à jour de la note:', err);
+            // Notification d'erreur avec enqueueSnackbar
+            enqueueSnackbar('Erreur lors de la mise à jour de la note', { variant: 'error' });
+            
             const event = new CustomEvent('gradeError', { 
               detail: { message: 'Erreur lors de la mise à jour de la note' } 
             });
@@ -104,34 +117,55 @@ const GradingSection: React.FC<GradingSectionProps> = ({
           })
           .finally(() => {
             apiCallInProgressRef.current = false; // Marquer la fin de la requête
+            setIsUpdating(false); // Réactiver les sliders
           });
       }
-    }, 500);
+    }, 2000); // Délai de 2 secondes avant l'appel API
     
     setSaveGradeTimeout(timeout);
   };
 
   // Fonction pour mettre à jour uniquement la pénalité
   const updatePenaltyOnly = (newPenaltyValue: number) => {
-    // Si la fonction handleUpdatePenalty est disponible, l'utiliser
-    if (handleUpdatePenalty) {
-      handleUpdatePenalty(newPenaltyValue)
-        .then(() => {
-          // Pas besoin de mettre à jour l'UI car le composant parent le fera
-          const event = new CustomEvent('penaltyUpdated', { 
-            detail: { message: 'Pénalité mise à jour' } 
-          });
-          window.dispatchEvent(event);
-        })
-        .catch(err => {
-          console.error('Erreur lors de la mise à jour de la pénalité:', err);
-        });
-    } else {
-      // Fallback à l'ancienne méthode
-      const currentExpGrade = parseFloat(experimentalGrade) || 0;
-      const currentTheoGrade = parseFloat(theoreticalGrade) || 0;
-      saveGradeWithDebounce(currentExpGrade, currentTheoGrade, newPenaltyValue);
+    // Annuler tout timeout en cours
+    if (saveGradeTimeout) {
+      clearTimeout(saveGradeTimeout);
     }
+    
+    // Configurer un nouveau timeout pour la sauvegarde différée (2 secondes)
+    const timeout = setTimeout(() => {
+      setIsUpdating(true); // Désactiver les sliders pendant la mise à jour
+      
+      // Si la fonction handleUpdatePenalty est disponible, l'utiliser
+      if (handleUpdatePenalty) {
+        handleUpdatePenalty(newPenaltyValue)
+          .then(() => {
+            // Notification de succès avec enqueueSnackbar
+            enqueueSnackbar('Pénalité mise à jour avec succès', { variant: 'success' });
+            
+            // Pas besoin de mettre à jour l'UI car le composant parent le fera
+            const event = new CustomEvent('penaltyUpdated', { 
+              detail: { message: 'Pénalité mise à jour' } 
+            });
+            window.dispatchEvent(event);
+          })
+          .catch(err => {
+            console.error('Erreur lors de la mise à jour de la pénalité:', err);
+            // Notification d'erreur
+            enqueueSnackbar('Erreur lors de la mise à jour de la pénalité', { variant: 'error' });
+          })
+          .finally(() => {
+            setIsUpdating(false); // Réactiver les sliders
+          });
+      } else {
+        // Fallback à l'ancienne méthode
+        const currentExpGrade = parseFloat(experimentalGrade) || 0;
+        const currentTheoGrade = parseFloat(theoreticalGrade) || 0;
+        saveGradeWithDebounce(currentExpGrade, currentTheoGrade, newPenaltyValue);
+      }
+    }, 2000); // Délai de 2 secondes
+    
+    setSaveGradeTimeout(timeout);
   };
 
   // Fonction pour appliquer la notation "travail non rendu"
@@ -157,6 +191,32 @@ const GradingSection: React.FC<GradingSectionProps> = ({
       setPenalty('0');
       updatePenaltyOnly(0);
     }
+  };
+
+  // Calculer la note finale selon la règle demandée
+  const calculateFinalGrade = (grade: number, penalty: number): number => {
+    if (grade < 6) {
+      // Si la note est inférieure à 6, on garde la note originale
+      return grade;
+    } else {
+      // Sinon, on prend le maximum entre (note-pénalité) et 6
+      return Math.max(grade - penalty, 6);
+    }
+  };
+
+  // Calculer la note totale
+  const calculateTotalGrade = (): number => {
+    const experimentalValue = parseFloat(experimentalGrade) || 0;
+    const theoreticalValue = parseFloat(theoreticalGrade) || 0;
+    return experimentalValue + theoreticalValue;
+  };
+
+  // Calculer la note finale (avec application de la pénalité si nécessaire)
+  const getFinalGrade = (): number => {
+    const totalGrade = calculateTotalGrade();
+    const penaltyValue = parseFloat(penalty) || 0;
+    
+    return calculateFinalGrade(totalGrade, penaltyValue);
   };
   
   return (
@@ -212,7 +272,7 @@ const GradingSection: React.FC<GradingSectionProps> = ({
               step={0.5}
               valueLabelDisplay="auto"
               marks
-              disabled={neverSubmitted}
+              disabled={neverSubmitted || isUpdating}
               sx={{ 
                 width: "90%",
                 color: 'primary.main',
@@ -254,7 +314,7 @@ const GradingSection: React.FC<GradingSectionProps> = ({
               step={0.5}
               valueLabelDisplay="auto"
               marks
-              disabled={neverSubmitted}
+              disabled={neverSubmitted || isUpdating}
               sx={{ 
                 width: "90%",
                 color: 'secondary.main', 
@@ -294,7 +354,7 @@ const GradingSection: React.FC<GradingSectionProps> = ({
                   step={0.5}
                   valueLabelDisplay="auto"
                   marks
-                  disabled={neverSubmitted}
+                  disabled={neverSubmitted || isUpdating}
                   sx={{ 
                     width: "90%",
                     color: 'error.main',
@@ -324,8 +384,19 @@ const GradingSection: React.FC<GradingSectionProps> = ({
                   const expGrade = parseFloat(experimentalGrade) || 0;
                   const theoGrade = parseFloat(theoreticalGrade) || 0;
                   const penaltyValue = isPenaltyEnabled ? (parseFloat(penalty) || 0) : 0;
-                  const totalGrade = expGrade + theoGrade - penaltyValue;
-                  return isNaN(totalGrade) ? 0 : Math.max(6, totalGrade);
+                  const rawTotal = expGrade + theoGrade;
+                  
+                  // Appliquer la règle pour la note finale
+                  let finalGrade;
+                  if (rawTotal < 6) {
+                    // Si la note brute est < 6, on garde cette note
+                    finalGrade = Math.max(0, rawTotal);
+                  } else {
+                    // Sinon, on prend le maximum entre (note-pénalité) et 6
+                    finalGrade = Math.max(rawTotal - penaltyValue, 6);
+                  }
+                  
+                  return isNaN(finalGrade) ? 0 : finalGrade;
                 })()}
                 max={experimentalPoints + theoreticalPoints}
                 disabled
@@ -346,8 +417,22 @@ const GradingSection: React.FC<GradingSectionProps> = ({
                   const expGrade = parseFloat(experimentalGrade) || 0;
                   const theoGrade = parseFloat(theoreticalGrade) || 0;
                   const penaltyValue = isPenaltyEnabled ? (parseFloat(penalty) || 0) : 0;
-                  const totalGrade = expGrade + theoGrade - penaltyValue;
-                  return isNaN(totalGrade) ? 0 : Math.max(6, totalGrade).toFixed(1);
+                  const rawTotal = expGrade + theoGrade;
+                  
+                  // Appliquer la règle pour la note finale
+                  let finalGrade;
+                  if (rawTotal < 6) {
+                    // Si la note brute est < 6, on garde cette note
+                    finalGrade = Math.max(0, rawTotal);
+                  } else {
+                    // Sinon, on prend le maximum entre (note-pénalité) et 6
+                    finalGrade = Math.max(rawTotal - penaltyValue, 6);
+                  }
+                  
+                  // Toujours s'assurer que la note n'est pas négative
+                  finalGrade = Math.max(0, finalGrade);
+                  
+                  return isNaN(finalGrade) ? 0 : finalGrade.toFixed(1);
                 })()} / {experimentalPoints + theoreticalPoints}
               </Typography>
             </Box>

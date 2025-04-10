@@ -48,13 +48,24 @@ export async function GET(
 
       const correctionId = (shares[0] as any).correction_id;
 
-      // Récupérer la correction avec les notes et calculer le grade si nécessaire
+      // Récupérer la correction avec les notes et utiliser le champ final_grade de la base de données
+      // NOTE: La valeur de 'grade' peut être soit:
+      // 1. La valeur stockée explicitement dans la base de données (si non NULL)
+      // 2. OU la somme de experimental_points_earned + theoretical_points_earned (si grade est NULL)
+      // Ce qui peut créer une discordance si grade a été manuellement défini à une valeur
+      // différente de la somme des points.
       const [rows] = await connection.query(
         `SELECT c.*, a.name as activity_name, a.experimental_points, a.theoretical_points,
             CONCAT(s.first_name, ' ', LEFT(s.last_name, 1), '.') as student_name,
             IFNULL(c.grade, (c.experimental_points_earned + c.theoretical_points_earned)) as grade, 
             IFNULL(c.penalty, 0) as penalty,
-            ((c.experimental_points_earned + c.theoretical_points_earned) - IFNULL(c.penalty, 0)) as final_grade
+            IFNULL(c.final_grade, 
+                  CASE 
+                    WHEN IFNULL(c.grade, (c.experimental_points_earned + c.theoretical_points_earned)) < 6 
+                      THEN IFNULL(c.grade, (c.experimental_points_earned + c.theoretical_points_earned))
+                    ELSE GREATEST((IFNULL(c.grade, (c.experimental_points_earned + c.theoretical_points_earned)) - IFNULL(c.penalty, 0)), 6)
+                  END
+            ) as final_grade
          FROM corrections c 
          JOIN activities a ON c.activity_id = a.id 
          LEFT JOIN students s ON c.student_id = s.id
@@ -62,7 +73,7 @@ export async function GET(
         [correctionId]
       );
 
-      console.log('rows', rows);
+      
 
       if (!Array.isArray(rows) || rows.length === 0) {
         return NextResponse.json(
@@ -72,6 +83,7 @@ export async function GET(
       }
 
       const correction = rows[0] as any;
+      console.log('correction', correction);
 
       // Si content_data existe et est une string, parser en JSON
       if (correction.content_data && typeof correction.content_data === 'string') {

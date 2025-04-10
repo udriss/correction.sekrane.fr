@@ -674,7 +674,7 @@ export default function FAQPage() {
                           alignItems: 'center', 
                           mt: 2, 
                           p: 1.5, 
-                          bgcolor: 'warning.lighter', 
+                          bgcolor: theme => theme.palette.warning.light, 
                           borderRadius: 1,
                           border: '1px dashed',
                           borderColor: 'warning.main'

@@ -33,6 +33,7 @@ import EventAvailableIcon from '@mui/icons-material/EventAvailable';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import ScheduleIcon from '@mui/icons-material/Schedule';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import InfoIcon from '@mui/icons-material/Info';
 import GradientBackground from '@/components/ui/GradientBackground';
 import PatternBackground from '@/components/ui/PatternBackground';
 import ErrorDisplay from '@/components/ui/ErrorDisplay';
@@ -251,9 +252,43 @@ export default function FeedbackViewer({ params }: { params: Promise<{ code: str
     return formatGrade(value);
   };
   
+  // Calcul de la note finale selon la règle
+  const calculateFinalGrade = (grade: number, penalty: number): number => {
+    if (grade < 6) {
+      // Si la note est inférieure à 6, on garde la note originale sans appliquer de pénalité
+      return grade;
+    } else {
+      // Si la note est supérieure ou égale à 6, on applique la pénalité
+      // mais on ne descend pas en dessous de 6
+      return Math.max(grade - penalty, 6);
+    }
+  };
+  
+  // Récupérer final_grade de la correction ou la calculer si elle n'est pas disponible
+  const getFinalGrade = () => {
+    // Si final_grade est déjà défini dans la correction, l'utiliser
+    if (correction.final_grade !== undefined && correction.final_grade !== null) {
+      return correction.final_grade;
+    }
+    
+    // Sinon calculer selon la règle
+    const rawTotal = parseFloat(correction.grade) || 0;
+    const penalty = parseFloat(correction.penalty) || 0;
+    return calculateFinalGrade(rawTotal, penalty);
+  };
+  
+  console.log('Correction ID 532:', correction);
+  
+  // Données préparées pour les explications
+  const rawTotal = hasGrade ? parseFloat(correction.grade) || 0 : 0;
+  const penalty = hasPenalty ? parseFloat(correction.penalty) || 0 : 0;
+  const calculatedGrade = rawTotal - penalty;
   const finalGrade = hasGrade ? 
-    (hasPenalty ? correction.final_grade : correction.grade) : 
+    (hasPenalty ? getFinalGrade() : rawTotal) : 
     null;
+  
+  // Déterminer le cas d'application de la règle pour l'explication
+  const isPenaltyRule6Applied = hasPenalty && rawTotal >= 6 && calculatedGrade < 6;
   
   // Formater les dates
   const formatDate = (dateString: string | null) => {
@@ -286,7 +321,7 @@ export default function FeedbackViewer({ params }: { params: Promise<{ code: str
   const isOnTime = !isLate && correction.deadline && correction.submission_date;
 
 
-  console.log(correction);
+  
   
   return (
     <Box 
@@ -486,6 +521,127 @@ export default function FeedbackViewer({ params }: { params: Promise<{ code: str
                                   </Typography>
                                 )}
                               </Alert>
+                            )}
+
+                            {/* Explication du calcul de la note avec règle du seuil de 6/20 */}
+                            {hasPenalty && rawTotal >= 6 && (
+                              <Paper 
+                                elevation={0} 
+                                sx={{ 
+                                  p: 2, 
+                                  mb: 2, 
+                                  border: '1px dashed',
+                                  borderColor: 'info.light',
+                                  bgcolor: 'info.50',
+                                  borderRadius: 2
+                                }}
+                              >
+                                <Typography variant="subtitle2" sx={{ fontWeight: 'bold', color: 'info.dark', mb: 1 }}>
+                                  Calcul de votre note finale
+                                </Typography>
+                                
+                                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                                  <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                                    <Typography variant="body2">Note brute obtenue :</Typography>
+                                    <Typography variant="body2" sx={{ fontWeight: 'bold' }}>{formatGrade(rawTotal)}/20</Typography>
+                                  </Box>
+                                  
+                                  <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                                    <Typography variant="body2">Pénalité appliquée :</Typography>
+                                    <Typography variant="body2" sx={{ fontWeight: 'bold', color: 'error.main' }}>− {formatGrade(penalty)}</Typography>
+                                  </Box>
+                                  
+                                  <Box sx={{ 
+                                    display: 'flex', 
+                                    justifyContent: 'space-between',
+                                    borderTop: '1px dotted',
+                                    borderColor: 'divider',
+                                    pt: 1,
+                                    mt: 0.5
+                                  }}>
+                                    <Typography variant="body2">Résultat du calcul :</Typography>
+                                    <Typography variant="body2" sx={{ fontWeight: 'bold' }}>{formatGrade(calculatedGrade)}/20</Typography>
+                                  </Box>
+                                  
+                                  {isPenaltyRule6Applied && (
+                                    <>
+                                      <Box sx={{ 
+                                        display: 'flex', 
+                                        justifyContent: 'space-between',
+                                        borderTop: '1px dotted',
+                                        borderColor: 'divider',
+                                        pt: 1,
+                                        mt: 0.5,
+                                        bgcolor: 'success.50',
+                                        px: 1,
+                                        borderRadius: 1
+                                      }}>
+                                        <Typography variant="body2">
+                                          <strong>Note finale (seuil minimum) :</strong>
+                                        </Typography>
+                                        <Typography variant="body2" sx={{ fontWeight: 'bold', color: 'success.dark' }}>6/20</Typography>
+                                      </Box>
+                                      <Typography variant="caption" sx={{ color: 'success.dark', mt: 0.5 }}>
+                                        <InfoIcon sx={{ fontSize: 16, verticalAlign: 'text-bottom', mr: 0.5 }} />
+                                        Comme votre note brute était ≥ 6/20 et que le calcul après pénalité donnerait une note inférieure à 6/20, 
+                                        le seuil minimum de 6/20 s'applique.
+                                      </Typography>
+                                    </>
+                                  )}
+                                  
+                                  {!isPenaltyRule6Applied && rawTotal >= 6 && calculatedGrade >= 6 && (
+                                    <>
+                                      <Box sx={{ 
+                                        display: 'flex', 
+                                        justifyContent: 'space-between',
+                                        bgcolor: 'success.50',
+                                        px: 1,
+                                        borderRadius: 1
+                                      }}>
+                                        <Typography variant="body2">
+                                          <strong>Note finale :</strong>
+                                        </Typography>
+                                        <Typography variant="body2" sx={{ fontWeight: 'bold', color: 'success.dark' }}>{formatGrade(finalGrade)}/20</Typography>
+                                      </Box>
+                                      <Typography variant="caption" sx={{ color: 'text.secondary', mt: 0.5 }}>
+                                        <InfoIcon sx={{ fontSize: 16, verticalAlign: 'text-bottom', mr: 0.5 }} />
+                                        Note : si la pénalité avait fait descendre votre note en dessous de 6/20, 
+                                        vous auriez bénéficié du seuil minimum de 6/20.
+                                      </Typography>
+                                    </>
+                                  )}
+                                </Box>
+                              </Paper>
+                            )}
+                            
+                            {/* Explication spécifique pour les notes < 6/20 */}
+                            {hasPenalty && rawTotal < 6 && (
+                              <Paper 
+                                elevation={0} 
+                                sx={{ 
+                                  p: 2, 
+                                  mb: 2, 
+                                  border: '1px dashed',
+                                  borderColor: 'info.light',
+                                  bgcolor: 'info.50',
+                                  borderRadius: 2
+                                }}
+                              >
+                                <Typography variant="subtitle2" sx={{ fontWeight: 'bold', color: 'info.dark', mb: 1 }}>
+                                  Information sur le calcul de votre note
+                                </Typography>
+                                
+                                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                                  <Typography variant="body2">
+                                    Votre note brute est de <strong>{formatGrade(rawTotal)}/20</strong>, ce qui est inférieur au seuil de 6/20.
+                                  </Typography>
+                                  
+                                  <Typography variant="body2">
+                                    Pour les notes inférieures à 6/20, la pénalité de retard n'est pas appliquée.
+                                    Votre note finale reste donc <strong>{formatGrade(finalGrade)}/20</strong>.
+                                  </Typography>
+                                </Box>
+                              </Paper>
                             )}
                             
                             {/* Nouveau: Message d'indulgence pour les retards d'un jour */}

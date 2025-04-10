@@ -110,13 +110,12 @@ const CorrectionCard: React.FC<CorrectionCardProps> = ({
 
   // Calculate normalized grade (0-20)
   // Vérifier s'il y a une pénalité à appliquer
-  const hasPenalty = correction.penality !== undefined && correction.penality !== null;
+  const hasPenalty = correction.penalty !== undefined && correction.penalty !== null;
   
   // Calculer la note avec la pénalité si elle existe
-  const gradeWithPenalty = hasPenalty && correction.penality !== undefined && correction.penality !== null
-    ? Math.max(0, correction.grade) 
+  const gradeWithPenalty = hasPenalty && correction.penalty !== undefined && correction.penalty !== null
+    ? Math.max(0, correction.final_grade ?? correction.grade - correction.penalty) 
     : correction.grade;
-    
   // Normaliser la note sur 20
   const normalizedGrade = correction.experimental_points && correction.theoretical_points
     ? (gradeWithPenalty / (correction.theoretical_points + correction.experimental_points) * 20)
@@ -156,6 +155,38 @@ const CorrectionCard: React.FC<CorrectionCardProps> = ({
     
     // Couleur de repli si rien ne correspond
     return theme.palette.grey[500];
+  };
+
+  // Calculer la note finale selon la règle demandée
+  const calculateFinalGrade = (grade: number, penalty: number): number => {
+    if (grade < 6) {
+      // Si la note est inférieure à 6, on garde la note originale
+      return grade;
+    } else {
+      // Sinon, on prend le maximum entre (note-pénalité) et 6
+      return Math.max(grade - penalty, 6);
+    }
+  };
+
+  // Obtenir la note finale à afficher
+  const getFinalGrade = () => {
+    // Si final_grade est déjà défini dans la correction, l'utiliser
+    if (correction.final_grade !== undefined && correction.final_grade !== null) {
+      return typeof correction.final_grade === 'number' 
+        ? correction.final_grade 
+        : parseFloat(correction.final_grade);
+    }
+    
+    // Sinon, calculer avec la règle appropriée
+    const grade = typeof correction.grade === 'number' 
+      ? correction.grade 
+      : parseFloat(String(correction.grade || 0));
+    
+    const penalty = typeof correction.penalty === 'number' 
+      ? correction.penalty 
+      : parseFloat(String(correction.penalty || 0));
+    
+    return calculateFinalGrade(grade, penalty);
   };
   
   return (

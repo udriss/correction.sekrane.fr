@@ -80,6 +80,7 @@ interface Correction {
   updated_at: string;
   max_points?: number; // Calculé côté client
   score_percentage?: number; // Calculé côté client
+  final_grade?: number | null; // Note finale calculée côté client
 }
 
 interface StudentStats {
@@ -498,6 +499,38 @@ Votre enseignant`;
     }
   };
   
+  // Calculer la note finale selon la règle établie
+  const calculateFinalGrade = (grade: number, penalty: number = 0): number => {
+    if (grade < 6) {
+      // Si la note est inférieure à 6, on garde la note originale
+      return grade;
+    } else {
+      // Sinon, on prend le maximum entre (note-pénalité) et 6
+      return Math.max(grade - penalty, 6);
+    }
+  };
+
+  // Déterminer la note finale à afficher
+  const getFinalGrade = (correction: Correction): number => {
+    // Si final_grade est déjà défini, l'utiliser
+    if (correction.final_grade !== undefined && correction.final_grade !== null) {
+      return typeof correction.final_grade === 'number' 
+        ? correction.final_grade 
+        : parseFloat(String(correction.final_grade));
+    }
+    
+    // Sinon calculer la note en fonction de la règle
+    const grade = typeof correction.grade === 'number'
+      ? correction.grade
+      : parseFloat(String(correction.grade || 0));
+    
+    const penalty = typeof correction.penalty === 'number'
+      ? correction.penalty
+      : parseFloat(String(correction.penalty || 0));
+    
+    return calculateFinalGrade(grade, penalty);
+  };
+
   if (loading) {
     return (
       <Container>

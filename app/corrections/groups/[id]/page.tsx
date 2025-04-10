@@ -91,6 +91,33 @@ export default function CorrectionGroupDetailPageFromCorrection() {
     fetchGroupDetails();
   }, [groupId]);
 
+  // Calculer la note finale selon la règle demandée
+  const calculateFinalGrade = (grade: number, penalty: number = 0): number => {
+    if (grade < 6) {
+      // Si la note est inférieure à 6, on garde la note originale
+      return grade;
+    } else {
+      // Sinon, on prend le maximum entre (note-pénalité) et 6
+      return Math.max(grade - penalty, 6);
+    }
+  };
+
+  // Obtenir la note finale à afficher
+  const getFinalGrade = (correction: any) => {
+    // Si final_grade est déjà défini dans la correction, l'utiliser
+    if (correction.final_grade !== undefined && correction.final_grade !== null) {
+      return typeof correction.final_grade === 'number' 
+        ? correction.final_grade 
+        : parseFloat(String(correction.final_grade));
+    }
+    
+    // Sinon, calculer selon la règle
+    const grade = (correction.experimental_grade || 0) + (correction.theoretical_grade || 0);
+    const penalty = correction.penalty || 0;
+    
+    return calculateFinalGrade(grade, penalty);
+  };
+
   if (loading) {
     return <LoadingSpinner />;
   }
@@ -172,8 +199,7 @@ export default function CorrectionGroupDetailPageFromCorrection() {
                         </TableCell>
                         <TableCell>
                           <strong>
-                            {((correction.experimental_grade || 0) + 
-                              (correction.theoretical_grade || 0)).toFixed(1)} /
+                            {getFinalGrade(correction).toFixed(1)} /
                             {(correction.experimental_points || 0) + (correction.theoretical_points || 0)}
                           </strong>
                         </TableCell>

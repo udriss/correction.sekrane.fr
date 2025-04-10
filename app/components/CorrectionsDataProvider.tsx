@@ -19,12 +19,13 @@ export interface Correction {
   status: string;
   experimental_points?: number;
   theoretical_points?: number;
-  penality?: number | null; // Correction: utilisation correcte de penality avec un type number | null
+  penalty?: number | null; // Correction: utilisation correcte de penalty avec un type number | null
   created_at: string;
   updated_at: string;
   sub_class?: string | null;
   student_sub_class?: string | null; // Ajout de la propriété student_sub_class
   active?: number; // Ajout du champ active pour identifier les corrections actives/inactives
+  final_grade?: number | null; // Note finale: si (grade-penalty) < 6 et grade >= 6 alors 6, si grade < 6 alors grade, sinon (grade-penalty)
 }
 
 // Définition de l'interface Student pour typer correctement les étudiants
@@ -323,10 +324,10 @@ export const CorrectionsProvider: React.FC<CorrectionsProviderProps> = ({
           comparison = a.class_name.localeCompare(b.class_name);
           break;
         case 'grade':
-          const gradeA = a.penality !== undefined && a.penality !== null ? 
-            Math.max(0, a.grade - a.penality) : a.grade;
-          const gradeB = b.penality !== undefined && b.penality !== null ? 
-            Math.max(0, b.grade - b.penality) : b.grade;
+          const gradeA = a.penalty !== undefined && a.penalty !== null ? 
+            Math.max(0, a.grade - a.penalty) : a.grade;
+          const gradeB = b.penalty !== undefined && b.penalty !== null ? 
+            Math.max(0, b.grade - b.penalty) : b.grade;
           comparison = gradeA - gradeB;
           break;
         case 'submission_date':

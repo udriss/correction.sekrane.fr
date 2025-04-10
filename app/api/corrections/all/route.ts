@@ -55,6 +55,7 @@ export async function GET(request: NextRequest) {
       if (!Array.isArray(rows) || (rows as any[]).length === 0) {
         return NextResponse.json([]);
       }
+      
 
       // Formater les résultats pour le frontend
       const formattedCorrections = (rows as any[]).map(correction => ({
@@ -77,7 +78,7 @@ export async function GET(request: NextRequest) {
         status: correction.status || 'pending',
         experimental_points: Number(correction.experimental_points) || 0,
         theoretical_points: Number(correction.theoretical_points) || 0,
-        penality: Number(correction.penalty) || null, // Ajout du champ penality (issu du champ penalty en DB)
+        penalty: Number(correction.penalty) || null, // Ajout du champ penalty (issu du champ penalty en DB)
         content: correction.content,
         created_at: correction.created_at,
         updated_at: correction.updated_at,
@@ -96,6 +97,7 @@ export async function GET(request: NextRequest) {
         shareCode: correction.share_code || null, // Ajout du champ shareCode
         student_sub_class: correction.student_sub_class || null, // Ajout du champ student_sub_class
         active: correction.active !== undefined ? correction.active : undefined,
+        final_grade: correction.final_grade !== undefined ? correction.final_grade : undefined,
       }));
 
 

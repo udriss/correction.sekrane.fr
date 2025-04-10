@@ -166,11 +166,11 @@ export default function CorrectionDetail({ params }: { params: Promise<{ id: str
       autoSaveTimerRef.current = setInterval(() => {
         // Only auto-save if there are unsaved changes
         if (history.length > 0 || contentItems.length > 0) {
-          console.log('Auto-saving correction...');
+          
           handleSaveCorrection()
             .then(() => {
               setLastAutoSave(new Date());
-              console.log('Auto-save completed successfully');
+              
             })
             .catch(err => {
               console.error('Auto-save failed:', err);
@@ -576,11 +576,21 @@ export default function CorrectionDetail({ params }: { params: Promise<{ id: str
     const expGrade = parseFloat(experimentalGrade || '0');
     const theoGrade = parseFloat(theoreticalGrade || '0');
     
-    // Simplement additionner les notes des deux parties pour obtenir la note totale sur 20
-    const totalGrade = expGrade + theoGrade;
+    // Calculer la note brute (sans pénalité)
+    const rawTotalGrade = expGrade + theoGrade;
     
-    return totalGrade;
-  }, [experimentalGrade, theoreticalGrade]);
+    // Appliquer la pénalité si elle existe
+    const penaltyValue = isPenaltyEnabled ? parseFloat(penalty || '0') : 0;
+    
+    // Appliquer la règle pour la note finale:
+    // Si note < 6, on garde la note originale
+    // Sinon, on prend le maximum entre (note-pénalité) et 6
+    if (rawTotalGrade < 6) {
+      return rawTotalGrade;
+    } else {
+      return Math.max(rawTotalGrade - penaltyValue, 6);
+    }
+  }, [experimentalGrade, theoreticalGrade, isPenaltyEnabled, penalty]);
 
   // Fonction séparée pour gérer uniquement les dates sans toucher aux notes
   const handleSaveDates = async (deadline: string | null, submission: string | null) => {
@@ -771,7 +781,7 @@ export default function CorrectionDetail({ params }: { params: Promise<{ id: str
   }
 
   if (correctionNotFound) {
-    console.log('Correction not found');
+    
     return (
       <CorrectionNotFound />
     );
@@ -900,7 +910,13 @@ export default function CorrectionDetail({ params }: { params: Promise<{ id: str
                 
                   {/* Email feedback button */}
                   <Box sx={{ display: 'flex', justifyContent:'space-around', gap: 2, mb: 3 }}>
-                    <EmailFeedback correctionId={correctionId} studentData={correction.student_data} />
+                    <EmailFeedback 
+                      correctionId={correctionId} 
+                      studentData={correction.student_data}
+                      experimental_points_earned={correction.experimental_points_earned?.toString()}
+                      theoretical_points_earned={correction.theoretical_points_earned?.toString()}
+                      penalty={correction.penalty?.toString()}
+                    />
                     <DuplicateCorrection correctionId={correctionId} />
                   </Box>
                   

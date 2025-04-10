@@ -113,7 +113,7 @@ export default function ActivitiesPage() {
             let inactiveCorrectionsCount = 0;
             if (statsResponse.ok) {
               const statsData = await statsResponse.json();
-              console.log(statsData);
+              
               // Sum up counts from all sub-groups
               if (Array.isArray(statsData)) {
                 correctionCount = statsData.reduce((total, group) => total + (Number(group.count) || 0), 0);
