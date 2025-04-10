@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { useSnackbar } from 'notistack';
 import { 
   TextField,
   IconButton,
@@ -66,6 +67,7 @@ const CorrectionHeader: React.FC<CorrectionHeaderProps> = ({
   const [localFirstName, setLocalFirstName] = useState('');
   const [localLastName, setLocalLastName] = useState('');
   const [localEmail, setLocalEmail] = useState('');
+  const { enqueueSnackbar } = useSnackbar();
   
   // Initialize local state when editing starts or correction changes
   useEffect(() => {
@@ -92,13 +94,17 @@ const CorrectionHeader: React.FC<CorrectionHeaderProps> = ({
   const handleFormSubmit = () => {
     // Validate: At least one name field must be non-empty
     if (!localFirstName && !localLastName) {
-      alert("Veuillez saisir au moins un prénom ou un nom.");
+      enqueueSnackbar("Veuillez saisir au moins un prénom ou un nom.", { 
+        variant: "warning" 
+      });
       return;
     }
     
     // Validate email format if provided
     if (localEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(localEmail)) {
-      alert("Veuillez saisir une adresse email valide.");
+      enqueueSnackbar("Veuillez saisir une adresse email valide.", { 
+        variant: "error" 
+      });
       return;
     }
     

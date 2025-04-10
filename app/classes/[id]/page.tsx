@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useMemo } from 'react';
+import { useSnackbar } from 'notistack';
 import { 
   Typography, 
   Paper, 
@@ -57,6 +58,7 @@ import SaveIcon from '@mui/icons-material/Save';
 import CloseIcon from '@mui/icons-material/Close';
 import CheckIcon from '@mui/icons-material/Check';
 import OpenInNewIcon from '@mui/icons-material/OpenInNew';
+import QrCodeIcon from '@mui/icons-material/QrCode';
 
 import Link from 'next/link';
 import LoadingSpinner from '@/components/LoadingSpinner';
@@ -65,6 +67,8 @@ import AssociateActivitiesModal, { Activity as ModalActivity } from "@/component
 import CreateCorrectionsModal from "@/components/corrections/CreateCorrectionsModal";
 import { Correction, Class, Student } from '@/lib/types';
 import { Student as BaseStudent } from '@/lib/types';
+import { Correction as ProviderCorrection } from '@/app/components/CorrectionsDataProvider';
+import ExportPDFComponent from '@/components/pdf/ExportPDFComponent';
 
 
 
@@ -113,7 +117,7 @@ export default function ClassDetailPage({ params }: { params: Promise<{ id: stri
   const [classId, setClassId] = useState<number | null>(null);
   const [classData, setClassData] = useState<Class | null>(null);
   const [activities, setActivities] = useState<Activity[]>([]);
-  const [corrections, setCorrections] = useState<Correction[]>([]);
+  const [corrections, setCorrections] = useState<ProviderCorrection[]>([]);
   const [classStudents, setClassStudents] = useState<ClassStudent[]>([]);
   const [students, setStudents] = useState<Student[]>([]); // Nouveau state pour tous les étudiants
   const [loading, setLoading] = useState(true);
@@ -126,6 +130,7 @@ export default function ClassDetailPage({ params }: { params: Promise<{ id: stri
   const [loadingAssociate, setLoadingAssociate] = useState(false);
   const [createCorrectionsModalOpen, setCreateCorrectionsModalOpen] = useState(false);
   const [selectedActivityForCorrections, setSelectedActivityForCorrections] = useState<number | null>(null);
+  const { enqueueSnackbar } = useSnackbar();
   
   // New state variables for correction filtering and sorting
   const [filterActivity, setFilterActivity] = useState<number | 'all'>('all');
@@ -188,7 +193,7 @@ export default function ClassDetailPage({ params }: { params: Promise<{ id: stri
       .map(([id]) => parseInt(id));
     
     if (selectedIds.length === 0) {
-      alert("Aucune correction sélectionnée");
+      enqueueSnackbar("Aucune correction sélectionnée", { variant: "warning" });
       return;
     }
     
@@ -217,9 +222,11 @@ export default function ClassDetailPage({ params }: { params: Promise<{ id: stri
       setSelectedForDelete({});
       setDeleteMode(false);
       
+      enqueueSnackbar(`${selectedIds.length} correction(s) supprimée(s) avec succès`, { variant: "success" });
+      
     } catch (error) {
       console.error('Erreur lors de la suppression des corrections:', error);
-      alert('Certaines suppressions ont échoué');
+      enqueueSnackbar('Certaines suppressions ont échoué', { variant: "error" });
     } finally {
       setIsDeleting(false);
     }
@@ -240,6 +247,20 @@ export default function ClassDetailPage({ params }: { params: Promise<{ id: stri
     theoretical: number;
   }>>({});
   const [savingCorrections, setSavingCorrections] = useState<Record<number, boolean>>({});
+  
+  // Add state for scroll tracking
+  const [tableScrolled, setTableScrolled] = useState(false);
+  
+  // Add effect to track table scrolling for sticky buttons
+  useEffect(() => {
+    const handleScroll = () => {
+      const scrollPosition = window.scrollY;
+      setTableScrolled(scrollPosition > 100); // Set to true when scrolled past 100px
+    };
+    
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
   
   // Extract and validate the class ID from params
   useEffect(() => {
@@ -413,7 +434,7 @@ export default function ClassDetailPage({ params }: { params: Promise<{ id: stri
   };
 
   // Ajouter cette fonction pour la suppression d'une correction
-  const handleDeleteCorrection = async (correction: Correction) => {
+  const handleDeleteCorrection = async (correction: ProviderCorrection) => {
     if (!correction.id) return;
     
     if (!confirm(`Êtes-vous sûr de vouloir supprimer la correction pour ${getStudentFullName(correction.student_id)} ?`)) {
@@ -432,9 +453,11 @@ export default function ClassDetailPage({ params }: { params: Promise<{ id: stri
       // Retirer la correction supprimée de l'état
       setCorrections(prev => prev.filter(c => c.id !== correction.id));
       
+      enqueueSnackbar('Correction supprimée avec succès', { variant: 'success' });
+      
     } catch (error) {
       console.error('Erreur lors de la suppression:', error);
-      alert('Échec de la suppression de la correction');
+      enqueueSnackbar('Échec de la suppression de la correction', { variant: 'error' });
     }
   };
 
@@ -629,7 +652,7 @@ export default function ClassDetailPage({ params }: { params: Promise<{ id: stri
     if (groupBy === 'none') return { ungrouped: filteredCorrections };
     
     if (groupBy === 'activity') {
-      const grouped: Record<string | number, Correction[]> = {};
+      const grouped: Record<string | number, ProviderCorrection[]> = {};
       
       filteredCorrections.forEach(correction => {
         const key = correction.activity_id;
@@ -643,7 +666,7 @@ export default function ClassDetailPage({ params }: { params: Promise<{ id: stri
     }
     
     if (groupBy === 'student') {
-      const grouped: Record<string, Correction[]> = {};
+      const grouped: Record<string, ProviderCorrection[]> = {};
       
       filteredCorrections.forEach(correction => {
         const key = getStudentFullName(correction.student_id);
@@ -670,7 +693,7 @@ export default function ClassDetailPage({ params }: { params: Promise<{ id: stri
   };
 
   // Function to save edited correction
-  const saveCorrection = async (correction: Correction) => {
+  const saveCorrection = async (correction: ProviderCorrection) => {
     if (!correction.id) return;
     
     const editedData = editedCorrections[correction.id];
@@ -747,7 +770,7 @@ export default function ClassDetailPage({ params }: { params: Promise<{ id: stri
   };
   
   // Function to toggle edit mode for a specific row
-  const toggleRowEditMode = (correction: Correction) => {
+  const toggleRowEditMode = (correction: ProviderCorrection) => {
     if (!correction.id) return;
     
     const isCurrentlyEditing = editingRows[correction.id] || false;
@@ -1051,6 +1074,7 @@ export default function ClassDetailPage({ params }: { params: Promise<{ id: stri
           <Tab label="Activités" icon={<MenuBookIcon />} iconPosition="start" />
           <Tab label="Étudiants" icon={<PeopleIcon />} iconPosition="start" />
           <Tab label="Corrections" icon={<AssignmentTurnedInIcon />} iconPosition="start" />
+          <Tab icon={<QrCodeIcon />} label="Export PDF" />
         </Tabs>
       </Box>
 
@@ -1443,11 +1467,27 @@ export default function ClassDetailPage({ params }: { params: Promise<{ id: stri
           onSuccess={handleCreateCorrectionsSuccess}
         />
       )}
+      <TabPanel value={tabValue} index={3}>
+        <ExportPDFComponent 
+          classData={classData}
+          corrections={corrections}
+          activities={activities}
+          students={students}
+          filterActivity={filterActivity}
+          setFilterActivity={setFilterActivity}
+          filterSubClass={filterSubClass}
+          setFilterSubClass={setFilterSubClass}
+          uniqueSubClasses={uniqueSubClasses}
+          uniqueActivities={uniqueActivities}
+          getActivityById={getActivityById}
+          getStudentById={getStudentById}
+        />
+      </TabPanel>
     </Container>
   );
 
   // Helper function to render corrections based on view mode
-  function renderCorrectionsView(items: Correction[], mode: 'card' | 'table') {
+  function renderCorrectionsView(items: ProviderCorrection[], mode: 'card' | 'table') {
     switch (mode) {
       /* case 'list':
         return (
@@ -1541,6 +1581,73 @@ export default function ClassDetailPage({ params }: { params: Promise<{ id: stri
       case 'table':
         return (
           <Box>
+            {/* Sticky Delete Mode Controls */}
+            {deleteMode && (
+              <Box 
+                sx={{
+                  display: 'flex',
+                  justifyContent: 'flex-end',
+                  gap: 1,
+                  position: tableScrolled ? 'fixed' : 'static',
+                  top: tableScrolled ? '15px' : 'auto',
+                  right: tableScrolled ? '15px' : 'auto',
+                  zIndex: 1100,
+                  transition: 'all 0.3s ease',
+                  py: 1,
+                  px: 2,
+                  bgcolor: theme => tableScrolled ? alpha(theme.palette.background.paper, 0.9) : 'transparent',
+                  backdropFilter: tableScrolled ? 'blur(8px)' : 'none',
+                  borderRadius: tableScrolled ? 2 : 0,
+                  boxShadow: tableScrolled ? 3 : 0,
+                }}
+              >
+                {showDeleteConfirm ? (
+                  <>
+                    <Button
+                      variant="contained"
+                      color="success"
+                      onClick={deleteSelectedCorrections}
+                      startIcon={isDeleting ? <CircularProgress size={18} color="inherit" /> : <CheckIcon />}
+                      size="small"
+                      disabled={isDeleting}
+                    >
+                      Confirmer ({Object.values(selectedForDelete).filter(Boolean).length})
+                    </Button>
+                    <Button
+                      variant="outlined"
+                      onClick={cancelDeleteConfirmation}
+                      startIcon={<CloseIcon />}
+                      size="small"
+                      disabled={isDeleting}
+                    >
+                      Annuler
+                    </Button>
+                  </>
+                ) : (
+                  <>
+                    <Button
+                      variant="contained"
+                      color="error"
+                      onClick={deleteSelectedCorrections}
+                      startIcon={isDeleting ? <CircularProgress size={18} color="inherit" /> : <DeleteIcon />}
+                      size="small"
+                      disabled={isDeleting || !Object.values(selectedForDelete).some(selected => selected)}
+                    >
+                      Supprimer ({Object.values(selectedForDelete).filter(Boolean).length})
+                    </Button>
+                    <Button
+                      variant="outlined"
+                      onClick={toggleDeleteMode}
+                      startIcon={<CloseIcon />}
+                      size="small"
+                      disabled={isDeleting}
+                    >
+                      Annuler
+                    </Button>
+                  </>
+                )}
+              </Box>
+            )}
             {/* Edit mode toggle button */}
             <Box sx={{ mb: 2, display: 'flex', justifyContent: 'flex-end', gap: 2 }}>
               {deleteMode && (
@@ -1621,7 +1728,7 @@ export default function ClassDetailPage({ params }: { params: Promise<{ id: stri
               {!tableEditMode && !deleteMode && (
                 <Button
                   variant="outlined"
-                  color="error"tab
+                  color="error"
                   onClick={toggleDeleteMode}
                   startIcon={<DeleteIcon />}
                   size="small"
@@ -1763,15 +1870,26 @@ export default function ClassDetailPage({ params }: { params: Promise<{ id: stri
                         {/* Total grade cell */}
                         <TableCell align="center">
                           <Chip 
-                            label={`${isEditing 
-                              ? Number(calculatedGrade.toFixed(1)) 
-                              : correction.grade} / 20`}
+                            label={isEditing 
+                              ? `${Number(calculatedGrade.toFixed(1))} / 20` 
+                              : correction.active !== 0 
+                                ? `${correction.grade} / 20`
+                                : "inactive"}
                             color={
+                              correction.active === 0 ? "default" :
                               (isEditing ? calculatedGrade : (correction.grade || 0)) < 5 ? "error" :
                               (isEditing ? calculatedGrade : (correction.grade || 0)) < 10 ? "warning" :
                               (isEditing ? calculatedGrade : (correction.grade || 0)) < 15 ? "info" : "success"
                             }
                             size="small"
+                            variant={correction.active === 0 ? "outlined" : "filled"}
+                            {...(correction.active === 0 && { 
+                              sx: { 
+                                fontVariant: 'all-small-caps',
+                                letterSpacing: '0.5px',
+                                opacity: 0.7
+                              } 
+                            })}
                           />
                         </TableCell>
                         

@@ -4,7 +4,8 @@ import React, { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Activity } from '@/lib/activity';
-import { Correction, CorrectionWithShareCode } from '@/lib/types';
+import { CorrectionWithShareCode } from '@/lib/types';
+import { Correction } from '@/app/components/CorrectionsDataProvider';
 import LoadingSpinner from '@/components/LoadingSpinner';
 import { 
   Button, 
@@ -35,7 +36,8 @@ import {
   TableBody,
   TableFooter,
   TablePagination,
-  Switch
+  Switch,
+  Collapse
 } from '@mui/material';
 import EditIcon from '@mui/icons-material/Edit';
 import SaveIcon from '@mui/icons-material/Save';
@@ -50,6 +52,7 @@ import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import QrCodeIcon from '@mui/icons-material/QrCode';
 import ClassIcon from '@mui/icons-material/Class';
 import GroupIcon from '@mui/icons-material/Group';
+import TableChartIcon from '@mui/icons-material/TableChart';
 import ActivityStatsGraphs from '@/components/ActivityStatsGraphs';
 // Import components
 import FragmentsList from '@/components/FragmentsList';
@@ -65,9 +68,13 @@ import KeyboardArrowLeft from '@mui/icons-material/KeyboardArrowLeft';
 import KeyboardArrowRight from '@mui/icons-material/KeyboardArrowRight';
 import LastPageIcon from '@mui/icons-material/LastPage';
 import { useTheme } from '@mui/material/styles';
+// Import ExportPDFComponent
+import ExportPDFComponent from '@/components/pdf/ExportPDFComponent';
+import { Correction as ProviderCorrection } from '@/app/components/CorrectionsDataProvider';
+import { Student as LibStudent } from '@/lib/types';
 
 // Type guard pour vérifier si une correction a un shareCode
-function hasShareCode(correction: Correction): correction is CorrectionWithShareCode {
+function hasShareCode(correction: Correction | CorrectionWithShareCode): correction is CorrectionWithShareCode & Correction {
   return 'shareCode' in correction && correction.shareCode !== null && correction.shareCode !== undefined;
 }
 
@@ -146,7 +153,7 @@ export default function ActivityDetail({ params }: { params: Promise<{ id: strin
   const [selectedClass, setSelectedClass] = useState<number | null>(null);
   const [selectedSubGroup, setSelectedSubGroup] = useState<string>('');
   const [subGroups, setSubGroups] = useState<string[]>([]);
-  const [filteredCorrections, setFilteredCorrections] = useState<CorrectionWithShareCode[]>([]);
+  const [filteredCorrections, setFilteredCorrections] = useState<Correction[]>([]);
   const [students, setStudents] = useState<Student[]>([]);
   const [isExporting, setIsExporting] = useState(false);
   const [includeUncorrected, setIncludeUncorrected] = useState(false);
@@ -288,7 +295,7 @@ export default function ActivityDetail({ params }: { params: Promise<{ id: strin
   useEffect(() => {
     if (!corrections.length) return;
     
-    let filtered = [...corrections] as (CorrectionWithShareCode)[];
+    let filtered = [...corrections] as (Correction)[];
     
     if (selectedClass) {
       // Filtrer par classe en utilisant les données de class_students
@@ -323,14 +330,14 @@ export default function ActivityDetail({ params }: { params: Promise<{ id: strin
       
       // Sinon, rechercher la classe correspondante pour obtenir le nom
       const classObj = correction.class_id ? classes.find(c => c.id === correction.class_id) : null;
-      // Retourner la correction avec class_name ajouté
+      // Retourner la correction avec class_name ajouté (avec valeur par défaut pour éviter undefined)
       return {
         ...correction,
-        class_name: classObj ? classObj.name : undefined
+        class_name: classObj ? classObj.name : "Classe inconnue"
       };
     });
     
-    setFilteredCorrections(filtered as CorrectionWithShareCode[]);
+    setFilteredCorrections(filtered as Correction[]);
   }, [selectedClass, selectedSubGroup, corrections, classStudents, classes]);
 
   // Load students data for a specific class when selectedClass changes
@@ -358,6 +365,19 @@ export default function ActivityDetail({ params }: { params: Promise<{ id: strin
     fetchClassStudents();
   }, [selectedClass]);
   
+  // Extract unique subclasses from class students
+  const uniqueSubClasses = useMemo(() => {
+    if (!classStudents.length) return [];
+    
+    // Extract all sub_class values from class students
+    const subClasses = classStudents
+      .filter(student => student.sub_class !== undefined && student.sub_class !== null)
+      .map(student => student.sub_class?.toString());
+    
+    // Remove duplicates with Array.from + Set instead of spread operator
+    return Array.from(new Set(subClasses)).sort((a, b) => Number(a) - Number(b));
+  }, [classStudents]);
+
   const handleEditClick = () => {
     setIsEditing(true);
   };
@@ -696,7 +716,562 @@ export default function ActivityDetail({ params }: { params: Promise<{ id: strin
   const handleNewCorrection = () => {
     router.push(`/activities/${activityId}/corrections/new`);
   };
+
+  // Ajouter des états pour les options d'export des notes
+  const [arrangement, setArrangement] = useState<'student' | 'class' | 'subclass' | 'activity'>('student');
+  const [subArrangement, setSubArrangement] = useState<'student' | 'class' | 'subclass' | 'activity' | 'none'>('activity');
+  const [exportFormat, setExportFormat] = useState<'pdf' | 'csv' | 'xlsx'>('pdf');
+  const [viewType, setViewType] = useState<'detailed' | 'simplified'>('detailed');
+  const [isExportingGrades, setIsExportingGrades] = useState(false);
   
+  // Fonction pour obtenir une activité par son ID
+  const getActivityById = (activityId: number) => {
+    return { id: activityId, name: activity?.name, experimental_points: activity?.experimental_points, theoretical_points: activity?.theoretical_points };
+  };
+  
+  // Fonction pour obtenir un étudiant par son ID
+  const getStudentById = (studentId: number | null) => {
+    if (!studentId) return undefined;
+    return students.find(s => s.id === studentId);
+  };
+  
+  // Fonction pour générer un libellé pour chaque option d'arrangement
+  const getArrangementLabel = (type: string): string => {
+    switch (type) {
+      case 'student': return 'Par étudiant';
+      case 'class': return 'Par classe';
+      case 'subclass': return 'Par groupe';
+      case 'activity': return 'Par activité';
+      case 'none': return 'Aucun sous-arrangement';
+      default: return '';
+    }
+  };
+  
+  // Fonction pour obtenir les sous-arrangements disponibles en fonction de l'arrangement principal
+  const getAvailableSubArrangements = (): ('student' | 'class' | 'subclass' | 'activity' | 'none')[] => {
+    switch (arrangement) {
+      case 'student':
+        return ['activity', 'class', 'subclass', 'none'];
+      case 'class':
+        return ['student', 'activity', 'subclass', 'none'];
+      case 'subclass':
+        return ['student', 'activity', 'class', 'none'];
+      case 'activity':
+        return ['student', 'class', 'subclass', 'none'];
+      default:
+        return ['none'];
+    }
+  };
+  
+  // Fonction pour générer un PDF avec les notes
+  const generateGradesPDF = async () => {
+    try {
+      setIsExportingGrades(true);
+      
+      // Organiser les données en fonction de l'arrangement sélectionné
+      const groupedData = organizeData(filteredCorrections);
+      
+      // Importer jspdf et jspdf-autotable
+      const jsPDFModule = await import('jspdf');
+      const jsPDF = jsPDFModule.jsPDF;
+      const autoTableModule = await import('jspdf-autotable');
+      
+      // Créer un nouveau document PDF
+      const doc = new jsPDF();
+      
+      // Ajouter le titre
+      const title = `Récapitulatif des notes - ${activity?.name}`;
+      const subtitle = selectedSubGroup !== '' 
+        ? `Groupe: ${selectedSubGroup}`
+        : 'Tous les groupes';
+      const className = selectedClass 
+        ? classes.find(c => c.id === selectedClass)?.name || 'Classe'
+        : 'Toutes les classes';
+      
+      doc.setFontSize(16);
+      doc.text(title, 14, 20);
+      doc.setFontSize(12);
+      doc.text(subtitle, 14, 28);
+      doc.text(`Classe: ${className}`, 14, 36);
+      doc.text(`Date: ${new Date().toLocaleDateString()}`, 14, 44);
+      doc.text(`Organisation: ${getArrangementLabel(arrangement)} > ${getArrangementLabel(subArrangement)}`, 14, 52);
+      
+      let yPosition = 60;
+      
+      // Générer le contenu du PDF
+      generatePDFContent(doc, groupedData, yPosition);
+      
+      // Sauvegarder le PDF
+      const fileName = `Notes_${activity?.name.replace(/\s+/g, '_')}_${new Date().toISOString().slice(0, 10)}.pdf`;
+      doc.save(fileName);
+      
+      // Afficher message de succès
+      enqueueSnackbar(`PDF des notes généré avec succès: ${fileName}`, { variant: 'success' });
+      
+    } catch (error) {
+      console.error('Erreur lors de la génération du PDF des notes:', error);
+      enqueueSnackbar('Erreur lors de la génération du PDF des notes', { variant: 'error' });
+    } finally {
+      setIsExportingGrades(false);
+    }
+  };
+  
+  // Fonction pour organiser les données selon l'arrangement choisi
+  const organizeData = (corrections: Correction[]) => {
+    const result: any = {};
+    
+    // Premier niveau d'organisation (arrangement principal)
+    switch (arrangement) {
+      case 'student':
+        corrections.forEach(correction => {
+          const student = getStudentById(correction.student_id);
+          if (!student) return;
+          
+          const studentKey = `${student.last_name} ${student.first_name}`;
+          if (!result[studentKey]) {
+            result[studentKey] = {
+              info: { student },
+              items: {}
+            };
+          }
+          
+          // Deuxième niveau (sous-arrangement)
+          if (subArrangement === 'activity') {
+            const activity = getActivityById(correction.activity_id);
+            const activityKey = activity?.name || `Activité ${correction.activity_id}`;
+            
+            if (!result[studentKey].items[activityKey]) {
+              result[studentKey].items[activityKey] = {
+                info: { activity },
+                corrections: []
+              };
+            }
+            
+            result[studentKey].items[activityKey].corrections.push(correction);
+          } 
+          else if (subArrangement === 'class') {
+            // Déterminer la classe de l'étudiant
+            const classObj = classes.find(c => c.id === correction.class_id);
+            const classKey = classObj?.name || 'Classe';
+            
+            if (!result[studentKey].items[classKey]) {
+              result[studentKey].items[classKey] = {
+                info: { className: classObj?.name },
+                corrections: []
+              };
+            }
+            
+            result[studentKey].items[classKey].corrections.push(correction);
+          }
+          else if (subArrangement === 'subclass') {
+            // Déterminer le groupe de l'étudiant
+            const subClass = student.sub_class;
+            const subClassName = subClass 
+              ? `Groupe ${subClass}`
+              : 'Sans groupe';
+            
+            if (!result[studentKey].items[subClassName]) {
+              result[studentKey].items[subClassName] = {
+                info: { subClass },
+                corrections: []
+              };
+            }
+            
+            result[studentKey].items[subClassName].corrections.push(correction);
+          }
+          else {
+            // Pas de sous-arrangement, mettre directement les corrections
+            if (!result[studentKey].corrections) {
+              result[studentKey].corrections = [];
+            }
+            result[studentKey].corrections.push(correction);
+          }
+        });
+        break;
+        
+      case 'class':
+        // Grouper par classe
+        corrections.forEach(correction => {
+          const classObj = classes.find(c => c.id === correction.class_id);
+          const classKey = classObj?.name || 'Classe';
+          
+          if (!result[classKey]) {
+            result[classKey] = {
+              info: { className: classObj?.name },
+              items: {}
+            };
+          }
+          
+          // Sous-arrangement
+          if (subArrangement === 'student') {
+            const student = getStudentById(correction.student_id);
+            if (!student) return;
+            
+            const studentKey = `${student.last_name} ${student.first_name}`;
+            
+            if (!result[classKey].items[studentKey]) {
+              result[classKey].items[studentKey] = {
+                info: { student },
+                corrections: []
+              };
+            }
+            
+            result[classKey].items[studentKey].corrections.push(correction);
+          } 
+          else if (subArrangement === 'activity') {
+            const activity = getActivityById(correction.activity_id);
+            const activityKey = activity?.name || `Activité ${correction.activity_id}`;
+            
+            if (!result[classKey].items[activityKey]) {
+              result[classKey].items[activityKey] = {
+                info: { activity },
+                corrections: []
+              };
+            }
+            
+            result[classKey].items[activityKey].corrections.push(correction);
+          }
+          else if (subArrangement === 'subclass') {
+            const student = getStudentById(correction.student_id);
+            if (!student) return;
+            
+            const subClass = student.sub_class;
+            const subClassName = subClass 
+              ? `Groupe ${subClass}`
+              : 'Sans groupe';
+            
+            if (!result[classKey].items[subClassName]) {
+              result[classKey].items[subClassName] = {
+                info: { subClass },
+                corrections: []
+              };
+            }
+            
+            result[classKey].items[subClassName].corrections.push(correction);
+          }
+          else {
+            // Pas de sous-arrangement
+            if (!result[classKey].corrections) {
+              result[classKey].corrections = [];
+            }
+            result[classKey].corrections.push(correction);
+          }
+        });
+        break;
+        
+      case 'subclass':
+        // Grouper par sous-groupe
+        corrections.forEach(correction => {
+          const student = getStudentById(correction.student_id);
+          if (!student) return;
+          
+          const subClass = student.sub_class;
+          const subClassName = subClass 
+            ? `Groupe ${subClass}`
+            : 'Sans groupe';
+          
+          if (!result[subClassName]) {
+            result[subClassName] = {
+              info: { subClass },
+              items: {}
+            };
+          }
+          
+          // Sous-arrangement
+          if (subArrangement === 'student') {
+            const studentKey = `${student.last_name} ${student.first_name}`;
+            
+            if (!result[subClassName].items[studentKey]) {
+              result[subClassName].items[studentKey] = {
+                info: { student },
+                corrections: []
+              };
+            }
+            
+            result[subClassName].items[studentKey].corrections.push(correction);
+          } 
+          else if (subArrangement === 'activity') {
+            const activity = getActivityById(correction.activity_id);
+            const activityKey = activity?.name || `Activité ${correction.activity_id}`;
+            
+            if (!result[subClassName].items[activityKey]) {
+              result[subClassName].items[activityKey] = {
+                info: { activity },
+                corrections: []
+              };
+            }
+            
+            result[subClassName].items[activityKey].corrections.push(correction);
+          }
+          else if (subArrangement === 'class') {
+            const classObj = classes.find(c => c.id === correction.class_id);
+            const classKey = classObj?.name || 'Classe';
+            
+            if (!result[subClassName].items[classKey]) {
+              result[subClassName].items[classKey] = {
+                info: { className: classObj?.name },
+                corrections: []
+              };
+            }
+            
+            result[subClassName].items[classKey].corrections.push(correction);
+          }
+          else {
+            // Pas de sous-arrangement
+            if (!result[subClassName].corrections) {
+              result[subClassName].corrections = [];
+            }
+            result[subClassName].corrections.push(correction);
+          }
+        });
+        break;
+        
+      case 'activity':
+        // Grouper par activité
+        corrections.forEach(correction => {
+          // Pour cette page, on n'a qu'une seule activité, donc on utilise son nom
+          const activityKey = activity?.name || `Activité ${correction.activity_id}`;
+          
+          if (!result[activityKey]) {
+            result[activityKey] = {
+              info: { activity },
+              items: {}
+            };
+          }
+          
+          // Sous-arrangement
+          if (subArrangement === 'student') {
+            const student = getStudentById(correction.student_id);
+            if (!student) return;
+            
+            const studentKey = `${student.last_name} ${student.first_name}`;
+            
+            if (!result[activityKey].items[studentKey]) {
+              result[activityKey].items[studentKey] = {
+                info: { student },
+                corrections: []
+              };
+            }
+            
+            result[activityKey].items[studentKey].corrections.push(correction);
+          } 
+          else if (subArrangement === 'class') {
+            const classObj = classes.find(c => c.id === correction.class_id);
+            const classKey = classObj?.name || 'Classe';
+            
+            if (!result[activityKey].items[classKey]) {
+              result[activityKey].items[classKey] = {
+                info: { className: classObj?.name },
+                corrections: []
+              };
+            }
+            
+            result[activityKey].items[classKey].corrections.push(correction);
+          }
+          else if (subArrangement === 'subclass') {
+            const student = getStudentById(correction.student_id);
+            if (!student) return;
+            
+            const subClass = student.sub_class;
+            const subClassName = subClass 
+              ? `Groupe ${subClass}`
+              : 'Sans groupe';
+            
+            if (!result[activityKey].items[subClassName]) {
+              result[activityKey].items[subClassName] = {
+                info: { subClass },
+                corrections: []
+              };
+            }
+            
+            result[activityKey].items[subClassName].corrections.push(correction);
+          }
+          else {
+            // Pas de sous-arrangement
+            if (!result[activityKey].corrections) {
+              result[activityKey].corrections = [];
+            }
+            result[activityKey].corrections.push(correction);
+          }
+        });
+        break;
+    }
+    
+    return result;
+  };
+
+  // Fonction pour générer le contenu du PDF selon les données organisées
+  const generatePDFContent = (doc: any, data: any, startY: number) => {
+    let yPosition = startY;
+    
+    // Parcourir les entrées du premier niveau
+    Object.entries(data).forEach(([key, value]: [string, any]) => {
+      // Vérifier si on doit passer à une nouvelle page
+      if (yPosition > 250) {
+        doc.addPage();
+        yPosition = 20;
+      }
+      
+      // Titre du premier niveau
+      doc.setFontSize(14);
+      doc.setFont(undefined, 'bold');
+      doc.text(key, 14, yPosition);
+      yPosition += 8;
+      doc.setFont(undefined, 'normal');
+      
+      // Si pas de sous-arrangement, afficher un tableau unique
+      if (value.corrections) {
+        if (viewType === 'simplified' && arrangement === 'class') {
+          // Tableau simplifié pour l'arrangement par classe
+          generateSimplifiedTable(doc, value.corrections, yPosition);
+        } else {
+          // Tableau détaillé standard
+          generateDetailedTable(doc, value.corrections, yPosition);
+        }
+        
+        // Mettre à jour la position Y
+        yPosition = (doc as any).lastAutoTable.finalY + 15;
+      } 
+      // Sinon parcourir les sous-arrangements
+      else if (value.items) {
+        Object.entries(value.items).forEach(([subKey, subValue]: [string, any]) => {
+          // Vérifier si on doit passer à une nouvelle page
+          if (yPosition > 250) {
+            doc.addPage();
+            yPosition = 20;
+          }
+          
+          // Titre du sous-niveau
+          doc.setFontSize(12);
+          doc.text(`${subKey}`, 20, yPosition);
+          yPosition += 6;
+          
+          // Générer le tableau pour ce sous-niveau
+          if (viewType === 'simplified' && arrangement === 'class') {
+            // Tableau simplifié pour l'arrangement par classe
+            generateSimplifiedTable(doc, subValue.corrections, yPosition);
+          } else {
+            // Tableau détaillé standard
+            generateDetailedTable(doc, subValue.corrections, yPosition);
+          }
+          
+          // Mettre à jour la position Y
+          yPosition = (doc as any).lastAutoTable.finalY + 15;
+        });
+      }
+    });
+  };
+
+  // Fonction pour générer un tableau détaillé
+  const generateDetailedTable = (doc: any, corrections: Correction[], yPosition: number) => {
+    const tableData = corrections.map(c => {
+      const activityData = getActivityById(c.activity_id);
+      const student = getStudentById(c.student_id);
+      
+      // Marquer explicitement les notes inactives
+      const isActive = c.active !== 0 && c.active !== null;
+      const totalGrade = isActive ? `${c.grade || 0} / 20` : "Non rendu / ABS";
+      const expGrade = isActive ? `${c.experimental_points_earned || 0} / ${activityData?.experimental_points || 0}` : "-";
+      const theoGrade = isActive ? `${c.theoretical_points_earned || 0} / ${activityData?.theoretical_points || 0}` : "-";
+      
+      return [
+        student ? `${student.first_name} ${student.last_name}` : 'N/A',
+        activityData?.name || `Activité ${c.activity_id}`,
+        expGrade,
+        theoGrade,
+        totalGrade
+      ];
+    });
+    
+    const headers = [
+      'Étudiant',
+      'Activité',
+      'Note Exp.',
+      'Note Théo.',
+      'Total'
+    ];
+    
+    // Ajouter le tableau
+    const autoTableModule = require('jspdf-autotable').default;
+    autoTableModule(doc, {
+      head: [headers],
+      body: tableData,
+      startY: yPosition,
+      theme: 'grid',
+      styles: { fontSize: 10 },
+      headStyles: { fillColor: [66, 135, 245] }
+    });
+  };
+
+  // Fonction pour générer un tableau simplifié (pour l'arrangement par classe)
+  const generateSimplifiedTable = (doc: any, corrections: Correction[], yPosition: number) => {
+    // Regrouper les étudiants (lignes) et les activités (colonnes)
+    const studentMap: Record<string, Record<string, any>> = {};
+    const activitySet = new Set<string>();
+    
+    corrections.forEach(c => {
+      const student = getStudentById(c.student_id);
+      const activityData = getActivityById(c.activity_id);
+      
+      if (!student) return;
+      
+      const studentKey = `${student.last_name} ${student.first_name}`;
+      const activityKey = activityData?.name || `Activité ${c.activity_id}`;
+      
+      activitySet.add(activityKey);
+      
+      if (!studentMap[studentKey]) {
+        studentMap[studentKey] = {};
+      }
+      
+      studentMap[studentKey][activityKey] = c.grade || 0;
+    });
+    
+    // Convertir en tableau pour jspdf-autotable
+    const activityArray = Array.from(activitySet);
+    const tableData = Object.entries(studentMap).map(([student, grades]) => {
+      const row = [student];
+      activityArray.forEach(activity => {
+        row.push(grades[activity]?.toString() || '-');
+      });
+      return row;
+    });
+    
+    // Préparer les en-têtes
+    const headers = ['Étudiant', ...activityArray];
+    
+    // Ajouter le tableau
+    const autoTableModule = require('jspdf-autotable').default;
+    autoTableModule(doc, {
+      head: [headers],
+      body: tableData,
+      startY: yPosition,
+      theme: 'grid',
+      styles: { fontSize: 10 },
+      headStyles: { fillColor: [66, 135, 245] },
+      columnStyles: {
+        0: { cellWidth: 40 }
+      }
+    });
+  };
+
+  // Conversion du type Student local vers le type Student attendu par ExportPDFComponent
+  const mapToLibStudent = (student: Student): LibStudent => {
+    return {
+      id: student.id,
+      first_name: student.first_name,
+      last_name: student.last_name,
+      email: student.email || '', // Fournir une valeur par défaut pour email qui est obligatoire
+      gender: (student.gender as 'M' | 'F' | 'N') || 'N', // S'assurer que gender est 'M', 'F' ou 'N'
+      sub_class: student.sub_class ? (typeof student.sub_class === 'string' ? parseInt(student.sub_class) : student.sub_class) : null,
+      group: student.group || '',
+      className: student.name || '', // Utiliser le nom si disponible
+      corrections_count: 0, // Valeur par défaut
+      created_at: '',  // Valeur par défaut
+      updated_at: ''   // Valeur par défaut
+    };
+  };
+
   if (loading) {
     return (
       <div className="container max-w-[400px] mx-auto px-4 py-8 flex justify-center">
@@ -974,203 +1549,24 @@ export default function ActivityDetail({ params }: { params: Promise<{ id: strin
           )}
           
           {tabValue === 4 && (
-            <Box sx={{ mt: 2 }}>
-              <Typography variant="h6" gutterBottom>
-                Export des QR codes de feedback
-              </Typography>
-              <Typography variant="body2" color="text.secondary">
-                Exportez un document PDF contenant les QR codes d'accès aux corrections pour chaque étudiant. Les étudiants peuvent scanner ces codes pour voir leurs résultats.
-              </Typography>
-              
-              <Paper variant="outlined" sx={{ p: 3, mt: 2 }}>
-                <Grid container spacing={3}>
-                  <Grid size={{ xs: 12, md: 6 }}>
-                    <FormControl fullWidth size="small">
-                      <InputLabel id="class-select-label">Classe</InputLabel>
-                      <Select
-                        labelId="class-select-label"
-                        value={selectedClass === null ? "" : selectedClass}
-                        onChange={handleClassChange}
-                        label="Classe"
-                        startAdornment={
-                          <ClassIcon sx={{ ml: 1, mr: 0.5, color: 'primary.main' }} />
-                        }
-                      >
-                        <MenuItem value="">Toutes les classes</MenuItem>
-                        {classes.map((cls) => (
-                          <MenuItem key={cls.id} value={cls.id}>{cls.name}</MenuItem>
-                        ))}
-                      </Select>
-                    </FormControl>
-                  </Grid>
-                  
-                  <Grid size={{ xs: 12, md: 6 }}>
-                    <FormControl fullWidth size="small" disabled={!selectedClass || !classes.find(c => c.id === selectedClass)?.nbre_subclasses}>
-                      <InputLabel id="subgroup-select-label">Sous-groupe</InputLabel>
-                      <Select
-                        labelId="subgroup-select-label"
-                        value={selectedSubGroup}
-                        onChange={handleSubGroupChange}
-                        label="Sous-groupe"
-                        startAdornment={
-                          <GroupIcon sx={{ ml: 1, mr: 0.5, color: 'secondary.main' }} />
-                        }
-                      >
-                        <MenuItem value="">Tous les sous-groupes</MenuItem>
-                        {selectedClass && classes.find(c => c.id === selectedClass)?.nbre_subclasses ? 
-                          // Générer directement les options de sous-groupes à partir de nbre_subclasses
-                          Array.from(
-                            { length: classes.find(c => c.id === selectedClass)!.nbre_subclasses! }, 
-                            (_, i) => (
-                              <MenuItem key={`Groupe ${i + 1}`} value={`${i + 1}`}>
-                                Groupe {i + 1}
-                              </MenuItem>
-                            )
-                          )
-                          : 
-                          // Utiliser subGroups comme fallback si disponible
-                          subGroups.map((group) => (
-                            <MenuItem key={group} value={group}>{group}</MenuItem>
-                          ))
-                        }
-                      </Select>
-                    </FormControl>
-                  </Grid>
-                  
-                  <Grid size={{ xs: 12 }}>
-                    <FormControlLabel
-                      control={
-                        <Checkbox
-                          checked={includeUncorrected}
-                          onChange={(e) => setIncludeUncorrected(e.target.checked)}
-                          color="primary"
-                        />
-                      }
-                      label="Inclure les élèves sans correction"
-                    />
-                  </Grid>
-                </Grid>
-                
-                <Divider sx={{ my: 3 }} />
-                
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <Typography variant="body2">
-                    {filteredCorrections.length} correction(s) sélectionnée(s)
-                  </Typography>
-                  <Button
-                    variant="contained"
-                    color="primary"
-                    startIcon={<PictureAsPdfIcon />}
-                    onClick={handleExportPDF}
-                    disabled={isExporting || filteredCorrections.length === 0}
-                  >
-                    {isExporting ? 'Génération en cours...' : 'Générer le PDF'}
-                  </Button>
-                </Box>
-                
-                {filteredCorrections.length > 0 && (
-                  <Box sx={{ mt: 3 }}>
-                    <Typography variant="subtitle2" gutterBottom>
-                      Aperçu des corrections sélectionnées:
-                    </Typography>
-                    <TableContainer component={Paper} variant="outlined" sx={{ maxHeight: 400, overflow: 'auto' }}>
-                      <Table size="small" stickyHeader>
-                        <TableHead>
-                          <TableRow>
-                            <TableCell sx={{ fontWeight: 'bold' }}>Étudiant</TableCell>
-                            <TableCell sx={{ fontWeight: 'bold' }}>Note</TableCell>
-                            <TableCell sx={{ fontWeight: 'bold' }}>Classe</TableCell>
-                            <TableCell sx={{ fontWeight: 'bold' }}>Sous-groupe</TableCell>
-                            <TableCell sx={{ fontWeight: 'bold' }} align="center">Lien de partage</TableCell>
-                          </TableRow>
-                        </TableHead>
-                        <TableBody>
-                          {(rowsPerPage > 0
-                            ? filteredCorrections.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
-                            : filteredCorrections
-                          ).map((correction) => {
-                            const student = students.find(s => s.id === correction.student_id);
-                            const studentClass = classStudents.find(cs => cs.id === correction.student_id);
-                            
-                            return (
-                              <TableRow key={correction.id} hover>
-                                <TableCell component="th" scope="row">
-                                  {student 
-                                    ? `${student.first_name} ${student.last_name}` 
-                                    : `Étudiant #${correction.student_id}`}
-                                </TableCell>
-                                <TableCell>
-                                  {correction.grade !== undefined 
-                                    ? <Chip 
-                                        size="small" 
-                                        label={`${correction.grade}/20`} 
-                                        color={Number(correction.grade) >= 10 ? "success" : "error"} 
-                                        variant="outlined"
-                                      /> 
-                                    : 'Non noté'}
-                                </TableCell>
-                                <TableCell>
-                                  {correction.class_name || (selectedClass && classes.find(c => c.id === selectedClass)?.name) || '-'}
-                                </TableCell>
-                                <TableCell>
-                                  {studentClass?.sub_class ? `Groupe ${studentClass.sub_class}` : '-'}
-                                </TableCell>
-                                <TableCell align="center">
-                                  {hasShareCode(correction) ? (
-                                    <Chip
-                                      size="small"
-                                      icon={<QrCodeIcon />}
-                                      label="Disponible"
-                                      color="success"
-                                      variant="outlined"
-                                    />
-                                  ) : (
-                                    <Chip
-                                      size="small"
-                                      icon={<QrCodeIcon />}
-                                      label="À générer"
-                                      color="warning"
-                                      variant="outlined"
-                                    />
-                                  )}
-                                </TableCell>
-                              </TableRow>
-                            );
-                          })}
-                          
-                          {/* Ajouter des lignes vides si nécessaire pour maintenir la hauteur constante */}
-                          {rowsPerPage > 0 && filteredCorrections.length > 0 && 
-                            emptyRows > 0 && (
-                            <TableRow style={{ height: 53 * emptyRows }}>
-                              <TableCell colSpan={5} />
-                            </TableRow>
-                          )}
-                        </TableBody>
-                        <TableFooter>
-                          <TableRow>
-                            <TablePagination
-                              rowsPerPageOptions={[5, 10, 25, { label: 'Tous', value: -1 }]}
-                              colSpan={5}
-                              count={filteredCorrections.length}
-                              rowsPerPage={rowsPerPage}
-                              page={page}
-                              SelectProps={{
-                                inputProps: {'aria-label': 'lignes par page'},
-                                native: true,
-                              }}
-                              onPageChange={handleChangePage}
-                              onRowsPerPageChange={handleChangeRowsPerPage}
-                              labelRowsPerPage="Lignes par page"
-                              labelDisplayedRows={({ from, to, count }) => `${from}-${to} sur ${count}`}
-                              ActionsComponent={TablePaginationActions}
-                            />
-                          </TableRow>
-                        </TableFooter>
-                      </Table>
-                    </TableContainer>
-                  </Box>
-                )}
-              </Paper>
+            <Box sx={{ py: 2 }}>
+              <ExportPDFComponent
+                classData={{ id: 'all', name: activity?.name || 'Activité' }}
+                corrections={filteredCorrections as ProviderCorrection[]}
+                activities={[{ id: activity?.id || 0, name: activity?.name || 'Activité' }]}
+                students={students.map(mapToLibStudent)}
+                filterActivity={activity?.id || 0}
+                setFilterActivity={() => {}} // Non utilisable dans ce contexte
+                filterSubClass={selectedSubGroup === '' ? 'all' : selectedSubGroup}
+                setFilterSubClass={(value) => setSelectedSubGroup(value === 'all' ? '' : value)}
+                uniqueSubClasses={uniqueSubClasses.filter(subClass => subClass !== undefined).map(subClass => ({ id: parseInt(subClass || "0"), name: `Groupe ${subClass}` }))}
+                uniqueActivities={[{ id: activity?.id || 0, name: activity?.name || 'Activité' }]}
+                getActivityById={getActivityById}
+                getStudentById={(studentId) => {
+                  const student = getStudentById(studentId);
+                  return student ? mapToLibStudent(student) : undefined;
+                }}
+              />
             </Box>
           )}
         </Box>

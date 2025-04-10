@@ -345,7 +345,7 @@ export const CorrectionsProvider: React.FC<CorrectionsProviderProps> = ({
     if (!corrections.length) return;
     
     // Étape 1: Appliquer tous les filtres sauf le filtre par sous-classe
-    let filtered = applyAllFiltersExceptSubClass(corrections);
+    let filtered = applyAllFiltersExceptSubClass(corrections) as Correction[];
     // Étape 2: Appliquer le filtre de sous-classe si nécessaire
     if (filters.subClassId && activeFilters.includes('subClassId') && subClassStudentIds.length > 0) {
       filtered = filtered.filter(correction => 

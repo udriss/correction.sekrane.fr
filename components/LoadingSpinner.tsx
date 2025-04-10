@@ -64,6 +64,12 @@ const LoadingSpinner: React.FC<LoadingSpinnerProps> = ({
     100% { transform: translateX(100%); }
   `;
   
+  // Define counter-clockwise animation
+  const counterClockwiseAnimation = keyframes`
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(-360deg); }
+  `;
+  
   // Dynamic dots for animation
   const [dots, setDots] = React.useState('.');
   
@@ -120,7 +126,11 @@ const LoadingSpinner: React.FC<LoadingSpinnerProps> = ({
             thickness={2}
             sx={{ 
               color: alpha(spinnerColor, 0.3),
-              animationDuration: '3s'
+              animation: `${counterClockwiseAnimation} 2.5s linear infinite`,
+              // Désactiver l'animation par défaut du composant CircularProgress
+              '& .MuiCircularProgress-circle': {
+                animation: 'none'
+              }
             }}
           />
         </Box>
@@ -163,7 +173,7 @@ const LoadingSpinner: React.FC<LoadingSpinnerProps> = ({
           </Box>
           
           {/* Progress bar */}
-          <Box sx={{ 
+{/*           <Box sx={{ 
             mt: 1,
             height: 4,
             width: '100%',
@@ -178,7 +188,7 @@ const LoadingSpinner: React.FC<LoadingSpinnerProps> = ({
               animation: `${loadingBarAnimation} 2s linear infinite`,
               borderRadius: 'inherit'
             }} />
-          </Box>
+          </Box> */}
         </Box>
       )}
     </Box>

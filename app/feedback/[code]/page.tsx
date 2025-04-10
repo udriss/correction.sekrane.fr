@@ -605,7 +605,7 @@ export default function FeedbackViewer({ params }: { params: Promise<{ code: str
                                       </Box>
                                       <Typography variant="caption" sx={{ color: 'text.secondary', mt: 0.5 }}>
                                         <InfoIcon sx={{ fontSize: 16, verticalAlign: 'text-bottom', mr: 0.5 }} />
-                                        Note : si la pénalité avait fait descendre votre note en dessous de 6/20, 
+                                        Info : si la pénalité avait fait descendre votre note en dessous de 6/20, 
                                         vous auriez bénéficié du seuil minimum de 6/20.
                                       </Typography>
                                     </>

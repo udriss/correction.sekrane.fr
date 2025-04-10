@@ -15,6 +15,7 @@ export interface Correction {
   deadline?: Date | string | null;
   group_id: number | null;
   class_id: number | null;
+  active?: number; // 0 = inactive, 1 = active
 }
 
 export interface ShareCode {

@@ -20,7 +20,7 @@ interface LocalCorrection extends Omit<Correction, 'activity_id' | 'class_id'> {
   deadline?: string;
   submission_date?: string;
   grade?: number;
-  active?: number | boolean;
+  active?: number; // Ensuring this matches the type in Correction (0 = inactive, 1 = active)
   experimental_points_earned?: number;
   theoretical_points_earned?: number;
   penalty?: number;
@@ -419,7 +419,9 @@ export function useCorrections(correctionId: string) {
     setError('');
     
     try {
-      const newActiveState = !(correction.active === 1 || correction.active === true);
+      // Correction : éviter la comparaison avec true (boolean) puisque active est un number
+      const isCurrentlyActive = correction.active === 1;
+      const newActiveState = !isCurrentlyActive;
       
       const response = await fetch(`/api/corrections/${correctionId}/toggle-active`, {
         method: 'POST',

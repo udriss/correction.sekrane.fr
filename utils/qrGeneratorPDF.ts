@@ -134,8 +134,8 @@ export async function generateQRCodePDF({
     doc.text(`${formattedDate}`, 105, 42, { align: 'center' });
     
     // Compter les corrections actives et inactives
-    const activeCorrections = corrections.filter(c => c.active !== false);
-    const inactiveCorrections = corrections.filter(c => c.active === false);
+    const activeCorrections = corrections.filter(c => c.active !== 0);
+    const inactiveCorrections = corrections.filter(c => c.active === 0);
     let statusText = `${corrections.length} corrections`;
     if (inactiveCorrections.length > 0) {
       statusText += ` (dont ${inactiveCorrections.length} inactives)`;
