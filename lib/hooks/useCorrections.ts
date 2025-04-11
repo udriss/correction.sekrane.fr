@@ -20,7 +20,7 @@ interface LocalCorrection extends Omit<Correction, 'activity_id' | 'class_id'> {
   deadline?: string;
   submission_date?: string;
   grade?: number;
-  active?: number; // Ensuring this matches the type in Correction (0 = inactive, 1 = active)
+  active?: number ; // Ensuring this matches the type in Correction (0 = inactive, 1 = active)
   experimental_points_earned?: number;
   theoretical_points_earned?: number;
   penalty?: number;
@@ -421,14 +421,16 @@ export function useCorrections(correctionId: string) {
     try {
       // Correction : éviter la comparaison avec true (boolean) puisque active est un number
       const isCurrentlyActive = correction.active === 1;
-      const newActiveState = !isCurrentlyActive;
+      // Changer pour retourner 0 ou 1 au lieu d'un booléen
+      const newActiveState = isCurrentlyActive ? 0 : 1;
+
       
       const response = await fetch(`/api/corrections/${correctionId}/toggle-active`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ active: newActiveState }),
+        body: JSON.stringify({ active: !isCurrentlyActive }), // Inverser l'état actuel
       });
       
       if (!response.ok) {
@@ -443,15 +445,23 @@ export function useCorrections(correctionId: string) {
         if (!prev) return null;
         return {
           ...prev,
-          active: newActiveState ? 1 : 0
+          active: newActiveState
         };
       });
       
       setSuccessMessage(`Correction ${newActiveState ? 'activée' : 'désactivée'} avec succès`);
       setTimeout(() => setSuccessMessage(''), 3000);
     } catch (err) {
-      console.error('Erreur:', err);
-      setError('Erreur lors de la modification du statut de la correction');
+      console.error('Erreur lors de la modification du statut:', err);
+      // Au lieu d'utiliser directement setError, nous allons stocker plus d'informations
+      // pour que le composant ErrorDisplay puisse les afficher
+      if (err instanceof Error) {
+        // Stocker l'objet Error complet et pas seulement le message
+        setError(err.message);
+        // Les détails de l'erreur seront gérés par ErrorDisplay
+      } else {
+        setError('Erreur lors de la modification du statut de la correction');
+      }
     } finally {
       setSaving(false);
     }

@@ -331,7 +331,7 @@ export default function ActivitiesPage() {
                 backdropFilter: 'blur(5px)',
                 borderRadius: 2,
               }}>
-                <Typography variant="overline" color="text.secondary">Total</Typography>
+                <Typography  color="text.secondary">Total</Typography>
                 <Typography variant="h3" fontWeight="bold" color="text.primary">{totalActivities}</Typography>
                 <Typography variant="overline" color="text.secondary">
                   {totalActivities === 1 ? 'activité' : 'activités'}

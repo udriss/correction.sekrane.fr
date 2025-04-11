@@ -78,14 +78,14 @@ export async function GET(
         [idNumber]
       );
       
-      let activeStatus = true; // Par défaut, une correction est active
+      let activeStatus = 1; // Par défaut, une correction est active (1)
       let finalGrade = null; // Initialiser la note finale à null
       
       if (Array.isArray(activeStatusResult) && activeStatusResult.length > 0) {
         // La valeur peut être 0, 1, true, false ou null
         const activeValue = (activeStatusResult[0] as any).active;
-        // Convertir en booléen: false si activeValue est 0, false ou null, true sinon
-        activeStatus = !(activeValue === 0 || activeValue === false || activeValue === null);
+        // Convertir en nombre entier: 0 si activeValue est 0, false ou null, 1 sinon
+        activeStatus = (activeValue === 0 || activeValue === false || activeValue === null) ? 0 : 1;
         
         // Calculer la note finale selon la nouvelle règle
         const grade = parseFloat((activeStatusResult[0] as any).grade) || 0;

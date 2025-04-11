@@ -5,6 +5,7 @@ import CorrectionCard from './CorrectionCard';
 import { getBatchShareCodes } from '@/lib/services/shareService';
 import { useSnackbar } from 'notistack';
 import ErrorDisplay from '@/components/ui/ErrorDisplay';
+import { toggleCorrectionActive } from '@/lib/services/correctionService';
 
 interface StudentsListProps {
   filteredCorrections: Correction[];
@@ -54,18 +55,8 @@ const StudentsList: React.FC<StudentsListProps> = ({
   // Handle toggling the active status of a correction
   const handleToggleActive = async (correctionId: number, newActiveState: boolean) => {
     try {
-      const response = await fetch(`/api/corrections/${correctionId}/toggle-active`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ active: newActiveState }),
-      });
-      
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error || 'Failed to update correction status');
-      }
+      // Appeler la fonction utilitaire au lieu de l'API directement
+      const result = await toggleCorrectionActive(correctionId, newActiveState);
       
       // Show success message
       enqueueSnackbar(`Correction ${newActiveState ? 'activée' : 'désactivée'} avec succès`, {
@@ -78,6 +69,7 @@ const StudentsList: React.FC<StudentsListProps> = ({
         await refreshCorrections();
       }
       
+      return result;
     } catch (error) {
       console.error('Error toggling correction active status:', error);
       enqueueSnackbar(`Erreur: ${error instanceof Error ? error.message : 'Échec de la mise à jour'}`, {

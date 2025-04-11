@@ -123,7 +123,6 @@ export async function PUT(
         `UPDATE corrections SET ${fieldsToUpdate.join(', ')} WHERE id = ?`,
         params
       );
-      console.log('Correction mise à jour avec succès:', params);
       // Créer un log pour la mise à jour des notes
       await createLogEntry({
         action_type: 'UPDATE_GRADE',

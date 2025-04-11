@@ -23,16 +23,103 @@ const MicroscopeExitPupilDemo = () => {
   
   // Calculate the exit pupil position when parameters change
   useEffect(() => {
-    // Formula: Position = eyepieceFocal - (opticalInterval / objectiveMagnification²)
-    const position = eyepieceFocal - (opticalInterval / (objectiveMagnification * objectiveMagnification));
+    // Nouvelle formule basée sur la relation de conjugaison:
+    // D = f'2 - Δ/G²  où G = Δ/f'1
+    // Donc D = f'2 - f'1²/Δ
+    const G = opticalInterval / objectiveFocal;
+    const position = eyepieceFocal - (opticalInterval / (G * G));
+    // Ou de façon équivalente:
+    // const position = eyepieceFocal - ((objectiveFocal * objectiveFocal) / opticalInterval);
     setExitPupilPosition(parseFloat(position.toFixed(2)));
-  }, [eyepieceFocal, opticalInterval, objectiveMagnification]);
+  }, [eyepieceFocal, opticalInterval, objectiveMagnification, objectiveFocal]);
   
   return (
     <Paper elevation={3} sx={{ p: 3, mb: 4 }}>
       <Typography variant="h5" gutterBottom sx={{ mb: 2 }}>
         Calcul de la Position du Cercle Oculaire (Pupille de Sortie)
       </Typography>
+      
+      {/* Mathematical demonstration */}
+      <Typography variant="h6" gutterBottom sx={{ mb: 2 }}>
+        Démonstration Mathématique
+      </Typography>
+      
+      <Grid container spacing={3}>
+        <Grid size={{ xs: 12, md: 6 }}>
+          <Paper elevation={1} sx={{ p: 2, mb: 2, bgcolor: 'background.paper' }}>
+            <Typography variant="subtitle1" gutterBottom>
+              Principes optiques:
+            </Typography>
+            <Typography variant="body2" paragraph>
+              Dans un microscope, le cercle oculaire est l'image de la pupille d'entrée (diaphragme d'ouverture) formée par l'oculaire.
+            </Typography>
+            <Typography variant="body2" paragraph>
+              Sa position se détermine en utilisant la relation de conjugaison et en faisant l'image de l'objectif à travers l'oculaire.
+            </Typography>
+          </Paper>
+        </Grid>
+        
+        <Grid size={{ xs: 12, md: 6 }}>
+          <Paper elevation={1} sx={{ p: 2, mb: 2, bgcolor: 'background.paper' }}>
+            <Typography variant="subtitle1" gutterBottom>
+              Formule simplifiée:
+            </Typography>
+            <Box sx={{ p: 1, fontFamily: 'monospace' }}>
+              <Typography variant="body2" sx={{ fontWeight: 'bold' }}>
+                D = f'<sub>2</sub> - Δ/G<sup>2</sup> = f'<sub>2</sub> - f'<sub>1</sub><sup>2</sup>/Δ
+              </Typography>
+              <Typography variant="caption" display="block" sx={{ mt: 1 }}>
+                où:
+              </Typography>
+              <Typography variant="caption" display="block">
+                • f'<sub>1</sub> = distance focale de l'objectif ({objectiveFocal} mm)
+              </Typography>
+              <Typography variant="caption" display="block">
+                • f'<sub>2</sub> = distance focale de l'oculaire ({eyepieceFocal} mm)
+              </Typography>
+              <Typography variant="caption" display="block">
+                • Δ = intervalle optique ({opticalInterval} mm)
+              </Typography>
+              <Typography variant="caption" display="block">
+                • G = grossissement de l'objectif = Δ/f'<sub>1</sub> ({objectiveMagnification}x)
+              </Typography>
+            </Box>
+          </Paper>
+        </Grid>
+      </Grid>
+      
+      {/* Step by step calculation */}
+      <Paper elevation={1} sx={{ p: 3, mt: 3, mb: 3, bgcolor: 'rgb(245, 250, 255)' }}>
+        <Typography variant="subtitle1" gutterBottom>
+          Calcul étape par étape:
+        </Typography>
+        <Box sx={{ pl: 2, fontFamily: 'monospace' }}>
+          <Typography variant="body2">
+            1. f'<sub>1</sub> = {objectiveFocal} mm
+          </Typography>
+          <Typography variant="body2">
+            2. f'<sub>2</sub> = {eyepieceFocal} mm
+          </Typography>
+          <Typography variant="body2">
+            3. Δ = {opticalInterval} mm
+          </Typography>
+          <Typography variant="body2">
+            4. G = Δ/f'<sub>1</sub> = {opticalInterval}/{objectiveFocal} = {objectiveMagnification}x
+          </Typography>
+          <Typography variant="body2">
+            5. G<sup>2</sup> = {objectiveMagnification} × {objectiveMagnification} = {(objectiveMagnification * objectiveMagnification).toFixed(1)}
+          </Typography>
+          <Typography variant="body2">
+            6. Δ/G<sup>2</sup> = {opticalInterval}/{(objectiveMagnification * objectiveMagnification).toFixed(1)} = {(opticalInterval / (objectiveMagnification * objectiveMagnification)).toFixed(2)}
+          </Typography>
+          <Typography variant="body2">
+            7. Position = {eyepieceFocal} - {(opticalInterval / (objectiveMagnification * objectiveMagnification)).toFixed(2)} = {exitPupilPosition} mm
+          </Typography>
+          <Typography variant="body2" sx={{ mt: 1, color: 'text.secondary' }}>
+            Alternative: f'<sub>1</sub><sup>2</sup>/Δ = {objectiveFocal}<sup>2</sup>/{opticalInterval} = {((objectiveFocal * objectiveFocal) / opticalInterval).toFixed(2)}
+          </Typography>
+        </Box>
+      </Paper>
       
       <Grid container spacing={4}>
         <Grid size={{ xs: 12, md: 6 }}>
@@ -42,7 +129,11 @@ const MicroscopeExitPupilDemo = () => {
             </Typography>
             <Slider
               value={objectiveFocal}
-              onChange={(_, value) => setObjectiveFocal(value as number)}
+              onChange={(_, value) => {
+                setObjectiveFocal(value as number);
+                // Mettre à jour le grossissement qui est lié à la focale par G = Δ/f'1
+                setObjectiveMagnification(parseFloat((opticalInterval / (value as number)).toFixed(1)));
+              }}
               min={1}
               max={40}
               step={0.5}
@@ -80,7 +171,11 @@ const MicroscopeExitPupilDemo = () => {
             </Typography>
             <Slider
               value={opticalInterval}
-              onChange={(_, value) => setOpticalInterval(value as number)}
+              onChange={(_, value) => {
+                setOpticalInterval(value as number);
+                // Mettre à jour le grossissement qui est lié à l'intervalle par G = Δ/f'1
+                setObjectiveMagnification(parseFloat(((value as number) / objectiveFocal).toFixed(1)));
+              }}
               min={140}
               max={200}
               step={1}
@@ -98,7 +193,11 @@ const MicroscopeExitPupilDemo = () => {
             </Typography>
             <Slider
               value={objectiveMagnification}
-              onChange={(_, value) => setObjectiveMagnification(value as number)}
+              onChange={(_, value) => {
+                setObjectiveMagnification(value as number);
+                // Mettre à jour la focale de l'objectif qui est liée au grossissement par f'1 = Δ/G
+                setObjectiveFocal(parseFloat((opticalInterval / (value as number)).toFixed(1)));
+              }}
               min={4}
               max={100}
               step={1}
@@ -119,79 +218,6 @@ const MicroscopeExitPupilDemo = () => {
       </Grid>
       
       <Divider sx={{ my: 3 }} />
-      
-      {/* Mathematical demonstration */}
-      <Typography variant="h6" gutterBottom sx={{ mb: 2 }}>
-        Démonstration Mathématique
-      </Typography>
-      
-      <Grid container spacing={3}>
-        <Grid size={{ xs: 12, md: 6 }}>
-          <Paper elevation={1} sx={{ p: 2, mb: 2, bgcolor: 'background.paper' }}>
-            <Typography variant="subtitle1" gutterBottom>
-              Principes optiques:
-            </Typography>
-            <Typography variant="body2" paragraph>
-              Dans un microscope, le cercle oculaire est l'image de la pupille d'entrée (diaphragme d'ouverture) formée par l'oculaire.
-            </Typography>
-            <Typography variant="body2" paragraph>
-              La position du cercle oculaire est déterminée par les paramètres optiques du système.
-            </Typography>
-          </Paper>
-        </Grid>
-        
-        <Grid size={{ xs: 12, md: 6 }}>
-          <Paper elevation={1} sx={{ p: 2, mb: 2, bgcolor: 'background.paper' }}>
-            <Typography variant="subtitle1" gutterBottom>
-              Formule de calcul:
-            </Typography>
-            <Box sx={{ p: 1, fontFamily: 'monospace' }}>
-              <Typography variant="body2" sx={{ fontWeight: 'bold' }}>
-                Position = f<sub>o</sub> - (Δ / M<sup>2</sup>)
-              </Typography>
-              <Typography variant="caption" display="block" sx={{ mt: 1 }}>
-                où:
-              </Typography>
-              <Typography variant="caption" display="block">
-                • f<sub>o</sub> = distance focale de l'oculaire ({eyepieceFocal} mm)
-              </Typography>
-              <Typography variant="caption" display="block">
-                • Δ = intervalle optique ({opticalInterval} mm)
-              </Typography>
-              <Typography variant="caption" display="block">
-                • M = grossissement de l'objectif ({objectiveMagnification}x)
-              </Typography>
-            </Box>
-          </Paper>
-        </Grid>
-      </Grid>
-      
-      {/* Step by step calculation */}
-      <Paper elevation={1} sx={{ p: 3, mt: 3, mb: 3, bgcolor: 'rgb(245, 250, 255)' }}>
-        <Typography variant="subtitle1" gutterBottom>
-          Calcul étape par étape:
-        </Typography>
-        <Box sx={{ pl: 2, fontFamily: 'monospace' }}>
-          <Typography variant="body2">
-            1. f<sub>o</sub> = {eyepieceFocal} mm
-          </Typography>
-          <Typography variant="body2">
-            2. Δ = {opticalInterval} mm
-          </Typography>
-          <Typography variant="body2">
-            3. M = {objectiveMagnification}x
-          </Typography>
-          <Typography variant="body2">
-            4. M<sup>2</sup> = {objectiveMagnification} × {objectiveMagnification} = {objectiveMagnification * objectiveMagnification}
-          </Typography>
-          <Typography variant="body2">
-            5. Δ / M<sup>2</sup> = {opticalInterval} / {objectiveMagnification * objectiveMagnification} = {(opticalInterval / (objectiveMagnification * objectiveMagnification)).toFixed(2)}
-          </Typography>
-          <Typography variant="body2">
-            6. Position = {eyepieceFocal} - {(opticalInterval / (objectiveMagnification * objectiveMagnification)).toFixed(2)} = {exitPupilPosition} mm
-          </Typography>
-        </Box>
-      </Paper>
       
       {/* Result display */}
       <Box sx={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
@@ -222,12 +248,12 @@ const MicroscopeExitPupilDemo = () => {
         </Typography>
         
         <Grid container spacing={2} sx={{ width: "100%", mb: 3 }}>
-          {/* Schema on the left side */}
+          {/* Schema on the left side - SIMPLIFIED */}
           <Grid size={{ xs: 12, md: 7 }}>
             <Paper 
               elevation={0} 
               sx={{ 
-                height: 280, 
+                height: 320, 
                 position: "relative", 
                 border: "1px solid #ddd",
                 borderRadius: 2,
@@ -236,91 +262,257 @@ const MicroscopeExitPupilDemo = () => {
                 p: 1
               }}
             >
-              {/* Eye */}
+              {/* Title of the schema */}
+              <Typography 
+                variant="caption" 
+                sx={{ 
+                  position: "absolute", 
+                  top: 10, 
+                  left: 10,
+                  fontStyle: "italic",
+                  color: "#666",
+                  zIndex: 5
+                }}
+              >
+                Coupe longitudinale du microscope
+              </Typography>
+
+              {/* Axe optique */}
               <Box sx={{
                 position: "absolute",
-                bottom: 120 + Math.min(Math.max(exitPupilPosition * 3, 0), 80),
-                left: "50%",
-                width: 40,
-                height: 25,
+                left: 10,
+                right: 10,
+                top: "50%",
+                height: 1,
+                bgcolor: "#555",
+              }} />
+              
+              {/* Objectif */}
+              <Box sx={{
+                position: "absolute",
+                bottom: 120,
+                left: 50,
+                width: 8,
+                height: 80,
+                bgcolor: "#555",
+                borderRadius: 2,
+                zIndex: 3
+              }} />
+              <Typography 
+                variant="caption" 
+                sx={{ 
+                  position: "absolute", 
+                  bottom: 100, 
+                  left: 40,
+                  color: "#555",
+                  fontWeight: "bold"
+                }}
+              >
+                Objectif
+              </Typography>
+
+              {/* Plan focal image objectif */}
+              <Box sx={{
+                position: "absolute",
+                bottom: 120,
+                left: 80,
+                width: 1,
+                height: 30,
+                bgcolor: "#555",
+                borderStyle: "dashed"
+              }} />
+              <Typography 
+                variant="caption" 
+                sx={{ 
+                  position: "absolute", 
+                  bottom: 140, 
+                  left: 90,
+                  color: "#555"
+                }}
+              >
+                F'<sub>1</sub>
+              </Typography>
+              
+              {/* Point focal objectif */}
+              <Box sx={{
+                position: "absolute",
+                bottom: 120,
+                left: 80,
+                width: 6,
+                height: 6,
+                bgcolor: "#000",
+                borderRadius: "50%",
+                transform: "translateX(-50%) translateY(-50%)",
+                zIndex: 4
+              }} />
+
+              {/* Interval optique */}
+              <Box sx={{
+                position: "absolute",
+                bottom: 145,
+                left: 80,
+                width: 240,
+                height: 1,
+                borderTop: "1px dashed #777"
+              }} />
+              <Typography 
+                variant="caption" 
+                sx={{ 
+                  position: "absolute", 
+                  bottom: 155, 
+                  left: 200,
+                  color: "#555",
+                  fontWeight: "bold"
+                }}
+              >
+                Δ = {opticalInterval} mm
+              </Typography>
+
+              {/* Oculaire */}
+              <Box sx={{
+                position: "absolute",
+                bottom: 120,
+                left: 320,
+                width: 8,
+                height: 60,
+                bgcolor: "#555",
+                borderRadius: 2,
+                zIndex: 3
+              }} />
+              <Typography 
+                variant="caption" 
+                sx={{ 
+                  position: "absolute", 
+                  bottom: 100, 
+                  left: 310,
+                  color: "#555",
+                  fontWeight: "bold"
+                }}
+              >
+                Oculaire
+              </Typography>
+
+              {/* Plan focal objet oculaire */}
+              <Box sx={{
+                position: "absolute",
+                bottom: 120,
+                left: 320,
+                width: 1,
+                height: 30,
+                bgcolor: "#555",
+                borderStyle: "dashed"
+              }} />
+              <Typography 
+                variant="caption" 
+                sx={{ 
+                  position: "absolute", 
+                  bottom: 140, 
+                  left: 330,
+                  color: "#555"
+                }}
+              >
+                F<sub>2</sub>
+              </Typography>
+              
+              {/* Point focal oculaire */}
+              <Box sx={{
+                position: "absolute",
+                bottom: 120,
+                left: 320,
+                width: 6,
+                height: 6,
+                bgcolor: "#000",
+                borderRadius: "50%",
+                transform: "translateX(-50%) translateY(-50%)",
+                zIndex: 4
+              }} />
+
+              {/* Cercle oculaire */}
+              <Box sx={{ 
+                position: "absolute", 
+                bottom: 120 + Math.min(Math.max(exitPupilPosition * 2, 0), 100), 
+                left: 400, 
+                width: 12, 
+                height: 12, 
+                bgcolor: "#d32f2f", 
+                borderRadius: "50%",
+                transform: "translateX(-50%)",
+                boxShadow: '0 0 8px rgba(211, 47, 47, 0.6)',
+                zIndex: 4
+              }} />
+
+              {/* Ligne de position cercle oculaire */}
+              <Box sx={{
+                position: "absolute",
+                bottom: 120,
+                left: 320,
+                width: 100,
+                height: 1,
+                bgcolor: "#555"
+              }} />
+
+              {/* Distance du cercle oculaire */}
+              {exitPupilPosition > 0 && (
+                <Box sx={{
+                  position: "absolute",
+                  bottom: 120,
+                  left: 400,
+                  width: 1,
+                  height: Math.min(Math.max(exitPupilPosition * 2, 0), 100),
+                  bgcolor: "#d32f2f"
+                }} />
+              )}
+
+              {/* Œil */}
+              <Box sx={{
+                position: "absolute",
+                bottom: 160 + Math.min(Math.max(exitPupilPosition * 2, 0), 100),
+                left: 400,
+                width: 30,
+                height: 20,
                 borderRadius: "50%",
                 border: "2px solid #555",
-                bgcolor: "#fff9",
+                bgcolor: "transparent",
                 transform: "translateX(-50%)",
                 zIndex: 2
               }} />
-              
-              {/* Eyepiece */}
-              <Box sx={{ 
-                position: "absolute", 
-                bottom: 30, 
-                left: "50%", 
-                width: 80, 
-                height: 60, 
-                bgcolor: "#9e9e9e", 
-                transform: "translateX(-50%)",
-                borderTopLeftRadius: 8,
-                borderTopRightRadius: 8,
-                zIndex: 3
-              }} />
-              
-              {/* Exit pupil */}
-              <Box sx={{ 
-                position: "absolute", 
-                bottom: 90 + Math.min(Math.max(exitPupilPosition * 3, 0), 80), 
-                left: "50%", 
-                width: 16, 
-                height: 16, 
-                bgcolor: "#f44336", 
-                borderRadius: "50%",
-                transform: "translateX(-50%)",
-                boxShadow: '0 0 8px #f44336',
-                zIndex: 4
-              }} />
-              
-              {/* Light ray lines */}
-              <Box sx={{ 
-                position: "absolute", 
-                bottom: 30, 
-                left: "calc(50% - 35px)", 
-                width: 70, 
-                height: Math.min(Math.max(exitPupilPosition * 3, 10), 140) + 60, 
-                borderLeft: "1.5px dashed #666",
-                borderRight: "1.5px dashed #666",
-                zIndex: 1
-              }} />
-              
-              {/* Position line - Reference line for measurement */}
-              <Box sx={{ 
-                position: "absolute", 
-                bottom: 90, 
-                left: 20, 
-                width: "calc(100% - 40px)", 
-                height: 1, 
-                bgcolor: "#666", 
-                borderStyle: "dashed",
-                zIndex: 1
-              }} />
-              
-              {/* Vertical measurement line */}
-              {exitPupilPosition > 0 && (
-                <Box sx={{ 
-                  position: "absolute", 
-                  bottom: 90, 
-                  left: "calc(50% + 50px)", 
-                  width: 1, 
-                  height: Math.min(Math.max(exitPupilPosition * 3, 0), 80),
-                  bgcolor: "#666",
+
+              {/* Rayons lumineux */}
+              <Box
+                component="svg"
+                sx={{
+                  position: "absolute",
+                  top: 0,
+                  left: 0,
+                  width: "100%",
+                  height: "100%",
                   zIndex: 1
-                }} />
-              )}
-              
-              {/* Distance value */}
+                }}
+                viewBox="0 0 500 320"
+              >
+                {/* Rayons à travers le système */}
+                <path
+                  d="M50,160 L320,160 L400,190"
+                  stroke="#777"
+                  strokeWidth="1"
+                  fill="none"
+                  strokeDasharray="3,2"
+                />
+                <path
+                  d="M50,160 L320,160 L400,130"
+                  stroke="#777"
+                  strokeWidth="1"
+                  fill="none"
+                  strokeDasharray="3,2"
+                />
+              </Box>
+
+              {/* Valeur de distance */}
               {exitPupilPosition > 0 && (
                 <Box sx={{ 
                   position: "absolute", 
-                  bottom: 90 + Math.min(Math.max(exitPupilPosition * 3, 0), 80) / 2, 
-                  left: "calc(50% + 60px)", 
+                  bottom: 120 + Math.min(Math.max(exitPupilPosition * 2, 0), 100) / 2, 
+                  left: 410, 
                   bgcolor: "rgba(255, 255, 255, 0.8)",
                   px: 1,
                   borderRadius: 1,
@@ -333,7 +525,42 @@ const MicroscopeExitPupilDemo = () => {
                 </Box>
               )}
               
-              {/* Scale indicator */}
+              {/* Plan focal image oculaire - f'2 */}
+              <Box sx={{
+                position: "absolute",
+                bottom: 120,
+                left: 350,
+                width: 1,
+                height: 30,
+                bgcolor: "#555",
+                borderStyle: "dashed"
+              }} />
+              <Typography 
+                variant="caption" 
+                sx={{ 
+                  position: "absolute", 
+                  bottom: 140, 
+                  left: 360,
+                  color: "#555"
+                }}
+              >
+                F'<sub>2</sub>
+              </Typography>
+              
+              {/* Point focal image oculaire */}
+              <Box sx={{
+                position: "absolute",
+                bottom: 120,
+                left: 350,
+                width: 6,
+                height: 6,
+                bgcolor: "#000",
+                borderRadius: "50%",
+                transform: "translateX(-50%) translateY(-50%)",
+                zIndex: 4
+              }} />
+              
+              {/* Échelle */}
               <Box sx={{
                 position: "absolute",
                 bottom: 10,
@@ -349,58 +576,15 @@ const MicroscopeExitPupilDemo = () => {
                 <Box sx={{ width: 30, height: 2, bgcolor: "#000", mr: 1 }}/>
                 <Typography variant="caption">10 mm</Typography>
               </Box>
-              
-              {/* Labels directly on the schema */}
-              <Typography 
-                variant="caption" 
-                sx={{ 
-                  position: "absolute", 
-                  bottom: 5, 
-                  left: "50%", 
-                  transform: "translateX(-50%)",
-                  fontWeight: "bold",
-                  color: "#555",
-                  zIndex: 5
-                }}
-              >
-                Oculaire
-              </Typography>
-              
-              <Typography 
-                variant="caption" 
-                sx={{ 
-                  position: "absolute", 
-                  bottom: 75, 
-                  left: 10,
-                  color: "#555",
-                  zIndex: 5
-                }}
-              >
-                Plan focal
-              </Typography>
-              
-              <Typography 
-                variant="caption" 
-                sx={{ 
-                  position: "absolute", 
-                  top: 10, 
-                  left: 10,
-                  fontStyle: "italic",
-                  color: "#666",
-                  zIndex: 5
-                }}
-              >
-                Vue en coupe
-              </Typography>
             </Paper>
           </Grid>
           
-          {/* Legend on the right side */}
+          {/* Legend on the right side - SIMPLIFIED */}
           <Grid size={{ xs: 12, md: 5 }}>
             <Paper 
               elevation={0} 
               sx={{ 
-                height: 280, 
+                height: 320, 
                 p: 2, 
                 border: "1px solid #ddd",
                 borderRadius: 2,
@@ -416,12 +600,38 @@ const MicroscopeExitPupilDemo = () => {
               <Box sx={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "space-around" }}>
                 <Box sx={{ display: "flex", alignItems: "center", mb: 1 }}>
                   <Box sx={{ 
-                    width: 16, 
-                    height: 16, 
+                    width: 8, 
+                    height: 30, 
+                    bgcolor: "#555",
+                    borderRadius: 1,
+                    mr: 2 
+                  }} />
+                  <Typography variant="body2">
+                    <strong>Lentilles</strong> (objectif et oculaire)
+                  </Typography>
+                </Box>
+                
+                <Box sx={{ display: "flex", alignItems: "center", mb: 1 }}>
+                  <Box sx={{ 
+                    width: 6, 
+                    height: 6, 
                     borderRadius: "50%", 
-                    bgcolor: "#f44336",
+                    bgcolor: "#000",
+                    mr: 2
+                  }} />
+                  <Typography variant="body2">
+                    <strong>Points focaux</strong> (F<sub>2</sub>, F'<sub>1</sub>, F'<sub>2</sub>)
+                  </Typography>
+                </Box>
+                
+                <Box sx={{ display: "flex", alignItems: "center", mb: 1 }}>
+                  <Box sx={{ 
+                    width: 12, 
+                    height: 12, 
+                    borderRadius: "50%", 
+                    bgcolor: "#d32f2f",
                     mr: 2,
-                    boxShadow: '0 0 5px #f44336'
+                    boxShadow: '0 0 5px rgba(211, 47, 47, 0.6)'
                   }} />
                   <Typography variant="body2">
                     <strong>Cercle oculaire</strong> (pupille de sortie)
@@ -434,25 +644,11 @@ const MicroscopeExitPupilDemo = () => {
                     height: 15, 
                     borderRadius: "50%", 
                     border: "2px solid #555",
-                    bgcolor: "#fff9",
+                    bgcolor: "transparent",
                     mr: 2 
                   }} />
                   <Typography variant="body2">
                     <strong>Œil</strong> de l'observateur
-                  </Typography>
-                </Box>
-                
-                <Box sx={{ display: "flex", alignItems: "center", mb: 1 }}>
-                  <Box sx={{ 
-                    width: 20, 
-                    height: 15, 
-                    bgcolor: "#9e9e9e", 
-                    borderTopLeftRadius: 3,
-                    borderTopRightRadius: 3,
-                    mr: 2 
-                  }} />
-                  <Typography variant="body2">
-                    <strong>Oculaire</strong> du microscope
                   </Typography>
                 </Box>
                 
@@ -465,39 +661,38 @@ const MicroscopeExitPupilDemo = () => {
                     width: 18
                   }}>
                     <Box sx={{ 
-                      width: 0, 
-                      height: 20, 
-                      borderLeft: "1.5px dashed #666",
+                      width: 20, 
+                      height: 0, 
+                      borderTop: "1px dashed #777",
                       mx: 1
-                    }} />
-                    <Box sx={{ 
-                      width: 0, 
-                      height: 20, 
-                      borderLeft: "1.5px dashed #666"
                     }} />
                   </Box>
                   <Typography variant="body2">
-                    <strong>Faisceau lumineux</strong>
+                    <strong>Distances focales</strong> et parcours lumineux
                   </Typography>
                 </Box>
                 
                 <Box sx={{ display: "flex", alignItems: "center" }}>
                   <Box sx={{ 
                     width: 20, 
-                    height: 1, 
-                    bgcolor: "#666", 
+                    height: 0, 
+                    borderTop: "1px solid #555", 
                     mr: 2 
                   }} />
                   <Typography variant="body2">
-                    <strong>Plan focal image</strong> (référence 0 mm)
+                    <strong>Axe optique</strong> et distances de référence
                   </Typography>
                 </Box>
               </Box>
               
               <Box sx={{ mt: 2, pt: 1, borderTop: "1px solid #eee" }}>
                 <Typography variant="caption" sx={{ fontStyle: "italic", display: "block" }}>
-                  La position idéale du cercle oculaire est de 10-15 mm
-                  au-dessus de l'oculaire pour un confort optimal.
+                  Position idéale du cercle oculaire: 10-15 mm au-dessus de
+                  l'oculaire pour permettre une observation confortable.
+                </Typography>
+                <Typography variant="caption" sx={{ fontStyle: "italic", display: "block", mt: 0.5 }}>
+                  À fort grossissement, le cercle oculaire tend vers la distance
+                  focale de l'oculaire (f'<sub>2</sub> = {eyepieceFocal} mm).
                 </Typography>
               </Box>
             </Paper>
@@ -522,7 +717,7 @@ const MicroscopeExitPupilDemo = () => {
           </Typography>
           <Typography variant="body2">
             Plus le grossissement de l'objectif est élevé, plus le cercle oculaire se rapproche de la distance focale de l'oculaire 
-            ({eyepieceFocal} mm), rendant l'observation plus confortable.
+            ({eyepieceFocal} mm), comme le montre la formule D = f'<sub>2</sub> - Δ/G<sup>2</sup>.
           </Typography>
         </Paper>
       </Box>

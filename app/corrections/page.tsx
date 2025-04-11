@@ -46,6 +46,8 @@ import VisibilityIcon from '@mui/icons-material/Visibility';
 import GroupIcon from '@mui/icons-material/Group';
 import DeleteIcon from '@mui/icons-material/Delete';
 import { BatchDeleteProvider, useBatchDelete } from '@/hooks/useBatchDelete';
+import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
+import ErrorDisplay from '@/components/ui/ErrorDisplay';
 
 // Composant principal qui utilise le provider
 export default function CorrectionsPage() {
@@ -510,6 +512,30 @@ function CorrectionsContent() {
     );
   }
   
+  // Si une erreur est présente, afficher le composant ErrorDisplay
+  if (error) {
+    return (
+      <Box sx={{ mt: 2 }}>
+        <ErrorDisplay 
+          error={error} 
+          withRefreshButton={true}
+          onRefresh={refreshCorrections}
+        />
+      </Box>
+    );
+  }
+
+  // Get a display text for active filter
+  const getActiveFilterText = () => {
+    if (activeFilters.includes('hideInactive')) {
+      return 'Affiche uniquement les corrections actives';
+    } else if (activeFilters.includes('showOnlyInactive')) {
+      return 'Affiche uniquement les corrections inactives';
+    } else {
+      return 'Affiche toutes les corrections, y compris celles qui sont inactives';
+    }
+  };
+
   return (
     <Container maxWidth="lg" sx={{ py: 4 }}>
       {/* Header */}
@@ -824,6 +850,45 @@ function CorrectionsContent() {
                   }}
                 />
               )}
+              {activeFilters.includes('hideInactive') && (
+                <Chip 
+                  icon={<VisibilityIcon />}
+                  label="Actives uniquement"
+                  onDelete={() => handleRemoveFilter('hideInactive')}
+                  color="success"
+                  variant="outlined"
+                  sx={{ 
+                    borderRadius: 3, 
+                    '& .MuiChip-deleteIcon': { 
+                      color: 'success.dark',
+                      '&:hover': { color: 'error.main' } 
+                    },
+                    py: 0.5,
+                    fontWeight: 500,
+                    borderWidth: 1.5
+                  }}
+                />
+              )}
+              
+              {activeFilters.includes('showOnlyInactive') && (
+                <Chip 
+                  icon={<VisibilityOffIcon />}
+                  label="Inactives uniquement"
+                  onDelete={() => handleRemoveFilter('showOnlyInactive')}
+                  color="warning"
+                  variant="outlined"
+                  sx={{ 
+                    borderRadius: 3, 
+                    '& .MuiChip-deleteIcon': { 
+                      color: 'warning.dark',
+                      '&:hover': { color: 'error.main' } 
+                    },
+                    py: 0.5,
+                    fontWeight: 500,
+                    borderWidth: 1.5
+                  }}
+                />
+              )}
             </Box>
           </Box>
             )}
@@ -1042,22 +1107,38 @@ function CorrectionsContent() {
       )}
       
       <Box sx={{ mb: 2 }}>
+        {/* Filter Menu */}
         <FormControl fullWidth>
           <Typography variant="body2" color="text.secondary" gutterBottom>
             Statut des corrections
           </Typography>
           <ToggleButtonGroup
-            value={activeFilters.includes('showInactive') ? 'all' : 'active'}
+            value={activeFilters.includes('hideInactive') 
+              ? 'active' 
+              : activeFilters.includes('showOnlyInactive') 
+                ? 'inactive' 
+                : 'all'}
             exclusive
-            onChange={(_, newValue) => {
-              if (newValue !== null) {
-                if (newValue === 'all') {
-                  setFilters(prev => ({ ...prev, showInactive: true }));
-                  handleApplyFilter('showInactive');
-                } else {
-                  handleRemoveFilter('showInactive');
+            onChange={(event, newValue) => {
+              // On commence par réinitialiser complètement les filtres d'activité
+              setActiveFilters(prev => prev.filter(f => f !== 'hideInactive' && f !== 'showOnlyInactive'));
+              setFilters(prev => ({
+                ...prev,
+                hideInactive: false,
+                showOnlyInactive: false
+              }));
+
+              // On attend que la réinitialisation soit terminée avant d'appliquer le nouveau filtre
+              setTimeout(() => {
+                if (newValue === 'active') {
+                  setFilters(prev => ({ ...prev, hideInactive: true }));
+                  setActiveFilters(prev => [...prev, 'hideInactive']);
+                } else if (newValue === 'inactive') {
+                  setFilters(prev => ({ ...prev, showOnlyInactive: true }));
+                  setActiveFilters(prev => [...prev, 'showOnlyInactive']);
                 }
-              }
+                // Pour 'all', on ne fait rien car on a déjà tout réinitialisé
+              }, 0);
             }}
             size="small"
             color="primary"
@@ -1072,7 +1153,7 @@ function CorrectionsContent() {
             <ToggleButton 
               value="active"
               sx={{
-                fontWeight: !activeFilters.includes('showInactive') ? 'medium' : 'normal',
+                fontWeight: activeFilters.includes('hideInactive') ? 'medium' : 'normal',
                 transition: 'all 0.2s'
               }}
             >
@@ -1080,9 +1161,19 @@ function CorrectionsContent() {
               Actives uniquement
             </ToggleButton>
             <ToggleButton 
+              value="inactive"
+              sx={{
+                fontWeight: activeFilters.includes('showOnlyInactive') ? 'medium' : 'normal',
+                transition: 'all 0.2s'
+              }}
+            >
+              <VisibilityOffIcon sx={{ mr: 1, fontSize: '1rem' }} />
+              Inactives uniquement
+            </ToggleButton>
+            <ToggleButton 
               value="all"
               sx={{
-                fontWeight: activeFilters.includes('showInactive') ? 'medium' : 'normal',
+                fontWeight: !activeFilters.includes('hideInactive') && !activeFilters.includes('showOnlyInactive') ? 'medium' : 'normal',
                 transition: 'all 0.2s'
               }}
             >
@@ -1090,10 +1181,8 @@ function CorrectionsContent() {
               Toutes les corrections
             </ToggleButton>
           </ToggleButtonGroup>
-          <Typography variant="caption" sx={{ mt: 1, display: 'block', color: theme => theme.palette.error.dark }}>
-            {activeFilters.includes('showInactive') 
-              ? 'Affiche toutes les corrections, y compris celles qui sont inactives' 
-              : 'Affiche uniquement les corrections actives'}
+          <Typography variant="overline" sx={{ mt: 1, display: 'block', color: theme => theme.palette.error.dark }}>
+            {getActiveFilterText()}
           </Typography>
         </FormControl>
       </Box>

@@ -83,7 +83,6 @@ export async function GET(
       }
 
       const correction = rows[0] as any;
-      console.log('correction', correction);
 
       // Si content_data existe et est une string, parser en JSON
       if (correction.content_data && typeof correction.content_data === 'string') {

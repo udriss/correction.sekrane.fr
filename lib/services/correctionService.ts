@@ -175,3 +175,29 @@ export function parseContentItems(correction: Correction): ContentItem[] {
   
   return parseHtmlToItems(correction.content || '');
 }
+
+// Fonction pour activer/désactiver une correction
+export async function toggleCorrectionActive(
+  correctionId: number | string,
+  newActiveState: boolean
+): Promise<any> {
+  try {
+    const response = await fetch(`/api/corrections/${correctionId}/toggle-active`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ active: newActiveState }),
+    });
+    
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error || 'Échec de la mise à jour du statut de la correction');
+    }
+    
+    return await response.json();
+  } catch (error) {
+    console.error('Erreur lors de la modification du statut de la correction:', error);
+    throw error;
+  }
+}

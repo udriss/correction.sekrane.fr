@@ -1533,20 +1533,29 @@ const ExportPDFComponent: React.FC<ExportPDFComponentProps> = ({
                       </TableCell>
                       <TableCell align="center">
                         <Chip 
-                          label={correction.active === 0 ? "Non rendu / ABS" : `${correction.grade} / 20`}
-                          color={
-                            correction.active === 0 ? "default" :
-                            (correction.grade || 0) < 5 ? "error" :
-                            (correction.grade || 0) < 10 ? "warning" :
-                            (correction.grade || 0) < 15 ? "info" : "success"
-                          }
+                        
+                          label={correction.active === 0 ?
+                            <Typography variant="overline" color="text.secondary">Non rendu / ABS</Typography> 
+                            : 
+                             `${correction.grade} / 20`}
+                            // Get card status color based on grade
                           size="small"
                           variant={correction.active === 0 ? "outlined" : "filled"}
                           sx={correction.active === 0 ? { 
-                            fontVariant: 'all-small-caps',
                             letterSpacing: '0.5px', 
-                            opacity: 0.7 
-                          } : undefined}
+                            opacity: 0.7,
+                            textAlign: 'center',
+                            justifyContent: 'center',
+                          } : {
+                            fontWeight: 700,
+                            color: theme => theme.palette.text.primary,
+                            backgroundColor:
+                              (correction.grade || 0) < 8 ? theme => theme.palette.error.light :
+                              (correction.grade || 0) < 10 ? theme => theme.palette.warning.light :
+                              (correction.grade || 0) < 12 ? theme => theme.palette.primary.light :
+                              (correction.grade || 0) < 16 ? theme => theme.palette.info.light :
+                              theme => theme.palette.success.light, 
+                          }}
                         />
                       </TableCell>
                     </TableRow>

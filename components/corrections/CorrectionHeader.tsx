@@ -86,9 +86,10 @@ const CorrectionHeader: React.FC<CorrectionHeaderProps> = ({
   
   // Add type guards around student_name usage
   const displayName = correction.student_name || `${correction.activity_name || 'Activité'} - Sans nom`;
-  const displayEmail = correction?.student_data?.email || '';
   // Déterminer si la correction est active
-  const isActive = correction.active !== 0 && correction.active !== false;
+  const isActive = correction.active === 1 || correction.active === true;
+
+
 
   // Update parent state and handle form submission
   const handleFormSubmit = () => {

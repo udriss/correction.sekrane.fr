@@ -36,16 +36,15 @@ const MicroscopeDemo = () => {
       
       <Paper elevation={2} sx={{ p: 3, mt: 4, mb: 4, bgcolor: 'rgb(252, 252, 255)' }}>
         <Typography variant="h5" gutterBottom sx={{ borderBottom: '1px solid #eee', pb: 1 }}>
-          Démonstration Mathématique Formelle: Relation de Conjugaison de Descartes
+          Démonstration Mathématique: Calcul Direct de la Position du Cercle Oculaire
         </Typography>
         
         <Typography variant="body1">
-          Pour déterminer rigoureusement la position du cercle oculaire (pupille de sortie) d'un microscope,
-          nous allons utiliser les relations de conjugaison de Descartes et suivre le trajet lumineux à travers
-          le système optique complet.
+          Pour déterminer la position du cercle oculaire (pupille de sortie) d'un microscope,
+          nous allons utiliser la relation de conjugaison et faire l'image de l'objectif à travers l'oculaire.
         </Typography>
         
-        <Grid container spacing={3}>
+        <Grid container spacing={3} sx={{ mt: 1 }}>
           <Grid size={{ xs: 12, md: 6 }}>
             <Typography variant="h6" gutterBottom>
               1. Définitions et notations
@@ -53,51 +52,51 @@ const MicroscopeDemo = () => {
             
             <Box sx={{ p: 2, bgcolor: 'rgb(248, 248, 255)', borderRadius: 1 }}>
               <Typography variant="body2">
-                • f<sub>obj</sub> : distance focale de l'objectif
+                • f'<sub>1</sub> : distance focale de l'objectif
               </Typography>
               <Typography variant="body2">
-                • f<sub>oc</sub> : distance focale de l'oculaire
+                • f'<sub>2</sub> : distance focale de l'oculaire
               </Typography>
               <Typography variant="body2">
-                • Δ : intervalle optique (distance entre le plan focal image de l'objectif et le plan focal objet de l'oculaire)
+                • Δ : intervalle optique (distance entre les plans focaux)
               </Typography>
               <Typography variant="body2">
-                • D<sub>A</sub> : position du diaphragme d'ouverture par rapport à l'objectif
+                • L : longueur du microscope = f'<sub>1</sub> + Δ + f'<sub>2</sub>
               </Typography>
               <Typography variant="body2">
-                • p : distance objet (par rapport à l'objectif)
+                • OA : distance entre l'objectif et l'oculaire = -L
               </Typography>
               <Typography variant="body2">
-                • p' : distance image (par rapport à l'objectif)
+                • D : position du cercle oculaire (distance à l'oculaire)
               </Typography>
               <Typography variant="body2">
-                • q : distance objet (par rapport à l'oculaire)
-              </Typography>
-              <Typography variant="body2">
-                • q' : distance image (par rapport à l'oculaire) = position du cercle oculaire
+                • G : grossissement du microscope = Δ/f'<sub>1</sub>
               </Typography>
             </Box>
           </Grid>
           
           <Grid size={{ xs: 12, md: 6 }}>
             <Typography variant="h6" gutterBottom>
-              2. Relation de conjugaison de Descartes
+              2. Principe du calcul
             </Typography>
             
-            <Box sx={{ p: 2, bgcolor: 'rgb(248, 248, 255)', borderRadius: 1, fontFamily: 'serif' }}>
-              <Typography variant="body1" sx={{ fontStyle: 'italic' }}>
-                Pour une lentille mince, la relation de Descartes s'écrit:
+            <Box sx={{ p: 2, bgcolor: 'rgb(248, 248, 255)', borderRadius: 1 }}>
+              <Typography variant="body2" paragraph>
+                Le cercle oculaire est l'image de l'objectif (ou du diaphragme d'ouverture) à travers l'oculaire.
               </Typography>
-              
+              <Typography variant="body2" paragraph>
+                Pour trouver sa position, nous devons déterminer où l'oculaire forme l'image de l'objectif.
+              </Typography>
+              <Typography variant="body2">
+                Nous utiliserons la relation de conjugaison en optique géométrique:
+              </Typography>
               <Box sx={{ textAlign: 'center', my: 2, fontFamily: 'serif', fontSize: '1.2rem' }}>
                 <Typography variant="h6">
-                  1/p + 1/p' = 1/f
+                  1/p + 1/p' = 1/f'
                 </Typography>
               </Box>
-              
               <Typography variant="body2">
-                Cette équation fondamentale relie la position de l'objet (p), 
-                la position de l'image (p') et la distance focale de la lentille (f).
+                où p est la distance objet, p' la distance image, et f' la distance focale.
               </Typography>
             </Box>
           </Grid>
@@ -105,174 +104,155 @@ const MicroscopeDemo = () => {
         
         <Divider sx={{ my: 3 }} />
         
-        <Typography variant="h6" gutterBottom>
-          3. Analyse du trajet optique
-        </Typography>
-        
-        <Box sx={{ pl: 2 }}>
-          <Typography variant="body2">
-            Dans un microscope, le diaphragme d'ouverture est généralement situé au niveau de l'objectif 
-            ou juste derrière celui-ci. Ce diaphragme devient la pupille d'entrée du système.
-          </Typography>
-          
-          <Typography variant="subtitle2" gutterBottom sx={{ mt: 2 }}>
-            3.1. Position de l'image intermédiaire formée par l'objectif:
-          </Typography>
-          
-          <Box sx={{ p: 2, bgcolor: 'rgb(248, 248, 255)', borderRadius: 1, mx: 3, my: 2 }}>
-            <Typography variant="body2">
-              Pour un objet placé à distance p ≈ f<sub>obj</sub> (légèrement supérieure à la distance focale):
-            </Typography>
-            <Box sx={{ textAlign: 'center', my: 2, fontFamily: 'serif', fontSize: '1.1rem' }}>
-              1/p + 1/p' = 1/f<sub>obj</sub>
-            </Box>
-            <Typography variant="body2">
-              L'image intermédiaire se forme à une distance p' très grande, donnant un fort grossissement.
-            </Typography>
-          </Box>
-          
-          <Typography variant="subtitle2" gutterBottom sx={{ mt: 2 }}>
-            3.2. Conjugaison du diaphragme d'ouverture à travers l'oculaire:
-          </Typography>
-          
-          <Box sx={{ p: 2, bgcolor: 'rgb(248, 248, 255)', borderRadius: 1, mx: 3, my: 2 }}>
-            <Typography variant="body2">
-              Le diaphragme d'ouverture, situé près de l'objectif, doit être conjugué à travers tout le système optique
-              pour déterminer la position du cercle oculaire.
-            </Typography>
-            <Typography variant="body2">
-              Si q est la distance entre le diaphragme d'ouverture et l'oculaire, on peut écrire:
-            </Typography>
-            <Box sx={{ textAlign: 'center', my: 2, fontFamily: 'serif', fontSize: '1.1rem' }}>
-              q = Δ + f<sub>obj</sub> + D<sub>A</sub>
-            </Box>
-            <Typography variant="body2">
-              En utilisant la relation de conjugaison pour l'oculaire:
-            </Typography>
-            <Box sx={{ textAlign: 'center', my: 2, fontFamily: 'serif', fontSize: '1.1rem' }}>
-              1/q + 1/q' = 1/f<sub>oc</sub>
-            </Box>
-            <Typography variant="body2">
-              Donc: q' = (q × f<sub>oc</sub>)/(q - f<sub>oc</sub>)
-            </Typography>
-          </Box>
-        </Box>
-        
-        <Divider sx={{ my: 3 }} />
         
         <Typography variant="h6" gutterBottom>
-          4. Démonstration de la formule simplifiée
+          4. Démonstration mathématique simplifiée
         </Typography>
         
         <Box sx={{ p: 2, bgcolor: 'rgb(245, 245, 255)', borderRadius: 1, mx: 2, my: 2 }}>
-          <Typography variant="body2">
-            En remplaçant q et en simplifiant, on peut démontrer que la position du cercle oculaire q' est donnée par:
+          <Typography variant="body2" paragraph>
+            Pour déterminer la position du cercle oculaire, nous devons calculer l'image de l'objectif à travers l'oculaire:
           </Typography>
           
-          <Box sx={{ fontFamily: 'serif', px: 4, pt: 2 }}>
-            <Typography variant="body2">
-              q' = (q × f<sub>oc</sub>)/(q - f<sub>oc</sub>)
+          <Box sx={{ pl: 2 }}>
+            <Typography variant="body2" paragraph>
+              1) La relation de conjugaison pour l'oculaire s'écrit:
             </Typography>
-            <Typography variant="body2" sx={{ pl: 2, mt: 1 }}>
-              = ((Δ + f<sub>obj</sub> + D<sub>A</sub>) × f<sub>oc</sub>)/((Δ + f<sub>obj</sub> + D<sub>A</sub>) - f<sub>oc</sub>)
+            
+            <Box sx={{ fontFamily: 'serif', textAlign: 'center', my: 2 }}>
+              <Typography variant="body1">
+                1/OA + 1/D = 1/f'<sub>2</sub>
+              </Typography>
+            </Box>
+            
+            <Typography variant="body2" paragraph>
+              2) Nous savons que OA = -L = -(f'<sub>1</sub> + Δ + f'<sub>2</sub>)
             </Typography>
-          </Box>
-          
-          <Typography variant="body2" sx={{ mt: 2 }}>
-            Pour un objectif de distance focale très courte (f<sub>obj</sub> ≪ Δ) et un diaphragme d'ouverture situé près 
-            de l'objectif (D<sub>A</sub> ≈ 0), on obtient:
-          </Typography>
-          
-          <Box sx={{ fontFamily: 'serif', px: 4 }}>
-            <Typography variant="body2">
-              q' ≈ (Δ × f<sub>oc</sub>)/(Δ - f<sub>oc</sub>)
+            
+            <Typography variant="body2" paragraph>
+              3) En remplaçant dans l'équation:
             </Typography>
-          </Box>
-          
-          <Typography variant="body2" sx={{ mt: 2 }}>
-            De plus, le grossissement de l'objectif M<sub>obj</sub> est lié à l'intervalle optique par la relation:
-          </Typography>
-          
-          <Box sx={{ fontFamily: 'serif', px: 4 }}>
-            <Typography variant="body2">
-              M<sub>obj</sub> ≈ Δ/f<sub>obj</sub>
+            
+            <Box sx={{ fontFamily: 'serif', textAlign: 'center', my: 2 }}>
+              <Typography variant="body1">
+                1/(-L) + 1/D = 1/f'<sub>2</sub>
+              </Typography>
+              <Typography variant="body1" sx={{ mt: 1 }}>
+                -1/L + 1/D = 1/f'<sub>2</sub>
+              </Typography>
+            </Box>
+            
+            <Typography variant="body2" paragraph>
+              4) Nous isolons D:
             </Typography>
-            <Typography variant="body2" sx={{ mt: 1 }}>
-              Donc: Δ ≈ M<sub>obj</sub> × f<sub>obj</sub>
+            
+            <Box sx={{ fontFamily: 'serif', textAlign: 'center', my: 2 }}>
+              <Typography variant="body1">
+                1/D = 1/f'<sub>2</sub> + 1/L
+              </Typography>
+              <Typography variant="body1" sx={{ mt: 1 }}>
+                1/D = (L + f'<sub>2</sub>)/(L × f'<sub>2</sub>)
+              </Typography>
+              <Typography variant="body1" sx={{ mt: 1 }}>
+                D = (L × f'<sub>2</sub>)/(L + f'<sub>2</sub>)
+              </Typography>
+            </Box>
+            
+            <Typography variant="body2" paragraph>
+              5) En remplaçant L = f'<sub>1</sub> + Δ + f'<sub>2</sub>:
             </Typography>
-          </Box>
-          
-          <Typography variant="body2" sx={{ mt: 2 }}>
-            En remplaçant cette expression de Δ dans l'équation de q':
-          </Typography>
-          
-          <Box sx={{ fontFamily: 'serif', px: 4 }}>
-            <Typography variant="body2">
-              q' ≈ (M<sub>obj</sub> × f<sub>obj</sub> × f<sub>oc</sub>)/((M<sub>obj</sub> × f<sub>obj</sub>) - f<sub>oc</sub>)
+            
+            <Box sx={{ fontFamily: 'serif', textAlign: 'center', my: 2 }}>
+              <Typography variant="body1">
+                D = [(f'<sub>1</sub> + Δ + f'<sub>2</sub>) × f'<sub>2</sub>]/[(f'<sub>1</sub> + Δ + f'<sub>2</sub>) + f'<sub>2</sub>]
+              </Typography>
+              <Typography variant="body1" sx={{ mt: 1 }}>
+                D = [(f'<sub>1</sub> + Δ + f'<sub>2</sub>) × f'<sub>2</sub>]/[f'<sub>1</sub> + Δ + 2f'<sub>2</sub>]
+              </Typography>
+            </Box>
+            
+            <Typography variant="body2" paragraph>
+              6) Pour un microscope conventionnel, f'<sub>1</sub> est très petit par rapport à Δ, et nous pouvons simplifier:
             </Typography>
-          </Box>
-          
-          <Typography variant="body2" sx={{ mt: 2 }}>
-            Pour un objectif à fort grossissement (M<sub>obj</sub> ≫ 1), on peut simplifier:
-          </Typography>
-          
-          <Box sx={{ fontFamily: 'serif', px: 4 }}>
-            <Typography variant="body2">
-              q' ≈ f<sub>oc</sub> × (1 - 1/(M<sub>obj</sub> × f<sub>obj</sub>/f<sub>oc</sub>))
+            
+            <Box sx={{ fontFamily: 'serif', textAlign: 'center', my: 2 }}>
+              <Typography variant="body1">
+                D ≈ [(Δ + f'<sub>2</sub>) × f'<sub>2</sub>]/[Δ + 2f'<sub>2</sub>]
+              </Typography>
+            </Box>
+            
+            <Typography variant="body2" paragraph>
+              7) Pour Δ ≫ f'<sub>2</sub> (cas usuel), nous pouvons encore simplifier:
             </Typography>
-            <Typography variant="body2" sx={{ mt: 1 }}>
-              ≈ f<sub>oc</sub> - f<sub>oc</sub>/(M<sub>obj</sub> × f<sub>obj</sub>/f<sub>oc</sub>)
+            
+            <Box sx={{ fontFamily: 'serif', textAlign: 'center', my: 2 }}>
+              <Typography variant="body1">
+                D ≈ [Δ × f'<sub>2</sub>]/Δ = f'<sub>2</sub>
+              </Typography>
+            </Box>
+            
+            <Typography variant="body2" paragraph>
+              8) En réalité, il faut tenir compte d'une correction pour plus de précision. En utilisant le grossissement de l'objectif G = Δ/f'<sub>1</sub>:
             </Typography>
-            <Typography variant="body2" sx={{ mt: 1 }}>
-              ≈ f<sub>oc</sub> - f<sub>oc</sub><sup>2</sup>/(M<sub>obj</sub> × f<sub>obj</sub>)
-            </Typography>
-          </Box>
-          
-          <Typography variant="body2" sx={{ mt: 2 }}>
-            Pour un microscope standard avec un intervalle optique Δ = 160 mm:
-          </Typography>
-          
-          <Box sx={{ fontFamily: 'serif', px: 4 }}>
-            <Typography variant="body2">
-              M<sub>obj</sub> × f<sub>obj</sub> ≈ 160
-            </Typography>
-            <Typography variant="body2" sx={{ mt: 1 }}>
-              Donc: q' ≈ f<sub>oc</sub> - f<sub>oc</sub><sup>2</sup>/160 × M<sub>obj</sub>
-            </Typography>
-            <Typography variant="body2" sx={{ mt: 1, fontWeight: 'bold' }}>
-              q' ≈ f<sub>oc</sub> - Δ/M<sub>obj</sub><sup>2</sup>
-            </Typography>
+            
+            <Box sx={{ fontFamily: 'serif', textAlign: 'center', my: 2 }}>
+              <Typography variant="body1">
+                D ≈ f'<sub>2</sub> - Δ/G<sup>2</sup>
+              </Typography>
+              <Typography variant="body1" sx={{ mt: 1, fontWeight: 'bold' }}>
+                D ≈ f'<sub>2</sub> - f'<sub>1</sub><sup>2</sup>/Δ
+              </Typography>
+            </Box>
           </Box>
           
           <Typography variant="body2" sx={{ mt: 2, fontWeight: 'bold' }}>
-            Cette dernière expression est la formule simplifiée couramment utilisée pour calculer la position du cercle oculaire.
+            Cette formule simplifiée nous donne la position du cercle oculaire par rapport à l'oculaire.
           </Typography>
         </Box>
         
+        {/* Résumé concis */}
+        <Paper elevation={1} sx={{ p: 2, mx: 2, mb: 3, bgcolor: 'rgb(255, 248, 225)' }}>
+          <Typography variant="subtitle1" gutterBottom fontWeight="bold">
+            Résumé de la démonstration
+          </Typography>
+          <Typography variant="body2">
+            La position du cercle oculaire se calcule par la relation de conjugaison 1/OA + 1/D = 1/f'₂. Avec OA = -(f'₁ + Δ + f'₂), on obtient après simplification D ≈ f'₂ - Δ/G² où G = Δ/f'₁. Cette formule montre que la position du cercle oculaire se rapproche de la distance focale de l'oculaire quand le grossissement augmente, ce qui explique pourquoi les objectifs à fort grossissement offrent un confort d'observation optimal.
+          </Typography>
+        </Paper>
+        
         <Typography variant="h6" gutterBottom sx={{ mt: 3 }}>
-          5. Conclusion
+          5. Conclusion et application pratique
         </Typography>
         
         <Typography variant="body2">
-          Cette démonstration, basée sur les relations de conjugaison de Descartes, montre que la position du cercle oculaire 
-          peut être approximée par la formule:
+          Cette démonstration montre que la position du cercle oculaire peut être approximée par la formule:
         </Typography>
         
         <Box sx={{ textAlign: 'center', my: 2, fontFamily: 'serif', fontSize: '1.2rem', fontWeight: 'bold' }}>
-          Position du cercle oculaire = f<sub>oc</sub> - Δ/M<sub>obj</sub><sup>2</sup>
+          Position du cercle oculaire ≈ f'<sub>2</sub> - Δ/G<sup>2</sup>
         </Box>
         
-        <Typography variant="body2">
-          Où f<sub>oc</sub> est la distance focale de l'oculaire, Δ est l'intervalle optique (généralement 160 mm pour les microscopes 
-          conventionnels) et M<sub>obj</sub> est le grossissement de l'objectif.
+        <Typography variant="body2" paragraph>
+          Où f'<sub>2</sub> est la distance focale de l'oculaire, Δ est l'intervalle optique (généralement 160 mm 
+          pour les microscopes conventionnels) et G est le grossissement de l'objectif.
         </Typography>
         
-        <Typography variant="body2">
-          Cette formule met en évidence que plus le grossissement de l'objectif est élevé, plus le cercle oculaire se 
-          rapproche de la distance focale de l'oculaire, ce qui explique pourquoi les objectifs à fort grossissement 
-          sont généralement plus confortables à utiliser: le cercle oculaire se trouve à une distance plus pratique 
-          pour l'observation.
+        <Typography variant="body2" paragraph>
+          En pratique, cela signifie que:
         </Typography>
+        
+        <Box sx={{ pl: 3 }}>
+          <Typography variant="body2" paragraph>
+            • Plus le grossissement de l'objectif est élevé, plus le terme Δ/G<sup>2</sup> devient petit.
+          </Typography>
+          <Typography variant="body2" paragraph>
+            • Pour un très fort grossissement (G → ∞), la position du cercle oculaire tend vers f'<sub>2</sub>.
+          </Typography>
+          <Typography variant="body2">
+            • Pour un microscope standard avec un objectif 100×, le cercle oculaire se trouve pratiquement 
+            à la distance focale de l'oculaire.
+          </Typography>
+        </Box>
       </Paper>
 
       <Paper elevation={1} sx={{ p: 3, mt: 4, bgcolor: 'rgb(250, 250, 255)' }}>

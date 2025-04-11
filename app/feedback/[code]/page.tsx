@@ -276,8 +276,7 @@ export default function FeedbackViewer({ params }: { params: Promise<{ code: str
     const penalty = parseFloat(correction.penalty) || 0;
     return calculateFinalGrade(rawTotal, penalty);
   };
-  
-  console.log('Correction ID 532:', correction);
+
   
   // Données préparées pour les explications
   const rawTotal = hasGrade ? parseFloat(correction.grade) || 0 : 0;

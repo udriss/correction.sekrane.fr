@@ -168,26 +168,7 @@ const CorrectionCard: React.FC<CorrectionCardProps> = ({
     }
   };
 
-  // Obtenir la note finale à afficher
-  const getFinalGrade = () => {
-    // Si final_grade est déjà défini dans la correction, l'utiliser
-    if (correction.final_grade !== undefined && correction.final_grade !== null) {
-      return typeof correction.final_grade === 'number' 
-        ? correction.final_grade 
-        : parseFloat(correction.final_grade);
-    }
-    
-    // Sinon, calculer avec la règle appropriée
-    const grade = typeof correction.grade === 'number' 
-      ? correction.grade 
-      : parseFloat(String(correction.grade || 0));
-    
-    const penalty = typeof correction.penalty === 'number' 
-      ? correction.penalty 
-      : parseFloat(String(correction.penalty || 0));
-    
-    return calculateFinalGrade(grade, penalty);
-  };
+
   
   return (
     <Paper
