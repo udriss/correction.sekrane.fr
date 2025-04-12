@@ -33,11 +33,12 @@ export async function POST(
       
       const oldState = (currentState[0] as any).active === 1;
       
-      // Mettre à NULL les champs requis lors de la désactivation
+      // Mettre à jour la condition de désactivation pour gérer à la fois active et status
       if (!active) {
         const [result] = await connection.query(
           `UPDATE corrections SET 
            active = 0,
+           status = 'DEACTIVATED',
            experimental_points_earned = NULL,
            theoretical_points_earned = NULL, 
            penalty = NULL,
@@ -66,13 +67,15 @@ export async function POST(
         return NextResponse.json({ 
           success: true, 
           message: 'Correction désactivée avec succès',
-          active: 0
+          active: 0,
+          status: 'DEACTIVATED'
         });
       } else {
         // Réactivation - mettre les valeurs numériques à 0 au lieu de NULL
         const [result] = await connection.query(
           `UPDATE corrections SET 
            active = 1,
+           status = 'ACTIVE',
            experimental_points_earned = 0,
            theoretical_points_earned = 0, 
            penalty = 0,
@@ -98,7 +101,8 @@ export async function POST(
         return NextResponse.json({ 
           success: true, 
           message: 'Correction activée avec succès',
-          active: 1
+          active: 1,
+          status: 'ACTIVE'
         });
       }
     });

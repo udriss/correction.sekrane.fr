@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, createContext, useContext, ReactNode, useCallback } from 'react';
+import React, { useState, useEffect, createContext, useContext, ReactNode, useCallback, useMemo } from 'react';
 import dayjs from 'dayjs';
 
 // Types
@@ -197,9 +197,23 @@ export const CorrectionsProvider: React.FC<CorrectionsProviderProps> = ({
     
     // Application des filtres en fonction des filtres actifs
     if (activeFilters.includes('hideInactive')) {
-      filtered = filtered.filter(correction => correction.active === 1);
+      filtered = filtered.filter(correction => {
+        // Priorité à correction.status si disponible
+        if (correction.status) {
+          return correction.status === 'ACTIVE';
+        }
+        // Compatibilité avec l'ancien système
+        return correction.active === 1;
+      });
     } else if (activeFilters.includes('showOnlyInactive')) {
-      filtered = filtered.filter(correction => correction.active === 0);
+      filtered = filtered.filter(correction => {
+        // Priorité à correction.status si disponible
+        if (correction.status) {
+          return correction.status !== 'ACTIVE';
+        }
+        // Compatibilité avec l'ancien système
+        return correction.active === 0;
+      });
     }
     
     if (activeFilters.includes('search') && filters.search) {

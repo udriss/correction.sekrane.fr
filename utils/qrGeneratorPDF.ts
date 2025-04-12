@@ -1,6 +1,7 @@
 import { jsPDF } from 'jspdf';
 import QRCode from 'qrcode';
 import { Correction, Student, CorrectionWithShareCode } from '@/lib/types';
+import { getCorrectionCellValues, getCorrectionCellStyle, CellStyle } from '@/components/pdf/types';
 
 // Ajout d'une interface pour les activités
 interface Activity {
@@ -455,4 +456,53 @@ export async function generateQRCodePDF({
     console.error('Error generating QR code PDF:', error);
     return null;
   }
+}
+
+// Fonction utilitaire pour appliquer un style au texte dans le PDF
+function applyStatusStyleToPDF(doc: any, style: CellStyle, statusText: string): void {
+  // Convertir les couleurs hexadécimales en RGB
+  const rgbColor = hexToRgb(style.color);
+  
+  if (rgbColor) {
+    doc.setTextColor(rgbColor.r, rgbColor.g, rgbColor.b);
+  }
+  
+  // Appliquer le style de police
+  switch (style.fontStyle) {
+    case 'bold':
+      doc.setFont('helvetica', 'bold');
+      break;
+    case 'italic':
+      doc.setFont('helvetica', 'italic');
+      break;
+    case 'bolditalic':
+      doc.setFont('helvetica', 'bolditalic');
+      break;
+    default:
+      doc.setFont('helvetica', 'normal');
+  }
+}
+
+// Fonction pour convertir une couleur hexadécimale en RGB
+function hexToRgb(hex: string): { r: number, g: number, b: number } | null {
+  // Supprimer le # si présent
+  hex = hex.replace(/^#/, '');
+  
+  // Convertir les formats courts (3 caractères) en formats longs (6 caractères)
+  if (hex.length === 3) {
+    hex = hex[0] + hex[0] + hex[1] + hex[1] + hex[2] + hex[2];
+  }
+  
+  // Vérifier la longueur
+  if (hex.length !== 6) {
+    return null;
+  }
+  
+  // Extraire les composantes
+  const bigint = parseInt(hex, 16);
+  return {
+    r: (bigint >> 16) & 255,
+    g: (bigint >> 8) & 255,
+    b: bigint & 255
+  };
 }

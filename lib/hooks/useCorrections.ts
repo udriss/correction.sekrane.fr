@@ -20,7 +20,8 @@ interface LocalCorrection extends Omit<Correction, 'activity_id' | 'class_id'> {
   deadline?: string;
   submission_date?: string;
   grade?: number;
-  active?: number ; // Ensuring this matches the type in Correction (0 = inactive, 1 = active)
+  active?: number; // Ensuring this matches the type in Correction (0 = inactive, 1 = active)
+  status?: string; // Ajout de la propriété status qui manquait
   experimental_points_earned?: number;
   theoretical_points_earned?: number;
   penalty?: number;
@@ -419,33 +420,24 @@ export function useCorrections(correctionId: string) {
     setError('');
     
     try {
-      // Correction : éviter la comparaison avec true (boolean) puisque active est un number
-      const isCurrentlyActive = correction.active === 1;
-      // Changer pour retourner 0 ou 1 au lieu d'un booléen
-      const newActiveState = isCurrentlyActive ? 0 : 1;
+      // Vérifier si la correction est active (en utilisant soit status, soit active)
+      const isCurrentlyActive = correction.status 
+        ? correction.status === 'ACTIVE' 
+        : correction.active === 1;
+      
+      // Inverser l'état actuel pour la requête API
+      const newActiveState = !isCurrentlyActive;
 
-      
-      const response = await fetch(`/api/corrections/${correctionId}/toggle-active`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ active: !isCurrentlyActive }), // Inverser l'état actuel
-      });
-      
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Erreur lors de la modification du statut');
-      }
-      
-      const updatedCorrection = await response.json();
+      // Appeler le service pour basculer le statut
+      const result = await correctionService.toggleCorrectionActive(parseInt(correctionId, 10), newActiveState);
       
       // Mettre à jour la correction locale avec le nouveau statut
       setCorrection(prev => {
         if (!prev) return null;
         return {
           ...prev,
-          active: newActiveState
+          active: result.active,
+          status: result.status
         };
       });
       
@@ -453,12 +445,8 @@ export function useCorrections(correctionId: string) {
       setTimeout(() => setSuccessMessage(''), 3000);
     } catch (err) {
       console.error('Erreur lors de la modification du statut:', err);
-      // Au lieu d'utiliser directement setError, nous allons stocker plus d'informations
-      // pour que le composant ErrorDisplay puisse les afficher
       if (err instanceof Error) {
-        // Stocker l'objet Error complet et pas seulement le message
         setError(err.message);
-        // Les détails de l'erreur seront gérés par ErrorDisplay
       } else {
         setError('Erreur lors de la modification du statut de la correction');
       }

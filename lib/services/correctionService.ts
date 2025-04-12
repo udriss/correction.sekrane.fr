@@ -1,6 +1,7 @@
 import { Correction } from '@/lib/types';
 import { ContentItem } from '@/types/correction';
 import { parseHtmlToItems, generateHtmlFromItems } from '@/utils/htmlUtils';
+import { query } from '@/lib/db';
 
 // Define the content_data structure to help TypeScript understand the shape
 interface ContentData {
@@ -176,28 +177,70 @@ export function parseContentItems(correction: Correction): ContentItem[] {
   return parseHtmlToItems(correction.content || '');
 }
 
-// Fonction pour activer/désactiver une correction
-export async function toggleCorrectionActive(
-  correctionId: number | string,
-  newActiveState: boolean
-): Promise<any> {
+
+/**
+ * Toggles the active status of a correction
+ * @param correctionId The ID of the correction to update
+ * @param activeState The new active state (true/false)
+ * @returns Promise resolving to the updated correction
+ */
+export async function toggleCorrectionActive(correctionId: number, activeState: boolean): Promise<any> {
   try {
-    const response = await fetch(`/api/corrections/${correctionId}/toggle-active`, {
-      method: 'POST',
+    // Use the API to update the status
+    const response = await fetch(`/api/corrections/${correctionId}/status`, {
+      method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ active: newActiveState }),
+      body: JSON.stringify({ 
+        active: activeState,
+        status: activeState ? 'ACTIVE' : 'DEACTIVATED'
+      }),
     });
     
     if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.error || 'Échec de la mise à jour du statut de la correction');
+      const errorData = await response.json();
+      throw new Error(errorData.message || 'Échec de la mise à jour du statut');
     }
     
     return await response.json();
   } catch (error) {
-    console.error('Erreur lors de la modification du statut de la correction:', error);
+    console.error('Error in toggleCorrectionActive:', error);
+    throw error;
+  }
+}
+
+/**
+ * Change the status of a correction to a specific value
+ * @param correctionId The ID of the correction to update
+ * @param status The new status (ACTIVE, DEACTIVATED, ABSENT, NON_RENDU, NON_NOTE)
+ * @returns Promise resolving to the updated correction
+ */
+export async function changeCorrectionStatus(correctionId: number, status: string): Promise<any> {
+  try {
+    // Vérifier que le status est valide
+    const validStatuses = ['ACTIVE', 'DEACTIVATED', 'ABSENT', 'NON_RENDU', 'NON_NOTE'];
+    if (!validStatuses.includes(status)) {
+      throw new Error('Statut invalide');
+    }
+
+    // Use the API to update the status
+    const response = await fetch(`/api/corrections/${correctionId}/status`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ status }),
+    });
+    
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.message || 'Échec de la mise à jour du statut');
+    }
+    
+    return await response.json();
+  } catch (error) {
+    console.error('Error in changeCorrectionStatus:', error);
     throw error;
   }
 }

@@ -1,5 +1,4 @@
 'use client';
-
 import React, { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -101,13 +100,14 @@ interface Student {
   group?: string; // Maintenir la rétrocompatibilité
 }
 
+// Modifié pour utiliser le type PageProps de Next.js pour App Router
 export default function ActivityDetail({ params }: { params: Promise<{ id: string }> }) {
-  // Unwrap the Promise for params using React.use
-  const { id } = React.use(params);
+  // Unwrap the params Promise using React.use()
+  const unwrappedParams = React.use(params);
+  const { id } = unwrappedParams;
   const activityId = id;
   
   const router = useRouter();
-  // Fix the type error by directly using useSearchParams without React.use
   const searchParams = useSearchParams();
   
   const [activity, setActivity] = useState<Activity | null>(null);
@@ -961,8 +961,8 @@ export default function ActivityDetail({ params }: { params: Promise<{ id: strin
         
       case 'subclass':
         // Grouper par sous-groupe
-        corrections.forEach(correction => {
-          const student = getStudentById(correction.student_id);
+        corrections.forEach(c => {
+          const student = getStudentById(c.student_id);
           if (!student) return;
           
           const subClass = student.sub_class;
@@ -988,11 +988,11 @@ export default function ActivityDetail({ params }: { params: Promise<{ id: strin
               };
             }
             
-            result[subClassName].items[studentKey].corrections.push(correction);
+            result[subClassName].items[studentKey].corrections.push(c);
           } 
           else if (subArrangement === 'activity') {
-            const activity = getActivityById(correction.activity_id);
-            const activityKey = activity?.name || `Activité ${correction.activity_id}`;
+            const activity = getActivityById(c.activity_id);
+            const activityKey = activity?.name || `Activité ${c.activity_id}`;
             
             if (!result[subClassName].items[activityKey]) {
               result[subClassName].items[activityKey] = {
@@ -1001,10 +1001,11 @@ export default function ActivityDetail({ params }: { params: Promise<{ id: strin
               };
             }
             
-            result[subClassName].items[activityKey].corrections.push(correction);
+            result[subClassName].items[activityKey].corrections.push(c);
           }
           else if (subArrangement === 'class') {
-            const classObj = classes.find(c => c.id === correction.class_id);
+            // Corrigé pour référencer la classe avec l'ID approprié
+            const classObj = classes.find(cls => cls.id === c.class_id);
             const classKey = classObj?.name || 'Classe';
             
             if (!result[subClassName].items[classKey]) {
@@ -1014,14 +1015,14 @@ export default function ActivityDetail({ params }: { params: Promise<{ id: strin
               };
             }
             
-            result[subClassName].items[classKey].corrections.push(correction);
+            result[subClassName].items[classKey].corrections.push(c);
           }
           else {
             // Pas de sous-arrangement
             if (!result[subClassName].corrections) {
               result[subClassName].corrections = [];
             }
-            result[subClassName].corrections.push(correction);
+            result[subClassName].corrections.push(c);
           }
         });
         break;

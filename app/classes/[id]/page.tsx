@@ -59,6 +59,7 @@ import CloseIcon from '@mui/icons-material/Close';
 import CheckIcon from '@mui/icons-material/Check';
 import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 import QrCodeIcon from '@mui/icons-material/QrCode';
+import BlockIcon from '@mui/icons-material/Block';
 
 import Link from 'next/link';
 import LoadingSpinner from '@/components/LoadingSpinner';
@@ -69,6 +70,7 @@ import { Correction, Class, Student } from '@/lib/types';
 import { Student as BaseStudent } from '@/lib/types';
 import { Correction as ProviderCorrection } from '@/app/components/CorrectionsDataProvider';
 import ExportPDFComponent from '@/components/pdf/ExportPDFComponent';
+import CorrectionCard from '@/components/allCorrections/CorrectionCard';
 
 
 
@@ -102,7 +104,7 @@ function TabPanel(props: TabPanelProps) {
       hidden={value !== index}
       id={`class-tabpanel-${index}`}
       aria-labelledby={`class-tab-${index}`}
-      {...other}
+      {...other }
     >
       {value === index && (
         <Box sx={{ py: 3 }}>
@@ -366,7 +368,7 @@ export default function ClassDetailPage({ params }: { params: Promise<{ id: stri
       const tabMatch = hash.match(/#tab=(\d+)/);
       if (tabMatch && tabMatch[1]) {
         const tabIndex = parseInt(tabMatch[1], 10);
-        if (tabIndex >= 0 && tabIndex <= 2) { // Valider l'index de l'onglet
+        if (tabIndex >= 0 && tabIndex <= 3) { // Valider l'index de l'onglet
           setTabValue(tabIndex);
         }
       }
@@ -822,6 +824,42 @@ export default function ClassDetailPage({ params }: { params: Promise<{ id: stri
     setEditingRows({});
   };
 
+  // State for storing share codes
+  const [shareCodesMap, setShareCodesMap] = useState<Map<string, string>>(new Map());
+  
+  // The useEffect for loading shareCodes
+  useEffect(() => {
+    const loadShareCodes = async () => {
+      if (corrections.length > 0) {
+        try {
+          const correctionIds = corrections.map(c => c.id.toString());
+          const response = await fetch('/api/share/batch', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ correctionIds }),
+          });
+          
+          if (response.ok) {
+            const data = await response.json();
+            const codesMap = new Map<string, string>();
+            
+            // Convert array of { correctionId, shareCode } to Map
+            data.forEach((item: { correctionId: string, shareCode: string }) => {
+              codesMap.set(item.correctionId, item.shareCode);
+            });
+            
+            setShareCodesMap(codesMap);
+          }
+        } catch (error) {
+          console.error('Error loading share codes:', error);
+        }
+      }
+    };
+    
+    loadShareCodes();
+  }, [corrections]);
 
   // Conserver la fonction handleChipClick telle quelle, mais assurez-vous qu'elle utilise updateUrlFragment
   const handleChipClick = (tabIndex: number) => {
@@ -1536,45 +1574,130 @@ export default function ClassDetailPage({ params }: { params: Promise<{ id: stri
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
             {items.map((correction) => {
               const activityData = getActivityById(correction.activity_id);
-              const studentFullName = getStudentFullName(correction.student_id);
+              const studentData = getStudentById(correction.student_id);
+              const studentSubClass = getStudentSubClass(correction.student_id);
+              
+              // Préparer l'objet de correction à passer au CorrectionCard
+              const correctionForCard = {
+                ...correction,
+                activity_name: activityData?.name || 'Activité inconnue',
+                student_name: studentData ? `${studentData.first_name} ${studentData.last_name}` : 'Étudiant inconnu',
+                class_name: classData?.name || '',
+                student_sub_class: studentSubClass ? `${studentSubClass}` : undefined,
+                theoretical_points: activityData?.theoretical_points || 0,
+                experimental_points: activityData?.experimental_points || 0
+              };
+
+              // Fonction pour obtenir la couleur de la note
+              const getGradeColor = (grade: number) => {
+                if (grade < 5) return "error";
+                if (grade < 10) return "warning";
+                if (grade < 15) return "info";
+                return "success";
+              };
+
+              // Fonctions de gestion du changement de statut
+              const handleToggleActive = async (correctionId: number, newActiveState: boolean) => {
+                try {
+                  const response = await fetch(`/api/corrections/${correctionId}/status`, {
+                    method: 'PUT',
+                    headers: {
+                      'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ 
+                      active: newActiveState,
+                      status: newActiveState ? 'ACTIVE' : 'DEACTIVATED'
+                    }),
+                  });
+                  
+                  if (!response.ok) {
+                    throw new Error('Échec de la mise à jour du statut');
+                  }
+                  
+                  // Mettre à jour les corrections dans l'état local
+                  setCorrections(prev => prev.map(c => 
+                    c.id === correctionId 
+                      ? { ...c, active: newActiveState ? 1 : 0, status: newActiveState ? 'ACTIVE' : 'DEACTIVATED' } 
+                      : c
+                  ));
+                  
+                  // Afficher un message de succès
+                  enqueueSnackbar(`Correction ${newActiveState ? 'activée' : 'désactivée'} avec succès`, {
+                    variant: 'success',
+                    autoHideDuration: 3000,
+                  });
+                } catch (error) {
+                  console.error('Erreur lors du changement de statut:', error);
+                  enqueueSnackbar(`Erreur: ${error instanceof Error ? error.message : 'Échec de la mise à jour'}`, {
+                    variant: 'error',
+                    autoHideDuration: 5000,
+                  });
+                  throw error;
+                }
+              };
+              
+              const handleChangeStatus = async (correctionId: number, newStatus: string) => {
+                try {
+                  const response = await fetch(`/api/corrections/${correctionId}/status`, {
+                    method: 'PUT',
+                    headers: {
+                      'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ status: newStatus }),
+                  });
+                  
+                  if (!response.ok) {
+                    throw new Error('Échec de la mise à jour du statut');
+                  }
+                  
+                  // Mettre à jour les corrections dans l'état local
+                  setCorrections(prev => prev.map(c => 
+                    c.id === correctionId 
+                      ? { 
+                          ...c, 
+                          status: newStatus,
+                          active: newStatus === 'ACTIVE' ? 1 : 0 
+                        } 
+                      : c
+                  ));
+                  
+                  // Map status to readable name for the toast message
+                  const statusNames: Record<string, string> = {
+                    'ACTIVE': 'activée',
+                    'DEACTIVATED': 'désactivée',
+                    'ABSENT': 'marquée comme absent',
+                    'NON_RENDU': 'marquée comme non rendue',
+                    'NON_NOTE': 'marquée comme non notée'
+                  };
+                  
+                  // Afficher un message de succès
+                  enqueueSnackbar(`Correction ${statusNames[newStatus] || 'mise à jour'} avec succès`, {
+                    variant: 'success',
+                    autoHideDuration: 3000,
+                  });
+                } catch (error) {
+                  console.error('Erreur lors du changement de statut:', error);
+                  enqueueSnackbar(`Erreur: ${error instanceof Error ? error.message : 'Échec de la mise à jour'}`, {
+                    variant: 'error',
+                    autoHideDuration: 5000,
+                  });
+                  throw error;
+                }
+              };
+
               return (
-              <Card key={correction.id} className="hover:shadow-md transition-shadow">
-                <CardContent>
-                  <Typography variant="h6" component="div" noWrap>
-                    {studentFullName}
-                  </Typography>
-                  <Typography variant="body2" color="textSecondary" noWrap>
-                    {activityData?.name}
-                  </Typography>
-                    <Box sx={{ mt: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <Chip 
-                      label={`${Number(correction.grade).toFixed(1) ?? 0} / ${(activityData?.experimental_points ?? 0) + (activityData?.theoretical_points ?? 0) || 20}`}
-                      color={
-                      (correction.grade ?? 0) < 5 ? "error" :
-                      (correction.grade ?? 0) < 10 ? "warning" :
-                      (correction.grade ?? 0) < 15 ? "info" : "success"
-                      }
-                      size="small"
-                    />
-                    <Typography variant="body2" color="textSecondary">
-                      Exp : {Number(correction.experimental_points_earned).toFixed(1)} / {Number(activityData?.experimental_points || 10).toFixed(1)} | 
-                      Théo : {Number(correction.theoretical_points_earned).toFixed(1)} / {Number(activityData?.theoretical_points || 10).toFixed(1)}
-                    </Typography>
-                    </Box>
-                </CardContent>
-                <CardActions>
-                  <Button 
-                    size="small" 
-                    component={Link} 
-                    href={`/corrections/${correction.id}`}
-                    startIcon={<AssignmentIcon />}
-                  >
-                    Voir détails
-                  </Button>
-                </CardActions>
-              </Card>
-            )}
-            )}
+                <CorrectionCard
+                  key={correction.id}
+                  correction={correctionForCard}
+                  getGradeColor={getGradeColor}
+                  showStudent={true}
+                  showActivity={true}
+                  showClass={false}
+                  onToggleActive={handleToggleActive}
+                  onChangeStatus={handleChangeStatus}
+                />
+              );
+            })}
           </div>
         );
       
