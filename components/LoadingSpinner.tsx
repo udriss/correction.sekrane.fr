@@ -70,16 +70,8 @@ const LoadingSpinner: React.FC<LoadingSpinnerProps> = ({
     100% { transform: rotate(-360deg); }
   `;
   
-  // Dynamic dots for animation
-  const [dots, setDots] = React.useState('.');
-  
-  React.useEffect(() => {
-    const interval = setInterval(() => {
-      setDots(prev => prev.length < 3 ? prev + '.' : '.');
-    }, 400);
-    
-    return () => clearInterval(interval);
-  }, []);
+ 
+
 
   // Display message - use provided text or default
   const displayText = text !== null ? text : 'Chargement en cours';
@@ -161,14 +153,7 @@ const LoadingSpinner: React.FC<LoadingSpinnerProps> = ({
             justifyContent: 'center' 
           }}>
             <Typography variant="body1" sx={{ color: theme => theme.palette.text.primary, fontWeight: 500 }}>
-              <span>{displayText}</span>
-              <Box component="span" sx={{ 
-                display: 'inline-block', 
-                width: 28, 
-                textAlign: 'left' 
-              }}>
-                {dots}
-              </Box>
+              {displayText}
             </Typography>
           </Box>
           

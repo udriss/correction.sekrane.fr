@@ -107,7 +107,9 @@ function CorrectionsContent() {
   const [students, setStudents] = useState<ClassStudent[]>([]);
   const [filterActivity, setFilterActivity] = useState<number | 'all'>('all');
   const [filterSubClass, setFilterSubClass] = useState<string | 'all'>('all');
-  
+  const [errorDetails, setErrorDetails] = useState<any>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
   // Add state for delete confirmation modal
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
   
@@ -120,7 +122,7 @@ function CorrectionsContent() {
   const { 
     filteredCorrections, 
     loading, 
-    error, 
+    error: errorString, 
     metaData,
     filters,
     setFilters,
@@ -133,6 +135,9 @@ function CorrectionsContent() {
     clearAllFilters,
     refreshCorrections
   } = useCorrections();
+  
+  // Convert string error to Error object
+  const error = errorString ? new Error(errorString) : null;
   
   const { 
     batchDeleteMode, 
@@ -286,13 +291,27 @@ function CorrectionsContent() {
           // Récupérer toutes les corrections via l'API
           const correctionsResponse = await fetch('/api/corrections/all');
           if (!correctionsResponse.ok) {
-            throw new Error('Erreur lors du chargement des corrections');
+            const errorText = await correctionsResponse.text();
+            setErrorMessage('Erreur lors du chargement des corrections');
+            setErrorDetails({
+              status: correctionsResponse.status,
+              statusText: correctionsResponse.statusText,
+              responseText: errorText
+            });
+            return;
           }
           
           // Récupérer tous les étudiants
           const allStudentsResponse = await fetch('/api/students');
           if (!allStudentsResponse.ok) {
-            throw new Error('Erreur lors du chargement des étudiants');
+            const errorText = await allStudentsResponse.text();
+            setErrorMessage('Erreur lors du chargement des étudiants');
+            setErrorDetails({
+              status: allStudentsResponse.status,
+              statusText: allStudentsResponse.statusText,
+              responseText: errorText
+            });
+            return;
           }
           
           
@@ -303,7 +322,14 @@ function CorrectionsContent() {
           // Récupérer toutes les activités
           const allActivitiesResponse = await fetch('/api/activities');
           if (!allActivitiesResponse.ok) {
-            throw new Error('Erreur lors du chargement des activités');
+            const errorText = await allActivitiesResponse.text();
+            setErrorMessage('Erreur lors du chargement des activités');
+            setErrorDetails({
+              status: allActivitiesResponse.status,
+              statusText: allActivitiesResponse.statusText,
+              responseText: errorText
+            });
+            return;
           }
           
           const activitiesData = await allActivitiesResponse.json();
@@ -653,13 +679,15 @@ function CorrectionsContent() {
   }
   
   // Si une erreur est présente, afficher le composant ErrorDisplay
-  if (error) {
+  if (errorMessage) {
+    console.error('Error fetching corrections:', errorMessage);
     return (
       <Box sx={{ mt: 2 }}>
         <ErrorDisplay 
-          error={error} 
+          error={errorMessage} 
           withRefreshButton={true}
           onRefresh={refreshCorrections}
+          errorDetails={errorDetails}
         />
       </Box>
     );

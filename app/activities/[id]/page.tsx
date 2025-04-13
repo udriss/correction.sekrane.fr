@@ -15,43 +15,20 @@ import {
   CircularProgress, 
   Container, 
   Tabs, 
-  Tab, 
-  FormControl, 
-  InputLabel, 
-  Select, 
-  MenuItem, 
+  Tab,
   SelectChangeEvent, 
-  Checkbox, 
   FormControlLabel, 
   Box, 
-  Grid,
-  Divider,
-  Chip,
-  TableContainer,
-  Table,
-  TableHead,
-  TableRow,
-  TableCell,
-  TableBody,
-  TableFooter,
-  TablePagination,
   Switch,
-  Collapse
 } from '@mui/material';
 import EditIcon from '@mui/icons-material/Edit';
 import SaveIcon from '@mui/icons-material/Save';
 import CloseIcon from '@mui/icons-material/Close';
 import DeleteIcon from '@mui/icons-material/Delete';
 import CheckIcon from '@mui/icons-material/Check';
-import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline';
-import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf';
 import { useSnackbar } from 'notistack';
-import RefreshIcon from '@mui/icons-material/Refresh';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import QrCodeIcon from '@mui/icons-material/QrCode';
-import ClassIcon from '@mui/icons-material/Class';
-import GroupIcon from '@mui/icons-material/Group';
-import TableChartIcon from '@mui/icons-material/TableChart';
 import ActivityStatsGraphs from '@/components/ActivityStatsGraphs';
 // Import components
 import FragmentsList from '@/components/FragmentsList';

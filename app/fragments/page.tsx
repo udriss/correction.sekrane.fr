@@ -18,6 +18,7 @@ import LoadingSpinner from '@/components/LoadingSpinner';
 import useAuth from '@/hooks/useAuth';
 import GradientBackground from '@/components/ui/GradientBackground';
 import PatternBackground from '@/components/ui/PatternBackground';
+import ErrorDisplay from '@/components/ui/ErrorDisplay';
 import { FragmentForm, FragmentEditor } from '@/components/fragments';
 
 // Importation des composants extraits
@@ -859,9 +860,18 @@ export default function FragmentsLibraryPage() {
 
       <Container className="max-w-4xl" sx={{ px: { xs: 2, sm: 3 } }}>
         {error && (
-          <Alert severity="error" sx={{ mb: 4, borderRadius: 2 }}>
-            {error}
-          </Alert>
+          <div className="container mx-auto px-4 py-2 flex justify-center">
+            <div className="w-full animate-slide-in">
+              <ErrorDisplay 
+                error={error} 
+                onRefresh={() => {
+                  setError('');
+                  fetchFragments();
+                }}
+                withRefreshButton={true}
+              />
+            </div>
+          </div>
         )}
 
         {/* Utilisation du composant d'actions */}

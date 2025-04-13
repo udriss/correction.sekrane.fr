@@ -37,6 +37,7 @@ import LoadingSpinner from '@/components/LoadingSpinner';
 import MultipleCorrectionsForm from '@/components/MultipleCorrectionsForm';
 import GradientBackground from '@/components/ui/GradientBackground';
 import PatternBackground from '@/components/ui/PatternBackground';
+import ErrorDisplay from '@/components/ui/ErrorDisplay';
 
 export default function MultipleCorrections() {
   const router = useRouter();
@@ -485,9 +486,15 @@ export default function MultipleCorrections() {
           </Grid>
         
         {error && (
-          <Alert severity="error" className="mb-6 animate-fadeIn">
-            {error}
-          </Alert>
+          <div className="container mx-auto px-4 py-2 flex justify-center">
+            <div className="w-full animate-slide-in">
+              <ErrorDisplay 
+                error={error} 
+                onRefresh={() => setError('')}
+                withRefreshButton={true}
+              />
+            </div>
+          </div>
         )}
         
         {!activity && !error && (

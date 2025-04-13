@@ -84,7 +84,7 @@ export const isCorrectionActive = (correction: any): boolean => {
 export const getCorrectionCellValues = (correction: any, activity: any, useCommaFormat: boolean = false): any => {
   // Déterminer le statut
   if (correction.status) {
-    console.log('Statut de la correction:', correction.status);
+
     switch (correction.status) {
       case 'NON_NOTE':
         return {
@@ -177,6 +177,15 @@ export const getCorrectionCellStyle = (cellValue: any): {
   
   // Si c'est une chaîne, vérifier les statuts spéciaux
   if (typeof cellValue === 'string') {
+    if (cellValue === 'NON NOTÉ MANUEL') {
+      console.log('Correction non notée manuellement détectée');
+      return {
+        color: 'CC0000', // Rouge
+        backgroundColor: 'FFEEEE', // Rouge très pâle
+        fontStyle: 'italic'
+      };
+    }
+
     if (cellValue === 'NON NOTÉ') {
       return {
         color: 'CC0000', // Rouge

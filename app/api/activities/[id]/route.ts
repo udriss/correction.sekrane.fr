@@ -12,7 +12,7 @@ export async function GET(
     const activityId = parseInt(id);
     
     if (isNaN(activityId)) {
-      return NextResponse.json({ error: 'ID invalide' }, { status: 400 });
+      return NextResponse.json({ error: 'InvalidActivityID: ID invalide' }, { status: 400 });
     }
 
     // Récupérer l'utilisateur connecté
@@ -25,13 +25,13 @@ export async function GET(
     const activity = await getActivityById(activityId, userId);
     
     if (!activity) {
-      return NextResponse.json({ error: 'activité non trouvée' }, { status: 404 });
+      return NextResponse.json({ error: 'ActivityNotFound: activité non trouvée' }, { status: 404 });
     }
     
     return NextResponse.json(activity);
   } catch (error) {
-    console.error('Error fetching activity:', error);
-    return NextResponse.json({ error: 'erreur lors de la récupération de l\'activité' }, { status: 500 });
+    console.error('ActivityFetchError:', error);
+    return NextResponse.json({ error: 'ActivityFetchError: erreur lors de la récupération de l\'activité', details: String(error) }, { status: 500 });
   }
 }
 
@@ -46,7 +46,7 @@ export async function PUT(
     
     
     if (isNaN(activityId)) {
-      return NextResponse.json({ error: 'ID invalide' }, { status: 400 });
+      return NextResponse.json({ error: 'InvalidActivityID: ID invalide' }, { status: 400 });
     }
     
     const data = await request.json();
@@ -63,7 +63,7 @@ export async function PUT(
     // S'assurer que les valeurs sont des nombres valides
     if (isNaN(experimentalPoints) || isNaN(theoreticalPoints)) {
       return NextResponse.json(
-        { error: "les valeurs de points doivent être des nombres valides" },
+        { error: "InvalidPointsValues: les valeurs de points doivent être des nombres valides" },
         { status: 400 }
       );
     }
@@ -91,7 +91,7 @@ export async function PUT(
 
     if (!success) {
       return NextResponse.json(
-        { error: "Échec de la mise à jour de l'activité" },
+        { error: "ActivityUpdateFailed: Échec de la mise à jour de l'activité" },
         { status: 500 }
       );
     }
@@ -102,16 +102,16 @@ export async function PUT(
     
     if (!updatedActivity) {
       return NextResponse.json(
-        { error: "Activité non trouvée après la mise à jour" },
+        { error: "ActivityNotFound: Activité non trouvée après la mise à jour" },
         { status: 404 }
       );
     }
     
     return NextResponse.json(updatedActivity);
   } catch (error) {
-    console.error('Erreur lors de la mise à jour de l\'activité:', error);
+    console.error('ActivityUpdateError:', error);
     return NextResponse.json(
-      { error: "Erreur serveur lors de la mise à jour de l'activité" },
+      { error: "ActivityUpdateError: Erreur serveur lors de la mise à jour de l'activité", details: String(error) },
       { status: 500 }
     );
   }
@@ -126,21 +126,21 @@ export async function DELETE(
     const activityId = parseInt(id);
     
     if (isNaN(activityId)) {
-      return NextResponse.json({ error: 'ID invalide' }, { status: 400 });
+      return NextResponse.json({ error: 'InvalidActivityID: ID invalide' }, { status: 400 });
     }
 
     // Récupérer l'utilisateur connecté
     const user = await getUser(req);
     
     if (!user) {
-      return NextResponse.json({ error: 'utilisateur non authentifié' }, { status: 401 });
+      return NextResponse.json({ error: 'AuthenticationRequired: utilisateur non authentifié' }, { status: 401 });
     }
 
     // Vérifier que l'activité existe et appartient à l'utilisateur
     const existingActivity = await getActivityById(activityId, user.id);
     
     if (!existingActivity) {
-      return NextResponse.json({ error: 'Activité non trouvée' }, { status: 404 });
+      return NextResponse.json({ error: 'ActivityNotFound: Activité non trouvée' }, { status: 404 });
     }
 
     const deleted = await deleteActivity(activityId);
@@ -148,10 +148,10 @@ export async function DELETE(
     if (deleted) {
       return NextResponse.json({ success: true });
     } else {
-      return NextResponse.json({ error: 'Échec de la suppression' }, { status: 500 });
+      return NextResponse.json({ error: 'ActivityDeletionFailed: Échec de la suppression' }, { status: 500 });
     }
   } catch (error) {
-    console.error('Error deleting activity:', error);
-    return NextResponse.json({ error: 'Erreur lors de la suppression de l\'activité' }, { status: 500 });
+    console.error('ActivityDeleteError:', error);
+    return NextResponse.json({ error: 'ActivityDeleteError: Erreur lors de la suppression de l\'activité', details: String(error) }, { status: 500 });
   }
 }

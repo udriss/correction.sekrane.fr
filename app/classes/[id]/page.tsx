@@ -43,6 +43,7 @@ import LinkOffIcon from '@mui/icons-material/LinkOff';
 
 import PatternBackground from '@/components/ui/PatternBackground';
 import GradientBackground from '@/components/ui/GradientBackground';
+import ErrorDisplay from '@/components/ui/ErrorDisplay';
 
 import { ClassEditForm } from "@/components/ClassEditForm";
 
@@ -71,6 +72,7 @@ import { Student as BaseStudent } from '@/lib/types';
 import { Correction as ProviderCorrection } from '@/app/components/CorrectionsDataProvider';
 import ExportPDFComponent from '@/components/pdf/ExportPDFComponent';
 import CorrectionCard from '@/components/allCorrections/CorrectionCard';
+import { getBatchShareCodes } from '@/lib/services/shareService';
 
 
 
@@ -298,34 +300,51 @@ export default function ClassDetailPage({ params }: { params: Promise<{ id: stri
         
         // Fetch class details
         const classResponse = await fetch(`/api/classes/${classId}`);
-        if (!classResponse.ok) throw new Error('Erreur lors du chargement de la classe');
+        if (!classResponse.ok) {
+          const errorStatus = classResponse.status;
+          setError(`La classe n'a pas pu être chargée (${errorStatus})`);
+          setLoading(false);
+          return;
+        }
         const classData = await classResponse.json();
         setClassData(classData);
         
         // Fetch activities for this class
         const activitiesResponse = await fetch(`/api/classes/${classId}/activities`);
-        if (activitiesResponse.ok) {
+        if (!activitiesResponse.ok) {
+          console.warn(`Impossible de charger les activités: ${activitiesResponse.status}`);
+          // Continue execution - non-blocking error
+        } else {
           const activitiesData = await activitiesResponse.json();
           setActivities(activitiesData);
         }
         
         // Fetch corrections for this class
         const correctionsResponse = await fetch(`/api/classes/${classId}/corrections`);
-        if (correctionsResponse.ok) {
+        if (!correctionsResponse.ok) {
+          console.warn(`Impossible de charger les corrections: ${correctionsResponse.status}`);
+          // Continue execution - non-blocking error
+        } else {
           const correctionsData = await correctionsResponse.json();
           setCorrections(correctionsData);
         }
 
         // Fetch students for this class
         const studentsResponse = await fetch(`/api/classes/${classId}/students`);
-        if (studentsResponse.ok) {
+        if (!studentsResponse.ok) {
+          console.warn(`Impossible de charger les étudiants: ${studentsResponse.status}`);
+          // Continue execution - non-blocking error
+        } else {
           const studentsData = await studentsResponse.json();
           setClassStudents(studentsData);
         }
 
         // Fetch all students to be able to get names by ID
         const allStudentsResponse = await fetch(`/api/students`);
-        if (allStudentsResponse.ok) {
+        if (!allStudentsResponse.ok) {
+          console.warn(`Impossible de charger tous les étudiants: ${allStudentsResponse.status}`);
+          // Continue execution - non-blocking error
+        } else {
           const studentsData = await allStudentsResponse.json();
           setStudents(studentsData);
         }
@@ -827,39 +846,20 @@ export default function ClassDetailPage({ params }: { params: Promise<{ id: stri
   // State for storing share codes
   const [shareCodesMap, setShareCodesMap] = useState<Map<string, string>>(new Map());
   
-  // The useEffect for loading shareCodes
+  // The useEffect for loading shareCodes should depend on filteredCorrections
   useEffect(() => {
     const loadShareCodes = async () => {
-      if (corrections.length > 0) {
-        try {
-          const correctionIds = corrections.map(c => c.id.toString());
-          const response = await fetch('/api/share/batch', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ correctionIds }),
-          });
-          
-          if (response.ok) {
-            const data = await response.json();
-            const codesMap = new Map<string, string>();
-            
-            // Convert array of { correctionId, shareCode } to Map
-            data.forEach((item: { correctionId: string, shareCode: string }) => {
-              codesMap.set(item.correctionId, item.shareCode);
-            });
-            
-            setShareCodesMap(codesMap);
-          }
-        } catch (error) {
-          console.error('Error loading share codes:', error);
-        }
+      if (filteredCorrections.length > 0) {
+        const correctionIds = filteredCorrections.map(c => c.id.toString());
+        const shareCodes = await getBatchShareCodes(correctionIds);
+        setShareCodesMap(shareCodes);
+      } else {
+        setShareCodesMap(new Map());
       }
     };
     
     loadShareCodes();
-  }, [corrections]);
+  }, [filteredCorrections]);
 
   // Conserver la fonction handleChipClick telle quelle, mais assurez-vous qu'elle utilise updateUrlFragment
   const handleChipClick = (tabIndex: number) => {
@@ -894,28 +894,27 @@ export default function ClassDetailPage({ params }: { params: Promise<{ id: stri
 
   if (error || !classData || classId === null) {
     return (
-      <Container maxWidth="md" className="py-8">
-        <Alert 
-          severity="error" 
-          sx={{ 
-            mb: 3,
-            border: 1,
-            borderColor: 'error.main',
-            '& .MuiAlert-icon': {
-              color: 'error.main'
-            }
-          }}
-        >
-          {error || 'Impossible de charger les informations de la classe'}
-        </Alert>
-        <Button 
-          variant="contained" 
-          startIcon={<ArrowBackIcon />} 
-          onClick={() => window.history.back()}
-        >
-          Retour
-        </Button>
-      </Container>
+      <div className="container mx-auto px-4 py-8 flex justify-center">
+        <div className="w-full max-w-lg animate-slide-in">
+          <Paper className="p-6 overflow-hidden relative" elevation={3}>
+            {/* Utilisation du composant ErrorDisplay */}
+            <ErrorDisplay 
+              error={error || 'Impossible de charger les informations de la classe'} 
+              onRefresh={() => window.location.reload()}
+              withRefreshButton={true}
+            />
+            <Box sx={{ mt: 3, display: 'flex', justifyContent: 'center' }}>
+              <Button 
+                variant="contained" 
+                startIcon={<ArrowBackIcon />} 
+                onClick={() => window.history.back()}
+              >
+                Retour
+              </Button>
+            </Box>
+          </Paper>
+        </div>
+      </div>
     );
   }
 
@@ -1695,6 +1694,7 @@ export default function ClassDetailPage({ params }: { params: Promise<{ id: stri
                   showClass={false}
                   onToggleActive={handleToggleActive}
                   onChangeStatus={handleChangeStatus}
+                  preloadedShareCode={shareCodesMap.get(correction.id.toString())}
                 />
               );
             })}

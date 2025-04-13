@@ -36,6 +36,7 @@ import { Student } from '@/lib/types';
 import { Correction as ProviderCorrection } from '@/app/components/CorrectionsDataProvider';
 import ArrangementOptions from './ArrangementOptions';
 import ExportFormatOptions from './ExportFormatOptions';
+import ErrorDisplay from '@/components/ui/ErrorDisplay';
 import { 
   ExportPDFComponentAllCorrectionsProps, 
   ArrangementType, 
@@ -74,7 +75,17 @@ const ExportPDFComponentAllCorrections: React.FC<ExportPDFComponentAllCorrection
   const [classesMap, setClassesMap] = useState<Map<number | null, any>>(new Map());
   const [loading, setLoading] = useState<boolean>(false);
   
+  // État pour la gestion des erreurs
+  const [error, setError] = useState<string | null>(null);
+  const [errorDetails, setErrorDetails] = useState<any | null>(null);
+  
   const { enqueueSnackbar } = useSnackbar();
+
+  // Fonction pour effacer les erreurs
+  const clearError = () => {
+    setError(null);
+    setErrorDetails(null);
+  };
 
   // État pour la pagination
   const [page, setPage] = useState<number>(0);
@@ -101,7 +112,6 @@ const ExportPDFComponentAllCorrections: React.FC<ExportPDFComponentAllCorrection
     
     return result;
   }, [corrections, filterActivity]);
-  console.log('filteredCorrections', filteredCorrections);
 
   // Effet pour charger les classes au chargement du composant
   useEffect(() => {
@@ -117,7 +127,8 @@ const ExportPDFComponentAllCorrections: React.FC<ExportPDFComponentAllCorrection
           setClassesMap(newClassesMap);
         } catch (error) {
           console.error('Erreur lors du chargement des classes:', error);
-          enqueueSnackbar('Erreur lors du chargement des classes', { variant: 'error' });
+          setError('Erreur lors du chargement des classes');
+          setErrorDetails(error);
         } finally {
           setLoading(false);
         }
@@ -138,7 +149,8 @@ const ExportPDFComponentAllCorrections: React.FC<ExportPDFComponentAllCorrection
           }
         } catch (error) {
           console.error('Erreur lors du chargement des classes:', error);
-          enqueueSnackbar('Erreur lors du chargement des classes', { variant: 'error' });
+          setError('Erreur lors du chargement des classes');
+          setErrorDetails(error);
         } finally {
           setLoading(false);
         }
@@ -146,7 +158,7 @@ const ExportPDFComponentAllCorrections: React.FC<ExportPDFComponentAllCorrection
     };
 
     loadClasses();
-  }, [getAllClasses, enqueueSnackbar]);
+  }, [getAllClasses]);
 
   // Effet pour charger tous les étudiants lorsque includeAllStudents change
   useEffect(() => {
@@ -162,7 +174,8 @@ const ExportPDFComponentAllCorrections: React.FC<ExportPDFComponentAllCorrection
           setAllStudents(allStudentsData);
         } catch (error) {
           console.error('Erreur lors du chargement des étudiants:', error);
-          enqueueSnackbar('Erreur lors du chargement de tous les étudiants', { variant: 'error' });
+          setError('Erreur lors du chargement de tous les étudiants');
+          setErrorDetails(error);
         } finally {
           setLoading(false);
         }
@@ -170,7 +183,7 @@ const ExportPDFComponentAllCorrections: React.FC<ExportPDFComponentAllCorrection
     };
 
     loadAllStudents();
-  }, [includeAllStudents, enqueueSnackbar]);
+  }, [includeAllStudents]);
 
   // Fonction pour obtenir les sous-arrangements disponibles
   const getAvailableSubArrangements = (): SubArrangementType[] => {
@@ -179,6 +192,8 @@ const ExportPDFComponentAllCorrections: React.FC<ExportPDFComponentAllCorrection
         return ['activity', 'class', 'none'];
       case 'class':
         return ['student', 'activity', 'subclass', 'none'];
+      case 'subclass':
+        return ['student', 'activity', 'class', 'none'];
       case 'activity':
         return ['student', 'class', 'none'];
       default:
@@ -354,7 +369,8 @@ const ExportPDFComponentAllCorrections: React.FC<ExportPDFComponentAllCorrection
       
     } catch (error) {
       console.error('Erreur lors de la génération du PDF des notes:', error);
-      enqueueSnackbar('Erreur lors de la génération du PDF des notes', { variant: 'error' });
+      setError('Erreur lors de la génération du PDF des notes');
+      setErrorDetails(error);
     }
   };
 
@@ -380,7 +396,7 @@ const ExportPDFComponentAllCorrections: React.FC<ExportPDFComponentAllCorrection
       
       // Si pas de sous-arrangement, afficher un tableau unique
       if (value.corrections) {
-        if (viewType === 'simplified' && arrangement === 'class') {
+        if (viewType === 'simplified' && (arrangement === 'class' || arrangement === 'subclass')) {
           // Tableau simplifié pour l'arrangement par classe
           generateSimplifiedTable(doc, value.corrections, yPosition);
         } else {
@@ -406,7 +422,7 @@ const ExportPDFComponentAllCorrections: React.FC<ExportPDFComponentAllCorrection
           yPosition += 6;
           
           // Générer le tableau pour ce sous-niveau
-          if (viewType === 'simplified' && arrangement === 'class') {
+          if (viewType === 'simplified' && (arrangement === 'class' || arrangement === 'subclass')) {
             // Tableau simplifié pour l'arrangement par classe
             generateSimplifiedTable(doc, subValue.corrections, yPosition);
           } else {
@@ -661,7 +677,7 @@ const ExportPDFComponentAllCorrections: React.FC<ExportPDFComponentAllCorrection
         if (value.corrections) {
           fileName = `Notes_Toutes_Classes_${key.replace(/\s+/g, '_')}_${new Date().toISOString().slice(0, 10)}.csv`;
           
-          if (viewType === 'simplified' && arrangement === 'class') {
+          if (viewType === 'simplified' && (arrangement === 'class' || arrangement === 'subclass')) {
             // Format simplifié pour l'arrangement par classe
             csvContent = generateSimplifiedCSV(value.corrections);
           } else {
@@ -677,7 +693,7 @@ const ExportPDFComponentAllCorrections: React.FC<ExportPDFComponentAllCorrection
           Object.entries(value.items).forEach(([subKey, subValue]: [string, any]) => {
             fileName = `Notes_Toutes_Classes_${key.replace(/\s+/g, '_')}_${subKey.replace(/\s+/g, '_')}_${new Date().toISOString().slice(0, 10)}.csv`;
             
-            if (viewType === 'simplified' && arrangement === 'class') {
+            if (viewType === 'simplified' && (arrangement === 'class' || arrangement === 'subclass')) {
               // Format simplifié pour l'arrangement par classe
               csvContent = generateSimplifiedCSV(subValue.corrections);
             } else {
@@ -696,7 +712,8 @@ const ExportPDFComponentAllCorrections: React.FC<ExportPDFComponentAllCorrection
       
     } catch (error) {
       console.error('Erreur lors de la génération du fichier CSV:', error);
-      enqueueSnackbar('Erreur lors de la génération du fichier CSV', { variant: 'error' });
+      setError('Erreur lors de la génération du fichier CSV');
+      setErrorDetails(error);
     }
   };
 
@@ -860,7 +877,8 @@ const ExportPDFComponentAllCorrections: React.FC<ExportPDFComponentAllCorrection
       
     } catch (error) {
       console.error('Erreur lors de la génération du fichier Excel:', error);
-      enqueueSnackbar('Erreur lors de la génération du fichier Excel', { variant: 'error' });
+      setError('Erreur lors de la génération du fichier Excel');
+      setErrorDetails(error);
     }
   };
 
@@ -871,12 +889,13 @@ const ExportPDFComponentAllCorrections: React.FC<ExportPDFComponentAllCorrection
     viewType: ViewType, 
     arrangement: ArrangementType
   ) => {
-    if (viewType === 'simplified' && arrangement === 'class') {
+    if (viewType === 'simplified' && (arrangement === 'class' || arrangement === 'subclass')) {
       // Format simplifié pour l'arrangement par classe
       // Regrouper les étudiants (lignes) et les activités (colonnes)
       const studentMap: Record<string, Record<string, any>> = {};
       const activitySet = new Set<string>();
-      console.log('corrections', corrections);
+      const activityStatusMap: Record<string, string> = {}; // Pour stocker les statuts des activités
+      
       corrections.forEach(c => {
         const student = getStudentById(c.student_id);
         const activity = getActivityById(c.activity_id);
@@ -890,6 +909,11 @@ const ExportPDFComponentAllCorrections: React.FC<ExportPDFComponentAllCorrection
         
         if (!studentMap[studentKey]) {
           studentMap[studentKey] = {};
+        }
+        
+        // Stocker le statut de l'activité pour cet étudiant
+        if (c.status) {
+          activityStatusMap[`${studentKey}-${activityKey}`] = c.status;
         }
         
         // Utiliser les cellValues avec le format virgule
@@ -915,10 +939,45 @@ const ExportPDFComponentAllCorrections: React.FC<ExportPDFComponentAllCorrection
         const rowData: any = { student: studentName };
         
         activityArray.forEach(activity => {
-          rowData[activity] = grades[activity] !== undefined ? grades[activity] : '-';
+          // Déterminer la valeur à afficher en fonction du statut
+          const status = activityStatusMap[`${studentName}-${activity}`];
+          let displayValue;
+          
+          if (grades[activity] !== undefined) {
+            displayValue = grades[activity];
+          } else {
+            // Utiliser le statut de l'activité pour cet étudiant si disponible
+            switch (status) {
+              case 'NON_NOTE':
+                displayValue = 'NON NOTÉ';
+                break;
+              case 'ABSENT':
+                displayValue = 'ABSENT';
+                break;
+              case 'NON_RENDU':
+                displayValue = 'NON RENDU';
+                break;
+              case 'DEACTIVATED':
+                displayValue = 'DÉSACTIVÉ';
+                break;
+              default:
+                displayValue = 'NON ÉVALUÉ';
+            }
+          }
+          
+          rowData[activity] = displayValue;
         });
+
+        const row = worksheet.addRow(rowData);
         
-        worksheet.addRow(rowData);
+        // Appliquer des styles aux cellules de notes (commençant à l'index 1 car la première colonne est l'étudiant)
+        activityArray.forEach((activity, index) => {
+          const cellValue = rowData[activity];
+          if (cellValue) {
+            const cell = row.getCell(index + 2); // +2 car 1 est l'index de l'étudiant et les index Excel commencent à 1
+            applyExcelCellStyle(cell, cellValue);
+          }
+        });
       });
       
     } else {
@@ -945,7 +1004,7 @@ const ExportPDFComponentAllCorrections: React.FC<ExportPDFComponentAllCorrection
         // Utiliser la fonction utilitaire pour obtenir les valeurs à afficher avec le format virgule
         const cellValues = getCorrectionCellValues(c, activity, true);
         
-        worksheet.addRow({
+        const row = worksheet.addRow({
           student: student ? `${student.first_name} ${student.last_name}` : 'N/A',
           class: className,
           activity: activity?.name || `Activité ${c.activity_id}`,
@@ -957,6 +1016,12 @@ const ExportPDFComponentAllCorrections: React.FC<ExportPDFComponentAllCorrection
           max: 20,
           status: cellValues.statusDisplay
         });
+        
+        // Appliquer des styles aux cellules de notes
+        applyExcelCellStyle(row.getCell('expGrade'), cellValues.experimentalDisplay);
+        applyExcelCellStyle(row.getCell('theoGrade'), cellValues.theoreticalDisplay);
+        applyExcelCellStyle(row.getCell('total'), cellValues.totalGradeDisplay);
+        applyExcelCellStyle(row.getCell('status'), cellValues.statusDisplay);
       });
     }
     
@@ -985,6 +1050,56 @@ const ExportPDFComponentAllCorrections: React.FC<ExportPDFComponentAllCorrection
     worksheet.views = [
       { state: 'frozen', xSplit: 0, ySplit: 1, activeCell: 'A2' }
     ];
+  };
+
+  // Fonction d'aide pour convertir les styles de getCorrectionCellStyle vers les styles ExcelJS
+  const applyExcelCellStyle = (cell: any, cellValue: any) => {
+    if (!cell) return;
+    
+    // Obtenir le style recommandé pour cette valeur de cellule
+    const cellStyle = getCorrectionCellStyle(cellValue);
+    
+    // Convertir les couleurs hexadécimales en format ARGB pour ExcelJS
+    const hexToArgb = (hex: string) => {
+      // Ajouter l'alpha (FF pour opaque) devant la couleur hexadécimale
+      return `FF${hex.toUpperCase()}`;
+    };
+    
+    // Appliquer la couleur de texte
+    if (cellStyle.color !== '000000') {
+      cell.font = cell.font || {};
+      cell.font.color = { argb: hexToArgb(cellStyle.color) };
+    }
+    
+    // Appliquer la couleur d'arrière-plan
+    if (cellStyle.backgroundColor !== 'FFFFFF') {
+      cell.fill = {
+        type: 'pattern',
+        pattern: 'solid',
+        fgColor: { argb: hexToArgb(cellStyle.backgroundColor) }
+      };
+    }
+    
+    // Appliquer le style de police
+    cell.font = cell.font || {};
+    switch (cellStyle.fontStyle) {
+      case 'italic':
+        cell.font.italic = true;
+        break;
+      case 'bold':
+        cell.font.bold = true;
+        break;
+      case 'bolditalic':
+        cell.font.bold = true;
+        cell.font.italic = true;
+        break;
+    }
+    
+    // Centrer les cellules de notes
+    cell.alignment = {
+      horizontal: 'center',
+      vertical: 'middle'
+    };
   };
 
   // Fonction pour générer un PDF de QR codes pour toutes les corrections
@@ -1045,12 +1160,22 @@ const ExportPDFComponentAllCorrections: React.FC<ExportPDFComponentAllCorrection
       
     } catch (error) {
       console.error('Erreur lors de la génération du PDF:', error);
-      enqueueSnackbar('Erreur lors de la génération du PDF de QR codes', { variant: 'error' });
+      setError('Erreur lors de la génération du PDF de QR codes');
+      setErrorDetails(error);
     }
   };
 
   return (
     <>
+      {error && (
+        <ErrorDisplay 
+          error={error}
+          errorDetails={errorDetails}
+          withRefreshButton={true}
+          onRefresh={clearError}
+        />
+      )}
+      
       <Paper sx={{ p: 2, mb: 3 }} elevation={1}>
         <Typography variant="h5" gutterBottom>Export des données - Toutes les corrections</Typography>
         

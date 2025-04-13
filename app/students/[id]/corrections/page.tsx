@@ -23,6 +23,7 @@ import {
 } from '@mui/material';
 import GradientBackground from '@/components/ui/GradientBackground';
 import PatternBackground from '@/components/ui/PatternBackground';
+import ErrorDisplay from '@/components/ui/ErrorDisplay';
 import Link from 'next/link';
 import LoadingSpinner from '@/components/LoadingSpinner';
 import StudentEditDialog from '@/components/students/StudentEditDialog';
@@ -121,7 +122,8 @@ export default function StudentCorrectionsPage() {
   const [loadingSubgroups, setLoadingSubgroups] = useState(false);
   const [editError, setEditError] = useState<string | null>(null);
   const [classes, setClasses] = useState<any[]>([]);
-  
+  const [errorDetails, setErrorDetails] = useState<any>(null);
+
   useEffect(() => {
     const fetchData = async () => {
       if (!studentId) return;
@@ -133,7 +135,13 @@ export default function StudentCorrectionsPage() {
         // Récupérer les informations de l'étudiant
         const studentResponse = await fetch(`/api/students/${studentId}`);
         if (!studentResponse.ok) {
-          throw new Error('Étudiant non trouvé');
+          setError('Étudiant non trouvé');
+          setErrorDetails({
+            status: studentResponse.status,
+            statusText: studentResponse.statusText
+          });
+          setLoading(false);
+          return;
         }
         const studentData = await studentResponse.json();
         setStudent(studentData);
@@ -148,7 +156,13 @@ export default function StudentCorrectionsPage() {
         // Récupérer les corrections de l'étudiant
         const correctionsResponse = await fetch(`/api/students/${studentId}/corrections`);
         if (!correctionsResponse.ok) {
-          throw new Error('Erreur lors du chargement des corrections');
+          setError('Erreur lors du chargement des corrections');
+          setErrorDetails({
+            status: correctionsResponse.status,
+            statusText: correctionsResponse.statusText
+          });
+          setLoading(false);
+          return;
         }
         const correctionsData = await correctionsResponse.json();
         
@@ -545,17 +559,27 @@ Votre enseignant`;
   if (error || !student) {
     return (
       <Container maxWidth="lg" className="py-8">
-        <Alert severity="error" className="mb-6">
-          {error || "Étudiant non trouvé"}
-        </Alert>
-        <Button 
-          variant="outlined" 
-          component={Link} 
-          href="/students"
-          startIcon={<PersonIcon />}
-        >
-          Retour à la liste des étudiants
-        </Button>
+        <div className="container mx-auto px-4 py-2 flex justify-center">
+          <div className="w-full max-w-lg animate-slide-in">
+            <Paper className="p-6 overflow-hidden relative" elevation={3}>
+              <ErrorDisplay 
+                error={error || "Étudiant non trouvé"} 
+                onRefresh={() => window.location.reload()}
+                withRefreshButton={true}
+              />
+              <Box sx={{ mt: 3, display: 'flex', justifyContent: 'center' }}>
+                <Button 
+                  variant="contained" 
+                  component={Link} 
+                  href="/students"
+                  startIcon={<PersonIcon />}
+                >
+                  Retour à la liste des étudiants
+                </Button>
+              </Box>
+            </Paper>
+          </div>
+        </div>
       </Container>
     );
   }

@@ -51,6 +51,7 @@ export default function StudentsPage() {
   const [error, setError] = useState<string | null>(null);
   const [showTutorial, setShowTutorial] = useState(false);
   const [lastUpdate, setLastUpdate] = useState<number>(Date.now());
+  const [errorDetails, setErrorDetails] = useState<any>(null);
 
   // Fonction pour charger les données
   const fetchData = async () => {

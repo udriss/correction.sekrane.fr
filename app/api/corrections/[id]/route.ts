@@ -13,19 +13,19 @@ export async function GET(
     // Vérifier l'authentification
     const user = await getUser(request);
     if (!user) {
-      return NextResponse.json({ error: 'Non autorisé' }, { status: 401 });
+      return NextResponse.json({ error: 'AuthenticationRequired: Non autorisé' }, { status: 401 });
     }
     
     const idNumber = parseInt(id);
     
     if (isNaN(idNumber)) {
-      return NextResponse.json({ error: 'ID de correction invalide' }, { status: 400 });
+      return NextResponse.json({ error: 'InvalidCorrectionID: ID de correction invalide' }, { status: 400 });
     }
 
     // Récupérer la correction
     const correction = await getCorrectionById(idNumber);
     if (!correction) {
-      return NextResponse.json({ error: 'Correction non trouvée' }, { status: 404 });
+      return NextResponse.json({ error: 'CorrectionNotFound: Correction non trouvée' }, { status: 404 });
     }
 
     return await withConnection(async (connection) => {
@@ -112,8 +112,8 @@ export async function GET(
       });
     });
   } catch (error) {
-    console.error('Error fetching correction:', error);
-    return NextResponse.json({ error: 'Erreur lors de la récupération de la correction' }, { status: 500 });
+    console.error('CorrectionFetchError:', error);
+    return NextResponse.json({ error: 'CorrectionFetchError: Erreur lors de la récupération de la correction', details: String(error) }, { status: 500 });
   }
 }
 
@@ -128,7 +128,7 @@ export async function PUT(
     const idNumber = parseInt(correctionId);
     
     if (isNaN(idNumber)) {
-      return NextResponse.json({ error: 'Invalid correction ID' }, { status: 400 });
+      return NextResponse.json({ error: 'InvalidCorrectionID: ID de correction invalide' }, { status: 400 });
     }
 
     const body = await request.json();
@@ -303,7 +303,7 @@ export async function PUT(
       }
       
       if (updateFields.length === 0) {
-        return NextResponse.json({ error: 'Aucun champ valide à mettre à jour' }, { status: 400 });
+        return NextResponse.json({ error: 'NoValidData: Aucun champ valide à mettre à jour' }, { status: 400 });
       }
       
       // Ajouter l'ID à la fin des valeurs
@@ -315,7 +315,7 @@ export async function PUT(
       );
       
       if ((result as any).affectedRows === 0) {
-        return NextResponse.json({ error: 'Correction non trouvée ou non modifiée' }, { status: 404 });
+        return NextResponse.json({ error: 'CorrectionNotFound: Correction non trouvée ou non modifiée' }, { status: 404 });
       }
       
       // Récupérer la correction mise à jour pour la retourner
@@ -365,9 +365,9 @@ export async function PUT(
       return NextResponse.json(updatedCorrection);
     });
   } catch (error) {
-    console.error('Erreur lors de la mise à jour de la correction:', error);
+    console.error('CorrectionUpdateError:', error);
     return NextResponse.json(
-      { error: 'Erreur lors de la mise à jour de la correction', details: String(error) },
+      { error: 'CorrectionUpdateError: Erreur lors de la mise à jour de la correction', details: String(error) },
       { status: 500 }
     );
   }
@@ -383,6 +383,15 @@ export async function DELETE(
     const { id } = await params;
     const user = await getUser(request);
     
+    if (!user) {
+      return NextResponse.json({ error: 'AuthenticationRequired: Authentification requise' }, { status: 401 });
+    }
+    
+    const correctionId = parseInt(id);
+    if (isNaN(correctionId)) {
+      return NextResponse.json({ error: 'InvalidCorrectionID: ID de correction invalide' }, { status: 400 });
+    }
+    
     // Utiliser withConnection au lieu de pool.query directement
     return await withConnection(async (connection) => {
       // Récupérer d'abord la correction pour la retourner après suppression
@@ -396,7 +405,7 @@ export async function DELETE(
       );
       
       if (!Array.isArray(rows) || rows.length === 0) {
-        return new NextResponse(JSON.stringify({ error: 'Correction non trouvée' }), {
+        return new NextResponse(JSON.stringify({ error: 'CorrectionNotFound: Correction non trouvée' }), {
           status: 404,
           headers: {
             'Cache-Control': 'no-cache, no-store, must-revalidate',
@@ -436,7 +445,7 @@ export async function DELETE(
       });
     });
   } catch (error) {
-    console.error('Erreur lors de la suppression de la correction:', error);
+    console.error('CorrectionDeleteError:', error);
     
     // Log de l'erreur
     try {
@@ -452,7 +461,7 @@ export async function DELETE(
       console.error('Error creating log entry:', logError);
     }
     
-    return new NextResponse(JSON.stringify({ error: 'Erreur serveur' }), {
+    return new NextResponse(JSON.stringify({ error: 'CorrectionDeleteError: Erreur serveur lors de la suppression' }), {
       status: 500,
       headers: {
         'Cache-Control': 'no-cache, no-store, must-revalidate',

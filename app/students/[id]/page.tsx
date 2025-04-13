@@ -65,7 +65,9 @@ export default function StudentDetailPage() {
         const studentResponse = await fetch(`/api/students/${studentId}`);
         if (!studentResponse.ok) {
           const errorData = await studentResponse.json();
-          throw new Error(`Erreur lors du chargement des informations de l'étudiant : ${errorData.error}` || "Erreur lors du chargement des informations de l'étudiant.");
+          setError(`Erreur lors du chargement des informations de l'étudiant : ${errorData.error}` || "Erreur lors du chargement des informations de l'étudiant.");
+          setLoading(false);
+          return;
         }
         const studentData = await studentResponse.json();
         setStudent(studentData);

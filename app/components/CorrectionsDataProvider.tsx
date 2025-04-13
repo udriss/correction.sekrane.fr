@@ -70,7 +70,8 @@ interface ContextData {
   corrections: Correction[];
   filteredCorrections: Correction[];
   loading: boolean;
-  error: Error | null;
+  error: string | null;
+  errorDetails: any;
   metaData: MetaData;
   filters: FilterState;
   setFilters: React.Dispatch<React.SetStateAction<FilterState>>;
@@ -114,7 +115,8 @@ export const CorrectionsProvider: React.FC<CorrectionsProviderProps> = ({
   const [corrections, setCorrections] = useState<Correction[]>([]);
   const [filteredCorrections, setFilteredCorrections] = useState<Correction[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<Error | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [errorDetails, setErrorDetails] = useState<any>(null);
   
   // Meta-données
   const [metaData, setMetaData] = useState<MetaData>({
@@ -497,12 +499,27 @@ export const CorrectionsProvider: React.FC<CorrectionsProviderProps> = ({
   // Récupérer les données
   const fetchCorrections = async () => {
     setLoading(true);
+    setError(null);
+    setErrorDetails(null);
+    
     try {
       // Récupérer les corrections
       const response = await fetch('/api/corrections/all');
-      if (!response.ok) throw new Error('Erreur lors du chargement des corrections');
+      if (!response.ok) {
+        const errorText = await response.text();
+        setError('Erreur lors du chargement des corrections');
+        setErrorDetails({
+          status: response.status,
+          statusText: response.statusText,
+          responseText: errorText
+        });
+        setLoading(false);
+        return;
+      }
+      
       const data = await response.json();
       setCorrections(data);
+      
       // Extraire les métadonnées des corrections
       const classes = new Map();
       const students = new Map();
@@ -542,7 +559,7 @@ export const CorrectionsProvider: React.FC<CorrectionsProviderProps> = ({
       
     } catch (err) {
       console.error('Error:', err);
-      setError(err instanceof Error ? err : new Error('Erreur inconnue'));
+      setError(err instanceof Error ? err.message : 'Erreur inconnue');
     } finally {
       setLoading(false);
     }
@@ -560,7 +577,7 @@ export const CorrectionsProvider: React.FC<CorrectionsProviderProps> = ({
       await fetchCorrections();
       setError(null);
     } catch (err) {
-      setError(err as Error);
+      setError(err instanceof Error ? err.message : 'Une erreur inconnue est survenue');
       console.error('Error refreshing corrections:', err);
     } finally {
       setLoading(false);
@@ -573,6 +590,7 @@ export const CorrectionsProvider: React.FC<CorrectionsProviderProps> = ({
     filteredCorrections,
     loading,
     error,
+    errorDetails,
     metaData,
     filters,
     setFilters,

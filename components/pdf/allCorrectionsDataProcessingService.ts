@@ -78,7 +78,6 @@ const organizeAllCorrectionsData = ({
   // Maintenant, construisons le résultat en fonction de l'arrangement souhaité
   switch (arrangement) {
     case 'class':
-        console.log('arrangement class:', {studentsByClass});
       // Pour chaque classe, ajouter une entrée dans le résultat
       Object.entries(studentsByClass).forEach(([classIdStr, studentsInClass]) => {
         const classId = classIdStr === "null" ? null : Number(classIdStr);
@@ -161,23 +160,89 @@ const organizeAllCorrectionsData = ({
             });
           }
           else if (subArrangement === 'subclass') {
-            // Déterminer le groupe de l'étudiant
-            const subClass = student.sub_class;
-            const subClassName = subClass ? `Groupe ${subClass}` : 'Sans groupe';
+            // Récupérer d'abord tous les sous-groupes présents dans cette classe
+            const subClassesInClass = new Set<number | string | null>();
             
-            if (!result[classKey].items[subClassName]) {
-              result[classKey].items[subClassName] = {
-                info: { subClass },
-                corrections: []
-              };
-            }
+            // Ajouter un groupe "Sans groupe" par défaut
+            subClassesInClass.add(null);
             
-            // Ajouter toutes les corrections de cet étudiant dans ce groupe
-            studentCorrections.forEach(correction => {
-              // Filtrer par activité si nécessaire
-              if (filterActivity === 'all' || correction.activity_id === filterActivity) {
-                result[classKey].items[subClassName].corrections.push(correction);
+            // Collecter tous les sous-groupes des étudiants dans cette classe
+            studentsInClass.forEach(student => {
+              if (student.sub_class !== undefined && student.sub_class !== null) {
+                // Convertir explicitement en nombre si possible, sinon garder comme chaîne
+                subClassesInClass.add(student.sub_class);
               }
+            });
+            
+            // Pour chaque sous-groupe, traiter toutes les activités pertinentes
+            subClassesInClass.forEach(subClass => {
+              const subClassName = subClass ? `Groupe ${subClass}` : 'Sans groupe';
+              
+              // Créer l'entrée pour ce sous-groupe s'il n'existe pas
+              if (!result[classKey].items[subClassName]) {
+                result[classKey].items[subClassName] = {
+                  info: { subClass },
+                  corrections: []
+                };
+              }
+              
+              // Filtrer les étudiants qui appartiennent à ce sous-groupe
+              const studentsInSubClass = studentsInClass.filter(student => 
+                student.sub_class === subClass
+              );
+              
+              // Pour chaque activité pertinente (toutes ou filtrée)
+              const activities = filterActivity === 'all' 
+                ? uniqueActivities 
+                : uniqueActivities.filter(a => a.id === filterActivity);
+                
+              activities.forEach(activityInfo => {
+                // Pour chaque étudiant dans ce sous-groupe
+                studentsInSubClass.forEach(student => {
+                  // Récupérer les corrections de cet étudiant
+                  const studentCorrections = correctionsMap[student.id] 
+                    ? Object.values(correctionsMap[student.id]) 
+                    : [];
+                  
+                  // Chercher si l'étudiant a une correction pour cette activité
+                  const correction = studentCorrections.find(c => 
+                    c.activity_id === Number(activityInfo.id) && 
+                    (filterActivity === 'all' || c.activity_id === filterActivity)
+                  );
+                  
+                  if (correction) {
+                    // Ajouter la correction existante
+                    result[classKey].items[subClassName].corrections.push(correction);
+                  } else if (includeAllStudents) {
+                    // Créer un placeholder pour cette activité si l'étudiant n'a pas de correction
+                    const activity = getActivityById(Number(activityInfo.id));
+                    const emptyCorrection = createEmptyCorrection(
+                      student.id, 
+                      Number(activityInfo.id), 
+                      classId,
+                      `${student.last_name} ${student.first_name}`,
+                      activity?.name || `Activité ${activityInfo.id}`,
+                      className
+                    );
+                    result[classKey].items[subClassName].corrections.push(emptyCorrection);
+                  }
+                });
+                
+                // S'il n'y a aucun étudiant dans ce sous-groupe mais que nous voulons le traiter quand même
+                if (studentsInSubClass.length === 0 && includeAllStudents) {
+                  // Ajouter un placeholder vide pour cette activité dans ce sous-groupe
+                  const activity = getActivityById(Number(activityInfo.id));
+                  const emptyCorrection = createEmptyCorrection(
+                    -1, // ID étudiant fictif
+                    Number(activityInfo.id),
+                    classId,
+                    "Aucun étudiant",
+                    activity?.name || `Activité ${activityInfo.id}`,
+                    className
+                  );
+                  result[classKey].items[subClassName].corrections.push(emptyCorrection);
+                }
+              });
             });
           }
           else {
@@ -406,6 +471,332 @@ const organizeAllCorrectionsData = ({
               }
             });
           }
+        }
+      });
+      break;
+
+    case 'subclass':
+      // Pour l'arrangement par groupe (subclass)
+      // Étape 1: Regrouper les étudiants par sous-classe
+      const studentsBySubClass: Record<string, { students: Student[], classIds: Set<number | null> }> = {};
+      
+      // Parcourir tous les étudiants pour les regrouper par sous-classe
+      students.forEach(student => {
+        const subClass = student.sub_class !== undefined && student.sub_class !== null 
+          ? student.sub_class 
+          : 'null'; // Utiliser 'null' comme clé pour les étudiants sans groupe
+        const subClassKey = String(subClass);
+        
+        if (!studentsBySubClass[subClassKey]) {
+          studentsBySubClass[subClassKey] = {
+            students: [],
+            classIds: new Set<number | null>()
+          };
+        }
+        
+        studentsBySubClass[subClassKey].students.push(student);
+        
+        // Collecter les classes auxquelles cet étudiant appartient
+        if (student.allClasses && student.allClasses.length > 0) {
+          student.allClasses.forEach(classInfo => {
+            studentsBySubClass[subClassKey].classIds.add(classInfo.classId);
+          });
+        } else {
+          studentsBySubClass[subClassKey].classIds.add(null);
+        }
+      });
+      
+      // Étape 2: Pour chaque sous-classe, créer une entrée dans le résultat
+      Object.entries(studentsBySubClass).forEach(([subClassKey, data]) => {
+        const subClass = subClassKey === 'null' ? null : (isNaN(Number(subClassKey)) ? subClassKey : Number(subClassKey));
+        const groupName = subClass === null ? 'Sans groupe' : `Groupe ${subClass}`;
+        
+        if (!result[groupName]) {
+          result[groupName] = {
+            info: { 
+              subClass,
+              name: groupName
+            },
+            items: {}
+          };
+        }
+        
+        // Traiter selon le sous-arrangement choisi
+        if (subArrangement === 'student') {
+          // Sous-arrangement par étudiant
+          data.students.forEach(student => {
+            const studentKey = `${student.last_name} ${student.first_name}`;
+            
+            if (!result[groupName].items[studentKey]) {
+              result[groupName].items[studentKey] = {
+                info: { student },
+                corrections: []
+              };
+            }
+            
+            // Récupérer les corrections de cet étudiant
+            const studentCorrections = correctionsMap[student.id] 
+              ? Object.values(correctionsMap[student.id]) 
+              : [];
+            
+            // Ajouter les corrections qui correspondent au filtre d'activité
+            studentCorrections.forEach(correction => {
+              if (filterActivity === 'all' || correction.activity_id === filterActivity) {
+                result[groupName].items[studentKey].corrections.push(correction);
+              }
+            });
+            
+            // Si l'étudiant n'a pas de corrections et qu'on veut inclure tous les étudiants
+            if (includeAllStudents && (result[groupName].items[studentKey].corrections.length === 0)) {
+              // Déterminer les activités à traiter
+              const activitiesToProcess = filterActivity === 'all'
+                ? uniqueActivities
+                : uniqueActivities.filter(a => a.id === filterActivity);
+              
+              activitiesToProcess.forEach(activityInfo => {
+                const activityId = Number(activityInfo.id);
+                const activity = getActivityById(activityId);
+                
+                // Déterminer la classe pour le placeholder
+                let classId = null;
+                let className = 'Classe non attribuée';
+                
+                if (student.allClasses && student.allClasses.length > 0) {
+                  classId = student.allClasses[0].classId;
+                  className = student.allClasses[0].className || `Classe ${classId}`;
+                }
+                
+                // Créer un placeholder pour cette activité
+                const emptyCorrection = createEmptyCorrection(
+                  student.id,
+                  activityId,
+                  classId,
+                  `${student.last_name} ${student.first_name}`,
+                  activity?.name || `Activité ${activityId}`,
+                  className
+                );
+                
+                result[groupName].items[studentKey].corrections.push(emptyCorrection);
+              });
+            }
+          });
+        }
+        else if (subArrangement === 'activity') {
+          // Sous-arrangement par activité
+          // Déterminer les activités à traiter
+          const activitiesToProcess = filterActivity === 'all'
+            ? uniqueActivities
+            : uniqueActivities.filter(a => a.id === filterActivity);
+          
+          activitiesToProcess.forEach(activityInfo => {
+            const activityId = Number(activityInfo.id);
+            const activity = getActivityById(activityId);
+            const activityKey = activity?.name || `Activité ${activityId}`;
+            
+            if (!result[groupName].items[activityKey]) {
+              result[groupName].items[activityKey] = {
+                info: { activity },
+                corrections: []
+              };
+            }
+            
+            // Pour chaque étudiant dans ce groupe
+            data.students.forEach(student => {
+              // Récupérer les corrections de cet étudiant
+              const studentCorrections = correctionsMap[student.id] || {};
+              const correction = studentCorrections[activityId];
+              
+              if (correction) {
+                result[groupName].items[activityKey].corrections.push(correction);
+              } else if (includeAllStudents) {
+                // Créer un placeholder pour cet étudiant et cette activité
+                let classId = null;
+                let className = 'Classe non attribuée';
+                
+                if (student.allClasses && student.allClasses.length > 0) {
+                  classId = student.allClasses[0].classId;
+                  className = student.allClasses[0].className || `Classe ${classId}`;
+                }
+                
+                const emptyCorrection = createEmptyCorrection(
+                  student.id,
+                  activityId,
+                  classId,
+                  `${student.last_name} ${student.first_name}`,
+                  activity?.name || `Activité ${activityId}`,
+                  className
+                );
+                
+                result[groupName].items[activityKey].corrections.push(emptyCorrection);
+              }
+            });
+          });
+        }
+        else if (subArrangement === 'class') {
+          // Sous-arrangement par classe
+          // Pour chaque classe associée à ce groupe
+          data.classIds.forEach(classId => {
+            const className = classId !== null 
+              ? (classesMap.get(classId)?.name || `Classe ${classId}`) 
+              : 'Classe non attribuée';
+            
+            if (!result[groupName].items[className]) {
+              result[groupName].items[className] = {
+                info: { 
+                  className,
+                  classId
+                },
+                corrections: []
+              };
+            }
+            
+            // Filtrer les étudiants de ce groupe qui sont dans cette classe
+            const studentsInGroupAndClass = data.students.filter(student => {
+              if (classId === null) {
+                return !student.allClasses || student.allClasses.length === 0;
+              }
+              return student.allClasses && student.allClasses.some(c => c.classId === classId);
+            });
+            
+            // Pour chaque étudiant dans ce groupe et cette classe
+            studentsInGroupAndClass.forEach(student => {
+              // Récupérer les corrections de cet étudiant
+              const studentCorrections = correctionsMap[student.id] 
+                ? Object.values(correctionsMap[student.id]) 
+                : [];
+              
+              // Filtrer les corrections par activité et classe
+              studentCorrections.forEach(correction => {
+                if (correction.class_id === classId && 
+                    (filterActivity === 'all' || correction.activity_id === filterActivity)) {
+                  result[groupName].items[className].corrections.push(correction);
+                }
+              });
+              
+              // Si l'étudiant n'a pas de corrections et qu'on veut inclure tous les étudiants
+              if (includeAllStudents) {
+                // Déterminer les activités à traiter
+                const activitiesToProcess = filterActivity === 'all'
+                  ? uniqueActivities
+                  : uniqueActivities.filter(a => a.id === filterActivity);
+                
+                activitiesToProcess.forEach(activityInfo => {
+                  const activityId = Number(activityInfo.id);
+                  const activity = getActivityById(activityId);
+                  
+                  // Vérifier si l'étudiant a déjà une correction pour cette activité dans cette classe
+                  const hasCorrection = studentCorrections.some(c => 
+                    c.activity_id === activityId && c.class_id === classId
+                  );
+                  
+                  if (!hasCorrection) {
+                    // Créer un placeholder pour cette activité
+                    const emptyCorrection = createEmptyCorrection(
+                      student.id,
+                      activityId,
+                      classId,
+                      `${student.last_name} ${student.first_name}`,
+                      activity?.name || `Activité ${activityId}`,
+                      className
+                    );
+                    
+                    result[groupName].items[className].corrections.push(emptyCorrection);
+                  }
+                });
+              }
+            });
+          });
+        }
+        else {
+          // Pas de sous-arrangement
+          if (!result[groupName].corrections) {
+            result[groupName].corrections = [];
+          }
+          
+          // Pour chaque étudiant dans ce groupe
+          data.students.forEach(student => {
+            // Récupérer les corrections de cet étudiant
+            const studentCorrections = correctionsMap[student.id] 
+              ? Object.values(correctionsMap[student.id]) 
+              : [];
+            
+            // Ajouter les corrections qui correspondent au filtre d'activité
+            studentCorrections.forEach(correction => {
+              if (filterActivity === 'all' || correction.activity_id === filterActivity) {
+                // Enrichir la correction avec les informations d'activité et de classe
+                const activity = getActivityById(correction.activity_id);
+                const classId = correction.class_id;
+                const className = classId !== null 
+                  ? (classesMap.get(classId)?.name || `Classe ${classId}`) 
+                  : 'Classe non attribuée';
+                
+                // Créer une copie avec les informations nécessaires
+                const enrichedCorrection = {
+                  ...correction,
+                  student_name: `${student.last_name} ${student.first_name}`,
+                  class_name: className,
+                  activity_name: activity?.name || `Activité ${correction.activity_id}`
+                };
+                
+                result[groupName].corrections.push(enrichedCorrection);
+              }
+            });
+          });
+          
+          // Déterminer toutes les activités à traiter (filtrées ou toutes)
+          const activitiesToProcess = filterActivity === 'all'
+            ? uniqueActivities
+            : uniqueActivities.filter(a => a.id === filterActivity);
+          
+          // Pour chaque activité
+          activitiesToProcess.forEach(activityInfo => {
+            const activityId = Number(activityInfo.id);
+            const activity = getActivityById(activityId);
+            
+            // Vérifier si ce groupe a déjà une correction pour cette activité
+            const hasActivityCorrection = result[groupName].corrections.some(
+              (c: ProviderCorrection) => c.activity_id === activityId
+            );
+            
+            // Si le groupe n'a pas de correction pour cette activité, ajouter un placeholder pour chaque étudiant
+            if (!hasActivityCorrection) {
+              // Si le groupe a des étudiants, ajouter un placeholder pour chaque étudiant
+              if (data.students.length > 0) {
+                data.students.forEach(student => {
+                  let classId = null;
+                  let className = 'Classe non attribuée';
+                  
+                  if (student.allClasses && student.allClasses.length > 0) {
+                    classId = student.allClasses[0].classId;
+                    className = student.allClasses[0].className || `Classe ${classId}`;
+                  }
+                  
+                  const emptyCorrection = createEmptyCorrection(
+                    student.id,
+                    activityId,
+                    classId,
+                    `${student.last_name} ${student.first_name}`,
+                    activity?.name || `Activité ${activityId}`,
+                    className
+                  );
+                  
+                  result[groupName].corrections.push(emptyCorrection);
+                });
+              } else {
+                // Si le groupe n'a pas d'étudiants, ajouter un placeholder générique
+                const emptyCorrection = createEmptyCorrection(
+                  -1, // ID étudiant fictif
+                  activityId,
+                  null,
+                  "Aucun étudiant",
+                  activity?.name || `Activité ${activityId}`,
+                  'Classe non attribuée'
+                );
+                
+                result[groupName].corrections.push(emptyCorrection);
+              }
+            }
+          });
         }
       });
       break;
