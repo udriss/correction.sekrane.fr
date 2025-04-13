@@ -13,6 +13,10 @@ import {
 import Grid from '@mui/material/Grid';
 import { useSnackbar } from 'notistack';
 import { Correction, CorrectionWithShareCode } from '@/lib/types';
+import { Student as BaseStudent } from '@/lib/types';
+import { Correction as ProviderCorrection } from '@/app/components/CorrectionsDataProvider';
+import ExportPDFComponent from '@/components/pdf/ExportPDFComponent';
+import ExportPDFComponentAllCorrections from '@/components/pdf/ExportPDFComponentAllCorrections';
 
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import { LocalizationProvider, DatePicker } from '@mui/x-date-pickers';
@@ -82,6 +86,31 @@ export default function CorrectionsPage() {
 
 // Composant qui affiche le contenu
 function CorrectionsContent() {
+  // State pour la gestion des menus
+  const [sortAnchorEl, setSortAnchorEl] = useState<null | HTMLElement>(null);
+  const [filterAnchorEl, setFilterAnchorEl] = useState<null | HTMLElement>(null);
+  
+  // Add state for available sub-classes
+  const [availableSubClasses, setAvailableSubClasses] = useState<{id: string, name: string}[]>([]);
+  
+  // Add state for scroll tracking
+  const [stickyButtons, setStickyButtons] = useState(false);
+  
+  // États pour la pagination du tableau d'aperçu des corrections
+  const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(10);
+  
+  // États pour ExportPDFComponent
+  const [classData, setClassData] = useState<any>(null);
+  const [activities, setActivities] = useState<Activity[]>([]);
+  const [classStudents, setClassStudents] = useState<any[]>([]);
+  const [students, setStudents] = useState<ClassStudent[]>([]);
+  const [filterActivity, setFilterActivity] = useState<number | 'all'>('all');
+  const [filterSubClass, setFilterSubClass] = useState<string | 'all'>('all');
+  
+  // Add state for delete confirmation modal
+  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
+  
   const router = useRouter();
   // Fix the type error by directly using useSearchParams without React.use
   const searchParams = useSearchParams();
@@ -102,19 +131,56 @@ function CorrectionsContent() {
     applyFilter,
     removeFilter,
     clearAllFilters,
-    refreshCorrections // Add this new method from the context
+    refreshCorrections
   } = useCorrections();
   
-  // State pour la gestion des menus
-  const [sortAnchorEl, setSortAnchorEl] = useState<null | HTMLElement>(null);
-  const [filterAnchorEl, setFilterAnchorEl] = useState<null | HTMLElement>(null);
+  const { 
+    batchDeleteMode, 
+    setBatchDeleteMode, 
+    selectedCorrections, 
+    setSelectedCorrections,
+    deletingCorrections,
+    setDeletingCorrection
+  } = useBatchDelete();
   
-  // Add state for available sub-classes
-  const [availableSubClasses, setAvailableSubClasses] = useState<{id: string, name: string}[]>([]);
+  // Récupérer le tab initial depuis l'URL ou utiliser 0 par défaut
+  const initialTabValue = useMemo(() => {
+    const tabParam = searchParams.get('tab');
+    if (tabParam !== null) {
+      const tabIndex = parseInt(tabParam, 10);
+      // Vérifier que le tab est valide (entre 0 et 4)
+      if (!isNaN(tabIndex) && tabIndex >= 0 && tabIndex <= 4) {
+        return tabIndex;
+      }
+    }
+    return 0;
+  }, [searchParams]);
   
-  // Add state for scroll tracking
-  const [stickyButtons, setStickyButtons] = useState(false);
+  const [tabValue, setTabValue] = useState(initialTabValue);
   
+  // Handle tab change
+  const handleTabChange = (_: React.SyntheticEvent, newValue: number) => {
+    setTabValue(newValue);
+    
+    // Mettre à jour l'URL avec le nouveau tab
+    const params = new URLSearchParams(searchParams.toString());
+    params.set('tab', newValue.toString());
+    
+    // Utiliser router.replace pour éviter d'ajouter une entrée dans l'historique
+    router.replace(`/corrections?${params.toString()}`, { scroll: false });
+  };
+
+  // État pour suivre quel sous-onglet d'export est actif
+  const [exportTabValue, setExportTabValue] = useState<number>(0);
+  
+  // Fonction pour gérer le changement de sous-onglet d'export
+  const handleExportTabChange = (event: React.SyntheticEvent, newValue: number) => {
+    setExportTabValue(newValue);
+  };
+
+  
+
+
   // Track scroll position
   useEffect(() => {
     const handleScroll = () => {
@@ -211,7 +277,116 @@ function CorrectionsContent() {
     
     fetchSubClasses();
   }, [filters.classId]);
+
+  // Effet pour récupérer les données pour ExportPDFComponent si on est sur l'onglet 4
+  useEffect(() => {
+    if (tabValue === 4) {
+      const fetchExportData = async () => {
+        try {
+          // Récupérer toutes les corrections via l'API
+          const correctionsResponse = await fetch('/api/corrections/all');
+          if (!correctionsResponse.ok) {
+            throw new Error('Erreur lors du chargement des corrections');
+          }
+          
+          // Récupérer tous les étudiants
+          const allStudentsResponse = await fetch('/api/students');
+          if (!allStudentsResponse.ok) {
+            throw new Error('Erreur lors du chargement des étudiants');
+          }
+          
+          
+          const studentsData = await allStudentsResponse.json();
+          setStudents(studentsData);
+          
+
+          // Récupérer toutes les activités
+          const allActivitiesResponse = await fetch('/api/activities');
+          if (!allActivitiesResponse.ok) {
+            throw new Error('Erreur lors du chargement des activités');
+          }
+          
+          const activitiesData = await allActivitiesResponse.json();
+          setActivities(activitiesData);
+          
+          // Si un filtre de classe est en place (vérification que classId n'est pas une chaîne vide)
+          if (filters.classId && filters.classId.trim() !== '') {
+            const classId = parseInt(filters.classId);
+            
+            // Récupérer les données de la classe
+            const classResponse = await fetch(`/api/classes/${classId}`);
+            if (classResponse.ok) {
+              const classDataResult = await classResponse.json();
+              setClassData(classDataResult);
+              
+              // Récupérer les étudiants pour cette classe spécifique
+              const classStudentsResponse = await fetch(`/api/classes/${classId}/students`);
+              if (classStudentsResponse.ok) {
+                const classStudentsData = await classStudentsResponse.json();
+                setClassStudents(classStudentsData);
+              }
+            }
+          } else {
+            // Récupérer toutes les classes pour que l'utilisateur puisse en sélectionner une
+            const allClassesResponse = await fetch('/api/classes');
+            if (!allClassesResponse.ok) {
+              throw new Error('Erreur lors du chargement des classes');
+            }
+            
+            const allClassesData = await allClassesResponse.json();
+          }
+        } catch (error) {
+          console.error('Erreur lors de la récupération des données pour l\'export:', error);
+          enqueueSnackbar(`Erreur: ${error instanceof Error ? error.message : 'Problème de chargement des données'}`, { 
+            variant: 'error',
+            autoHideDuration: 5000
+          });
+        }
+      };
+      
+      fetchExportData();
+    }
+  }, [tabValue, filters.classId, enqueueSnackbar]);
+
+  // Calculer les données de sous-classes uniques pour ExportPDFComponent
+  const uniqueSubClasses = useMemo(() => {
+    if (!classData?.nbre_subclasses) return [];
+    return Array.from({ length: classData.nbre_subclasses }, (_, i) => ({
+      id: i + 1,
+      name: `Groupe ${i + 1}`
+    }));
+  }, [classData]);
   
+  // Calculer les activités uniques pour ExportPDFComponent
+  const uniqueActivities = useMemo(() => {
+    // Obtenir les IDs d'activité uniques des corrections
+    const uniqueIds = new Set(filteredCorrections.map(c => c.activity_id));
+    
+    // Créer un tableau d'activités uniques avec noms appropriés
+    const uniqueActivitiesArray = Array.from(uniqueIds).map(id => {
+      const activityData = activities.find(a => a.id === id);
+      return {
+        id,
+        name: activityData?.name || `Activité ${id}`
+      };
+    });
+    
+    return uniqueActivitiesArray;
+  }, [filteredCorrections, activities]);
+  
+    // Fonctions utilitaires pour ExportPDFComponent
+    const getActivityById = (activityId: number) => {
+      return activities.find(a => a.id === activityId);
+    };
+  
+  const getStudentById = (studentId: number | null): ClassStudent | undefined => {
+    if (!studentId) return undefined;
+    return students.find(s => s.id === studentId);
+  };
+  
+
+  
+
   // Menu handlers
   const handleSortClick = (event: React.MouseEvent<HTMLButtonElement>) => {
     setSortAnchorEl(event.currentTarget);
@@ -326,33 +501,10 @@ function CorrectionsContent() {
     router.push(`/corrections?${newParams.toString()}`);
   };
   
-  // Récupérer le tab initial depuis l'URL ou utiliser 0 par défaut
-  const initialTabValue = useMemo(() => {
-    const tabParam = searchParams.get('tab');
-    if (tabParam !== null) {
-      const tabIndex = parseInt(tabParam, 10);
-      // Vérifier que le tab est valide (entre 0 et 4)
-      if (!isNaN(tabIndex) && tabIndex >= 0 && tabIndex <= 4) {
-        return tabIndex;
-      }
-    }
-    return 0;
-  }, [searchParams]);
-  
-  const [tabValue, setTabValue] = useState(initialTabValue);
-  
-  // Handle tab change
-  const handleTabChange = (_: React.SyntheticEvent, newValue: number) => {
-    setTabValue(newValue);
-    
-    // Mettre à jour l'URL avec le nouveau tab
-    const params = new URLSearchParams(searchParams.toString());
-    params.set('tab', newValue.toString());
-    
-    // Utiliser router.replace pour éviter d'ajouter une entrée dans l'historique
-    router.replace(`/corrections?${params.toString()}`, { scroll: false });
-  };
-
+  // Extended interface for students with sub-class information
+  interface ClassStudent extends BaseStudent {
+    sub_class?: number;
+  }
   // Define the Activity type
   interface Activity {
     id: number;
@@ -370,17 +522,8 @@ function CorrectionsContent() {
     return 'error';
   };
 
-  const { 
-    batchDeleteMode, 
-    setBatchDeleteMode, 
-    selectedCorrections, 
-    setSelectedCorrections,
-    deletingCorrections,
-    setDeletingCorrection
-  } = useBatchDelete();
-  
-  // Add state for delete confirmation modal
-  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
+
+
   
   // Function to cancel batch delete mode
   const handleCancelBatchDelete = () => {
@@ -487,9 +630,6 @@ function CorrectionsContent() {
     }
   };
 
-  // États pour la pagination du tableau d'aperçu des corrections
-  const [page, setPage] = useState(0);
-  const [rowsPerPage, setRowsPerPage] = useState(10);
 
   // Gestion du changement de page
   const handleChangePage = (event: unknown, newPage: number) => {
@@ -535,6 +675,10 @@ function CorrectionsContent() {
       return 'Affiche toutes les corrections, y compris celles qui sont inactives';
     }
   };
+
+
+  
+
 
   return (
     <Container maxWidth="lg" sx={{ py: 4 }}>
@@ -1240,301 +1384,32 @@ function CorrectionsContent() {
       )}
       
       {tabValue === 4 && (
-        <Box sx={{ mt: 2 }}>
-          <Typography variant="h6" gutterBottom>
-            Export des QR codes de feedback
-          </Typography>
-          <Typography variant="body2" color="text.secondary" paragraph>
-            Générez un document PDF contenant les QR codes d'accès aux corrections pour chaque étudiant. Les étudiants peuvent scanner ces codes pour voir leurs résultats.
-          </Typography>
-          
-          <Paper variant="outlined" sx={{ p: 3, mt: 2 }}>
-            <Grid container spacing={3}>
-              <Grid size={{ xs: 12, md: 4 }}>
-                <FormControl fullWidth size="small">
-                  <InputLabel id="activity-select-label">Activité</InputLabel>
-                  <Select
-                    labelId="activity-select-label"
-                    value={filters.activityId}
-                    onChange={handleFilterChange as (event: SelectChangeEvent<string>) => void}
-                    name="activityId"
-                    label="Activité"
-                    startAdornment={
-                      <AssignmentIcon sx={{ ml: 1, mr: 0.5, color: 'secondary.main' }} />
-                    }
-                  >
-                    <MenuItem value="">Toutes les activités</MenuItem>
-                    {metaData.activities.map(a => (
-                      <MenuItem key={a.id} value={a.id.toString()}>{a.name}</MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
-                <Button 
-                  variant="text" 
-                  size="small" 
-                  onClick={() => handleApplyFilter('activityId')}
-                  disabled={!filters.activityId}
-                  sx={{ mt: 0.5 }}
-                >
-                  Appliquer
-                </Button>
-              </Grid>
-              
-              <Grid size={{ xs: 12, md: 4 }}>
-                <FormControl fullWidth size="small">
-                  <InputLabel id="class-select-label">Classe</InputLabel>
-                  <Select
-                    labelId="class-select-label"
-                    value={filters.classId}
-                    onChange={handleFilterChange as (event: SelectChangeEvent<string>) => void}
-                    name="classId"
-                    label="Classe"
-                    startAdornment={
-                      <SchoolIcon sx={{ ml: 1, mr: 0.5, color: 'primary.main' }} />
-                    }
-                  >
-                    <MenuItem value="">Toutes les classes</MenuItem>
-                    {metaData.classes.map(c => (
-                      <MenuItem key={c.id} value={c.id.toString()}>{c.name}</MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
-                <Button 
-                  variant="text" 
-                  size="small" 
-                  onClick={() => handleApplyFilter('classId')}
-                  disabled={!filters.classId}
-                  sx={{ mt: 0.5 }}
-                >
-                  Appliquer
-                </Button>
-              </Grid>
-              
-              <Grid size={{ xs: 12, md: 4 }}>
-                <FormControl fullWidth size="small" disabled={!filters.classId || availableSubClasses.length === 0}>
-                  <InputLabel id="subgroup-select-label">Sous-groupe</InputLabel>
-                  <Select
-                    labelId="subgroup-select-label"
-                    value={filters.subClassId}
-                    onChange={handleFilterChange as (event: SelectChangeEvent<string>) => void}
-                    name="subClassId"
-                    label="Sous-groupe"
-                    startAdornment={
-                      <GroupIcon sx={{ ml: 1, mr: 0.5, color: 'secondary.main' }} />
-                    }
-                  >
-                    <MenuItem value="">Tous les sous-groupes</MenuItem>
-                    {availableSubClasses.map(group => (
-                      <MenuItem key={group.id} value={group.id}>{group.name}</MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
-                <Button 
-                  variant="text" 
-                  size="small" 
-                  onClick={() => handleApplyFilter('subClassId')}
-                  disabled={!filters.subClassId || !filters.classId}
-                  sx={{ mt: 0.5 }}
-                >
-                  Appliquer
-                </Button>
-              </Grid>
-            </Grid>
-            
-            <Divider sx={{ my: 3 }} />
-            
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <Typography variant="body2">
-                {filteredCorrections.length} correction(s) sélectionnée(s)
-              </Typography>
-              <Button
-                variant="outlined"
-                color="success"
-                startIcon={<PictureAsPdfIcon />}
-                disabled={filteredCorrections.length === 0}
-                onClick={async () => {
+        <Box>
+          <Paper sx={{ p: 2, mb: 3 }}>
+            <Typography variant="h5" gutterBottom>
+              Options d'export PDF
+            </Typography>
+              < ExportPDFComponentAllCorrections
+                corrections={filteredCorrections}
+                activities={activities}
+                students={students}
+                filterActivity={filterActivity}
+                setFilterActivity={setFilterActivity}
+                uniqueActivities={uniqueActivities}
+                getActivityById={getActivityById}
+                getStudentById={getStudentById}
+                getAllClasses={async () => {
                   try {
-                    // Vérifier et créer des codes de partage pour toutes les corrections qui en ont besoin
-                    const correctionsWithoutShareCodes = filteredCorrections.filter(c => 
-                      // Vérifier si la propriété shareCode n'existe pas ou est nulle
-                      !('shareCode' in c) || !(c as any).shareCode
-                    );
-                    
-                    if (correctionsWithoutShareCodes.length > 0) {
-                      // Récupérer uniquement les IDs des corrections sans codes de partage
-                      const correctionIds = correctionsWithoutShareCodes.map(c => c.id!);
-                      
-                      // Créer des codes de partage par lots
-                      const response = await fetch('/api/share/batch', {
-                        method: 'POST',
-                        headers: {
-                          'Content-Type': 'application/json',
-                        },
-                        body: JSON.stringify({ correctionIds }),
-                      });
-                      
-                      if (!response.ok) {
-                        throw new Error('Erreur lors de la création des codes de partage');
-                      }
-                    }
-                    
-                    // Générer le PDF de codes QR
-                    const groupName = filters.subClassId ? 
-                      availableSubClasses.find(g => g.id === filters.subClassId)?.name || 'Groupe' : 
-                      filters.classId ? 
-                        metaData.classes.find(c => c.id.toString() === filters.classId)?.name || 'Classe' : 
-                        'Toutes les corrections';
-                    
-                    const activityName = filters.activityId ? 
-                      metaData.activities.find(a => a.id.toString() === filters.activityId)?.name || 'Activité' : 
-                      'Toutes les activités';
-
-                    const pdfFileName = await generateQRCodePDF({
-                      corrections: filteredCorrections,
-                      group: {
-                        name: groupName,
-                        activity_name: activityName
-                      },
-                      generateShareCode: async (correctionId) => {
-                        const response = await fetch(`/api/corrections/${correctionId}/share`, {
-                          method: 'POST',
-                        });
-                        const data = await response.json();
-                        return { isNew: true, code: data.code };
-                      },
-                      getExistingShareCode: async (correctionId) => {
-                        const response = await fetch(`/api/corrections/${correctionId}/share`);
-                        const data = await response.json();
-                        return { exists: data.exists, code: data.code };
-                      },
-                      students: metaData.students.map(student => ({
-                        id: parseInt(student.id.toString()),
-                        first_name: student.name.split(' ')[0] || '',
-                        last_name: student.name.split(' ').slice(1).join(' ') || ''
-                      })),
-                      activities: metaData.activities.map(activity => ({
-                        id: parseInt(activity.id.toString()),
-                        name: activity.name
-                      }))
-                    });
-                    
-                    if (pdfFileName) {
-                      enqueueSnackbar(`PDF généré avec succès : ${pdfFileName}`, { variant: 'success', autoHideDuration: 5000 });
-                    } else {
-                      throw new Error('Erreur lors de la génération du PDF');
-                    }
+                    const response = await fetch('/api/classes');
+                    if (!response.ok) throw new Error('Erreur lors du chargement des classes');
+                    return await response.json();
                   } catch (error) {
                     console.error('Erreur:', error);
-                    enqueueSnackbar(`Erreur lors de l'export PDF: ${(error as Error).message}`, { variant: 'error', autoHideDuration: 5000 });
+                    enqueueSnackbar('Erreur lors du chargement des classes', { variant: 'error' });
+                    return [];
                   }
                 }}
-              >
-                Générer PDF
-              </Button>
-            </Box>
-            
-            {filteredCorrections.length > 0 && (
-              <Box sx={{ mt: 3 }}>
-                <Typography variant="subtitle2" gutterBottom>
-                  Aperçu des corrections sélectionnées:
-                </Typography>
-                <TableContainer component={Paper} sx={{ maxHeight: 400, overflow: 'auto' }}>
-                  <Table stickyHeader size="small">
-                    <TableHead>
-                      <TableRow>
-                        <TableCell>Étudiant</TableCell>
-                        <TableCell>Activité</TableCell>
-                        <TableCell>Classe</TableCell>
-                        <TableCell align="center">Note</TableCell>
-                        <TableCell align="center">Lien de partage</TableCell>
-                      </TableRow>
-                    </TableHead>
-                    <TableBody>
-                      {filteredCorrections
-                        .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
-                        .map((correction) => {
-                        const student = metaData.students.find(s => s.id === correction.student_id);
-                        const activity = metaData.activities.find(a => a.id === correction.activity_id);
-                        const classInfo = metaData.classes.find(c => c.id === correction.class_id);
-                        const isActive = correction.active !== 0; // Considère la correction comme active par défaut (0 = inactive, 1 = active)
-                        
-                        return (
-                          <TableRow 
-                            key={correction.id} 
-                            hover
-                            sx={{ 
-                              '&:last-child td, &:last-child th': { border: 0 },
-                              bgcolor: !isActive ? alpha('#f5f5f5', 0.4) : 'inherit'
-                            }}
-                          >
-                            <TableCell>{student?.name || `ID: ${correction.student_id}`}</TableCell>
-                            <TableCell>{activity?.name || `ID: ${correction.activity_id}`}</TableCell>
-                            <TableCell>{classInfo?.name || `ID: ${correction.class_id}`}</TableCell>
-                            <TableCell align="center">
-                              {isActive ? (
-                                <Chip 
-                                  label={`${correction.final_grade !== undefined ? correction.final_grade : correction.grade}/20`} 
-                                  size="small"
-                                  color={getGradeColor(
-                                    correction.final_grade !== undefined && correction.final_grade !== null 
-                                      ? Number(correction.final_grade) 
-                                      : correction.grade !== undefined && correction.grade !== null 
-                                        ? Number(correction.grade) 
-                                        : 0
-                                  )}
-                                  variant="outlined"
-                                />
-                              ) : (
-                                <Chip 
-                                  label="Correction inactive" 
-                                  size="small"
-                                  color="warning"
-                                  sx={{ 
-                                    bgcolor: theme => alpha(theme.palette.warning.dark, 0.1),
-                                    color: theme => theme.palette.warning.dark,
-                                    borderColor: theme => theme.palette.warning.dark,
-                                  }}
-                                />
-                              )}
-                            </TableCell>
-                            <TableCell align="center">
-                              {((correction as unknown) as CorrectionWithShareCode).shareCode ? (
-                                <Chip
-                                  size="small"
-                                  icon={<QrCodeIcon />}
-                                  label="Prêt"
-                                  color="success"
-                                  variant="outlined"
-                                />
-                              ) : (
-                                <Chip
-                                  size="small"
-                                  icon={<QrCodeIcon />}
-                                  label="Manquant"
-                                  color="warning"
-                                  variant="outlined"
-                                />
-                              )}
-                            </TableCell>
-                          </TableRow>
-                        );
-                      })}
-                    </TableBody>
-                  </Table>
-                </TableContainer>
-                <TablePagination
-                  rowsPerPageOptions={[5, 10, 25, 50]}
-                  component="div"
-                  count={filteredCorrections.length}
-                  rowsPerPage={rowsPerPage}
-                  page={page}
-                  onPageChange={handleChangePage}
-                  onRowsPerPageChange={handleChangeRowsPerPage}
-                  labelRowsPerPage="Lignes par page:"
-                  labelDisplayedRows={({ from, to, count }) => `${from}-${to} sur ${count}`}
-                />
-              </Box>
-            )}
+              />
           </Paper>
         </Box>
       )}

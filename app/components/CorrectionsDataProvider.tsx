@@ -503,7 +503,6 @@ export const CorrectionsProvider: React.FC<CorrectionsProviderProps> = ({
       if (!response.ok) throw new Error('Erreur lors du chargement des corrections');
       const data = await response.json();
       setCorrections(data);
-
       // Extraire les métadonnées des corrections
       const classes = new Map();
       const students = new Map();

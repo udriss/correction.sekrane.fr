@@ -16,6 +16,7 @@ interface GradeDisplayChipProps extends Omit<ChipProps, 'label'> {
   studentName?: string; // Nom de l'étudiant à afficher
   studentGroup?: string; // Groupe de l'étudiant
   showStudentInfo?: boolean; // Afficher ou non les informations de l'étudiant
+  status?: string; // Ajout du statut de la correction
 }
 
 /**
@@ -34,6 +35,7 @@ const GradeDisplayChip: React.FC<GradeDisplayChipProps> = ({
   studentName,
   studentGroup,
   showStudentInfo = false,
+  status,
   ...props
 }) => {
   const theme = useTheme();
@@ -42,6 +44,19 @@ const GradeDisplayChip: React.FC<GradeDisplayChipProps> = ({
   const formatNumber = (num: number | null): string => {
     if (num === null) return 'N/A';
     return Number.isInteger(num) ? num.toString() : num.toFixed(1);
+  };
+
+  // Obtenir le libellé à afficher pour les corrections inactives en fonction du statut
+  const getInactiveLabel = (): string => {
+    if (!status) return 'Non rendu / ABS';
+    
+    switch (status) {
+      case 'NON_NOTE': return 'NON NOTÉ';
+      case 'ABSENT': return 'ABSENT';
+      case 'NON_RENDU': return 'NON RENDU';
+      case 'DEACTIVATED': return 'DÉSACTIVÉ';
+      default: return 'Non rendu / ABS';
+    }
   };
 
   // Déterminer la couleur en fonction de la note
@@ -149,7 +164,7 @@ const GradeDisplayChip: React.FC<GradeDisplayChipProps> = ({
               ...(colorProps.sx?.color ? { color: colorProps.sx.color } : {}),
             }}
           >
-            {inactive ? 'Non rendu / ABS' : label}
+            {inactive ? getInactiveLabel() : label}
           </Typography>
           <Typography variant="body2" color="text.secondary" noWrap title={studentName}>
             {studentName}
@@ -174,7 +189,7 @@ const GradeDisplayChip: React.FC<GradeDisplayChipProps> = ({
           ...(colorProps.sx?.color ? { color: colorProps.sx.color } : {})
         }}
       >
-        {inactive ? 'Non rendu / ABS' : label}
+        {inactive ? getInactiveLabel() : label}
       </span>
     );
   }
@@ -184,7 +199,7 @@ const GradeDisplayChip: React.FC<GradeDisplayChipProps> = ({
     return (
       <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'start', gap: 0.5 }}>
         <Chip
-          label={inactive ? 'Non rendu / ABS' : label}
+          label={inactive ? getInactiveLabel() : label}
           size={size}
           variant={variant}
           {...colorProps}
@@ -208,7 +223,7 @@ const GradeDisplayChip: React.FC<GradeDisplayChipProps> = ({
   // Sinon on retourne le Chip normal sans les informations de l'étudiant
   return (
     <Chip
-      label={inactive ? 'Non rendu / ABS' : label}
+      label={inactive ? getInactiveLabel() : label}
       size={size}
       variant={variant}
       {...colorProps}

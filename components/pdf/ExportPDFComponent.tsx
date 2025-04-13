@@ -26,7 +26,8 @@ import {
   FormLabel,
   Tabs,
   Tab,
-  Grid
+  Grid,
+  TablePagination
 } from '@mui/material';
 import { useSnackbar } from 'notistack';
 import QrCodeIcon from '@mui/icons-material/QrCode';
@@ -81,6 +82,20 @@ const ExportPDFComponent: React.FC<ExportPDFComponentProps> = ({
   const [subArrangement, setSubArrangement] = useState<SubArrangementType>('activity');
   const [activeTab, setActiveTab] = useState<number>(0);
   const { enqueueSnackbar } = useSnackbar();
+
+  // États pour la pagination
+  const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(10);
+
+  // Gestionnaires d'événements pour la pagination
+  const handleChangePage = (event: unknown, newPage: number) => {
+    setPage(newPage);
+  };
+
+  const handleChangeRowsPerPage = (event: React.ChangeEvent<HTMLInputElement>) => {
+    setRowsPerPage(parseInt(event.target.value, 10));
+    setPage(0);
+  };
 
   // Filtrer les corrections en fonction des critères sélectionnés
   const filteredCorrections = React.useMemo(() => {
@@ -199,7 +214,7 @@ const ExportPDFComponent: React.FC<ExportPDFComponentProps> = ({
                 </TableRow>
               </TableHead>
               <TableBody>
-                {filteredCorrections.slice(0, 10).map(correction => {
+                {filteredCorrections.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage).map(correction => {
                   const activity = getActivityById(correction.activity_id);
                   const student = getStudentById(correction.student_id);
                   return (
@@ -215,14 +230,25 @@ const ExportPDFComponent: React.FC<ExportPDFComponentProps> = ({
                       <TableCell align="center">
                         <Chip 
                         
-                          label={correction.active === 0 ?
-                            <Typography variant="overline" color="text.secondary">Non rendu / ABS</Typography> 
+                        label={correction.status !== 'ACTIVE' ?
+                            <Typography variant="overline" color="text.secondary">
+                              {(() => {
+                                if (!correction.status) return 'Non rendu / ABS';
+                                switch (correction.status) {
+                                  case 'NON_NOTE': return 'NON NOTÉ';
+                                  case 'ABSENT': return 'ABSENT';
+                                  case 'NON_RENDU': return 'NON RENDU';
+                                  case 'DEACTIVATED': return 'DÉSACTIVÉ';
+                                  default: return 'Non rendu / ABS';
+                                }
+                              })()}
+                            </Typography> 
                             : 
                              `${correction.grade} / 20`}
                             // Get card status color based on grade
                           size="small"
-                          variant={correction.active === 0 ? "outlined" : "filled"}
-                          sx={correction.active === 0 ? { 
+                          variant={correction.status !== 'ACTIVE' ? "outlined" : "filled"}
+                          sx={correction.status !== 'ACTIVE' ? { 
                             letterSpacing: '0.5px', 
                             opacity: 0.7,
                             textAlign: 'center',
@@ -242,17 +268,17 @@ const ExportPDFComponent: React.FC<ExportPDFComponentProps> = ({
                     </TableRow>
                   );
                 })}
-                {filteredCorrections.length > 10 && (
-                  <TableRow>
-                    <TableCell colSpan={5} align="center">
-                      <Typography variant="body2" color="text.secondary">
-                        ... et {filteredCorrections.length - 10} autres corrections
-                      </Typography>
-                    </TableCell>
-                  </TableRow>
-                )}
               </TableBody>
             </Table>
+            <TablePagination
+              rowsPerPageOptions={[5, 10, 25]}
+              component="div"
+              count={filteredCorrections.length}
+              rowsPerPage={rowsPerPage}
+              page={page}
+              onPageChange={handleChangePage}
+              onRowsPerPageChange={handleChangeRowsPerPage}
+            />
           </TableContainer>
         ) : (
           <Alert severity="info">

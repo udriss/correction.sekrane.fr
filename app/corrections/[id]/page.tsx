@@ -17,6 +17,7 @@ import {
   Tooltip, Card, Tab, Tabs, Link, Button
 } from '@mui/material';
 
+
 // Import our new hooks
 import { useFragments } from '@/lib/hooks/useFragments';
 import { useCorrections } from '@/lib/hooks/useCorrections';
@@ -31,10 +32,8 @@ import GradingSection from '@/components/corrections/GradingSection';
 import StatusMessages from '@/components/corrections/StatusMessages';
 import LoadingErrorStates from '@/components/corrections/LoadingErrorStates';
 import EmailFeedback from '@/components/corrections/EmailFeedback';
-import H1Title from '@/components/ui/H1Title';
 import GradientBackground from '@/components/ui/GradientBackground';
 import PatternBackground from '@/components/ui/PatternBackground';
-import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import DescriptionIcon from '@mui/icons-material/Description';
 import AssignmentIcon from '@mui/icons-material/Assignment';
@@ -129,13 +128,7 @@ export default function CorrectionDetail({ params }: { params: Promise<{ id: str
   const [experimentalPoints, setExperimentalPoints] = useState<number>(0);
   const [theoreticalPoints, setTheoreticalPoints] = useState<number>(0);
 
-  // Gestion du changement d'onglet
-  const handleTabChange = (_: React.SyntheticEvent, newValue: number) => {
-    // Only set valid tab values
-    if (newValue === 0 || newValue === 1) {
-      setTabValue(newValue);
-    }
-  };
+
 
   // Toggle drawer open/closed
   const toggleDrawer = () => {

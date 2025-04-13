@@ -37,8 +37,21 @@ export interface ExportPDFComponentProps {
   getStudentById: (studentId: number | null) => Student | undefined;
 }
 
+// Types pour les props du composant d'export PDF pour toutes les corrections
+export interface ExportPDFComponentAllCorrectionsProps {
+  corrections: ProviderCorrection[];
+  activities: any[];
+  students: Student[];
+  filterActivity: number | 'all';
+  setFilterActivity: (value: number | 'all') => void;
+  uniqueActivities: { id: number | string; name: string }[];
+  getActivityById: (activityId: number) => any;
+  getStudentById: (studentId: number | null) => Student | undefined;
+  getAllClasses?: () => Promise<any[]>; // Fonction optionnelle pour récupérer toutes les classes si nécessaire
+}
+
 // Utilitaires de formatage
-export const formatGrade = (grade: number | null): string => {
+export const formatGrade = (grade: number | null, useComma: boolean = false): string => {
   if (grade === null || grade === undefined) return '-';
   
   // Vérifier que grade est bien un nombre
@@ -51,7 +64,10 @@ export const formatGrade = (grade: number | null): string => {
   }
   
   // Sinon, afficher avec maximum 1 décimale
-  return numGrade.toFixed(1).replace(/\.0$/, '');
+  const formattedWithDot = numGrade.toFixed(1).replace(/\.0$/, '');
+  
+  // Remplacer le point par une virgule si demandé
+  return useComma ? formattedWithDot.replace('.', ',') : formattedWithDot;
 };
 
 // Fonction pour déterminer si une correction est active en fonction de son statut
@@ -65,9 +81,10 @@ export const isCorrectionActive = (correction: any): boolean => {
 };
 
 // Fonction pour obtenir les valeurs à afficher dans une cellule en fonction du statut de la correction
-export const getCorrectionCellValues = (correction: any, activity: any): any => {
+export const getCorrectionCellValues = (correction: any, activity: any, useCommaFormat: boolean = false): any => {
   // Déterminer le statut
   if (correction.status) {
+    console.log('Statut de la correction:', correction.status);
     switch (correction.status) {
       case 'NON_NOTE':
         return {
@@ -124,24 +141,24 @@ export const getCorrectionCellValues = (correction: any, activity: any): any => 
   
   // Formater les points expérimentaux
   const experimentalDisplay = isActive 
-    ? `${formatGrade(expPoints)}/${activity?.experimental_points || '?'}`
+    ? `${formatGrade(expPoints, useCommaFormat)}/${activity?.experimental_points || '?'}`
     : 'DÉSACTIVÉ';
   
   // Formater les points théoriques
   const theoreticalDisplay = isActive
-    ? `${formatGrade(theoPoints)}/${activity?.theoretical_points || '?'}`
+    ? `${formatGrade(theoPoints, useCommaFormat)}/${activity?.theoretical_points || '?'}`
     : 'DÉSACTIVÉ';
   
   // Formater la note totale
   const totalGradeDisplay = isActive
-    ? `${formatGrade(grade)}/20`
+    ? `${formatGrade(grade, useCommaFormat)}`
     : 'DÉSACTIVÉ';
   
   return {
     experimentalDisplay,
     theoreticalDisplay,
     totalGradeDisplay,
-    grade
+    grade: useCommaFormat && !isNaN(grade) ? formatGrade(grade, true) : grade // Stocker la note brute ou formatée avec virgule
   };
 };
 
@@ -237,19 +254,20 @@ export const getCorrectionCellStyle = (cellValue: any): {
 
 // Fonction pour convertir un statut en texte lisible
 export const getStatusLabel = (correction: ProviderCorrection): string => {
-  if ((correction as any).placeholder || correction.status === 'NON_NOTE') {
+  if ((correction as any).placeholder) {
     return "NON NOTÉ";
   } else if (correction.status) {
     switch (correction.status) {
-      case 'ACTIVE': return `${formatGrade(correction.grade || 0)}/20`;
+      case 'ACTIVE': return `${formatGrade(correction.grade || 0)}`;
+      case 'NON_NOTE': return 'NON NOTÉ';
       case 'ABSENT': return 'ABSENT';
       case 'NON_RENDU': return 'NON RENDU';
       case 'DEACTIVATED': return 'DÉSACTIVÉ';
-      default: return `${formatGrade(correction.grade || 0)}/20`;
+      default: return `${formatGrade(correction.grade || 0)}`;
     }
   } else {
     // Compatibilité avec l'ancien système utilisant le champ active
-    return correction.active === 0 ? 'DÉSACTIVÉ' : `${formatGrade(correction.grade || 0)}/20`;
+    return correction.active === 0 ? 'DÉSACTIVÉ' : `${formatGrade(correction.grade || 0)}`;
   }
 };
 
@@ -264,4 +282,36 @@ export const escapeCSV = (value: any): string => {
     return `"${stringValue.replace(/"/g, '""')}"`;
   }
   return stringValue;
+};
+
+// Fonction pour créer un objet placeholder représentant un étudiant sans correction
+export const createEmptyCorrection = (
+  studentId: number, 
+  activityId: number, 
+  classId: number | null,
+  studentName: string = 'Non défini',
+  activityName: string = 'Non défini',
+  className: string = classId ? `Classe ${classId}` : 'Classe non attribuée'
+): any => {
+  return {
+    id: -1, // ID négatif pour signifier qu'il s'agit d'un placeholder
+    student_id: studentId,
+    activity_id: activityId,
+    class_id: classId,
+    // Propriétés supplémentaires requises par le type Correction
+    student_name: studentName,
+    activity_name: activityName,
+    class_name: className,
+    submission_date: new Date().toISOString(),
+    // Valeurs par défaut pour les autres propriétés
+    experimental_points_earned: 0,
+    theoretical_points_earned: 0,
+    grade: 0,
+    active: 1, // Actif par défaut
+    status: 'NON_NOTE',
+    comment: '',
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+    placeholder: true // Propriété spéciale pour identifier un placeholder
+  };
 };

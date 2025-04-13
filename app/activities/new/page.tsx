@@ -356,10 +356,8 @@ export default function NewActivity() {
                         <TextField
                           fullWidth
                           type="number"
-                          inputProps={{
-                            min: "0",
-                            max: "20",
-                            step: "0.5"
+                          slotProps={{
+                            input: { inputProps: { min: 0, max: 20, step: 0.5 } }
                           }}
                           value={theoreticalPoints}
                           onChange={(e) => handlePointsChange(e, setTheoreticalPoints, false)}

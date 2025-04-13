@@ -58,6 +58,7 @@ import FragmentsList from '@/components/FragmentsList';
 import CorrectionsList from '@/components/CorrectionsList';
 import ActivityDetails from '@/components/ActivityDetails';
 import GradientBackground from '@/components/ui/GradientBackground';
+import ErrorDisplay from '@/components/ui/ErrorDisplay';
 // Import the Fragment type from FragmentEditModal
 import { Fragment as EditModalFragment } from '@/components/FragmentEditModal';
 // Import QR Code Generator utility
@@ -516,6 +517,11 @@ export default function ActivityDetail({ params }: { params: Promise<{ id: strin
     setTheoreticalPoints(activity?.theoretical_points !== undefined ? activity.theoretical_points : 15);
   };
   
+  // Fonction pour réinitialiser les erreurs
+  const clearError = () => {
+    setError('');
+  };
+
   const handleSubmit = async () => {
     if (!name.trim()) {
       setError('Le nom de l\'activité est requis');
@@ -1170,8 +1176,19 @@ export default function ActivityDetail({ params }: { params: Promise<{ id: strin
       const student = getStudentById(c.student_id);
       
       // Marquer explicitement les notes inactives
-      const isActive = c.active !== 0 && c.active !== null;
-      const totalGrade = isActive ? `${c.grade || 0} / 20` : "Non rendu / ABS";
+      const isActive = c.status === 'ACTIVE';
+      const getInactiveLabel = () => {
+        if (!c.status) return 'Non rendu / ABS';
+        
+        switch (c.status) {
+          case 'NON_NOTE': return 'NON NOTÉ';
+          case 'ABSENT': return 'ABSENT';
+          case 'NON_RENDU': return 'NON RENDU';
+          case 'DEACTIVATED': return 'DÉSACTIVÉ';
+          default: return 'Non rendu / ABS';
+        }
+      };
+      const totalGrade = isActive ? `${c.grade || 0} / 20` : getInactiveLabel();
       const expGrade = isActive ? `${c.experimental_points_earned || 0} / ${activityData?.experimental_points || 0}` : "-";
       const theoGrade = isActive ? `${c.theoretical_points_earned || 0} / ${activityData?.theoretical_points || 0}` : "-";
       
@@ -1287,42 +1304,12 @@ export default function ActivityDetail({ params }: { params: Promise<{ id: strin
       <div className="container mx-auto px-4 py-8 flex justify-center">
         <div className="w-full max-w-lg animate-slide-in">
           <Paper className="p-6 overflow-hidden relative" elevation={3}>
-            <div className="flex items-start gap-4">
-              <div className="text-red-500 animate-once">
-                <ErrorOutlineIcon fontSize="large" />
-              </div>
-              <div className="flex-1">
-                <Typography variant="h6" className="text-red-600 font-semibold mb-2">
-                {error}
-                </Typography>
-                <div className="flex justify-around items-center mt-4">
-                  <Button 
-                  variant="outlined" 
-                  color="success" 
-                  size="small" 
-                  className="mt-4"
-                  startIcon={<RefreshIcon />}
-                  onClick={() => window.location.reload()}
-                  >
-                  Recharger
-                  </Button>
-                    <Button 
-                    variant="outlined" 
-                    size="small"
-                    color="primary"
-                    className="mt-4"
-                    component={Link}
-                    href="/activities"
-                    startIcon={<ArrowBackIcon sx={{color: "primary"}}/>}
-                    >
-                    Retour aux activités
-                    </Button>
-                </div>
-              </div>
-            </div>
-            <div className="absolute -bottom-1 left-0 w-full h-1">
-              <div className="bg-red-500 h-full w-full animate-shrink"></div>
-            </div>
+            {/* Utilisation du composant ErrorDisplay */}
+            <ErrorDisplay 
+              error={error} 
+              onRefresh={clearError}
+              withRefreshButton={true}
+            />
           </Paper>
         </div>
       </div>

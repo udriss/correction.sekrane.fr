@@ -1,96 +1,233 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Typography, 
   Box, 
-  Grid, 
-  FormControlLabel, 
-  Checkbox 
+  FormControl, 
+  InputLabel, 
+  Select, 
+  MenuItem, 
+  Divider, 
+  Card, 
+  CardContent,
+  Alert,
+  TableContainer,
+  Table,
+  TableHead,
+  TableBody,
+  TableRow,
+  TableCell,
+  Chip,
+  Paper,
+  Tabs,
+  Tab,
+  Grid,
+  FormControlLabel,
+  Checkbox,
+  Button,
+  TablePagination
 } from '@mui/material';
 import { useSnackbar } from 'notistack';
-import FiltersSection from './FiltersSection';
+import QrCodeIcon from '@mui/icons-material/QrCode';
+import TableChartIcon from '@mui/icons-material/TableChart';
+import GroupIcon from '@mui/icons-material/Group';
+import SchoolIcon from '@mui/icons-material/School';
+import MenuBookIcon from '@mui/icons-material/MenuBook';
+import { Student } from '@/lib/types';
+import { Correction as ProviderCorrection } from '@/app/components/CorrectionsDataProvider';
 import ArrangementOptions from './ArrangementOptions';
 import ExportFormatOptions from './ExportFormatOptions';
 import { 
-  ExportPDFComponentProps, 
+  ExportPDFComponentAllCorrectionsProps, 
   ArrangementType, 
   SubArrangementType, 
   ExportFormat, 
   ViewType,
   formatGrade,
-  isCorrectionActive,
+  getCorrectionCellValues,
+  getCorrectionCellStyle,
   getStatusLabel,
   escapeCSV
 } from './types';
-import { dataProcessingService } from './dataProcessingService';
-import { getCorrectionCellValues, getCorrectionCellStyle, CellStyle } from '@/components/pdf/types';
+import { allCorrectionsDataProcessingService } from './allCorrectionsDataProcessingService';
 
-interface NotesTabProps {
-  classData: ExportPDFComponentProps['classData'];
-  filteredCorrections: ExportPDFComponentProps['corrections'];
-  filterActivity: ExportPDFComponentProps['filterActivity'];
-  setFilterActivity: ExportPDFComponentProps['setFilterActivity'];
-  filterSubClass: ExportPDFComponentProps['filterSubClass'];
-  setFilterSubClass: ExportPDFComponentProps['setFilterSubClass'];
-  uniqueSubClasses: ExportPDFComponentProps['uniqueSubClasses'];
-  uniqueActivities: ExportPDFComponentProps['uniqueActivities'];
-  students: ExportPDFComponentProps['students'];
-  activities: ExportPDFComponentProps['activities'];
-  getActivityById: ExportPDFComponentProps['getActivityById'];
-  getStudentById: ExportPDFComponentProps['getStudentById'];
-}
-
-const NotesTab: React.FC<NotesTabProps> = ({
-  classData,
-  filteredCorrections,
+// Composant pour exporter toutes les corrections sans nécessiter une classe spécifique
+const ExportPDFComponentAllCorrections: React.FC<ExportPDFComponentAllCorrectionsProps> = ({
+  corrections,
+  activities,
+  students,
   filterActivity,
   setFilterActivity,
-  filterSubClass,
-  setFilterSubClass,
-  uniqueSubClasses,
   uniqueActivities,
-  students,
-  activities,
   getActivityById,
-  getStudentById
+  getStudentById,
+  getAllClasses
 }) => {
-  const [arrangement, setArrangement] = useState<ArrangementType>('student');
-  const [subArrangement, setSubArrangement] = useState<SubArrangementType>('activity');
+
+  // États pour les options d'export
+  const [arrangement, setArrangement] = useState<ArrangementType>('class');
+  const [subArrangement, setSubArrangement] = useState<SubArrangementType>('student');
   const [exportFormat, setExportFormat] = useState<ExportFormat>('pdf');
   const [viewType, setViewType] = useState<ViewType>('detailed');
+  const [activeTab, setActiveTab] = useState<number>(0);
   const [includeAllStudents, setIncludeAllStudents] = useState<boolean>(false);
+  const [allStudents, setAllStudents] = useState<Student[]>([]);
+  const [classesMap, setClassesMap] = useState<Map<number | null, any>>(new Map());
+  const [loading, setLoading] = useState<boolean>(false);
+  
   const { enqueueSnackbar } = useSnackbar();
+
+  // État pour la pagination
+  const [page, setPage] = useState<number>(0);
+  const [rowsPerPage, setRowsPerPage] = useState<number>(10);
+
+  // Gérer le changement de page
+  const handleChangePage = (event: unknown, newPage: number) => {
+    setPage(newPage);
+  };
+
+  // Gérer le changement du nombre d'éléments par page
+  const handleChangeRowsPerPage = (event: React.ChangeEvent<HTMLInputElement>) => {
+    setRowsPerPage(parseInt(event.target.value, 10));
+    setPage(0);
+  };
+
+  // Filtrer les corrections en fonction de l'activité sélectionnée
+  const filteredCorrections = React.useMemo(() => {
+    let result = [...corrections];
+    // Filtrer par activité
+    if (filterActivity !== 'all') {
+      result = result.filter(c => c.activity_id === filterActivity);
+    }
+    
+    return result;
+  }, [corrections, filterActivity]);
+  console.log('filteredCorrections', filteredCorrections);
+
+  // Effet pour charger les classes au chargement du composant
+  useEffect(() => {
+    const loadClasses = async () => {
+      if (getAllClasses) {
+        setLoading(true);
+        try {
+          const classes = await getAllClasses();
+          const newClassesMap = new Map();
+          classes.forEach(cls => {
+            newClassesMap.set(cls.id, cls);
+          });
+          setClassesMap(newClassesMap);
+        } catch (error) {
+          console.error('Erreur lors du chargement des classes:', error);
+          enqueueSnackbar('Erreur lors du chargement des classes', { variant: 'error' });
+        } finally {
+          setLoading(false);
+        }
+      } else {
+        // Si getAllClasses n'est pas fourni, essayer de charger les classes via l'API
+        setLoading(true);
+        try {
+          const response = await fetch('/api/classes');
+          if (response.ok) {
+            const classes = await response.json();
+            const newClassesMap = new Map();
+            classes.forEach((cls: any) => {
+              newClassesMap.set(cls.id, cls);
+            });
+            setClassesMap(newClassesMap);
+          } else {
+            throw new Error('Erreur lors du chargement des classes');
+          }
+        } catch (error) {
+          console.error('Erreur lors du chargement des classes:', error);
+          enqueueSnackbar('Erreur lors du chargement des classes', { variant: 'error' });
+        } finally {
+          setLoading(false);
+        }
+      }
+    };
+
+    loadClasses();
+  }, [getAllClasses, enqueueSnackbar]);
+
+  // Effet pour charger tous les étudiants lorsque includeAllStudents change
+  useEffect(() => {
+    const loadAllStudents = async () => {
+      if (includeAllStudents) {
+        setLoading(true);
+        try {
+          const allStudentsResponse = await fetch('/api/students');
+          if (!allStudentsResponse.ok) {
+            throw new Error('Erreur lors du chargement des étudiants');
+          }
+          const allStudentsData = await allStudentsResponse.json();
+          setAllStudents(allStudentsData);
+        } catch (error) {
+          console.error('Erreur lors du chargement des étudiants:', error);
+          enqueueSnackbar('Erreur lors du chargement de tous les étudiants', { variant: 'error' });
+        } finally {
+          setLoading(false);
+        }
+      }
+    };
+
+    loadAllStudents();
+  }, [includeAllStudents, enqueueSnackbar]);
 
   // Fonction pour obtenir les sous-arrangements disponibles
   const getAvailableSubArrangements = (): SubArrangementType[] => {
     switch (arrangement) {
       case 'student':
-        return ['activity', 'class', 'subclass', 'none'];
+        return ['activity', 'class', 'none'];
       case 'class':
         return ['student', 'activity', 'subclass', 'none'];
-      case 'subclass':
-        return ['student', 'activity', 'class', 'none'];
       case 'activity':
-        return ['student', 'class', 'subclass', 'none'];
+        return ['student', 'class', 'none'];
       default:
         return ['none'];
     }
   };
 
+  // Mettre à jour le sous-arrangement lorsque l'arrangement principal change
+  React.useEffect(() => {
+    const availableSubArrangements = getAvailableSubArrangements();
+    if (!availableSubArrangements.includes(subArrangement)) {
+      setSubArrangement(availableSubArrangements[0]);
+    }
+  }, [arrangement, subArrangement]);
+
+  // Fonction pour gérer le changement d'onglet
+  const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
+    setActiveTab(newValue);
+  };
+
   // Fonction pour gérer l'export en fonction du format sélectionné
   const handleExport = () => {
-    const groupedData = dataProcessingService.organizeData({
+    // Utiliser la liste complète d'étudiants si includeAllStudents est activé
+    const studentsToUse = includeAllStudents && allStudents.length > 0
+      ? allStudents
+      : students;
+    
+    const groupedData = allCorrectionsDataProcessingService.organizeAllCorrectionsData({
       corrections: filteredCorrections,
       includeAllStudents,
       filterActivity,
-      filterSubClass,
       arrangement,
       subArrangement,
-      classData,
-      uniqueSubClasses,
       uniqueActivities,
-      students,
+      students: studentsToUse,
       getActivityById,
-      getStudentById
+      getStudentById: (studentId) => {
+        if (studentId === null) return undefined;
+        
+        // Si nous utilisons tous les étudiants, chercher d'abord dans allStudents
+        if (includeAllStudents && allStudents.length > 0) {
+          const student = allStudents.find(s => s.id === studentId);
+          if (student) return student;
+        }
+        
+        // Sinon, utiliser la fonction getStudentById fournie par les props
+        return getStudentById(studentId);
+      },
+      classesMap
     });
 
     if (exportFormat === 'pdf') {
@@ -119,10 +256,7 @@ const NotesTab: React.FC<NotesTabProps> = ({
       doc.setFont('times', 'normal');
       
       // Données pour l'en-tête
-      const title = `Récapitulatif des notes - ${classData.name}`;
-      const subtitle = filterSubClass !== 'all' 
-        ? `Groupe: ${uniqueSubClasses.find(g => g.id.toString() === filterSubClass)?.name}`
-        : 'Tous les groupes';
+      const title = `Récapitulatif des notes - Toutes les corrections`;
       const activityTitle = filterActivity !== 'all'
         ? `Activité: ${uniqueActivities.find(a => a.id === filterActivity)?.name}`
         : 'Toutes les activités';
@@ -160,8 +294,6 @@ const NotesTab: React.FC<NotesTabProps> = ({
       const lineHeight = 7;
       
       // Colonne de gauche
-      doc.text(subtitle, leftX, currentY);
-      currentY += lineHeight;
       doc.text(activityTitle, leftX, currentY);
       
       // Colonne de droite
@@ -214,7 +346,7 @@ const NotesTab: React.FC<NotesTabProps> = ({
       }
       
       // Sauvegarder le PDF
-      const fileName = `Notes_${classData.name.replace(/\s+/g, '_')}_${new Date().toISOString().slice(0, 10)}.pdf`;
+      const fileName = `Notes_Toutes_Classes_${new Date().toISOString().slice(0, 10)}.pdf`;
       doc.save(fileName);
       
       // Afficher message de succès
@@ -298,6 +430,9 @@ const NotesTab: React.FC<NotesTabProps> = ({
       // Utiliser getCorrectionCellValues pour obtenir les valeurs formatées
       const cellValues = getCorrectionCellValues(c, activity);
       
+      // Obtenir le nom de la classe à partir de classesMap
+      const className = classesMap.get(c.class_id)?.name || `Classe ${c.class_id}`;
+      
       // Déterminer les valeurs à afficher
       let totalGradeDisplay, expGradeDisplay, theoGradeDisplay;
       
@@ -321,6 +456,7 @@ const NotesTab: React.FC<NotesTabProps> = ({
       
       return [
         student ? `${student.first_name} ${student.last_name}` : 'N/A',
+        className,
         activity?.name || `Activité ${c.activity_id}`,
         expGradeDisplay,
         theoGradeDisplay,
@@ -330,6 +466,7 @@ const NotesTab: React.FC<NotesTabProps> = ({
     
     const headers = [
       'Étudiant',
+      'Classe',
       'Activité',
       'Note Exp.',
       'Note Théo.',
@@ -347,10 +484,11 @@ const NotesTab: React.FC<NotesTabProps> = ({
       headStyles: { fillColor: [66, 135, 245] },
       columnStyles: {
         0: { cellWidth: 'auto' }, // Largeur augmentée pour la colonne des étudiants
-        1: { cellWidth: 'auto' },
+        1: { cellWidth: 'auto' }, // Largeur pour la colonne des classes
         2: { cellWidth: 'auto' },
         3: { cellWidth: 'auto' },
-        4: { cellWidth: 'auto' }
+        4: { cellWidth: 'auto' },
+        5: { cellWidth: 'auto' }
       },
       margin: { left: 10, right: 10 }, // Marges réduites pour donner plus d'espace au tableau
       didParseCell: function(data: any) {
@@ -361,7 +499,7 @@ const NotesTab: React.FC<NotesTabProps> = ({
         }
         
         // Appliquer des styles spéciaux en utilisant getCorrectionCellStyle
-        if (data.column.index >= 2 && data.column.index <= 4) {
+        if (data.column.index >= 3 && data.column.index <= 5) {
           const cellValue = data.cell.raw;
           const cellStyle = getCorrectionCellStyle(cellValue);
           
@@ -521,7 +659,7 @@ const NotesTab: React.FC<NotesTabProps> = ({
         
         // Si pas de sous-arrangement, exporter un fichier unique
         if (value.corrections) {
-          fileName = `Notes_${classData.name.replace(/\s+/g, '_')}_${key.replace(/\s+/g, '_')}_${new Date().toISOString().slice(0, 10)}.csv`;
+          fileName = `Notes_Toutes_Classes_${key.replace(/\s+/g, '_')}_${new Date().toISOString().slice(0, 10)}.csv`;
           
           if (viewType === 'simplified' && arrangement === 'class') {
             // Format simplifié pour l'arrangement par classe
@@ -537,7 +675,7 @@ const NotesTab: React.FC<NotesTabProps> = ({
         // Sinon exporter un fichier pour chaque sous-groupe
         else if (value.items) {
           Object.entries(value.items).forEach(([subKey, subValue]: [string, any]) => {
-            fileName = `Notes_${classData.name.replace(/\s+/g, '_')}_${key.replace(/\s+/g, '_')}_${subKey.replace(/\s+/g, '_')}_${new Date().toISOString().slice(0, 10)}.csv`;
+            fileName = `Notes_Toutes_Classes_${key.replace(/\s+/g, '_')}_${subKey.replace(/\s+/g, '_')}_${new Date().toISOString().slice(0, 10)}.csv`;
             
             if (viewType === 'simplified' && arrangement === 'class') {
               // Format simplifié pour l'arrangement par classe
@@ -565,22 +703,28 @@ const NotesTab: React.FC<NotesTabProps> = ({
   // Fonction pour générer le contenu CSV détaillé
   const generateDetailedCSV = (corrections: any[]): string => {
     // En-tête du CSV
-    const headers = ['Étudiant', 'Activité', 'Note Exp.', 'Max Exp.', 'Note Théo.', 'Max Théo.', 'Total', 'Max'];
+    const headers = ['Étudiant', 'Classe', 'Activité', 'Note Exp.', 'Max Exp.', 'Note Théo.', 'Max Théo.', 'Total', 'Max'];
     let content = headers.join(',') + '\n';
     
     // Ajouter les données
     corrections.forEach(c => {
       const activity = getActivityById(c.activity_id);
       const student = getStudentById(c.student_id);
+      const className = classesMap.get(c.class_id)?.name || `Classe ${c.class_id}`;
       
+      // Utiliser les cellValues avec le format virgule pour l'export CSV
+      const cellValues = getCorrectionCellValues(c, activity, true);
+      
+      // Formater les valeurs pour l'export
       const row = [
         escapeCSV(student ? `${student.first_name} ${student.last_name}` : 'N/A'),
+        escapeCSV(className),
         escapeCSV(activity?.name || `Activité ${c.activity_id}`),
-        escapeCSV(c.experimental_points_earned || 0),
+        escapeCSV(typeof cellValues.experimentalDisplay === 'string' ? cellValues.experimentalDisplay : formatGrade(c.experimental_points_earned || 0, true)),
         escapeCSV(activity?.experimental_points || 0),
-        escapeCSV(c.theoretical_points_earned || 0),
+        escapeCSV(typeof cellValues.theoreticalDisplay === 'string' ? cellValues.theoreticalDisplay : formatGrade(c.theoretical_points_earned || 0, true)),
         escapeCSV(activity?.theoretical_points || 0),
-        escapeCSV(c.grade || 0),
+        escapeCSV(typeof cellValues.totalGradeDisplay === 'string' ? cellValues.totalGradeDisplay : formatGrade(c.grade || 0, true)),
         escapeCSV(20)
       ];
       
@@ -700,7 +844,7 @@ const NotesTab: React.FC<NotesTabProps> = ({
       const url = URL.createObjectURL(blob);
       
       // Créer un lien de téléchargement et déclencher le téléchargement
-      const fileName = `Notes_${classData.name.replace(/\s+/g, '_')}_${new Date().toISOString().slice(0, 10)}.xlsx`;
+      const fileName = `Notes_Toutes_Classes_${new Date().toISOString().slice(0, 10)}.xlsx`;
       const a = document.createElement('a');
       a.href = url;
       a.download = fileName;
@@ -748,8 +892,9 @@ const NotesTab: React.FC<NotesTabProps> = ({
           studentMap[studentKey] = {};
         }
         
-        // Utiliser les nouveaux statuts
-        studentMap[studentKey][activityKey] = getStatusLabel(c);
+        // Utiliser les cellValues avec le format virgule
+        const cellValues = getCorrectionCellValues(c, activity, true);
+        studentMap[studentKey][activityKey] = cellValues.totalGradeDisplay;
       });
       
       // Convertir les activités en tableau pour les colonnes
@@ -780,6 +925,7 @@ const NotesTab: React.FC<NotesTabProps> = ({
       // Format détaillé standard
       worksheet.columns = [
         { header: 'Étudiant', key: 'student', width: 30 },
+        { header: 'Classe', key: 'class', width: 20 },
         { header: 'Activité', key: 'activity', width: 30 },
         { header: 'Note Exp.', key: 'expGrade', width: 15 },
         { header: 'Max Exp.', key: 'expMax', width: 15 },
@@ -794,16 +940,18 @@ const NotesTab: React.FC<NotesTabProps> = ({
       corrections.forEach(c => {
         const activity = getActivityById(c.activity_id);
         const student = getStudentById(c.student_id);
+        const className = classesMap.get(c.class_id)?.name || `Classe ${c.class_id}`;
         
-        // Utiliser la fonction utilitaire pour obtenir les valeurs à afficher
-        const cellValues = getCorrectionCellValues(c, activity);
+        // Utiliser la fonction utilitaire pour obtenir les valeurs à afficher avec le format virgule
+        const cellValues = getCorrectionCellValues(c, activity, true);
         
         worksheet.addRow({
           student: student ? `${student.first_name} ${student.last_name}` : 'N/A',
+          class: className,
           activity: activity?.name || `Activité ${c.activity_id}`,
-          expGrade: cellValues.expGradeDisplay,
+          expGrade: cellValues.experimentalDisplay,
           expMax: activity?.experimental_points || 0,
-          theoGrade: cellValues.theoGradeDisplay,
+          theoGrade: cellValues.theoreticalDisplay,
           theoMax: activity?.theoretical_points || 0,
           total: cellValues.totalGradeDisplay,
           max: 20,
@@ -833,161 +981,302 @@ const NotesTab: React.FC<NotesTabProps> = ({
       });
     });
     
-    // Mise en forme conditionnelle pour les notes
-    if (!viewType.includes('simplified')) {
-      worksheet.eachRow((row: any, rowNumber: number) => {
-        if (rowNumber > 1) { // Ignorer l'en-tête
-          const statusCell = row.getCell('status');
-          const totalCell = row.getCell('total');
-          const expGradeCell = row.getCell('expGrade');
-          const theoGradeCell = row.getCell('theoGrade');
-          
-          // Récupérer les styles en fonction du statut ou de la note
-          const statusStyle = getCorrectionCellStyle(statusCell.value);
-          
-          // Appliquer le style à la cellule de statut
-          statusCell.font = { 
-            color: { argb: statusStyle.color }, 
-            bold: statusStyle.fontStyle.includes('bold'),
-            italic: statusStyle.fontStyle.includes('italic')
-          };
-          statusCell.fill = {
-            type: 'pattern',
-            pattern: 'solid',
-            fgColor: { argb: statusStyle.backgroundColor }
-          };
-          
-          // Si c'est un statut spécial, appliquer le même style aux cellules de notes
-          if (typeof statusCell.value === 'string' && 
-              ['NON NOTÉ', 'ABSENT', 'NON RENDU', 'DÉSACTIVÉ'].includes(statusCell.value)) {
-            
-            // Appliquer le style aux cellules de notes
-            [totalCell, expGradeCell, theoGradeCell].forEach(cell => {
-              cell.font = { 
-                color: { argb: statusStyle.color }, 
-                bold: statusStyle.fontStyle.includes('bold'),
-                italic: statusStyle.fontStyle.includes('italic')
-              };
-              cell.fill = {
-                type: 'pattern',
-                pattern: 'solid',
-                fgColor: { argb: statusStyle.backgroundColor }
-              };
-            });
-          } 
-          // Sinon, si c'est une note numérique, appliquer un style basé sur la valeur
-          else if (typeof totalCell.value === 'number') {
-            const totalStyle = getCorrectionCellStyle(totalCell.value);
-            
-            totalCell.fill = {
-              type: 'pattern',
-              pattern: 'solid',
-              fgColor: { argb: totalStyle.backgroundColor }
-            };
-            
-            if (totalStyle.fontStyle === 'bold') {
-              totalCell.font = { bold: true };
-            }
-          }
-        }
-      });
-    } else {
-      // Mise en forme conditionnelle pour les notes dans le cas simplifié
-      worksheet.eachRow((row: any, rowNumber: number) => {
-        if (rowNumber > 1) { // Ignorer l'en-tête
-          // Dans le format simplifié, chaque colonne à partir de l'index 1 représente une activité
-          for (let colIndex = 1; colIndex < row.cellCount; colIndex++) {
-            const cell = row.getCell(colIndex + 1); // +1 car l'index des cellules commence à 1
-            const cellValue = cell.value;
-            
-            // Appliquer le style en fonction de la valeur de la cellule
-            const cellStyle = getCorrectionCellStyle(cellValue);
-            
-            // Appliquer les styles à la cellule
-            cell.font = { 
-              color: { argb: cellStyle.color }, 
-              bold: cellStyle.fontStyle.includes('bold'),
-              italic: cellStyle.fontStyle.includes('italic')
-            };
-            
-            cell.fill = {
-              type: 'pattern',
-              pattern: 'solid',
-              fgColor: { argb: cellStyle.backgroundColor }
-            };
-          }
-        }
-      });
-    }
-    
     // Geler la première ligne
     worksheet.views = [
       { state: 'frozen', xSplit: 0, ySplit: 1, activeCell: 'A2' }
     ];
   };
 
-  return (
-    <Box>
-      <Typography variant="body2">
-        Exportez les notes des étudiants sous différents formats et organisations.
-      </Typography>
+  // Fonction pour générer un PDF de QR codes pour toutes les corrections
+  const generateQRCodePDF = async () => {
+    try {
+      enqueueSnackbar('Génération du PDF de QR codes en cours...', { variant: 'info' });
       
-      <Box sx={{ mt: 3 }}>
-        <Typography variant="h6" gutterBottom>Options d'export</Typography>
+      // Récupérer d'abord les codes de partage pour les corrections qui n'en ont pas
+      const correctionsWithoutQR = filteredCorrections.filter(c => 
+        !('shareCode' in c) || !(c as any).shareCode
+      );
+    
+      if (correctionsWithoutQR.length > 0) {
+        // Créer des codes de partage en lot
+        const correctionIds = correctionsWithoutQR.map(c => c.id);
+        await fetch('/api/share/batch', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ correctionIds }),
+        });
+      }
+      
+      // Générer le titre du PDF
+      const activityName = filterActivity !== 'all'
+        ? uniqueActivities.find(a => a.id === filterActivity)?.name
+        : 'Toutes les activités';
+      
+      // Importer la fonction de génération de QR codes
+      const { generateQRCodePDF } = await import('@/utils/qrGeneratorPDF');
+      
+      // Générer le PDF
+      await generateQRCodePDF({
+        corrections: filteredCorrections,
+        group: {
+          name: 'Toutes les classes',
+          activity_name: activityName || 'Activité'
+        },
+        generateShareCode: async (correctionId) => {
+          const response = await fetch(`/api/corrections/${correctionId}/share`, {
+            method: 'POST',
+          });
+          const data = await response.json();
+          return { isNew: true, code: data.code };
+        },
+        getExistingShareCode: async (correctionId) => {
+          const response = await fetch(`/api/corrections/${correctionId}/share`);
+          const data = await response.json();
+          return { exists: data.exists, code: data.code };
+        },
+        students,
+        activities
+      });
+      
+      // Afficher message de succès
+      enqueueSnackbar('PDF des QR codes généré avec succès', { variant: 'success' });
+      
+    } catch (error) {
+      console.error('Erreur lors de la génération du PDF:', error);
+      enqueueSnackbar('Erreur lors de la génération du PDF de QR codes', { variant: 'error' });
+    }
+  };
+
+  return (
+    <>
+      <Paper sx={{ p: 2, mb: 3 }} elevation={1}>
+        <Typography variant="h5" gutterBottom>Export des données - Toutes les corrections</Typography>
         
-        <FiltersSection
-          filterActivity={filterActivity}
-          setFilterActivity={setFilterActivity}
-          filterSubClass={filterSubClass}
-          setFilterSubClass={setFilterSubClass}
-          uniqueSubClasses={uniqueSubClasses.map(subClass => ({
-            ...subClass,
-            id: typeof subClass.id === 'string' ? Number(subClass.id) : subClass.id
-          }))}
-          uniqueActivities={uniqueActivities.map(activity => ({
-            ...activity,
-            id: typeof activity.id === 'string' ? Number(activity.id) : activity.id
-          }))}
-          classData={classData}
-        />
+        <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 2 }}>
+          <Tabs value={activeTab} onChange={handleTabChange} aria-label="export options tabs">
+            <Tab label="QR Codes" icon={<QrCodeIcon />} iconPosition="start" />
+            <Tab label="Notes" icon={<TableChartIcon />} iconPosition="start" />
+          </Tabs>
+        </Box>
         
-        <FormControlLabel
-          control={
-            <Checkbox
-              checked={includeAllStudents}
-              onChange={(e) => setIncludeAllStudents(e.target.checked)}
-              color="primary"
-            />
-          }
-          label="Inclure tous les étudiants de la classe (même ceux sans correction)"
-          sx={{ mt: 1, mb: 2 }}
-        />
-        
-        <Grid container spacing={3} sx={{ mb: 3 }}>
-          <Grid size={{ xs: 12, md: 6 }}>
-            <ArrangementOptions
-              arrangement={arrangement}
-              setArrangement={setArrangement}
-              subArrangement={subArrangement}
-              setSubArrangement={setSubArrangement}
-              viewType={viewType}
-              setViewType={setViewType}
-              availableSubArrangements={getAvailableSubArrangements()}
-            />
-          </Grid>
+        {activeTab === 0 && (
+          <Box>
+            <Typography variant="body2" paragraph>
+              Générez des PDFs contenant les QR codes d'accès aux corrections pour les étudiants de toutes les classes.
+            </Typography>
+            
+            <Box sx={{ mt: 3 }}>
+              <Typography variant="h6" gutterBottom>Options d'export</Typography>
+              
+              <FormControl fullWidth sx={{ mb: 2 }}>
+                <InputLabel>Activité</InputLabel>
+                <Select
+                  value={filterActivity}
+                  onChange={(e) => setFilterActivity(e.target.value as number | 'all')}
+                  label="Activité"
+                >
+                  <MenuItem value="all">Toutes les activités</MenuItem>
+                  {uniqueActivities.map(activity => (
+                    <MenuItem key={activity.id} value={activity.id}>
+                      {activity.name}
+                    </MenuItem>
+                  ))}
+                </Select>
+                <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5 }}>
+                  Sélectionnez une activité spécifique ou exportez pour toutes les activités
+                </Typography>
+              </FormControl>
           
-          <Grid size={{ xs: 12, md: 6 }}>
-            <ExportFormatOptions
-              exportFormat={exportFormat}
-              setExportFormat={setExportFormat}
-              onExport={handleExport}
-              disabled={filteredCorrections.length === 0}
+              <Box sx={{ display: 'flex', justifyContent: 'center', mt: 3 }}>
+                <Button
+                  variant="contained"
+                  startIcon={<QrCodeIcon />}
+                  disabled={filteredCorrections.length === 0 || loading}
+                  onClick={generateQRCodePDF}
+                  size="large"
+                >
+                  Générer PDF des QR codes
+                </Button>
+              </Box>
+            </Box>
+          </Box>
+        )}
+        
+        {activeTab === 1 && (
+          <Box>
+            <Typography variant="body2">
+              Exportez les notes des étudiants de toutes les classes sous différents formats et organisations.
+            </Typography>
+            
+            <Box sx={{ mt: 3 }}>
+              <Typography variant="h6" gutterBottom>Options d'export</Typography>
+              
+              <FormControl fullWidth sx={{ mb: 2 }}>
+                <InputLabel>Activité</InputLabel>
+                <Select
+                  value={filterActivity}
+                  onChange={(e) => setFilterActivity(e.target.value as number | 'all')}
+                  label="Activité"
+                >
+                  <MenuItem value="all">Toutes les activités</MenuItem>
+                  {uniqueActivities.map(activity => (
+                    <MenuItem key={activity.id} value={activity.id}>
+                      {activity.name}
+                    </MenuItem>
+                  ))}
+                </Select>
+                <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5 }}>
+                  Sélectionnez une activité spécifique ou exportez pour toutes les activités
+                </Typography>
+              </FormControl>
+              
+              <FormControlLabel
+                control={
+                  <Checkbox
+                    checked={includeAllStudents}
+                    onChange={(e) => setIncludeAllStudents(e.target.checked)}
+                    color="primary"
+                  />
+                }
+                label="Inclure tous les étudiants (même ceux sans correction)"
+                sx={{ mt: 1, mb: 2 }}
+              />
+              
+              <Grid container spacing={3} sx={{ mb: 3 }}>
+                <Grid size={{ xs: 12, md: 6 }}>
+                  <ArrangementOptions
+                    arrangement={arrangement}
+                    setArrangement={setArrangement}
+                    subArrangement={subArrangement}
+                    setSubArrangement={setSubArrangement}
+                    viewType={viewType}
+                    setViewType={setViewType}
+                    availableSubArrangements={getAvailableSubArrangements()}
+                  />
+                </Grid>
+                
+                <Grid size={{ xs: 12, md: 6 }}>
+                  <ExportFormatOptions
+                    exportFormat={exportFormat}
+                    setExportFormat={setExportFormat}
+                    onExport={handleExport}
+                    disabled={filteredCorrections.length === 0 || loading}
+                  />
+                </Grid>
+              </Grid>
+            </Box>
+          </Box>
+        )}
+      </Paper>
+      
+      {/* Aperçu des corrections qui seront incluses dans l'export */}
+      <Paper sx={{ p: 2 }} elevation={1}>
+        <Typography variant="h6" gutterBottom>
+          Aperçu des corrections ({filteredCorrections.length})
+        </Typography>
+        
+        {loading ? (
+          <Typography>Chargement des données...</Typography>
+        ) : filteredCorrections.length > 0 ? (
+          <TableContainer>
+            <Table size="small">
+              <TableHead>
+                <TableRow>
+                  <TableCell>Étudiant</TableCell>
+                  <TableCell>Classe</TableCell>
+                  <TableCell>Activité</TableCell>
+                  <TableCell align="right">Note Exp.</TableCell>
+                  <TableCell align="right">Note Théo.</TableCell>
+                  <TableCell align="center">Total</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {filteredCorrections.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage).map(correction => {
+                  const activity = getActivityById(correction.activity_id);
+                  const student = getStudentById(correction.student_id);
+                  const className = classesMap.get(correction.class_id)?.name || `Classe ${correction.class_id}`;
+                  
+                  return (
+                    <TableRow key={correction.id}>
+                      <TableCell>{student?.first_name} {student?.last_name}</TableCell>
+                      <TableCell>{className}</TableCell>
+                      <TableCell>{activity?.name}</TableCell>
+                      <TableCell align="right">
+                        {correction.experimental_points_earned} / {activity?.experimental_points}
+                      </TableCell>
+                      <TableCell align="right">
+                        {correction.theoretical_points_earned} / {activity?.theoretical_points}
+                      </TableCell>
+                      <TableCell align="center">
+                        <Chip 
+                          label={correction.status !== 'ACTIVE' ?
+                            <Typography variant="overline" color="text.secondary">
+                              {(() => {
+                                if (!correction.status) return 'Non rendu / ABS';
+                                switch (correction.status) {
+                                  case 'NON_NOTE': return 'NON NOTÉ';
+                                  case 'ABSENT': return 'ABSENT';
+                                  case 'NON_RENDU': return 'NON RENDU';
+                                  case 'DEACTIVATED': return 'DÉSACTIVÉ';
+                                  default: return 'Non rendu / ABS';
+                                }
+                              })()}
+                            </Typography> 
+                            : 
+                            `${correction.grade} / 20`}
+                          size="small"
+                          variant={correction.status !== 'ACTIVE' ? "outlined" : "filled"}
+                          sx={correction.status !== 'ACTIVE'? { 
+                            letterSpacing: '0.5px', 
+                            opacity: 0.7,
+                            textAlign: 'center',
+                            justifyContent: 'center',
+                          } : {
+                            fontWeight: 700,
+                            color: theme => theme.palette.text.primary,
+                            backgroundColor:
+                              (correction.grade || 0) < 8 ? theme => theme.palette.error.light :
+                              (correction.grade || 0) < 10 ? theme => theme.palette.warning.light :
+                              (correction.grade || 0) < 12 ? theme => theme.palette.primary.light :
+                              (correction.grade || 0) < 16 ? theme => theme.palette.info.light :
+                              theme => theme.palette.success.light, 
+                          }}
+                        />
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+                {filteredCorrections.length > 10 && (
+                  <TableRow>
+                    <TableCell colSpan={6} align="center">
+                      <Typography variant="body2" color="text.secondary">
+                        ... et {filteredCorrections.length - 10} autres corrections
+                      </Typography>
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+            <TablePagination
+              rowsPerPageOptions={[5, 10, 25]}
+              component="div"
+              count={filteredCorrections.length}
+              rowsPerPage={rowsPerPage}
+              page={page}
+              onPageChange={handleChangePage}
+              onRowsPerPageChange={handleChangeRowsPerPage}
             />
-          </Grid>
-        </Grid>
-      </Box>
-    </Box>
+          </TableContainer>
+        ) : (
+          <Alert severity="info">
+            Aucune correction correspondant aux critères sélectionnés
+          </Alert>
+        )}
+      </Paper>
+    </>
   );
 };
 
-export default NotesTab;
+export default ExportPDFComponentAllCorrections;
