@@ -28,11 +28,10 @@ export async function createActivity(activity: Activity): Promise<number> {
   });
 }
 
-export async function getActivities(userId: number): Promise<Activity[]> {
+export async function getActivities(): Promise<Activity[]> {
   return withConnection(async (connection) => {
     const [rows] = await connection.execute<RowDataPacket[]>(
-      'SELECT * FROM activities WHERE user_id = ? ORDER BY created_at DESC',
-      [userId] // Filtrer par user_id
+      'SELECT * FROM activities ORDER BY created_at DESC'
     );
     return rows as Activity[];
   });

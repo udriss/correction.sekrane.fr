@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getActivities, createActivity } from '@/lib/activity';
+import { getActivitiesAutres, createActivityAutre } from '@/lib/activityAutre';
 import { getServerSession } from "next-auth/next";
 import authOptions from "@/lib/auth";
 import { getUser } from '@/lib/auth';
@@ -19,7 +19,7 @@ export async function GET(req: NextRequest) {
 
     // Récupérer uniquement les activités de l'utilisateur
     if (customUser) {
-      const activities = await getActivities();
+      const activities = await getActivitiesAutres(customUser.id);
       return NextResponse.json(activities);
     }
   } catch (error) {
@@ -43,18 +43,33 @@ export async function POST(req: NextRequest) {
     
     // Obtenir les données de la requête
     const body = await req.json();
-    const { name, content, experimental_points, theoretical_points } = body;
+    const { name, content, parts_names, points } = body;
     
     if (!name || name.trim() === '') {
       return NextResponse.json({ error: 'Le nom est requis' }, { status: 400 });
     }
     
+    // Vérifier que parts_names et points sont des tableaux valides
+    if (!Array.isArray(parts_names) || parts_names.length === 0) {
+      return NextResponse.json({ error: 'Les noms des parties sont requis' }, { status: 400 });
+    }
+    
+    if (!Array.isArray(points) || points.length !== parts_names.length) {
+      return NextResponse.json({ error: 'Les points doivent correspondre au nombre de parties' }, { status: 400 });
+    }
+    
+    // Vérifier que les points sont des nombres valides
+    const validPoints = points.every(p => !isNaN(Number(p)) && Number(p) > 0);
+    if (!validPoints) {
+      return NextResponse.json({ error: 'Les points doivent être des nombres positifs' }, { status: 400 });
+    }
+    
     if (customUser) {
-      const activityId = await createActivity({
+      const activityId = await createActivityAutre({
         name,
         content: content || null,
-        experimental_points: experimental_points || 5,
-        theoretical_points: theoretical_points || 15,
+        parts_names: parts_names,
+        points: points.map(Number),
         user_id: customUser.id
       });    
       return NextResponse.json({ id: activityId }, { status: 201 });

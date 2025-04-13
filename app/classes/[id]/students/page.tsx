@@ -23,6 +23,8 @@ interface Class {
 }
 
 export default function ClassStudentsPage({ params }: { params: Promise<{ id: string }> }) {
+
+  
   const [classId, setClassId] = useState<number | null>(null);
   const [classData, setClassData] = useState<Class | null>(null);
   const [loading, setLoading] = useState(true);

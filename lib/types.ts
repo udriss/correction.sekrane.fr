@@ -104,3 +104,46 @@ export interface ClassStudent {
   email?: string;
   gender?: string;
 }
+
+export interface ActivityAutre {
+  id: number;
+  name: string;
+  content?: string | null;
+  parts_names: string[];
+  points: number[];
+  user_id?: number;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface CorrectionAutre {
+  id: number;
+  student_id: number | null;
+  activity_id: number;
+  grade?: number;
+  points_earned: number[]; // Array of points earned for each part
+  submission_date?: string;
+  content: string | null;
+  content_data?: Date | string; // Could be JSON or string
+  created_at?: Date | string;
+  updated_at?: Date | string;
+  penalty?: number | null;
+  final_grade?: number | null;
+  deadline?: Date | string | null;
+  group_id: number | null;
+  class_id: number | null;
+  active?: number; // 0 = inactive, 1 = active
+}
+
+export interface CorrectionAutreWithShareCode extends CorrectionAutre {
+  shareCode?: string | null;
+  class_name?: string;
+}
+
+export interface CorrectionAutreEnriched extends CorrectionAutre {
+  activity_name?: string;
+  student_name?: string;
+  class_name?: string;
+  score_percentage?: number;
+  status?: string;
+}
