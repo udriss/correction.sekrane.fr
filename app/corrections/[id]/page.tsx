@@ -14,7 +14,7 @@ import { copyToClipboard } from '@/utils/clipboardUtils';
 import { 
   Paper, Alert, Box, Container, Divider, Fade, Zoom, 
   Typography, useTheme, alpha, Drawer, IconButton, 
-  Tooltip, Card, Tab, Tabs, Link
+  Tooltip, Card, Tab, Tabs, Link, Button
 } from '@mui/material';
 
 // Import our new hooks
@@ -113,6 +113,10 @@ export default function CorrectionDetail({ params }: { params: Promise<{ id: str
     handleCancelDelete,
     handleToggleActive
   } = correctionsHook;
+
+  const [correctionStatus, setCorrectionStatus] = useState<string>('ACTIVE');
+  const [isStatusChanging, setIsStatusChanging] = useState<boolean>(false);
+  const [isActive, setIsActive] = useState<boolean>(correction?.active === 1);
 
   // Add state for experimental and theoretical grades
   const [experimentalGrade, setExperimentalGrade] = useState<string>('');
@@ -759,6 +763,53 @@ export default function CorrectionDetail({ params }: { params: Promise<{ id: str
     }
   };
 
+  // Handle changing the status
+  const handleChangeStatus = async (newStatus: string) => {
+    if (!correction || !correction.id) return;
+    
+    // If clicking on current status, toggle back to ACTIVE
+    if (correctionStatus === newStatus) {
+      newStatus = 'ACTIVE';
+    }
+    
+    setIsStatusChanging(true);
+    try {
+      // Utiliser la fonction utilitaire du service
+      await fetch(`/api/corrections/${correction.id}/status`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ status: newStatus }),
+      });
+      
+      // Map status to readable name for the toast message
+      const statusNames: Record<string, string> = {
+        'ACTIVE': 'activée',
+        'DEACTIVATED': 'désactivée',
+        'ABSENT': 'marquée comme absent',
+        'NON_RENDU': 'marquée comme non rendue',
+        'NON_NOTE': 'marquée comme non notée'
+      };
+      
+      // Show success message
+      setSuccessMessage(`Correction ${statusNames[newStatus] || 'mise à jour'} avec succès`);
+      setTimeout(() => setSuccessMessage(''), 3000);
+      
+      setCorrectionStatus(newStatus);
+      
+      // Also update the active state for backward compatibility
+      setIsActive(newStatus === 'ACTIVE');
+      
+    } catch (error) {
+      console.error('Error changing correction status:', error);
+      setError(`Erreur: ${error instanceof Error ? error.message : 'Échec de la mise à jour'}`);
+      setTimeout(() => setError(''), 5000);
+    } finally {
+      setIsStatusChanging(false);
+    }
+  };
+
   // Check for loading and error conditions directly
   if (loading) {
     return (
@@ -880,6 +931,9 @@ export default function CorrectionDetail({ params }: { params: Promise<{ id: str
                     setLastName={(value) => correctionsHook.setLastName?.(value)}
                     email={correction.student_data?.email || ''}
                     setEmail={(value) => correctionsHook.setEmail?.(value)}
+                    correctionStatus={correctionStatus}
+                    handleChangeStatus={handleChangeStatus}
+                    isStatusChanging={isStatusChanging}
                   />
                 </GradientBackground>
               </Box>

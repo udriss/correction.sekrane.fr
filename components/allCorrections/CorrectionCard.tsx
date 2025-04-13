@@ -103,22 +103,7 @@ const CorrectionCard: React.FC<CorrectionCardProps> = ({
       setCorrectionStatus(correction.active ? 'ACTIVE' : 'DEACTIVATED');
     }
   }, [correction.status, correction.active]);
-  
-  // Handle toggle active status
-  const handleToggleActive = async () => {
-    if (!onToggleActive || !correction.id) return;
-    
-    setIsToggling(true);
-    try {
-      await onToggleActive(correction.id, !isActive);
-      setIsActive(!isActive);
-    } catch (error) {
-      console.error('Error toggling active status:', error);
-      // The state will be updated by the parent component if the API call is successful
-    } finally {
-      setIsToggling(false);
-    }
-  };
+
   
   // Handle changing the status
   const handleChangeStatus = async (newStatus: string) => {

@@ -22,6 +22,10 @@ import SchoolIcon from '@mui/icons-material/School';
 import GroupsIcon from '@mui/icons-material/Groups';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
+import PersonOffIcon from '@mui/icons-material/PersonOff';
+import DoNotDisturbIcon from '@mui/icons-material/DoNotDisturb';
+import HourglassDisabledIcon from '@mui/icons-material/HourglassDisabled';
+import BlockIcon from '@mui/icons-material/Block';
 import { th } from 'date-fns/locale';
 
 interface CorrectionHeaderProps {
@@ -39,7 +43,10 @@ interface CorrectionHeaderProps {
   handleSaveName: (firstName: string, lastName: string, email?: string) => void;
   handleDelete: () => void;
   handleCancelDelete: () => void;
-  handleToggleActive?: () => void; // Ajout de la fonction pour activer/désactiver
+  handleToggleActive?: () => void; // Fonction pour activer/désactiver
+  correctionStatus?: string; // Statut actuel de la correction
+  handleChangeStatus?: (newStatus: string) => void; // Fonction pour changer le statut
+  isStatusChanging?: boolean; // Indique si le statut est en cours de changement
   email?: string;
   setEmail?: (email: string) => void;
 }
@@ -62,6 +69,9 @@ const CorrectionHeader: React.FC<CorrectionHeaderProps> = ({
   handleToggleActive,
   email = '',
   setEmail = () => {},
+  correctionStatus = 'ACTIVE',
+  handleChangeStatus = () => {},
+  isStatusChanging = false,
 }) => {
   // Add local state for form fields to prevent input issues
   const [localFirstName, setLocalFirstName] = useState('');
@@ -291,18 +301,58 @@ const CorrectionHeader: React.FC<CorrectionHeaderProps> = ({
                 <DeleteIcon fontSize="large" />
               </IconButton>
             )}
-            {/* Bouton d'activation/désactivation */}
-            <Tooltip title={isActive ? "Désactiver la correction" : "Activer la correction"}>
-              <IconButton
-                onClick={handleToggleActive}
-                color={isActive ? "primary" : "default"}
-                // Suppression du title qui est en conflit avec le Tooltip parent
-                size="small"
-                sx={{ ml: 1 }}
-              >
-                {isActive ? <VisibilityIcon fontSize="large" /> : <VisibilityOffIcon fontSize="large" />}
-              </IconButton>
-            </Tooltip>
+
+            
+            {/* Boutons de statut */}
+            <Box sx={{ ml: 1, display: 'flex' }}>
+              <Tooltip title={correctionStatus === 'ACTIVE' ? "Marquer comme désactivée" : "Marquer comme active"}>
+                <IconButton
+                  onClick={() => handleChangeStatus(correctionStatus === 'ACTIVE' ? 'DEACTIVATED' : 'ACTIVE')}
+                  color={correctionStatus === 'ACTIVE' ? "success" : correctionStatus === 'DEACTIVATED' ? "warning" : "default"}
+                  size="large"
+                  disabled={isStatusChanging}
+                  sx={{ mx: 0.5 }}
+                >
+                  {correctionStatus === 'ACTIVE' ? <VisibilityIcon fontSize="large"/> : <VisibilityOffIcon fontSize="large"/>}
+                </IconButton>
+              </Tooltip>
+              
+              <Tooltip title="Marquer comme absent">
+                <IconButton
+                  onClick={() => handleChangeStatus('ABSENT')}
+                  color={correctionStatus === 'ABSENT' ? "error" : "default"}
+                  size="large"
+                  disabled={isStatusChanging}
+                  sx={{ mx: 0.5 }}
+                >
+                  <PersonOffIcon fontSize="large"/>
+                </IconButton>
+              </Tooltip>
+              
+              <Tooltip title="Marquer comme non rendu">
+                <IconButton
+                  onClick={() => handleChangeStatus('NON_RENDU')}
+                  color={correctionStatus === 'NON_RENDU' ? "error" : "default"}
+                  size="large"
+                  disabled={isStatusChanging}
+                  sx={{ mx: 0.5 }}
+                >
+                  <DoNotDisturbIcon fontSize="large"/>
+                </IconButton>
+              </Tooltip>
+              
+              <Tooltip title="Marquer comme non noté">
+                <IconButton
+                  onClick={() => handleChangeStatus('NON_NOTE')}
+                  color={correctionStatus === 'NON_NOTE' ? "info" : "default"}
+                  size="large"
+                  disabled={isStatusChanging}
+                  sx={{ mx: 0.5 }}
+                >
+                  <HourglassDisabledIcon fontSize="large"/>
+                </IconButton>
+              </Tooltip>
+            </Box>
           </Box>
         )}
         
