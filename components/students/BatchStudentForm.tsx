@@ -387,7 +387,11 @@ const BatchStudentForm: React.FC<BatchStudentFormProps> = ({
                 type="number"
                 value={manualStudentCount}
                 onChange={handleManualStudentCountChange}
-                InputProps={{ inputProps: { min: 1 } }}
+                slotProps={{
+                  input: { 
+                    inputProps: { min: 1, step: 1 },
+                   }
+                }}
                 variant="outlined"
                 sx={{ width: { xs: '100%', sm: '200px' } }}
               />
@@ -779,11 +783,11 @@ const BatchStudentForm: React.FC<BatchStudentFormProps> = ({
                               error={!student.first_name.trim() && !student.markedForDeletion}
                               helperText={!student.first_name.trim() && !student.markedForDeletion ? "Requis" : ""}
                               disabled={student.markedForDeletion}
-                              InputProps={{
-                                sx: { 
-                                  opacity: student.markedForDeletion ? 0.7 : 1,
+                              slotProps={{
+                                input: { 
+                                  sx: {opacity: student.markedForDeletion ? 0.7 : 1,}
                                 }
-                              }}
+                                }}
                             />
                           </TableCell>
                           <TableCell>
@@ -796,11 +800,12 @@ const BatchStudentForm: React.FC<BatchStudentFormProps> = ({
                               error={!student.last_name.trim() && !student.markedForDeletion}
                               helperText={!student.last_name.trim() && !student.markedForDeletion ? "Requis" : ""}
                               disabled={student.markedForDeletion}
-                              InputProps={{
-                                sx: { 
-                                  opacity: student.markedForDeletion ? 0.7 : 1,
+                              
+                              slotProps={{
+                                input: { 
+                                  sx: {opacity: student.markedForDeletion ? 0.7 : 1,}
                                 }
-                              }}
+                                }}
                             />
                           </TableCell>
                           <TableCell>
@@ -811,11 +816,11 @@ const BatchStudentForm: React.FC<BatchStudentFormProps> = ({
                               onChange={(e) => handleStudentFieldChange(index, 'email', e.target.value)}
                               placeholder="Optionnel"
                               disabled={student.markedForDeletion}
-                              InputProps={{
-                                sx: { 
-                                  opacity: student.markedForDeletion ? 0.7 : 1,
+                              slotProps={{
+                                input: { 
+                                  sx: {opacity: student.markedForDeletion ? 0.7 : 1,}
                                 }
-                              }}
+                                }}
                             />
                           </TableCell>
                           <TableCell>

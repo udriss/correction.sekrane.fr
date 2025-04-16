@@ -47,6 +47,16 @@ import {
 
 import { Activity } from '@/lib/activity';
 import { constructFromSymbol } from 'date-fns/constants';
+import ErrorDisplay from '@/components/ui/ErrorDisplay';
+
+// Interface pour les détails d'erreur standardisés
+interface ErrorDetails {
+  message: string;
+  code?: string;
+  field?: string;
+  suggestion?: string;
+  details?: string;
+}
 
 type Student = {
   id?: number;
@@ -120,10 +130,17 @@ export default function MultipleCorrectionsForm({
   
   // UI states
   const [loading, setLoading] = useState<boolean>(false);
-  const [error, setError] = useState<string>('');
+  const [error, setError] = useState<string | null>(null);
+  const [errorDetails, setErrorDetails] = useState<any>(null);
   const [successMessage, setSuccessMessage] = useState<string>('');
   const [activeTab, setActiveTab] = useState<number>(0);
   const [saving, setSaving] = useState<boolean>(false);
+
+  // Fonction pour effacer les messages d'erreur
+  const clearError = () => {
+    setError(null);
+    setErrorDetails(null);
+  };
 
   // Student data states
   const [manualStudentCount, setManualStudentCount] = useState<number>(1);
@@ -192,7 +209,7 @@ export default function MultipleCorrectionsForm({
     if (!file) return;
 
     setLoading(true);
-    setError('');
+    clearError();
     
     try {
       // Use FormData to send the file to our API
@@ -206,7 +223,12 @@ export default function MultipleCorrectionsForm({
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.error || "Erreur lors du traitement du fichier CSV");
+        // Créer une instance d'Error et y attacher les détails
+        const error = new Error('Erreur lors du chargement des corrections : ' + (errorData.error || 'Erreur inconnue'));
+        (error as any).details = errorData.details || {};
+        setError(error.message);
+        setErrorDetails((error as any).details);
+        throw error;
       }
       
       const data = await response.json();
@@ -223,10 +245,23 @@ export default function MultipleCorrectionsForm({
         setStudents(parsedStudents);
       } else {
         setError("Aucun étudiant trouvé dans le fichier CSV");
+        setErrorDetails({
+          code: "CSV_EMPTY",
+          message: "Aucun étudiant trouvé dans le fichier CSV",
+          suggestion: "Vérifiez que votre fichier CSV contient des noms d'étudiants dans le format attendu"
+        });
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error("Erreur lors de l'importation du CSV:", err);
-      setError(err instanceof Error ? err.message : "Erreur lors de l'importation du fichier");
+      // Utiliser les détails d'erreur s'ils existent, sinon créer un objet d'erreur standard
+      if (!error) { // Seulement si l'erreur n'est pas déjà définie
+        setError(err.message || "Erreur lors de l'importation du fichier");
+        setErrorDetails(err.details || {
+          code: "CSV_IMPORT_ERROR",
+          message: err.message || "Erreur lors de l'importation du fichier",
+          suggestion: "Vérifiez le format de votre fichier CSV et réessayez"
+        });
+      }
     } finally {
       setLoading(false);
     }
@@ -378,16 +413,32 @@ export default function MultipleCorrectionsForm({
   // Function to fetch available classes
   const fetchClasses = async () => {
     setLoadingClasses(true);
+    clearError();
     try {
       const response = await fetch('/api/classes');
-      if (response.ok) {
-        const data = await response.json();
-        setClasses(data);
-      } else {
-        console.error('Failed to fetch classes');
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        // Créer une instance d'Error et y attacher les détails
+        const error = new Error('Erreur lors du chargement des classes : ' + (errorData.error || 'Erreur inconnue'));
+        (error as any).details = errorData.details || {};
+        setError(error.message);
+        setErrorDetails((error as any).details);
+        throw error;
       }
-    } catch (error) {
-      console.error('Error fetching classes:', error);
+      
+      const data = await response.json();
+      setClasses(data);
+    } catch (err: any) {
+      console.error('Error fetching classes:', err);
+      if (!error) { // Seulement si l'erreur n'est pas déjà définie
+        setError(err.message || "Erreur lors du chargement des classes");
+        setErrorDetails(err.details || {
+          code: "CLASSES_FETCH_ERROR",
+          message: err.message || "Erreur lors du chargement des classes",
+          suggestion: "Vérifiez votre connexion et réessayez"
+        });
+      }
     } finally {
       setLoadingClasses(false);
     }
@@ -398,44 +449,56 @@ export default function MultipleCorrectionsForm({
     if (!classId) return;
     
     setLoadingClassStudents(true);
+    clearError();
     try {
       const response = await fetch(`/api/classes/${classId}/students`);
-      if (response.ok) {
-        const data = await response.json();
-        setClassStudents(data);
-
-        
-
-        // Filter by subclass if specified
-        let studentsToUse = data;
-        if (subClass) {
-          studentsToUse = data.filter((student: ClassStudent) => 
-            student.sub_class === Number(subClass)
-          );
-        }
-        
-        // Convert class students to the format needed for corrections
-        // Inclure l'ID étudiant pour l'API
-        const formattedStudents = studentsToUse.map((student: ClassStudent) => ({
-          id: student.id, // Ajouter l'ID étudiant
-          firstName: student.first_name,
-          lastName: student.last_name,
-          experimentalGrade: '',
-          theoreticalGrade: '',
-        }));
-        
-        setStudents(formattedStudents);
-      } else {
-        console.error('Failed to fetch class students');
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        // Créer une instance d'Error et y attacher les détails
+        const error = new Error('Erreur lors du chargement des étudiants : ' + (errorData.error || 'Erreur inconnue'));
+        (error as any).details = errorData.details || {};
+        setError(error.message);
+        setErrorDetails((error as any).details);
+        throw error;
       }
-    } catch (error) {
-      console.error('Error fetching class students:', error);
+      
+      const data = await response.json();
+      setClassStudents(data);
+
+      // Filter by subclass if specified
+      let studentsToUse = data;
+      if (subClass) {
+        studentsToUse = data.filter((student: ClassStudent) => 
+          student.sub_class === Number(subClass)
+        );
+      }
+      
+      // Convert class students to the format needed for corrections
+      // Inclure l'ID étudiant pour l'API
+      const formattedStudents = studentsToUse.map((student: ClassStudent) => ({
+        id: student.id, // Ajouter l'ID étudiant
+        firstName: student.first_name,
+        lastName: student.last_name,
+        experimentalGrade: '',
+        theoreticalGrade: '',
+      }));
+      
+      setStudents(formattedStudents);
+    } catch (err: any) {
+      console.error('Error fetching class students:', err);
+      if (!error) { // Seulement si l'erreur n'est pas déjà définie
+        setError(err.message || "Erreur lors du chargement des étudiants");
+        setErrorDetails(err.details || {
+          code: "STUDENTS_FETCH_ERROR",
+          message: err.message || "Erreur lors du chargement des étudiants",
+          suggestion: "Vérifiez votre connexion et réessayez"
+        });
+      }
     } finally {
       setLoadingClassStudents(false);
     }
   };
-
-  
 
   // Handle class selection change
   const handleClassChange = (event: SelectChangeEvent) => {
@@ -532,7 +595,11 @@ export default function MultipleCorrectionsForm({
                   type="number"
                   value={manualStudentCount}
                   onChange={handleManualStudentCountChange}
-                  InputProps={{ inputProps: { min: 1 } }}
+                  slotProps={{
+                    input: { 
+                      inputProps: { min: 1, step: 1 },
+                     }
+                  }}
                   variant="outlined"
                   className="md:w-1/3"
                 />
@@ -736,9 +803,15 @@ export default function MultipleCorrectionsForm({
       </Paper>
 
       {error && (
-        <Alert severity="error" className="mb-4 animate-fadeIn">
-          {error}
-        </Alert>
+        <ErrorDisplay 
+          error={error}
+          errorDetails={errorDetails}
+          onRefresh={() => {
+            setError('');
+            window.location.reload();
+          }}
+          withRefreshButton = {true}
+        />
       )}
 
       {successMessage && (

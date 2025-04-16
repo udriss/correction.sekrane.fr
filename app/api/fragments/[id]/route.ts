@@ -71,7 +71,7 @@ export async function GET(
             ', (SELECT GROUP_CONCAT(fc.category_id) FROM fragments_categories fc WHERE fc.fragment_id = f.id) as category_ids' :
             ', NULL as category_ids'}
           FROM fragments f
-          LEFT JOIN activities a ON f.activity_id = a.id
+          LEFT JOIN activities_autres a ON f.activity_id = a.id
           WHERE f.id = ?`,
           [fragmentId]
         );
@@ -291,7 +291,7 @@ export async function PUT(
           ', (SELECT GROUP_CONCAT(fc.category_id) FROM fragments_categories fc WHERE fc.fragment_id = f.id) as category_ids' :
           ', NULL as category_ids'}
          FROM fragments f
-         LEFT JOIN activities a ON f.activity_id = a.id
+         LEFT JOIN activities_autres a ON f.activity_id = a.id
          WHERE f.id = ?`,
         [fragmentId]
       );

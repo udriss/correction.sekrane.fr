@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { query, withConnection } from '@/lib/db';
+import { getServerSession } from "next-auth/next";
+import authOptions from "@/lib/auth";
+import { getUser } from '@/lib/auth';
 
 // Get activities for a class
 export async function GET(
@@ -7,6 +10,17 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    // Get the user from both auth systems
+    const session = await getServerSession(authOptions);
+    const customUser = await getUser();
+    
+    // Use either auth system, starting with custom auth
+    const userId = customUser?.id || session?.user?.id;
+    
+    if (!userId) {
+      return NextResponse.json({ error: 'utilisateur non authentifié' }, { status: 401 });
+    }
+
     // Await the params
     const { id } = await params;
     const classId = parseInt(id);
@@ -27,15 +41,15 @@ export async function GET(
       SELECT 
         a.id, 
         a.name, 
-        a.content, 
-        a.experimental_points, 
-        a.theoretical_points,
+        a.content,
+        a.points,
+        a.parts_names,
         a.created_at, 
         a.updated_at
       FROM 
         class_activities ca
       JOIN 
-        activities a ON ca.activity_id = a.id
+        activities_autres a ON ca.activity_id = a.id
       WHERE 
         ca.class_id = ?
     `, [classId]);
@@ -53,6 +67,17 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    // Get the user from both auth systems
+    const session = await getServerSession(authOptions);
+    const customUser = await getUser();
+    
+    // Use either auth system, starting with custom auth
+    const userId = customUser?.id || session?.user?.id;
+    
+    if (!userId) {
+      return NextResponse.json({ error: 'utilisateur non authentifié' }, { status: 401 });
+    }
+
     // Await the params
     const { id } = await params;
     const classId = parseInt(id);
@@ -114,11 +139,22 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    // Get the user from both auth systems
+    const session = await getServerSession(authOptions);
+    const customUser = await getUser();
+    
+    // Use either auth system, starting with custom auth
+    const userId = customUser?.id || session?.user?.id;
+    
+    if (!userId) {
+      return NextResponse.json({ error: 'utilisateur non authentifié' }, { status: 401 });
+    }
+    
     // Await the params
     const { id } = await params;
     const classId = parseInt(id);
     const url = new URL(request.url);
-    const activityId = parseInt(url.searchParams.get('activityId') || '');
+    const { activityId } = await request.json();
     
     if (isNaN(classId) || isNaN(activityId)) {
       return NextResponse.json({ 

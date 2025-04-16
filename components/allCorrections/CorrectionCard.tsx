@@ -11,12 +11,12 @@ import PersonOffIcon from '@mui/icons-material/PersonOff';
 import AssignmentLateIcon from '@mui/icons-material/AssignmentLate';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
-import { Correction } from '@/app/components/CorrectionsDataProvider';
+import { CorrectionAutreEnriched } from '@/lib/types';
 import { useBatchDelete } from '@/hooks/useBatchDelete';
 import ShareModal from '@/app/components/ShareModal';
 import RecentActorsIcon from '@mui/icons-material/RecentActors';
 import CircularProgress from '@mui/material/CircularProgress';
-import CorrectionStatusToggle from './CorrectionStatusToggle';
+import Chip from '@mui/material/Chip';
 
 // Fonction pour vérifier si useBatchDelete est disponible dans le contexte
 const useOptionalBatchDelete = () => {
@@ -34,13 +34,12 @@ const useOptionalBatchDelete = () => {
 };
 
 interface CorrectionCardProps {
-  correction: Correction;
+  correction: CorrectionAutreEnriched;
   getGradeColor: (grade: number) => "success" | "info" | "primary" | "warning" | "error";
   preloadedShareCode?: string;
   highlighted?: boolean;
   highlight?: boolean;
   className?: string;
-  showTopLabel?: string;
   showClass?: boolean;
   showStudent?: boolean;
   showActivity?: boolean;
@@ -49,14 +48,13 @@ interface CorrectionCardProps {
   standalone?: boolean; // Nouveau prop pour indiquer si le composant est utilisé de manière autonome
 }
 
-const CorrectionCard: React.FC<CorrectionCardProps> = ({
+const CorrectionCardAutre: React.FC<CorrectionCardProps> = ({
   correction,
   getGradeColor,
   preloadedShareCode,
   highlighted = false,
   highlight = false,
   className = '',
-  showTopLabel,
   showClass = true,
   showStudent = true,
   showActivity = true,
@@ -158,12 +156,18 @@ const CorrectionCard: React.FC<CorrectionCardProps> = ({
   // Use either highlighted prop or highlight prop (for backward compatibility)
   const isHighlighted = highlighted || highlight;
 
-  // Calculate normalized grade (0-20)
+  // Gestion des points_earned comme un tableau de nombres
+  let grade = 0;
+  if (correction.points_earned) {
+    // Si points_earned est un tableau, faire la somme des points
+    grade = correction.points_earned.reduce((sum, points) => sum + (typeof points === 'number' ? points : parseFloat(String(points || '0'))), 0);
+  } else if (correction.grade !== undefined) {
+    // Fallback sur grade si points_earned n'est pas disponible
+    grade = typeof correction.grade === 'number' ? correction.grade : parseFloat(String(correction.grade || '0'));
+  }
+  
   // Vérifier s'il y a une pénalité à appliquer
   const hasPenalty = correction.penalty !== undefined && correction.penalty !== null;
-  
-  // Convertir les valeurs en nombres pour s'assurer que les calculs fonctionnent correctement
-  const grade = typeof correction.grade === 'number' ? correction.grade : parseFloat(String(correction.grade || '0'));
   const penalty = hasPenalty && correction.penalty !== undefined 
     ? (typeof correction.penalty === 'number' ? correction.penalty : parseFloat(String(correction.penalty || '0'))) 
     : 0;
@@ -175,23 +179,18 @@ const CorrectionCard: React.FC<CorrectionCardProps> = ({
   const gradeWithPenalty = hasPenalty 
     ? (finalGrade !== null ? finalGrade : Math.max(0, grade - penalty))
     : grade;
-  
-  // Normaliser la note sur 20
-  const normalizedGrade = correction.experimental_points && correction.theoretical_points
-    ? (gradeWithPenalty / (correction.theoretical_points + correction.experimental_points) * 20)
-    : gradeWithPenalty;
     
   // Déterminer si on doit utiliser la variante light ou main de la couleur
   const getColorVariant = (color: string): string => {
     // Pour les notes success (généralement bonnes), utiliser la variante main pour les très bonnes notes
     // et light pour les notes correctes mais pas excellentes
     if (color === 'success') {
-      return normalizedGrade >= 16.5 ? `${color}.dark` : `${color}.light`;
+      return gradeWithPenalty >= 16.5 ? `${color}.dark` : `${color}.light`;
     }
     // Pour les notes error (généralement mauvaises), utiliser la variante main pour les très mauvaises notes
     // et light pour les notes médiocres mais pas catastrophiques
     else if (color === 'error') {
-      return normalizedGrade <= 5 ? `${color}.dark` : `${color}.light`;
+      return gradeWithPenalty <= 5 ? `${color}.dark` : `${color}.light`;
     }
     // Pour les autres couleurs, conserver le comportement par défaut
     return `${color}.main`;
@@ -219,12 +218,12 @@ const CorrectionCard: React.FC<CorrectionCardProps> = ({
 
   // Calculer la note finale selon la règle demandée
   const calculateFinalGrade = (grade: number, penalty: number): number => {
-    if (grade < 6) {
-      // Si la note est inférieure à 6, on garde la note originale
+    if (grade < 5) {
+      // Si la note est inférieure à 5, on garde la note originale
       return grade;
     } else {
-      // Sinon, on prend le maximum entre (note-pénalité) et 6
-      return Math.max(grade - penalty, 6);
+      // Sinon, on prend le maximum entre (note-pénalité) et 5
+      return Math.max(grade - penalty, 5);
     }
   };
 
@@ -251,6 +250,10 @@ const CorrectionCard: React.FC<CorrectionCardProps> = ({
     }
   };
 
+
+  // Calcul du total de points possibles (somme des éléments du tableau points)
+  // Si l'activité associée à la correction a une propriété points_total, utilisez-la
+  const totalPossiblePoints = grade > 0 ? grade / (correction.score_percentage || 1) * 100 : 0;
   
   return (
     <Paper
@@ -287,7 +290,7 @@ const CorrectionCard: React.FC<CorrectionCardProps> = ({
         },
         opacity: isDeleting ? 0.7 : correctionStatus !== 'ACTIVE' ? 0.9 : 1, // Augmentation légère de l'opacité pour les inactives
         pointerEvents: isDeleting ? 'none' : 'auto',
-        bgcolor: theme => correctionStatus !== 'ACTIVE' ? alpha(theme.palette.grey[200], 0.7) : undefined, // Fond légèrement plus visible
+        bgcolor: theme => correctionStatus !== 'ACTIVE' ? alpha(theme.palette.grey[300], 0.8) : undefined, // Fond légèrement plus visible
       }}
     >
       {/* Deletion spinner overlay */}
@@ -308,25 +311,6 @@ const CorrectionCard: React.FC<CorrectionCardProps> = ({
           <CircularProgress color="error" size={40} />
         </Box>
       )}
-      
-      {/* Top label if needed */}
-      {showTopLabel && (
-        <Box sx={{ 
-          bgcolor: 'primary.main', 
-          color: 'primary.contrastText',
-          py: 0.5, 
-          px: 1.5,
-          fontSize: '0.75rem',
-          fontWeight: 'bold',
-          position: 'absolute',
-          top: 0,
-          right: 0,
-          borderBottomLeftRadius: 8,
-          zIndex: 1
-        }}>
-          {showTopLabel}
-        </Box>
-      )}
 
       {/* Status label */}
       {correctionStatus !== 'ACTIVE' && (
@@ -335,12 +319,12 @@ const CorrectionCard: React.FC<CorrectionCardProps> = ({
           color: 'white',
           py: 0.5, 
           px: 1.5,
-          fontSize: '0.75rem',
+          fontSize: '1.25rem',
           fontWeight: 'bold',
           position: 'absolute',
-          top: 0,
-          left: 0,
-          borderBottomRightRadius: 8,
+          bottom: 0,
+          right: 0,
+          borderTopRightRadius: 8,
           zIndex: 1
         }}>
           {getStatusLabel()}
@@ -437,8 +421,8 @@ const CorrectionCard: React.FC<CorrectionCardProps> = ({
               title={correction.class_name} // Ajoute un tooltip natif sur hover
               sx={{ textOverflow: 'ellipsis' }}
             >
-              {correction.student_sub_class ? 
-              <><RecentActorsIcon color="info" fontSize="small" sx={{ mr: .25 }} /> Groupe {correction.student_sub_class}</>
+              {correction.student_id ? 
+              <><RecentActorsIcon color="info" fontSize="small" sx={{ mr: .25 }} /> Groupe {correction.student_id}</>
                : ''}
             </Typography>
             </Box>
@@ -456,9 +440,7 @@ const CorrectionCard: React.FC<CorrectionCardProps> = ({
             {typeof gradeWithPenalty === 'number' ? gradeWithPenalty.toFixed(1) : '0.0'}
           </Typography>
           <Typography variant="body2" sx={{ ml: 1, opacity: 0.9 }}>
-            / {correction.experimental_points !== undefined && correction.theoretical_points !== undefined 
-              ? (correction.experimental_points + correction.theoretical_points).toFixed(1)
-              : '-'}
+            / {totalPossiblePoints > 0 ? totalPossiblePoints.toFixed(1) : '-'}
           </Typography>
         </Box>
       </Box>
@@ -493,6 +475,25 @@ const CorrectionCard: React.FC<CorrectionCardProps> = ({
             {modifiedDate}
           </Typography>
         </Box>
+        
+        {/* Points par partie */}
+        {Array.isArray(correction.points_earned) && correction.points_earned.length > 0 && (
+          <Box sx={{ mt: 2 }}>
+            <Typography variant="caption" color="text.secondary">
+              Points par partie:
+            </Typography>
+            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mt: 1 }}>
+              {correction.points_earned.map((points, index) => (
+                <Chip
+                  key={index}
+                  label={`P${index + 1}: ${points}`}
+                  size="small"
+                  variant="outlined"
+                />
+              ))}
+            </Box>
+          </Box>
+        )}
           
           
           {!batchDeleteMode && (
@@ -632,7 +633,7 @@ const CorrectionCard: React.FC<CorrectionCardProps> = ({
               
               {/* Bouton d'édition */}
               <Tooltip title="Éditer la correction">
-                <Link href={`/corrections/${correction.id}`} passHref target="_blank" rel="noopener noreferrer">
+                <Link href={`/corrections_autres/${correction.id}`} passHref target="_blank" rel="noopener noreferrer">
                 <IconButton
                   size="small"
                   color="primary"
@@ -664,4 +665,4 @@ const CorrectionCard: React.FC<CorrectionCardProps> = ({
   );
 };
 
-export default CorrectionCard;
+export default CorrectionCardAutre;

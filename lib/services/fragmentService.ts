@@ -1,7 +1,7 @@
 import { Fragment } from '@/lib/types';
 
 export async function fetchFragmentsForActivity(activityId: number): Promise<Fragment[]> {
-  const fragmentsResponse = await fetch(`/api/activities/${activityId}/fragments`);
+  const fragmentsResponse = await fetch(`/api/activities_autres/${activityId}/fragments`);
   if (!fragmentsResponse.ok) {
     throw new Error('Erreur lors du chargement des fragments');
   }
@@ -9,7 +9,7 @@ export async function fetchFragmentsForActivity(activityId: number): Promise<Fra
 }
 
 export async function fetchAllActivities(): Promise<Array<{id: number, name: string}>> {
-  const response = await fetch('/api/activities');
+  const response = await fetch('/api/activities_autres');
   if (!response.ok) {
     throw new Error('Erreur lors du chargement des activités');
   }

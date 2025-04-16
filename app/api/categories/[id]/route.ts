@@ -4,6 +4,8 @@ import { getServerSession } from "next-auth/next";
 import authOptions from "@/lib/auth";
 import { getUser } from '@/lib/auth';
 import { query } from '@/lib/db';
+
+
 import {deleteCategoryAssociations} from '@/lib/category';
 // DELETE: Delete a specific category by ID
 export async function DELETE(
@@ -11,6 +13,17 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    // Get the user from both auth systems
+    const session = await getServerSession(authOptions);
+    const customUser = await getUser();
+    
+    // Use either auth system, starting with custom auth
+    const userId = customUser?.id || session?.user?.id;
+    
+    if (!userId) {
+      return NextResponse.json({ error: 'utilisateur non authentifié' }, { status: 401 });
+    }
+    
     // Await the params
     const { id } = await params;
     const categoryId = parseInt(id);
@@ -73,7 +86,7 @@ export async function PUT(
   const userId = customUser?.id || session?.user?.id;
   
   if (!userId) {
-    return NextResponse.json({ error: 'Non autorisé' }, { status: 401 });
+    return NextResponse.json({ error: 'utilisateur non authentifié' }, { status: 401 });
   }
 
   // Await the params

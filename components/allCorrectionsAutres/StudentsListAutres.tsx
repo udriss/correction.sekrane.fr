@@ -1,26 +1,18 @@
-import React, { useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
-  Box,
-  Card,
-  CardContent,
-  Typography,
-  Grid,
-  Chip,
-  IconButton,
-  Tooltip,
-  Button,
-  Alert,
-  Accordion,
-  AccordionSummary,
-  AccordionDetails,
+  Box, Alert, Paper, Typography, Button, Divider, Grid,
+  Accordion, AccordionSummary, AccordionDetails, Chip,
+  CircularProgress
 } from '@mui/material';
+import { alpha } from '@mui/material/styles';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import CorrectionCardAutre from '@/components/allCorrections/CorrectionCard';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
-import ErrorDisplay from '../ui/ErrorDisplay';
+import { useSnackbar } from 'notistack';
+import ErrorDisplay from '@/components/ui/ErrorDisplay';
+import { changeCorrectionAutreStatus } from '@/lib/services/correctionsAutresService';
 import { CorrectionAutreEnriched } from '@/lib/types';
-import Link from 'next/link';
-import { alpha } from '@mui/material/styles';
 
 interface StudentsListAutresProps {
   filteredCorrections: CorrectionAutreEnriched[];
@@ -31,6 +23,7 @@ interface StudentsListAutresProps {
   highlightedIds?: string[];
   recentFilter?: boolean;
   refreshCorrections?: () => Promise<void>;
+  isLoading?: boolean; // Ajout d'une propriété pour indiquer l'état de chargement
 }
 
 interface StudentGroup {
@@ -50,8 +43,28 @@ export default function StudentsListAutres({
   getGradeColor,
   highlightedIds = [],
   recentFilter = false,
-  refreshCorrections
+  refreshCorrections,
+  isLoading = false
 }: StudentsListAutresProps) {
+  const { enqueueSnackbar } = useSnackbar();
+  
+  // Handle changing the status of a correction to a specific value
+  const handleChangeStatus = async (correctionId: number, newStatus: string): Promise<void> => {
+    try {
+      await changeCorrectionAutreStatus(correctionId, newStatus);
+      
+      // Rafraîchir la liste des corrections si nécessaire
+      if (refreshCorrections) {
+        await refreshCorrections();
+      }
+      
+      enqueueSnackbar(`Statut de la correction mis à jour avec succès`, { variant: 'success' });
+    } catch (error) {
+      console.error('Erreur lors du changement de statut:', error);
+      enqueueSnackbar(`Erreur lors de la mise à jour du statut: ${error instanceof Error ? error.message : 'Erreur inconnue'}`, { variant: 'error' });
+    }
+  };
+
   // Grouper les corrections par étudiant
   const studentGroups = useMemo(() => {
     const groups = new Map<string, CorrectionAutreEnriched[]>();
@@ -88,6 +101,18 @@ export default function StudentsListAutres({
 
   if (error) {
     return <ErrorDisplay error={error} />;
+  }
+
+  // Afficher un spinner pendant le chargement
+  if (isLoading) {
+    return (
+      <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', py: 4 }}>
+        <CircularProgress sx={{ mb: 2 }} />
+        <Typography variant="body1" color="text.secondary">
+          Chargement des corrections en cours
+        </Typography>
+      </Box>
+    );
   }
 
   if (!filteredCorrections || filteredCorrections.length === 0) {
@@ -140,70 +165,16 @@ export default function StudentsListAutres({
                 const isHighlighted = highlightedIds.includes(correction.id.toString());
 
                 return (
-                  <Grid size={{ xs: 12, sm:6, md: 4 }} key={correction.id} component="div">
-                    <Card 
-                      sx={{ 
-                        position: 'relative',
-                        height: '100%',
-                        ...(isHighlighted && {
-                          border: '2px solid',
-                          borderColor: 'primary.main',
-                          boxShadow: (theme) => `0 0 15px ${alpha(theme.palette.primary.main, 0.5)}`
-                        })
-                      }}
-                    >
-                      <CardContent>
-                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 2 }}>
-                          <Chip 
-                            label={correction.grade?.toFixed(2)}
-                            color={getGradeColor(correction.grade || 0)}
-                            size="medium"
-                          />
-                          <Link href={`/corrections_autres/${correction.id}`} passHref>
-                            <IconButton size="small" component="a">
-                              <Tooltip title="Voir les détails">
-                                <ExpandMoreIcon />
-                              </Tooltip>
-                            </IconButton>
-                          </Link>
-                        </Box>
-
-                        <Typography variant="h6" component="div" gutterBottom noWrap>
-                          {correction.activity_name || 'Activité inconnue'}
-                        </Typography>
-
-                        {/* Points par partie */}
-                        <Box sx={{ mt: 2 }}>
-                          <Typography variant="caption" color="text.secondary">
-                            Points par partie:
-                          </Typography>
-                          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mt: 1 }}>
-                            {correction.points_earned.map((points, index) => (
-                              <Chip
-                                key={index}
-                                label={`P${index + 1}: ${points}`}
-                                size="small"
-                                variant="outlined"
-                              />
-                            ))}
-                          </Box>
-                        </Box>
-
-                        <Typography 
-                          variant="caption" 
-                          color="text.secondary"
-                          sx={{ 
-                            display: 'block',
-                            mt: 2,
-                            fontStyle: 'italic'
-                          }}
-                        >
-                          {correction.submission_date 
-                            ? format(new Date(correction.submission_date), 'PP', { locale: fr })
-                            : 'Date non spécifiée'}
-                        </Typography>
-                      </CardContent>
-                    </Card>
+                  <Grid size={{ xs: 12, md: 6, lg: 4 }} key={correction.id}>
+                    <CorrectionCardAutre 
+                      correction={correction}
+                      highlighted={isHighlighted}
+                      getGradeColor={getGradeColor}
+                      showStudent={false}
+                      showClass={false}
+                      showActivity={true}
+                      onChangeStatus={handleChangeStatus}
+                    />
                   </Grid>
                 );
               })}

@@ -1189,8 +1189,12 @@ export default function ClassStudentsManager({
                                   onChange={(e) => handleBatchStudentFieldChange(index, 'first_name', e.target.value)}
                                   required
                                   disabled={student.markedForDeletion}
-                                  InputProps={{
-                                    sx: { opacity: student.markedForDeletion ? 0.7 : 1 }
+                                  slotProps={{
+                                    input: { 
+                                      inputProps: { 
+                                        sx: { opacity: student.markedForDeletion ? 0.7 : 1 },
+                                       },
+                                     }
                                   }}
                                 />
                               </TableCell>
@@ -1201,8 +1205,12 @@ export default function ClassStudentsManager({
                                   value={student.last_name}
                                   onChange={(e) => handleBatchStudentFieldChange(index, 'last_name', e.target.value)}
                                   disabled={student.markedForDeletion}
-                                  InputProps={{
-                                    sx: { opacity: student.markedForDeletion ? 0.7 : 1 }
+                                  slotProps={{
+                                    input: { 
+                                      inputProps: { 
+                                        sx: { opacity: student.markedForDeletion ? 0.7 : 1 },
+                                       },
+                                     }
                                   }}
                                 />
                               </TableCell>
@@ -1214,8 +1222,12 @@ export default function ClassStudentsManager({
                                   onChange={(e) => handleBatchStudentFieldChange(index, 'email', e.target.value)}
                                   placeholder="Optionnel"
                                   disabled={student.markedForDeletion}
-                                  InputProps={{
-                                    sx: { opacity: student.markedForDeletion ? 0.7 : 1 }
+                                  slotProps={{
+                                    input: { 
+                                      inputProps: { 
+                                        sx: { opacity: student.markedForDeletion ? 0.7 : 1 },
+                                       },
+                                     }
                                   }}
                                 />
                               </TableCell>

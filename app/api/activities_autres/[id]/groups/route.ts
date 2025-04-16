@@ -9,24 +9,23 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    // Get the user from both auth systems
+    const session = await getServerSession(authOptions);
+    const customUser = await getUser();
+    
+    // Use either auth system, starting with custom auth
+    const userId = customUser?.id || session?.user?.id;
+    
+    if (!userId) {
+      return NextResponse.json({ error: 'utilisateur non authentifié' }, { status: 401 });
+    }
+
     // Await the params
     const { id } = await params;
     const activityId = parseInt(id);
     
     if (isNaN(activityId)) {
       return NextResponse.json({ error: 'Invalid activity ID' }, { status: 400 });
-    }
-
-    // Authentication check
-    const session = await getServerSession(authOptions);
-    const customUser = await getUser(request);
-    const userId = customUser?.id || session?.user?.id;
-    
-    if (!userId) {
-      return NextResponse.json(
-        { error: 'Authentification requise' },
-        { status: 401 }
-      );
     }
 
     // Check if activity_autre exists

@@ -20,23 +20,18 @@ import {
   Checkbox,
   ListItemText,
   OutlinedInput,
-  Divider,
   Chip,
   TextField,
   Card,
   CardContent,
-  CardActions,
   Tabs,
   Tab
 } from '@mui/material';
 import Link from 'next/link';
-import AssignmentIcon from '@mui/icons-material/Assignment';
 import GroupIcon from '@mui/icons-material/Group';
 import PeopleIcon from '@mui/icons-material/People';
-import SaveIcon from '@mui/icons-material/Save';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import HourglassEmptyIcon from '@mui/icons-material/HourglassEmpty';
-import HomeIcon from '@mui/icons-material/Home';
 import TuneIcon from '@mui/icons-material/Tune';
 import CheckIcon from '@mui/icons-material/Check';
 
@@ -325,8 +320,9 @@ export default function MultipleCorrectionsAutrePage({ params }: { params: Promi
           results
             .filter(r => r.status === 'fulfilled')
             .map(async (r) => {
-              // @ts-ignore - TypeScript doesn't know this is a fulfilled result
-              const response = r.value as Response;
+              // TypeScript ne sait pas que c'est un résultat satisfait (fulfilled)
+              // Mais nous voulons explicitement traiter cela comme une Response
+              const response = (r as PromiseFulfilledResult<Response>).value;
               if (response.ok) {
                 const data = await response.json();
                 return data.id;
@@ -388,7 +384,7 @@ export default function MultipleCorrectionsAutrePage({ params }: { params: Promi
         <Box className="max-w-4xl w-full">
           <Paper elevation={2} sx={{ p: 4, borderRadius: 2 }} className="border-l-4 border-yellow-500">
             <Alert severity="warning" sx={{ mb: 3 }}>
-              L'activité demandée n'existe pas ou a été supprimée.
+              L&apos;activité demandée n&apos;existe pas ou a été supprimée.
             </Alert>
             <Button
               variant="outlined"

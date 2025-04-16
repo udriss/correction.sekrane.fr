@@ -21,7 +21,7 @@ export async function getExistingShareCode(correctionId: string | number): Promi
     // Convert number to string if needed
     const id = typeof correctionId === 'number' ? correctionId.toString() : correctionId;
 
-    const response = await fetch(`/api/corrections/${id}/share`, {
+    const response = await fetch(`/api/corrections_autres/${id}/share`, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
@@ -59,7 +59,7 @@ export async function generateShareCode(correctionId: string | number): Promise<
     }
     
     // If no existing code, generate a new one
-    const response = await fetch(`/api/corrections/${id}/share`, {
+    const response = await fetch(`/api/corrections_autres/${id}/share`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -84,7 +84,7 @@ export async function deactivateShareCode(correctionId: string | number): Promis
     // Convert number to string if needed
     const id = typeof correctionId === 'number' ? correctionId.toString() : correctionId;
 
-    const response = await fetch(`/api/corrections/${id}/share`, {
+    const response = await fetch(`/api/corrections_autres/${id}/share`, {
       method: 'DELETE',
     });
     
@@ -112,8 +112,8 @@ export async function getShareCodeDetails(code: string): Promise<ShareCode | nul
 }
 
 /**
- * Récupère en lot les codes de partage pour plusieurs corrections
- * @param correctionIds Liste des IDs de corrections
+ * Récupère en lot les codes de partage pour plusieurs corrections_autres
+ * @param correctionIds Liste des IDs de corrections_autres
  * @returns Map des codes de partage indexés par ID de correction
  */
 export async function getBatchShareCodes(correctionIds: (string | number)[]): Promise<Map<string, string>> {

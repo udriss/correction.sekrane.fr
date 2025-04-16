@@ -88,6 +88,9 @@ const ExportFormatOptions: React.FC<ExportFormatOptionsProps> = ({
           }
         </Button>
       </Box>
+      <Typography variant="caption" align="center" color="text.secondary" display="block">
+        Export d&apos;un tableau Excel
+      </Typography>
     </Paper>
   );
 };

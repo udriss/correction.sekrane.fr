@@ -1,6 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { withConnection } from '@/lib/db';
 import { PoolConnection } from 'mysql2/promise';
+import { getServerSession } from "next-auth/next";
+import authOptions from "@/lib/auth";
+import { getUser } from '@/lib/auth';
+import { ActivityAutre, Class } from '@/lib/types';
+
+
 
 // Récupérer les classes associées à une activité autre
 export async function GET(
@@ -8,6 +14,17 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    // Get the user from both auth systems
+    const session = await getServerSession(authOptions);
+    const customUser = await getUser();
+    
+    // Use either auth system, starting with custom auth
+    const userId = customUser?.id || session?.user?.id;
+    
+    if (!userId) {
+      return NextResponse.json({ error: 'utilisateur non authentifié' }, { status: 401 });
+    }
+
     // Await the params
     const { id } = await params;
     const activityId = parseInt(id);
@@ -23,11 +40,10 @@ export async function GET(
         [activityId]
       );
 
-      const activities = activityRows as any[];
+      const activities = activityRows as ActivityAutre[];
       if (activities.length === 0) {
         return NextResponse.json({ message: 'activité non trouvée' }, { status: 404 });
       }
-
       // Récupérer toutes les classes associées à cette activité autre en utilisant une jointure sur le champ activity_id
       const [classRows] = await connection.execute(
         `SELECT c.id, c.name, c.nbre_subclasses 
@@ -55,6 +71,17 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    // Get the user from both auth systems
+    const session = await getServerSession(authOptions);
+    const customUser = await getUser();
+    
+    // Use either auth system, starting with custom auth
+    const userId = customUser?.id || session?.user?.id;
+    
+    if (!userId) {
+      return NextResponse.json({ error: 'utilisateur non authentifié' }, { status: 401 });
+    }
+
     // Await the params
     const { id } = await params;
     const activityId = parseInt(id);
@@ -78,7 +105,7 @@ export async function POST(
         [activityId]
       );
 
-      const activities = activityRows as any[];
+      const activities = activityRows as ActivityAutre[];
       if (activities.length === 0) {
         return NextResponse.json({ message: 'activité non trouvée' }, { status: 404 });
       }
@@ -88,8 +115,8 @@ export async function POST(
         'SELECT * FROM classes WHERE id = ?',
         [classId]
       );
-
-      const classes = classRows as any[];
+      
+      const classes = classRows as Class[];
       if (classes.length === 0) {
         return NextResponse.json({ message: 'classe non trouvée' }, { status: 404 });
       }
@@ -100,7 +127,13 @@ export async function POST(
         [classId, activityId]
       );
 
-      const existingAssociations = existingRows as any[];
+      interface Association {
+        id: number;
+        class_id: number;
+        activity_id: number;
+      }
+
+      const existingAssociations = existingRows as Association[];
       
       // Si l'association existe déjà, retourner un succès sans rien faire
       if (existingAssociations.length > 0) {
@@ -117,7 +150,7 @@ export async function POST(
         [classId, activityId]
       );
 
-      const insertResult = result as any;
+      const insertResult = result as { insertId: number };
       
       // Récupérer l'association ajoutée
       const [newAssociation] = await connection.execute(

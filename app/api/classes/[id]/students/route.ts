@@ -11,23 +11,21 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    // Await the params
-    const { id } = await params;
-    const classId = parseInt(id);
-    
-    // Authentication check
+    // Get the user from both auth systems
     const session = await getServerSession(authOptions);
-    const customUser = await getUser(request);
+    const customUser = await getUser();
+    
+    // Use either auth system, starting with custom auth
     const userId = customUser?.id || session?.user?.id;
     
     if (!userId) {
-      return NextResponse.json(
-        { error: 'authentification requise' },
-        { status: 401 }
-      );
+      return NextResponse.json({ error: 'utilisateur non authentifié' }, { status: 401 });
     }
 
-    
+    // Await the params
+    const { id } = await params;
+    const classId = parseInt(id);
+
     if (!classId) {
       return NextResponse.json(
         { error: 'ID de classe manquant' },
@@ -57,11 +55,12 @@ export async function GET(
 
     return NextResponse.json(students);
   } catch (error) {
-    console.error('Erreur lors de la récupération des étudiants:', error);
-    return NextResponse.json(
-      { message: 'Erreur serveur', error: (error as Error).message },
-      { status: 500 }
-    );
+    console.error('Error fetching students for class:', error);
+    // Renvoyer l'erreur avec tous ses détails pour un meilleur débogage
+    return NextResponse.json({ 
+      error: error instanceof Error ? error.message : 'Erreur inconnue',
+      details: error 
+    }, { status: 500 });
   }
 }
 
@@ -71,6 +70,18 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    // Get the user from both auth systems
+    const session = await getServerSession(authOptions);
+    const customUser = await getUser();
+    
+    // Use either auth system, starting with custom auth
+    const userId = customUser?.id || session?.user?.id;
+    
+    if (!userId) {
+      return NextResponse.json({ error: 'utilisateur non authentifié' }, { status: 401 });
+    }
+   
+    
     // Await the params
     const { id } = await params;
     const classId = parseInt(id);
@@ -167,7 +178,7 @@ export async function POST(
   } catch (error) {
     console.error('Error adding student:', error);
     return NextResponse.json(
-      { error: 'Failed to add student' },
+      { error: error },
       { status: 500 }
     );
   }
@@ -179,6 +190,17 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    // Get the user from both auth systems
+    const session = await getServerSession(authOptions);
+    const customUser = await getUser();
+    
+    // Use either auth system, starting with custom auth
+    const userId = customUser?.id || session?.user?.id;
+    
+    if (!userId) {
+      return NextResponse.json({ error: 'utilisateur non authentifié' }, { status: 401 });
+    }
+
     // Await the params
     const { id } = await params;
     const classId = parseInt(id);
@@ -253,6 +275,18 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    // Get the user from both auth systems
+    const session = await getServerSession(authOptions);
+    const customUser = await getUser();
+    
+    // Use either auth system, starting with custom auth
+    const userId = customUser?.id || session?.user?.id;
+    
+    if (!userId) {
+      return NextResponse.json({ error: 'utilisateur non authentifié' }, { status: 401 });
+    }
+
+
     // Await the params
     const { id } = await params;
     const classId = parseInt(id);
@@ -275,7 +309,8 @@ export async function DELETE(
   } catch (error) {
     console.error('Error removing student from class:', error);
     return NextResponse.json({ 
-      error: 'Failed to remove student from class' 
+      error: error instanceof Error ? error.message : 'Erreur inconnue',
+      details: error 
     }, { status: 500 });
   }
 }

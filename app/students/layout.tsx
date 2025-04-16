@@ -92,10 +92,13 @@ export default function StudentsLayout({
 
   return (
     <Container maxWidth="lg" className="py-4">
-      <StudentsBreadcrumbs 
-        extraItems={extraItems} 
-        currentPageLabel={currentPageLabel} 
-      />
+      {/* Ne pas afficher les breadcrumbs pour les pages students/[id]/corrections */}
+      {!pathname.match(/^\/students\/\d+\/corrections$/) && (
+        <StudentsBreadcrumbs 
+          extraItems={extraItems} 
+          currentPageLabel={currentPageLabel} 
+        />
+      )}
       {children}
     </Container>
   );

@@ -1,6 +1,6 @@
-import { ContentCutOutlined } from '@mui/icons-material';
+
 import { query } from './db';
-import { ActivityAutre } from './types';
+import { ActivityAutre } from '@/lib/types';
 
 /**
  * Récupère toutes les activités avec parties dynamiques
@@ -12,8 +12,6 @@ export async function getActivitiesAutres(userId: number): Promise<ActivityAutre
     WHERE user_id = ?
     ORDER BY created_at DESC
   `, [userId]);
-
-  console.log('Activities:', activities);
 
   return activities.map(activity => ({
     ...activity,

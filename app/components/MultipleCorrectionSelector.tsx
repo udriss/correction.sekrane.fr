@@ -52,7 +52,7 @@ export default function MultipleCorrectionSelector({
     setError('');
     
     try {
-      const response = await fetch('/api/activities');
+      const response = await fetch('/api/activities_autres');
       if (!response.ok) throw new Error('Échec du chargement des activités');
       
       const data = await response.json();

@@ -2,11 +2,11 @@ import {
   ArrangementType, 
   SubArrangementType
 } from './types';
-import { Correction as ProviderCorrection } from '@/app/components/CorrectionsDataProvider';
-import { Student } from '@/lib/types';
+
+import { Student, CorrectionAutreEnriched, ActivityAutre } from '@/lib/types';
 
 interface OrganizeDataParams {
-  corrections: ProviderCorrection[];
+  corrections: CorrectionAutreEnriched[];
   includeAllStudents: boolean;
   filterActivity: number | 'all';
   filterSubClass: string | 'all';
@@ -41,14 +41,16 @@ const organizeData = ({
   
   // Créer une table de hachage pour les corrections existantes
   // Structure: { studentId: { activityId: correction } }
-  const correctionsMap: Record<number, Record<number, ProviderCorrection>> = {};
+  const correctionsMap: Record<number, Record<number, CorrectionAutreEnriched>> = {};
   
   // Remplir la table de hachage avec les corrections existantes
   corrections.forEach(correction => {
-    if (!correctionsMap[correction.student_id]) {
-      correctionsMap[correction.student_id] = {};
+    if (correction.student_id !== null) {
+      if (!correctionsMap[correction.student_id]) {
+        correctionsMap[correction.student_id] = {};
+      }
+      correctionsMap[correction.student_id][correction.activity_id] = correction;
     }
-    correctionsMap[correction.student_id][correction.activity_id] = correction;
   });
   
   if (includeAllStudents) {

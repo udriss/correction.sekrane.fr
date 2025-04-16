@@ -4,8 +4,7 @@ import {
   Box,
   Container,
   Zoom,
-  Fade,
-  useTheme
+  Fade
 } from '@mui/material';
 import GradientBackground from '@/components/ui/GradientBackground';
 import PatternBackground from '@/components/ui/PatternBackground';
@@ -33,7 +32,6 @@ export const FragmentsHeader: React.FC<FragmentsHeaderProps> = ({
   handleSearch,
   handleCategoryChange,
 }) => {
-  const theme = useTheme();
   const containerRef = useRef<HTMLDivElement>(null);
   
   // Safe DOM manipulation inside useEffect with null check

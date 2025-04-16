@@ -20,11 +20,10 @@ import CategoryIcon from '@mui/icons-material/Category';
 
 interface CategorySelectorProps {
   value: string;
-  onChange: (category: string) => void;
-  existingCategories: string[];
-  label?: string;
+  onChange: (value: string) => void;
+  existingCategories: Array<{id: number, name: string}>;
   required?: boolean;
-  fullWidth?: boolean;
+  label?: string;
   margin?: 'none' | 'dense' | 'normal';
   size?: 'small' | 'medium';
 }
@@ -33,11 +32,10 @@ const CategorySelector: React.FC<CategorySelectorProps> = ({
   value,
   onChange,
   existingCategories,
-  label = "Catégorie",
   required = false,
-  fullWidth = true,
-  margin = "normal",
-  size = "medium",
+  label = "Catégorie",
+  margin = "none",
+  size = "medium"
 }) => {
   const [selectedCategory, setSelectedCategory] = useState<string>(value || '');
   const [newCategoryDialogOpen, setNewCategoryDialogOpen] = useState(false);
@@ -68,7 +66,7 @@ const CategorySelector: React.FC<CategorySelectorProps> = ({
       return;
     }
 
-    if (existingCategories.includes(newCategoryName.trim())) {
+    if (existingCategories.some(category => category.name === newCategoryName.trim())) {
       setError('Cette catégorie existe déjà');
       return;
     }
@@ -86,7 +84,7 @@ const CategorySelector: React.FC<CategorySelectorProps> = ({
 
   return (
     <>
-      <FormControl required={required} fullWidth={fullWidth} margin={margin} size={size}>
+      <FormControl required={required} fullWidth={true} margin={margin} size={size}>
         <InputLabel id="category-label">{label}{required ? ' *' : ''}</InputLabel>
         <Select
           labelId="category-label"
@@ -95,20 +93,14 @@ const CategorySelector: React.FC<CategorySelectorProps> = ({
           label={`${label}${required ? ' *' : ''}`}
           startAdornment={<CategoryIcon sx={{ mr: 1, color: 'text.secondary' }} />}
         >
-          {/* Common categories as default options */}
-          <MenuItem value="Général">Général</MenuItem>
-          <MenuItem value="Points positifs">Points positifs</MenuItem>
-          <MenuItem value="Points négatifs">Points négatifs</MenuItem>
-          <MenuItem value="Conseils">Conseils</MenuItem>
-          
-          {/* User's existing categories that aren't part of the default set */}
-          {existingCategories
-            .filter(cat => !['Général', 'Points positifs', 'Points négatifs', 'Conseils'].includes(cat))
-            .map(cat => (
-              <MenuItem key={cat} value={cat}>{cat}</MenuItem>
-            ))
-          }
-          
+          <MenuItem value="">
+            <em>Sélectionner une catégorie</em>
+          </MenuItem>
+          {existingCategories.map((category) => (
+            <MenuItem key={category.id} value={category.name}>
+              {category.name}
+            </MenuItem>
+          ))}
           {/* Option to add a new category */}
           <MenuItem value="add_new" sx={{ color: 'primary.main' }}>
             <AddIcon fontSize="small" sx={{ mr: 1 }} />

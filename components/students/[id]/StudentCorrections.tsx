@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Box, 
   Typography, 
@@ -20,16 +20,17 @@ import {
   IconButton,
   Tooltip,
   alpha,
-  Stack
+  Stack,
+  InputAdornment,
+  CircularProgress
 } from '@mui/material';
 import Link from 'next/link';
-import dayjs from 'dayjs';
-import { Correction, Student } from './types';
+import { CorrectionAutreEnriched, Student, ActivityAutre } from '@/lib/types';
 import { getGradeColor } from './utils/gradeUtils';
 import { useTheme } from '@mui/material/styles';
 
 // Importation des composants de partage et d'email
-import EmailFeedback from '@/components/corrections/EmailFeedback';
+import EmailFeedbackAutre from '@/components/corrections/EmailFeedbackAutre';
 import ShareModal from '@/app/components/ShareModal';
 
 // Icons
@@ -49,28 +50,88 @@ import RemoveCircleIcon from '@mui/icons-material/RemoveCircle';
 
 interface StudentCorrectionsProps {
   student: Student;
-  corrections: Correction[];
+  corrections: CorrectionAutreEnriched[];
 }
 
-export default function StudentCorrections({ student, corrections }: StudentCorrectionsProps) {
+export default function StudentCorrections({ student, corrections: initialCorrections }: StudentCorrectionsProps) {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterActivity, setFilterActivity] = useState('');
-  const [sortOption, setSortOption] = useState('date-desc'); // Options: date-desc, date-asc, grade-high, grade-low
+  const [sortOption, setSortOption] = useState('date-desc');
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const theme = useTheme();
   const [shareModalOpen, setShareModalOpen] = useState(false);
   const [selectedCorrectionId, setSelectedCorrectionId] = useState<string>('');
+  const [corrections, setCorrections] = useState<CorrectionAutreEnriched[]>(initialCorrections);
+  const [activities, setActivities] = useState<Map<number, ActivityAutre>>(new Map());
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // Charger les activités pour les corrections
+  useEffect(() => {
+    const fetchActivities = async () => {
+      setLoading(true);
+      // Créer un tableau d'IDs uniques au lieu d'un Set
+      const activityIds = Array.from(new Set(initialCorrections.map(c => c.activity_id)));
+      
+      try {
+        const activitiesMap = new Map<number, ActivityAutre>();
+        
+        // Récupérer chaque activité individuellement
+        for (const activityId of activityIds) {
+          const response = await fetch(`/api/activities_autres/${activityId}`);
+          if (response.ok) {
+            const activity = await response.json();
+            activitiesMap.set(activityId, activity);
+          }
+        }
+        
+        setActivities(activitiesMap);
+        
+        // Enrichir les corrections avec les infos des activités
+        const enrichedCorrections = initialCorrections.map(correction => {
+          const activity = activitiesMap.get(correction.activity_id);
+          return {
+            ...correction,
+            activity_name: activity?.name || 'Activité inconnue',
+            // Toujours prendre les parts_names et points de l'activité associée
+            parts_names: activity?.parts_names || [],
+            points: activity?.points || [],
+            // Calculer le pourcentage de réussite
+            score_percentage: calculateScorePercentage(correction, activity)
+          };
+        });
+        
+        setCorrections(enrichedCorrections);
+      } catch (err) {
+        console.error('Erreur lors du chargement des activités:', err);
+        setError('Impossible de charger les informations des activités');
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    if (initialCorrections.length > 0) {
+      fetchActivities();
+    }
+  }, [initialCorrections]);
 
   // Fonction pour formater la date
-  const formatDate = (dateString: string) => {
+  const formatDate = (dateString?: string | Date) => {
+    if (!dateString) return 'Non spécifiée';
+    
+    const date = typeof dateString === 'string' 
+      ? new Date(dateString) 
+      : dateString;
+    
     const options: Intl.DateTimeFormatOptions = { 
       year: 'numeric', 
       month: 'short', 
       day: 'numeric',
     };
-    return new Date(dateString).toLocaleDateString('fr-FR', options);
+    return date.toLocaleDateString('fr-FR', options);
   };
 
+  // Obtenir les activités uniques
   const getUniqueActivities = () => {
     const activityMap = new Map();
     
@@ -86,6 +147,7 @@ export default function StudentCorrections({ student, corrections }: StudentCorr
     return Array.from(activityMap.values());
   };
 
+  // Filtrer et trier les corrections
   const getFilteredAndSortedCorrections = () => {
     let filtered = [...corrections];
     
@@ -106,11 +168,11 @@ export default function StudentCorrections({ student, corrections }: StudentCorr
     return filtered.sort((a, b) => {
       switch(sortOption) {
         case 'date-desc':
-          return new Date(b.submission_date || b.created_at).getTime() - 
-                 new Date(a.submission_date || a.created_at).getTime();
+          return new Date(b.submission_date || b.created_at || '').getTime() - 
+                 new Date(a.submission_date || a.created_at || '').getTime();
         case 'date-asc':
-          return new Date(a.submission_date || a.created_at).getTime() - 
-                 new Date(b.submission_date || b.created_at).getTime();
+          return new Date(a.submission_date || a.created_at || '').getTime() - 
+                 new Date(b.submission_date || b.created_at || '').getTime();
         case 'grade-high':
           return (b.grade || 0) - (a.grade || 0);
         case 'grade-low':
@@ -122,15 +184,32 @@ export default function StudentCorrections({ student, corrections }: StudentCorr
   };
 
   // Calculer le pourcentage de score pour une correction
-  const calculateScorePercentage = (correction: Correction) => {
-    const expPoints = correction.experimental_points || 0;
-    const theoPoints = correction.theoretical_points || 0;
-    const maxPoints = expPoints + theoPoints;
-    
-    if (maxPoints > 0 && correction.grade !== null) {
-      return (correction.grade / maxPoints) * 100;
+  const calculateScorePercentage = (correction: CorrectionAutreEnriched, activity?: ActivityAutre): number => {
+    if (!correction.points_earned || correction.points_earned.length === 0) {
+      return 0;
     }
-    return 0;
+    
+    // Utiliser les points de l'activité ou ceux fournis dans la correction
+    const activityPoints = activity?.points || [];
+    
+    if (activityPoints.length === 0) {
+      return 0;
+    }
+    
+    // Calculer le total des points gagnés et le total possible
+    const totalEarned = correction.points_earned.reduce((sum, points) => sum + (points || 0), 0);
+    const totalPossible = activityPoints.reduce((sum, points) => sum + (points || 0), 0);
+    
+    if (totalPossible <= 0) {
+      return 0;
+    }
+    
+    return (totalEarned / totalPossible) * 100;
+  };
+
+  // Obtenir une activité par son ID
+  const getActivity = (activityId: number): ActivityAutre | undefined => {
+    return activities.get(activityId);
   };
 
   // Fonction pour ouvrir le modal de partage
@@ -163,7 +242,11 @@ export default function StudentCorrections({ student, corrections }: StudentCorr
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             InputProps={{
-              startAdornment: <SearchIcon color="action" sx={{ mr: 1 }} />,
+              startAdornment: (
+                <InputAdornment position="start">
+                  <SearchIcon color="action" fontSize="small" />
+                </InputAdornment>
+              ),
             }}
             variant="outlined"
           />
@@ -204,8 +287,22 @@ export default function StudentCorrections({ student, corrections }: StudentCorr
         </Box>
       </Box>
       
+      {/* État de chargement */}
+      {loading && (
+        <Box sx={{ display: 'flex', justifyContent: 'center', my: 4 }}>
+          <CircularProgress />
+        </Box>
+      )}
+      
+      {/* Message d'erreur */}
+      {error && (
+        <Alert severity="error" sx={{ mb: 3 }}>
+          {error}
+        </Alert>
+      )}
+      
       {/* Contenu principal */}
-      {corrections.length === 0 ? (
+      {corrections.length === 0 && !loading ? (
         <Paper 
           sx={{ 
             p: 4, 
@@ -222,12 +319,12 @@ export default function StudentCorrections({ student, corrections }: StudentCorr
             variant="contained"
             startIcon={<AssignmentIcon />}
             component={Link}
-            href={`/corrections/unique?studentId=${student.id}`}
+            href={`/corrections_autres/unique?studentId=${student.id}`}
           >
             Ajouter une correction
           </Button>
         </Paper>
-      ) : filteredCorrections.length === 0 ? (
+      ) : filteredCorrections.length === 0 && !loading ? (
         <Alert 
           severity="warning"
           sx={{ 
@@ -240,10 +337,10 @@ export default function StudentCorrections({ student, corrections }: StudentCorr
         >
           Aucune correction ne correspond aux filtres appliqués.
         </Alert>
-      ) : (
+      ) : !loading && (
         <Grid container spacing={3}>
           {filteredCorrections.map((correction) => {
-            const scorePercentage = calculateScorePercentage(correction);
+            const activity = getActivity(correction.activity_id);
             return (
               <Grid size={{ xs: 12, md: 6 }} key={correction.id}>
                 <Card 
@@ -264,11 +361,24 @@ export default function StudentCorrections({ student, corrections }: StudentCorr
                       <Typography variant="h6" fontWeight="bold" noWrap>
                         {correction.activity_name}
                       </Typography>
-                      {correction.grade !== null ? (
+                      {correction.grade !== null && correction.grade !== undefined ? (
                         <Chip 
-                          label={`${correction.grade}/20`}
+                          label={
+                            correction.grade !== null && correction.grade !== undefined
+                              ?
+                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0 }}>
+                              <Typography variant="body2" fontWeight='700' noWrap>
+                                {correction.grade}&nbsp;
+                              </Typography>
+                              <Typography variant="body2" noWrap>
+                              / {activity?.points?.reduce((a, b) => a + b, 0)}
+                              </Typography>
+                              </Box>
+                              : 'Non notée'
+                          }
                           sx={{
-                            color: getGradeColor(correction.grade || 0)
+                            color: getGradeColor(correction.grade || 0),
+                            fontWeight: 700,
                           }}
                           icon={<GradeIcon />}
                         />
@@ -307,57 +417,61 @@ export default function StudentCorrections({ student, corrections }: StudentCorr
                         sx={{ display: 'flex', alignItems: 'center', gap: 1 }}
                       >
                         <SchoolIcon fontSize="small" />
-                        {correction.class_name}
+                        {correction.class_name || 'Aucune classe'}
                       </Typography>
                     </Box>
                     
-                    {(correction.experimental_points || correction.theoretical_points) && (
+                    {/* Affichage des points par partie */}
+                    {correction.points_earned && correction.points_earned.length > 0 && (
                       <>
                         <Typography variant="subtitle2" gutterBottom>
                           Répartition des points :
                         </Typography>
                         
                         <Grid container spacing={1} sx={{ mb: 1 }}>
-                          {correction.experimental_points && (
-                            <Grid size={{ xs: 4 }}>
+                          {correction.points_earned.map((points, index) => {
+                            // Obtenir le nom de la partie de l'activité
+                            const partName = activity?.parts_names?.[index] || `Partie ${index + 1}`;
+                            
+                            // Obtenir les points max de la partie
+                            const maxPoints = activity?.points?.[index] || 0;
+                            
+                            return (
+                              <Grid size={{ xs: 12, sm: 6 }} key={`part-${index}`}>
+                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                  {index === 0 ? (
+                                    <ScienceIcon color="primary" fontSize="small" />
+                                  ) : (
+                                    <MenuBookIcon color="secondary" fontSize="small" />
+                                  )}
+                                  <Typography variant="body2" fontWeight="medium">
+                                    {partName}: {points || 0} / {maxPoints} pts
+                                  </Typography>
+                                </Box>
+                              </Grid>
+                            );
+                          })}
+                          
+                          {correction.penalty && parseFloat(String(correction.penalty)) > 0 && (
+                            <Grid size={{ xs: 12, sm: 6 }}>
                               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                                <ScienceIcon color="primary" fontSize="small" />
-                                <Typography variant="body2" fontWeight="medium">
-                                  Expérim : {correction.experimental_points} pts
-                                </Typography>
-                              </Box>
-                            </Grid>
-                          )}
-                          {correction.theoretical_points && (
-                            <Grid size={{ xs: 4 }}>
-                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                                <MenuBookIcon color="secondary" fontSize="small" />
-                                <Typography variant="body2" fontWeight="medium">
-                                  Théorique: {correction.theoretical_points} pts
-                                </Typography>
-                              </Box>
-                            </Grid>
-                          )}
-                          {correction.penalty && (
-                            <Grid size={{ xs: 4 }}>
-                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                                 <RemoveCircleIcon color="error" fontSize="small" />
                                 <Typography variant="body2" fontWeight="medium">
-                                    Pénalité: {correction.penalty} pts
+                                  Pénalité: {correction.penalty} pts
                                 </Typography>
-                            </Box>
+                              </Box>
                             </Grid>
                           )}
                         </Grid>
                         
-                        {correction.grade !== null && (
+                        {correction.grade !== null && correction.grade !== undefined && (
                           <Box sx={{ mt: 2 }}>
                             <Typography variant="caption" color="text.secondary" gutterBottom>
                               Pourcentage de réussite
                             </Typography>
                             <LinearProgress 
                               variant="determinate" 
-                              value={scorePercentage} 
+                              value={correction.score_percentage || 0} 
                               sx={{ 
                                 height: 10, 
                                 borderRadius: 5,
@@ -386,7 +500,7 @@ export default function StudentCorrections({ student, corrections }: StudentCorr
                               }}
                             />
                             <Typography variant="caption" sx={{ display: 'block', textAlign: 'right', mt: 0.5 }}>
-                              {scorePercentage.toFixed(1)}%
+                              {(correction.score_percentage || 0).toFixed(1)}%
                             </Typography>
                           </Box>
                         )}
@@ -401,8 +515,10 @@ export default function StudentCorrections({ student, corrections }: StudentCorr
                     <Button 
                       startIcon={<EditIcon />}
                       component={Link}
-                      href={`/corrections/${correction.id}`}
+                      href={`/corrections_autres/${correction.id}`}
                       variant="outlined"
+                      target="_blank"
+                      rel="noopener noreferrer"
                     >
                       Voir/Modifier
                     </Button>
@@ -410,7 +526,7 @@ export default function StudentCorrections({ student, corrections }: StudentCorr
                     <Stack direction="row" spacing={1} sx={{ display:'flex', justifyItems:'center',
                          flexWrap: 'wrap', justifyContent: 'flex-end', alignContent: 'center' }}>
                       {/* Bouton de partage - uniquement pour les corrections notées */}
-                      <Tooltip title={correction.grade !== null 
+                      <Tooltip title={correction.grade !== null && correction.grade !== undefined 
                         ? "Partager cette correction" 
                         : "Attribution d'une note nécessaire pour partager"}>
                         <span className='flex justify-center'> {/* Wrapper pour permettre le tooltip sur un bouton désactivé */}
@@ -418,22 +534,23 @@ export default function StudentCorrections({ student, corrections }: StudentCorr
                             color="primary" 
                             size="small"
                             onClick={() => handleOpenShareModal(correction.id)}
-                            disabled={correction.grade === null}
+                            disabled={correction.grade === null || correction.grade === undefined}
                           >
                             <ShareIcon fontSize="small" />
                           </IconButton>
                         </span>
                       </Tooltip>
                       
-                      {/* Utiliser EmailFeedback correctement - sans le nester dans un IconButton */}
-                      {correction.grade !== null ? (
-                        <EmailFeedback
+                      {/* Email Feedback */}
+                      {correction.grade !== null && correction.grade !== undefined ? (
+                        <EmailFeedbackAutre
                           correctionId={correction.id.toString()}
-                          studentData={{
-                            first_name: student.first_name,
-                            last_name: student.last_name,
-                            email: student.email || ''
-                          }}
+                          activityName={correction.activity_name}
+                          student={student}
+                          points_earned={correction.points_earned || []}
+                          activity_parts_names={activity?.parts_names || []}
+                          activity_points={activity?.points || []}
+                          penalty={correction.penalty?.toString()}
                         />
                       ) : (
                         <Tooltip title="Attribution d'une note nécessaire pour envoyer par email">
@@ -470,7 +587,9 @@ export default function StudentCorrections({ student, corrections }: StudentCorr
           variant="contained"
           startIcon={<AssignmentIcon />}
           component={Link}
-          href={`/corrections/unique?studentId=${student.id}`}
+          href={`/corrections_autres/unique?studentId=${student.id}`}
+          target="_blank"
+          rel="noopener noreferrer"
         >
           Ajouter une correction
         </Button>

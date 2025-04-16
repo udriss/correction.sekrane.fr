@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { query, withConnection } from '@/lib/db';
+import { getServerSession } from "next-auth/next";
+import authOptions from "@/lib/auth";
+import { getUser } from '@/lib/auth';
 
 // GET: Get a student by ID within a specific class
 export async function GET(
@@ -7,6 +10,17 @@ export async function GET(
   { params }: { params: Promise<{ id: string, studentId: string }> }
 ) {
   try {
+    // Get the user from both auth systems
+    const session = await getServerSession(authOptions);
+    const customUser = await getUser();
+    
+    // Use either auth system, starting with custom auth
+    const userId = customUser?.id || session?.user?.id;
+    
+    if (!userId) {
+      return NextResponse.json({ error: 'utilisateur non authentifié' }, { status: 401 });
+    }
+
     // Await the params
     const { id, studentId } = await params;
     
@@ -45,6 +59,17 @@ export async function PUT(
   { params }: { params: Promise<{ id: string, studentId: string }> }
 ) {
   try {
+    // Get the user from both auth systems
+    const session = await getServerSession(authOptions);
+    const customUser = await getUser();
+    
+    // Use either auth system, starting with custom auth
+    const userId = customUser?.id || session?.user?.id;
+    
+    if (!userId) {
+      return NextResponse.json({ error: 'utilisateur non authentifié' }, { status: 401 });
+    }
+
     // Await the params
     const { id, studentId } = await params;
     
@@ -130,6 +155,17 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string, studentId: string }> }
 ) {
   try {
+    // Get the user from both auth systems
+    const session = await getServerSession(authOptions);
+    const customUser = await getUser();
+    
+    // Use either auth system, starting with custom auth
+    const userId = customUser?.id || session?.user?.id;
+    
+    if (!userId) {
+      return NextResponse.json({ error: 'utilisateur non authentifié' }, { status: 401 });
+    }
+
     // Await the params
     const { id, studentId } = await params;
     
@@ -181,6 +217,17 @@ export async function POST(
   { params }: { params: Promise<{ id: string, studentId: string }> }
 ) {
   try {
+    // Get the user from both auth systems
+    const session = await getServerSession(authOptions);
+    const customUser = await getUser();
+    
+    // Use either auth system, starting with custom auth
+    const userId = customUser?.id || session?.user?.id;
+    
+    if (!userId) {
+      return NextResponse.json({ error: 'utilisateur non authentifié' }, { status: 401 });
+    }
+
     // Await the params
     const { id, studentId } = await params;
     
@@ -254,6 +301,17 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string; studentId: string }> }
 ) {
   try {
+    // Get the user from both auth systems
+    const session = await getServerSession(authOptions);
+    const customUser = await getUser();
+    
+    // Use either auth system, starting with custom auth
+    const userId = customUser?.id || session?.user?.id;
+    
+    if (!userId) {
+      return NextResponse.json({ error: 'utilisateur non authentifié' }, { status: 401 });
+    }
+    
     const { id, studentId } = await params;
     const classId = parseInt(id);
     const studentIdNumber = parseInt(studentId);

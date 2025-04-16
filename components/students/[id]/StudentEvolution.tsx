@@ -19,10 +19,10 @@ import {
   ReferenceLine,
   Legend
 } from 'recharts';
-import { Correction } from './types';
+import { CorrectionAutreEnriched } from '@/lib/types';
 
 interface StudentEvolutionProps {
-  corrections: Correction[];
+  corrections: CorrectionAutreEnriched[];
 }
 
 export default function StudentEvolution({ corrections }: StudentEvolutionProps) {
@@ -37,10 +37,10 @@ export default function StudentEvolution({ corrections }: StudentEvolutionProps)
         // Utiliser submission_date si disponible, sinon created_at
         const dateA = a.submission_date 
           ? new Date(a.submission_date).getTime() 
-          : new Date(a.created_at).getTime();
+          : new Date(a.created_at ?? 0).getTime();
         const dateB = b.submission_date 
           ? new Date(b.submission_date).getTime() 
-          : new Date(b.created_at).getTime();
+          : new Date(b.created_at ?? 0).getTime();
         return dateA - dateB;
       })
       .map(c => {

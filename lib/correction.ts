@@ -177,11 +177,13 @@ export async function getCorrectionStatsByActivity(activityId: number, includeIn
         cl.id as classId,
         cl.name as className,
         cs.sub_class as subClass,
-        ROUND(AVG(c.grade), 2) as averageGrade,
-        MAX(c.grade) as maxGrade,
-        MIN(c.grade) as minGrade,
+        ROUND(AVG(c.final_grade), 2) as averageGrade,
+        MAX(c.final_grade) as maxGrade,
+        MIN(c.final_grade) as minGrade,
         COUNT(c.id) as count,
-        SUM(CASE WHEN c.active = 0 THEN 1 ELSE 0 END) as inactive_count
+        SUM(CASE WHEN c.status = 'DEACTIVATED' THEN 1 ELSE 0 END) as inactive_count,
+        SUM(CASE WHEN c.status = 'NON_RENDU' THEN 1 ELSE 0 END) as non_rendu_count,
+        SUM(CASE WHEN c.status = 'ABSENT' THEN 1 ELSE 0 END) as absent_count
       FROM 
         corrections c
       LEFT JOIN 
@@ -194,7 +196,7 @@ export async function getCorrectionStatsByActivity(activityId: number, includeIn
         class_students cs ON (s.id = cs.student_id AND c.class_id = cs.class_id)
       WHERE 
         c.activity_id = ? 
-        ${includeInactive ? '' : 'AND c.active = 1'}
+        ${includeInactive ? '' : "AND c.status = 'ACTIVE'"}
       GROUP BY 
         -- Regrouper d'abord par la règle spéciale de priorité
         CASE 

@@ -9,7 +9,7 @@ import ErrorDisplay from '@/components/ui/ErrorDisplay';
 export default function LoginPage() {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
+  const [error, setError] = useState<Error | string | null>(null);
   const [loading, setLoading] = useState(false);
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -23,7 +23,7 @@ export default function LoginPage() {
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    setError('');
+    setError(null);
 
     try {
       const response = await fetch('/api/auth/login', {
@@ -37,7 +37,11 @@ export default function LoginPage() {
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.error || 'Authentification échouée');
+        // Créer une instance d'Error et y attacher les détails
+        const error = new Error(data.error || 'Authentification échouée');
+        (error as any).details = data.details || {};
+        setError(error);
+        throw error;
       }
 
       
@@ -49,7 +53,10 @@ export default function LoginPage() {
         window.location.href = callbackUrl;
       }, 300);
     } catch (err: any) {
-      setError(err.message || 'Connexion échouée');
+      console.error('Erreur lors de la connexion:', err);
+      if (!error) {
+        setError(err instanceof Error ? err : new Error(String(err)));
+      }
     } finally {
       setLoading(false);
     }
@@ -92,7 +99,15 @@ export default function LoginPage() {
           Connexion
         </Typography>
 
-        <ErrorDisplay error={error} onRefresh={() => setError('')} />
+        <ErrorDisplay 
+          error={error}
+          errorDetails={
+            error && typeof error === 'object' && 'details' in error
+              ? (error as any).details
+              : undefined
+          }
+          onRefresh={() => setError(null)} 
+        />
 
         <Box 
           component="form" 

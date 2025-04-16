@@ -1,7 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import { useSearchParams, useRouter } from 'next/navigation';
+import React from 'react';
 import { Container, Alert, Box, CircularProgress, Typography, Paper, Button, AlertTitle } from '@mui/material';
 import SearchIcon from '@mui/icons-material/Search';
 import SearchHeader from '@/components/search/SearchHeader';

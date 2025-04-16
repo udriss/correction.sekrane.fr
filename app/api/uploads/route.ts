@@ -6,8 +6,33 @@ import { getUser } from '@/lib/auth';
 
 export async function POST(request: NextRequest) {
   try {
-    // Verify authentication (optional but recommended)
-    const user = await getUser(request);
+    // Verify authentication with improved error handling
+    let user;
+    try {
+      user = await getUser(request);
+    } catch (authError) {
+      // Capture et retourne les détails de l'erreur d'authentification
+      console.error('Authentication error in upload route:', authError);
+      const errorMessage = authError instanceof Error ? authError.message : String(authError);
+      const errorType = authError instanceof Error ? authError.name : 'UnknownError';
+      
+      // Si c'est une erreur de base de données, capturer les détails spécifiques
+      const dbError = authError as any;
+      if (dbError.code && dbError.sqlMessage) {
+        return NextResponse.json({ 
+          error: `Erreur d'authentification - ${dbError.sqlMessage}`,
+          errorType: errorType,
+          errorCode: dbError.code,
+          errorDetails: process.env.NODE_ENV === 'development' ? String(authError) : undefined
+        }, { status: 500 }); // Utiliser 500 pour les erreurs de DB au lieu de 401
+      }
+      
+      return NextResponse.json({ 
+        error: `Erreur d'authentification - ${errorMessage}`,
+        errorType: errorType
+      }, { status: 401 });
+    }
+    
     if (!user) {
       return NextResponse.json({ error: 'Non autorisé' }, { status: 401 });
     }

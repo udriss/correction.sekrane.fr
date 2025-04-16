@@ -5,10 +5,9 @@ import {
   createEmptyCorrection
 } from './types';
 import { Correction as ProviderCorrection } from '@/app/components/CorrectionsDataProvider';
-import { Student } from '@/lib/types';
-
+import { Student, CorrectionAutreEnriched } from '@/lib/types';
 interface OrganizeAllCorrectionsDataParams {
-  corrections: ProviderCorrection[];
+  corrections: CorrectionAutreEnriched[];
   includeAllStudents: boolean;
   filterActivity: number | 'all';
   arrangement: ArrangementType;
@@ -36,14 +35,14 @@ const organizeAllCorrectionsData = ({
   
   // Créer une table de hachage pour les corrections existantes
   // Structure: { studentId: { activityId: correction } }
-  const correctionsMap: Record<number, Record<number, ProviderCorrection>> = {};
+  const correctionsMap: Record<number, Record<number, CorrectionAutreEnriched>> = {};
   
   // Remplir la table de hachage avec les corrections existantes
   corrections.forEach(correction => {
-    if (!correctionsMap[correction.student_id]) {
-      correctionsMap[correction.student_id] = {};
+    if (!correctionsMap[correction.activity_id]) {
+      correctionsMap[correction.activity_id] = {};
     }
-    correctionsMap[correction.student_id][correction.activity_id] = correction;
+
   });
   
   // Créer une carte des étudiants par classe pour une organisation plus efficace
@@ -755,7 +754,7 @@ const organizeAllCorrectionsData = ({
             
             // Vérifier si ce groupe a déjà une correction pour cette activité
             const hasActivityCorrection = result[groupName].corrections.some(
-              (c: ProviderCorrection) => c.activity_id === activityId
+              (c: CorrectionAutreEnriched) => c.activity_id === activityId
             );
             
             // Si le groupe n'a pas de correction pour cette activité, ajouter un placeholder pour chaque étudiant

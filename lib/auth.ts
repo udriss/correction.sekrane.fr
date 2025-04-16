@@ -23,6 +23,7 @@ export async function getUserFromToken(req: NextRequest): Promise<User | null> {
     const token = req.cookies.get('auth_token')?.value;
     
     if (!token) {
+      
       return null;
     }
     
@@ -32,6 +33,7 @@ export async function getUserFromToken(req: NextRequest): Promise<User | null> {
     
     // S'assurer que le payload contient un utilisateur valide
     if (!payload || !payload.id) {
+      
       return null;
     }
     
@@ -41,20 +43,27 @@ export async function getUserFromToken(req: NextRequest): Promise<User | null> {
       name: payload.name as string
     };
   } catch (error) {
-    console.error('Error verifying token:', error);
+    // Log l'erreur avec plus de détails pour faciliter le débogage
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    const errorType = error instanceof Error ? error.name : 'UnknownError';
+    console.error(`Error verifying token in getUserFromToken: ${errorType} - ${errorMessage}`, error);
+    
+    // Retourner null mais on pourrait aussi retourner { user: null, error: errorMessage }
+    // si on voulait propager l'erreur
     return null;
   }
 }
 
 export async function getUser(req?: NextRequest): Promise<User | null> {
+  const cookieStore = req ? req.cookies : await cookies();
+  const token = cookieStore.get('auth_token')?.value;
+
+  if (!token) {
+    
+    return null;
+  }
+
   try {
-    const cookieStore = req ? req.cookies : await cookies();
-    const token = cookieStore.get('auth_token')?.value;
-
-    if (!token) {
-      return null;
-    }
-
     // Verify the token
     const secret = new TextEncoder().encode(process.env.JWT_SECRET);
     const { payload } = await jwtVerify(token, secret);
@@ -70,6 +79,7 @@ export async function getUser(req?: NextRequest): Promise<User | null> {
     const user = users[0];
     
     if (!user) {
+      
       return null;
     }
     
@@ -80,8 +90,18 @@ export async function getUser(req?: NextRequest): Promise<User | null> {
       is_admin: user.is_admin === 1 // Convertir la valeur numérique en booléen
     };
   } catch (error) {
-    console.error('Error verifying token:', error);
-    return null;
+    // Log l'erreur avec plus de détails pour faciliter le débogage
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    const errorType = error instanceof Error ? error.name : 'UnknownError';
+    console.error(`Error in getUser: ${errorType} - ${errorMessage}`, error);
+    
+    // Si l'erreur est liée à la base de données, ajoutez des informations spécifiques
+    if (error instanceof Error && (error as any).code) {
+      console.error(`Database error code: ${(error as any).code}`);
+    }
+    
+    // Propager l'erreur au lieu de retourner null
+    throw error;
   }
 }
 

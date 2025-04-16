@@ -21,6 +21,7 @@ import {
   DialogContent,
   DialogActions,
   IconButton,
+  SelectChangeEvent,
 } from '@mui/material';
 import SaveIcon from '@mui/icons-material/Save';
 import CancelIcon from '@mui/icons-material/Cancel';
@@ -66,27 +67,23 @@ export default function FragmentEditor({
   const [categoryDeleteError, setCategoryDeleteError] = useState<string | null>(null);
   const [categoryDeleteSuccess, setCategoryDeleteSuccess] = useState(false);
   
-  // Générer des clés uniques pour forcer le rendu et éviter les problèmes de mise à jour
-  const tagsKey = useRef(`tags-${Date.now()}-${JSON.stringify(tags)}`).current;
-  const fragmentKey = useRef(`fragment-${fragment.id}-${Date.now()}`).current;
-  
   // État pour gérer les catégories sélectionnées
   const [selectedCategories, setSelectedCategories] = useState<number[]>(() => {
-    // Initialiser les catégories à partir du fragment
     if (fragment.categories) {
       if (Array.isArray(fragment.categories)) {
-        // Si c'est déjà un tableau de nombres
-        if (fragment.categories.length > 0 && typeof fragment.categories[0] === 'number') {
-          return fragment.categories as number[];
-        }
-        // Si c'est un tableau d'objets
-        if (fragment.categories.length > 0 && typeof fragment.categories[0] === 'object') {
-          return (fragment.categories as Array<{id: number, name: string}>).map(cat => cat.id);
-        }
+        return fragment.categories.map(cat => 
+          typeof cat === 'object' && cat !== null && 'id' in cat ? cat.id : 
+          typeof cat === 'number' ? cat : 
+          null
+        ).filter((id): id is number => id !== null);
       }
     }
     return [];
   });
+
+  // Générer des clés uniques pour forcer le rendu et éviter les problèmes de mise à jour
+  const tagsKey = useRef(`tags-${Date.now()}-${JSON.stringify(tags)}`).current;
+  const fragmentKey = useRef(`fragment-${fragment.id}-${Date.now()}`).current;
 
   // Ajouter une méthode directe d'enregistrement qui retourne à l'interface principale
   const handleSubmit = async (e: React.FormEvent) => {
@@ -95,50 +92,24 @@ export default function FragmentEditor({
     setError(null);
 
     try {
-      // S'assurer d'inclure tags même s'ils sont vides (pour préserver les tags existants)
+      // Convertir les IDs de catégories en objets complets
+      const categoriesObjects = selectedCategories.map(categoryId => {
+        const category = categories.find(c => c.id === categoryId);
+        return category || { id: categoryId, name: `Category ${categoryId}` };
+      });
+
       const updatedFragment = {
         ...fragment,
         content,
         tags: tags.length > 0 ? tags : (fragment.tags || []), // Préserver les tags existants si aucun nouveau tag n'est fourni
-        categories: selectedCategories
+        categories: categoriesObjects
       };
 
-      const response = await fetch(`/api/fragments/${fragment.id}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(updatedFragment),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Erreur lors de la mise à jour du fragment');
-      }
-
-      const result = await response.json();
+      await onUpdate(updatedFragment);
       setSuccess(true);
       
-      // Rafraîchir les catégories pour s'assurer que toutes les nouvelles catégories sont disponibles
-      if (refreshCategories) {
-        await refreshCategories();
-      }
-      
-      // Notifier le parent que l'opération est réussie avec un fragment complètement nouveau
-      // pour forcer le rendu à travers toute l'application
-      const enrichedResult = {
-        ...result,
-        _forceUpdate: Date.now(),
-        _renderKey: Math.random()
-      };
-      
-      onUpdate(enrichedResult);
-      
-      // Afficher la notification de succès
-      setTimeout(() => {
-        // Si vous voulez fermer automatiquement
-        // onCancel();
-      }, 1500);
+      // Fermer le modal après l'enregistrement réussi
+      onCancel();
     } catch (err: any) {
       setError(err.message || 'Une erreur est survenue lors de la mise à jour');
     } finally {
@@ -161,9 +132,11 @@ export default function FragmentEditor({
     setTags(newTags);
   };
 
-  const handleCategoryChange = (event: any) => {
-    // Créer une nouvelle référence pour forcer la mise à jour
-    const newSelectedCategories = [...event.target.value];
+  const handleCategoryChange = (event: SelectChangeEvent<number[]>) => {
+    const value = event.target.value;
+    const newSelectedCategories = typeof value === 'string' ? 
+      value.split(',').map(Number) : 
+      value;
     setSelectedCategories(newSelectedCategories);
   };
 
@@ -358,7 +331,7 @@ export default function FragmentEditor({
               size="small"
               placeholder="Ajouter un tag"
               sx={{ flexGrow: 1 }}
-              onKeyPress={(e) => {
+              onKeyDown={(e) => {
                 if (e.key === 'Enter') {
                   e.preventDefault();
                   handleAddTag();
@@ -384,9 +357,15 @@ export default function FragmentEditor({
                 color="info"
                 sx={{
                   borderRadius: 1.5,
-                  bgcolor: theme => alpha(theme.palette.info.main, 0.1),
+                  bgcolor: theme => alpha(theme.palette.info.main, 0.05),
                   color: theme => theme.palette.info.dark,
                   fontWeight: 500,
+                  '& .MuiChip-deleteIcon': {
+                    color: theme => theme.palette.info.dark,
+                    '&:hover': {
+                      color: theme => theme.palette.error.main,
+                    },
+                  },
                 }}
               />
             ))}
@@ -396,7 +375,7 @@ export default function FragmentEditor({
         <Box sx={{ mt: 3, display: 'flex', gap: 2, justifyContent: 'flex-end' }}>
           <Button
             variant="outlined"
-            color="secondary"
+            sx={{ color: theme => theme.palette.secondary.dark }}
             onClick={onCancel}
             startIcon={<CancelIcon />}
             disabled={loading}

@@ -19,6 +19,8 @@ export default function ClientLayout({ children }: ClientLayoutProps) {
   
   // Détection de toutes les routes principales
   const isFeedbackRoute = pathname && pathname.startsWith('/feedback');
+  // Détection de la route de correction d'un étudiant spécifique
+  const isStudentCorrectionPage = pathname && /^\/students\/\d+\/corrections$/.test(pathname);
   const isActivitiesRoute = pathname && pathname.startsWith('/activities');
   const isNewActivityRoute = pathname && pathname === '/activities/new';
   const isStudentsPage = pathname && pathname === '/students';
@@ -39,6 +41,7 @@ export default function ClientLayout({ children }: ClientLayoutProps) {
   // Créer un titre dynamique en fonction du chemin
   const getPageTitle = () => {
     if (isFeedbackRoute) return 'Correction - Feedback';
+    if (isStudentCorrectionPage) return 'Correction - résumé';
     if (isActivitiesRoute) {
       if (isNewActivityRoute) return 'Nouvelle activité';
       return 'Activités';
@@ -77,12 +80,12 @@ export default function ClientLayout({ children }: ClientLayoutProps) {
     if (canonicalLink) {
       canonicalLink.setAttribute('href', `https://correction.sekrane.fr${pathname}`);
     }
-  }, [pathname]);
+  }, [pathname, getPageTitle]);
   
   return (
     <LocalizationProvider dateAdapter={AdapterDayjs}>
-      {/* N'affichez la navbar que si nous ne sommes pas dans la route feedback */}
-      {!isFeedbackRoute && <MainNavbar />}
+      {/* N'affichez la navbar que si nous ne sommes pas dans la route feedback ou la page de corrections d'étudiant */}
+      {!(isFeedbackRoute || isStudentCorrectionPage) && <MainNavbar />}
       
       {/* 
         Utilisation du composant Box avec "div" au lieu de "main" pour éviter
@@ -90,7 +93,7 @@ export default function ClientLayout({ children }: ClientLayoutProps) {
       */}
       <Box 
         component="div" 
-        className={`flex-grow ${!isFeedbackRoute ? "pt-20" : ""}`}
+        className={`flex-grow ${!(isFeedbackRoute || isStudentCorrectionPage) ? "pt-20" : ""}`}
         sx={{
           bgcolor: 'background.default',
           color: 'text.primary',
@@ -103,8 +106,8 @@ export default function ClientLayout({ children }: ClientLayoutProps) {
         {children}
       </Box>
 
-      {/* N'affichez le footer que si nous ne sommes pas dans la route feedback */}
-      {!isFeedbackRoute && <Footer />}
+      {/* N'affichez le footer que si nous ne sommes pas dans la route feedback ou la page de corrections d'étudiant */}
+      {!(isFeedbackRoute || isStudentCorrectionPage) && <Footer />}
     </LocalizationProvider>
   );
 }

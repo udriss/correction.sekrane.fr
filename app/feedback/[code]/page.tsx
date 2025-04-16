@@ -37,9 +37,41 @@ import InfoIcon from '@mui/icons-material/Info';
 import GradientBackground from '@/components/ui/GradientBackground';
 import PatternBackground from '@/components/ui/PatternBackground';
 import ErrorDisplay from '@/components/ui/ErrorDisplay';
+import {CorrectionAutreEnriched} from '@/lib/types';
 
 // Initialiser la police Inter
 const inter = Inter({ subsets: ['latin'] });
+
+interface ContentData {
+  items: any[];
+  version: string;
+}
+
+interface Correction {
+  active: number;
+  activity_id: number;
+  activity_name: string;
+  class_id: number;
+  content: string;
+  content_data: ContentData;
+  created_at: string;
+  deadline: string;
+  final_grade: string;
+  grade: string;
+  group_id: number;
+  id: number;
+  parts_names: string[];
+  penalty: string;
+  points: number[];
+  points_earned: number[];
+  shareCode: string;
+  shared: boolean;
+  status: "ACTIVE" | "ABSENT" | "NON_RENDU" | "NON_NOTE" | "DEACTIVATED";
+  student_id: number;
+  student_name: string;
+  submission_date: string;
+  updated_at: string;
+}
 
 export default function FeedbackViewer({ params }: { params: Promise<{ code: string }> }) {
   // Unwrap the Promise for params using React.use in client components
@@ -49,11 +81,10 @@ export default function FeedbackViewer({ params }: { params: Promise<{ code: str
   const isMediumScreen = useMediaQuery(theme.breakpoints.up('md')); // Détecter si écran md ou plus grand
   
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-  const [correction, setCorrection] = useState<any>(null);
+  const [error, setError] = useState<Error | string | null>(null);
+  const [correction, setCorrection] = useState<Correction | null>(null);
   const [renderedHtml, setRenderedHtml] = useState('');
-  const [saving, setSaving] = useState(false);
-  const [saveSuccess, setSaveSuccess] = useState(false);
+
   
   // Ajout des états manquants
   const [correctionContent, setCorrectionContent] = useState<string>('');
@@ -94,10 +125,17 @@ export default function FeedbackViewer({ params }: { params: Promise<{ code: str
       const response = await fetch(`/api/feedback/${code}`);
       
       if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: 'Erreur lors du décodage de la réponse' }));
+        // Créer une instance d'Error et y attacher les détails
+        const error = new Error('Erreur lors du chargement de la correction : ' + (errorData.error || 'Erreur lors du chargement de la correction'));
+        (error as any).details = errorData.details || {};
+        
         if (response.status === 404) {
-          throw new Error('Ce lien de partage est invalide ou a expiré');
+          error.message = 'Ce lien de partage est invalide ou a expiré';
         }
-        throw new Error('Erreur lors du chargement de la correction');
+        
+        setError(error);
+        throw error;
       }
       
       const data = await response.json();
@@ -119,7 +157,10 @@ export default function FeedbackViewer({ params }: { params: Promise<{ code: str
       setRenderedHtml(html);
     } catch (err: any) {
       console.error('Erreur:', err);
-      setError(err.message || 'Une erreur est survenue');
+      // Si nous n'avons pas déjà défini l'erreur (avec des détails) ci-dessus
+      if (!error) {
+        setError(err instanceof Error ? err : new Error(String(err)));
+      }
     } finally {
       setLoading(false);
     }
@@ -240,11 +281,13 @@ export default function FeedbackViewer({ params }: { params: Promise<{ code: str
   const hasPenalty = correction.penalty !== null && correction.penalty !== undefined && parseFloat(correction.penalty) > 0;
   
   // Vérifier si c'est un travail non rendu (pénalité de 15 points et note totale de 20 sans pénalité)
+  // Dans notre système, un travail non rendu est représenté par une note maximale (20/20) 
+  // avec une pénalité maximale (15 points)
   const isNeverSubmitted = hasPenalty && 
-                          parseFloat(correction.penalty) === 15 && 
-                          (parseFloat(correction.grade) === 20 || 
-                          (parseFloat(correction.experimental_points_earned || 0) + 
-                           parseFloat(correction.theoretical_points_earned || 0) === 20));
+                          parseFloat(String(correction.penalty)) === 15 && 
+                          (parseFloat(String(correction.grade)) === 20 || 
+                          (Array.isArray(correction.points_earned) && 
+                           correction.points_earned.reduce((sum: number, p: number) => sum + (typeof p === 'number' ? p : parseFloat(String(p || '0'))), 0) === 20));
   
   // Format pour afficher "- -" au lieu des valeurs numériques pour les travaux non rendus
   const formatGradeWithNonRendu = (value: number | string | null | undefined) => {
@@ -252,15 +295,21 @@ export default function FeedbackViewer({ params }: { params: Promise<{ code: str
     return formatGrade(value);
   };
   
-  // Calcul de la note finale selon la règle
-  const calculateFinalGrade = (grade: number, penalty: number): number => {
-    if (grade < 6) {
-      // Si la note est inférieure à 6, on garde la note originale sans appliquer de pénalité
+  // Calcul de la note finale selon la règle, avec normalisation sur 20
+  const calculateFinalGrade = (grade: number, penalty: number, totalPoints: number): number => {
+    // Normaliser la note sur 20
+    const normalizedGrade = (grade * 20) / totalPoints;
+    const normalizedPenalty = (penalty * 20) / totalPoints;
+
+    if (normalizedGrade < 5) {
+      // Si la note normalisée est inférieure à 5/20, on garde la note originale sans appliquer de pénalité
       return grade;
     } else {
-      // Si la note est supérieure ou égale à 6, on applique la pénalité
-      // mais on ne descend pas en dessous de 6
-      return Math.max(grade - penalty, 6);
+      // Si la note normalisée est supérieure ou égale à 5/20, on applique la pénalité
+      // mais on ne descend pas en dessous de 5/20 (normalisé sur le barème total)
+      const normalizedResult = Math.max(normalizedGrade - normalizedPenalty, 5);
+      // Reconvertir le résultat sur le barème original
+      return (normalizedResult * totalPoints) / 20;
     }
   };
   
@@ -271,10 +320,10 @@ export default function FeedbackViewer({ params }: { params: Promise<{ code: str
       return correction.final_grade;
     }
     
-    // Sinon calculer selon la règle
+    // Sinon calculer selon la règle avec normalisation
     const rawTotal = parseFloat(correction.grade) || 0;
     const penalty = parseFloat(correction.penalty) || 0;
-    return calculateFinalGrade(rawTotal, penalty);
+    return calculateFinalGrade(rawTotal, penalty, maxPoints);
   };
 
   
@@ -287,7 +336,7 @@ export default function FeedbackViewer({ params }: { params: Promise<{ code: str
     null;
   
   // Déterminer le cas d'application de la règle pour l'explication
-  const isPenaltyRule6Applied = hasPenalty && rawTotal >= 6 && calculatedGrade < 6;
+  const isPenaltyRule5Applied = hasPenalty && rawTotal >= 5 && calculatedGrade < 5;
   
   // Formater les dates
   const formatDate = (dateString: string | null) => {
@@ -321,7 +370,9 @@ export default function FeedbackViewer({ params }: { params: Promise<{ code: str
 
 
   
-  
+  // Calculer le total des points disponibles
+  const maxPoints = correction.points ? correction.points.reduce((sum, points) => sum + points, 0) : 20;
+
   return (
     <Box 
       className={inter.className} 
@@ -433,74 +484,44 @@ export default function FeedbackViewer({ params }: { params: Promise<{ code: str
                           bgcolor: 'background.paper',
                           p: 3
                         }}>                           
-                            {/* Notes par partie affichées horizontalement */}
+                            {/* Notes par partie affichées dynamiquement à partir des tableaux points_earned et parts_names */}
                             <Grid container spacing={2} sx={{ mb: 2.5 }}>
-                              <Grid  size={{ xs: 12, md: 6 }}>
-                                <Paper sx={{ 
-                                  p: 2, 
-                                  border: 1, 
-                                  borderColor: 'divider',
-                                  boxShadow: (theme) => theme.shadows[1],
-                                  transition: 'all 0.2s',
-                                  '&:hover': { boxShadow: (theme) => theme.shadows[3] },
-                                  bgcolor: 'background.paper',
-                                }}>
-                                  <Typography variant="subtitle2" sx={{ 
-                                    color: 'text.secondary', mb: 0.5,
-                                    justifyContent: 'center', 
-                                    alignItems: 'center', 
-                                    display: 'flex'                                
+                              {correction.points_earned && 
+                              correction.parts_names && 
+                               correction.parts_names.map((partName: string, index: number) => (
+                                <Grid size={{ xs: 12, md: 6 }} key={index}>
+                                  <Paper sx={{ 
+                                    p: 2, 
+                                    border: 1, 
+                                    borderColor: 'divider',
+                                    boxShadow: (theme) => theme.shadows[1],
+                                    transition: 'all 0.2s',
+                                    '&:hover': { boxShadow: (theme) => theme.shadows[3] },
+                                    bgcolor: 'background.paper',
                                   }}>
-                                    PARTIE EXPÉRIMENTALE
-                                  </Typography>
-                                  <Typography variant="h4" sx={{ 
-                                    fontWeight: 'bold', 
-                                    color: 'primary.light', 
-                                    display: 'flex', 
-                                    alignItems: 'center', 
-                                    justifyContent: 'center'
-                                  }}>
-                                    {formatGradeWithNonRendu(correction.experimental_points_earned)} 
-                                    <Box component="span" sx={{ color: 'text.secondary', fontSize: '1rem', ml: 0.5 }}>
-                                      / {correction.experimental_points || '5'}
-                                    </Box>
-                                  </Typography>
-                                </Paper>
-                              </Grid>
-                              
-                              <Grid size={{ xs: 12, md: 6 }}>
-                                <Paper sx={{ 
-                                  p: 2, 
-                                  border: 1, 
-                                  borderColor: 'divider',
-                                  boxShadow: (theme) => theme.shadows[1],
-                                  transition: 'all 0.2s',
-                                  '&:hover': { boxShadow: (theme) => theme.shadows[3] },
-                                  bgcolor: 'background.paper',
-                                }}>
-                                  <Typography variant="subtitle2" sx={{ 
-                                    color: 'text.secondary', mb: 0.5,
-                                    flexDirection: 'column', 
-                                    justifyContent: 'center', 
-                                    alignItems: 'center', 
-                                    display: 'flex'
+                                    <Typography variant="subtitle2" sx={{ 
+                                      color: 'text.secondary', mb: 0.5,
+                                      justifyContent: 'center', 
+                                      alignItems: 'center', 
+                                      display: 'flex'                                
                                     }}>
-                                    PARTIE THÉORIQUE
-                                  </Typography>
-                                  <Typography variant="h4" sx={{ 
-                                    fontWeight: 'bold', 
-                                    color: 'primary.light', 
-                                    display: 'flex', 
-                                    alignItems: 'center', 
-                                    justifyContent: 'center'
-                                  }}>
-                                    {formatGradeWithNonRendu(correction.theoretical_points_earned)} 
-                                    <Box component="span" sx={{ color: 'text.secondary', fontSize: '1rem', ml: 0.5 }}>
-                                      / {correction.theoretical_points || '15'}
-                                    </Box>
-                                  </Typography>
-                                </Paper>
-                              </Grid>
+                                      {partName.toUpperCase()}
+                                    </Typography>
+                                    <Typography variant="h4" sx={{ 
+                                      fontWeight: 'bold', 
+                                      color: 'primary.light', 
+                                      display: 'flex', 
+                                      alignItems: 'center', 
+                                      justifyContent: 'center'
+                                    }}>
+                                      {formatGradeWithNonRendu(correction.points_earned[index])} 
+                                      <Box component="span" sx={{ color: 'text.secondary', fontSize: '1rem', ml: 0.5 }}>
+                                        / {correction.points ? correction.points[index] : '?'}
+                                      </Box>
+                                    </Typography>
+                                  </Paper>
+                                </Grid>
+                              ))}
                             </Grid>
                             
                             {/* Affichage des pénalités */}
@@ -512,7 +533,7 @@ export default function FeedbackViewer({ params }: { params: Promise<{ code: str
                                 icon={<ScheduleIcon />}
                               >
                                 <Typography variant="subtitle2" sx={{ fontWeight: 'bold' }}>
-                                  Pénalité de retard : — {correction.penalty} point{correction.penalty > 1 ? 's' : ''}
+                                  Pénalité de retard : — {parseFloat(String(correction.penalty))} point{parseFloat(String(correction.penalty)) > 1 ? 's' : ''}
                                 </Typography>
                                 {isMoreThanOneDayLate && (
                                   <Typography variant="caption">
@@ -523,7 +544,7 @@ export default function FeedbackViewer({ params }: { params: Promise<{ code: str
                             )}
 
                             {/* Explication du calcul de la note avec règle du seuil de 6/20 */}
-                            {hasPenalty && rawTotal >= 6 && (
+                            {hasPenalty && rawTotal >= 5 && (
                               <Paper 
                                 elevation={0} 
                                 sx={{ 
@@ -562,7 +583,7 @@ export default function FeedbackViewer({ params }: { params: Promise<{ code: str
                                     <Typography variant="body2" sx={{ fontWeight: 'bold' }}>{formatGrade(calculatedGrade)}/20</Typography>
                                   </Box>
                                   
-                                  {isPenaltyRule6Applied && (
+                                  {isPenaltyRule5Applied && (
                                     <>
                                       <Box sx={{ 
                                         display: 'flex', 
@@ -578,7 +599,7 @@ export default function FeedbackViewer({ params }: { params: Promise<{ code: str
                                         <Typography variant="body2">
                                           <strong>Note finale (seuil minimum) :</strong>
                                         </Typography>
-                                        <Typography variant="body2" sx={{ fontWeight: 'bold', color: 'success.dark' }}>6/20</Typography>
+                                        <Typography variant="body2" sx={{ fontWeight: 'bold', color: 'success.dark' }}>6 / 20</Typography>
                                       </Box>
                                       <Typography variant="caption" sx={{ color: 'success.dark', mt: 0.5 }}>
                                         <InfoIcon sx={{ fontSize: 16, verticalAlign: 'text-bottom', mr: 0.5 }} />
@@ -588,7 +609,7 @@ export default function FeedbackViewer({ params }: { params: Promise<{ code: str
                                     </>
                                   )}
                                   
-                                  {!isPenaltyRule6Applied && rawTotal >= 6 && calculatedGrade >= 6 && (
+                                  {!isPenaltyRule5Applied && rawTotal >= 5 && calculatedGrade >= 5 && (
                                     <>
                                       <Box sx={{ 
                                         display: 'flex', 
@@ -613,8 +634,8 @@ export default function FeedbackViewer({ params }: { params: Promise<{ code: str
                               </Paper>
                             )}
                             
-                            {/* Explication spécifique pour les notes < 6/20 */}
-                            {hasPenalty && rawTotal < 6 && (
+                            {/* Explication spécifique pour les notes < 5/20 */}
+                            {hasPenalty && rawTotal < 5 && (
                               <Paper 
                                 elevation={0} 
                                 sx={{ 
@@ -632,11 +653,11 @@ export default function FeedbackViewer({ params }: { params: Promise<{ code: str
                                 
                                 <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
                                   <Typography variant="body2">
-                                    Votre note brute est de <strong>{formatGrade(rawTotal)}/20</strong>, ce qui est inférieur au seuil de 6/20.
+                                    Votre note brute est de <strong>{formatGrade(rawTotal)}/20</strong>, ce qui est inférieur au seuil de 5/20.
                                   </Typography>
                                   
                                   <Typography variant="body2">
-                                    Pour les notes inférieures à 6/20, la pénalité de retard n'est pas appliquée.
+                                    Pour les notes inférieures à 5/20, la pénalité de retard n'est pas appliquée.
                                     Votre note finale reste donc <strong>{formatGrade(finalGrade)}/20</strong>.
                                   </Typography>
                                 </Box>
@@ -682,12 +703,15 @@ export default function FeedbackViewer({ params }: { params: Promise<{ code: str
                           boxShadow: (theme) => theme.shadows[5]
                         }}
                       >
-                        <Typography variant="overline" sx={{ letterSpacing: 1, color: `primary` }}>
+                        <Typography variant="overline" sx={{ 
+                          letterSpacing: 1, 
+                          color: `primary`,
+                          fontSize: '1.2rem',}}>
                           {isNeverSubmitted ? "STATUT" : "NOTE FINALE"}
                         </Typography>
                         <Typography variant="h1" sx={{ 
-                          fontSize: { xs: '2.5rem', sm: '3.5rem' }, 
-                          fontWeight: 'bold', 
+                          fontSize: { xs: '4.5rem', sm: '5.5rem' }, 
+                          fontWeight: 700, 
                           mb: 1, 
                           textAlign: 'center',
                           width: '100%' 
@@ -698,7 +722,11 @@ export default function FeedbackViewer({ params }: { params: Promise<{ code: str
                           }
                         </Typography>
                         <Typography variant="subtitle1">
-                          {!isNeverSubmitted && "sur 20 points"}
+                          {!isNeverSubmitted && (
+                            maxPoints === 1 
+                              ? 'sur 1 point' 
+                              : `sur ${maxPoints} points`
+                          )}
                         </Typography>
                       </Paper>
                     )}

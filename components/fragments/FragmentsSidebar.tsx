@@ -15,14 +15,14 @@ import { fetchCategories, fetchAllActivities, fetchFragmentsForActivity } from '
 import { Fragment } from '@/lib/types';
 
 interface FragmentsSidebarProps {
-  correction?: any;
+  correctionActivityId?: number; // Au lieu de l'objet correction entier
   onAddFragmentToCorrection?: (fragment: Fragment) => void;
   inCorrectionContext?: boolean;
   activityId?: number;
 }
 
 const FragmentsSidebar: React.FC<FragmentsSidebarProps> = ({
-  correction,
+  correctionActivityId,
   onAddFragmentToCorrection,
   inCorrectionContext = false,
   activityId: externalActivityId
@@ -93,8 +93,8 @@ const FragmentsSidebar: React.FC<FragmentsSidebarProps> = ({
     // Déterminer l'ID d'activité à utiliser
     let activityIdToUse = null;
     
-    if (inCorrectionContext && correction?.activity_id) {
-      activityIdToUse = correction.activity_id;
+    if (inCorrectionContext && correctionActivityId) {
+      activityIdToUse = correctionActivityId;
     } else if (externalActivityId) {
       activityIdToUse = externalActivityId;
     } else if (activities.length > 0) {
@@ -105,7 +105,7 @@ const FragmentsSidebar: React.FC<FragmentsSidebarProps> = ({
       setSelectedActivityId(activityIdToUse);
       loadFragmentsForActivity(activityIdToUse);
     }
-  }, [activities, correction, inCorrectionContext, externalActivityId]);
+  }, [activities, correctionActivityId, inCorrectionContext, externalActivityId]);
 
   // Charger les fragments pour une activité spécifique
   const loadFragmentsForActivity = async (activityId: number) => {
@@ -140,27 +140,42 @@ const FragmentsSidebar: React.FC<FragmentsSidebarProps> = ({
   };
 
   // Mettre à jour un fragment dans la liste
-  const updateFragmentInList = (updatedFragment: Fragment) => {
-    // Créer un nouvel objet Fragment pour garantir une nouvelle référence
-    // et s'assurer que les tags sont correctement parsés
-    
-    const processedFragment = {
-      ...JSON.parse(JSON.stringify(updatedFragment)), // Deep clone pour éviter les problèmes de référence
-      tags: Array.isArray(updatedFragment.tags) 
-            ? [...updatedFragment.tags] 
-            : (typeof updatedFragment.tags === 'string' 
-                ? JSON.parse(updatedFragment.tags) 
-                : []),
-      _updateKey: Date.now() // Ajouter une clé pour forcer la mise à jour du rendu
-    };
-    
-    // Mettre à jour la liste des fragments avec le fragment traité
-    setFragments(prev => prev.map(fragment => 
-      fragment.id === processedFragment.id ? processedFragment : fragment
-    ));
-    
-    setSuccessMessage('Fragment mis à jour avec succès');
-    setTimeout(() => setSuccessMessage(null), 3000);
+  const updateFragmentInList = async (updatedFragment: Fragment) => {
+    try {
+      // Sauvegarder les modifications dans la base de données
+      const response = await fetch(`/api/fragments/${updatedFragment.id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(updatedFragment),
+      });
+
+      if (!response.ok) {
+        throw new Error('Erreur lors de la mise à jour du fragment');
+      }
+
+      const processedFragment = {
+        ...JSON.parse(JSON.stringify(updatedFragment)),
+        tags: Array.isArray(updatedFragment.tags) 
+              ? [...updatedFragment.tags] 
+              : (typeof updatedFragment.tags === 'string' 
+                  ? JSON.parse(updatedFragment.tags) 
+                  : []),
+        _updateKey: Date.now()
+      };
+      
+      // Mettre à jour l'état local après la sauvegarde réussie
+      setFragments(prev => prev.map(fragment => 
+        fragment.id === processedFragment.id ? processedFragment : fragment
+      ));
+      
+      setSuccessMessage('Fragment modifié avec succès');
+      setTimeout(() => setSuccessMessage(null), 3000);
+    } catch (error) {
+      console.error('Error updating fragment:', error);
+      setError('Erreur lors de la mise à jour du fragment');
+    }
   };
 
   // Supprimer un fragment de la liste
@@ -168,15 +183,6 @@ const FragmentsSidebar: React.FC<FragmentsSidebarProps> = ({
     setFragments(prev => prev.filter(fragment => fragment.id !== fragmentId));
     setSuccessMessage('Fragment supprimé avec succès');
     setTimeout(() => setSuccessMessage(null), 3000);
-  };
-
-  // Déplacer un fragment dans la liste (drag and drop)
-  const moveFragment = (dragIndex: number, hoverIndex: number) => {
-    const draggedFragment = fragments[dragIndex];
-    const newFragments = [...fragments];
-    newFragments.splice(dragIndex, 1);
-    newFragments.splice(hoverIndex, 0, draggedFragment);
-    setFragments(newFragments);
   };
 
   // Ouvrir le modal pour régler la position
@@ -211,7 +217,7 @@ const FragmentsSidebar: React.FC<FragmentsSidebarProps> = ({
 
 
   const canAddNewFragments = inCorrectionContext ? 
-    selectedActivityId === correction?.activity_id : true;
+    selectedActivityId === correctionActivityId : true;
 
   return (
     <Paper elevation={2} sx={{ p: 3, borderRadius: 2 }}>
@@ -229,7 +235,7 @@ const FragmentsSidebar: React.FC<FragmentsSidebarProps> = ({
             {activities.map((activity) => (
               <MenuItem key={activity.id} value={activity.id}>
                 {activity.name} 
-                {correction && activity.id === correction.activity_id ? ' (courante)' : ''}
+                {correctionActivityId && activity.id === correctionActivityId ? ' (courante)' : ''}
               </MenuItem>
             ))}
           </Select>
@@ -289,7 +295,6 @@ const FragmentsSidebar: React.FC<FragmentsSidebarProps> = ({
             onUpdate={updateFragmentInList}
             onDelete={removeFragmentFromList}
             onAddToCorrection={onAddFragmentToCorrection}
-            moveFragment={moveFragment}
             refreshCategories={refreshCategories}
             renderPositionChip={(fragment) => (
               <Chip
@@ -300,6 +305,10 @@ const FragmentsSidebar: React.FC<FragmentsSidebarProps> = ({
                 variant="outlined"
                 onClick={() => handleOpenPositionModal(fragment)}
                 sx={{ 
+                  top: 0,
+                  right: 0,
+                  position: 'absolute',
+                  mt: 1,
                   mr: 1, 
                   cursor: 'pointer',
                   '&:hover': { 

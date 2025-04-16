@@ -112,10 +112,12 @@ export const EditFragmentDialog: React.FC<EditFragmentDialogProps> = ({
       onClose={onClose}
       fullWidth
       maxWidth="md"
-      PaperProps={{
-        sx: {
-          borderRadius: 3,
-          boxShadow: `0 8px 32px ${alpha(theme.palette.primary.main, 0.2)}`
+      slotProps={{
+        paper: {
+          sx: {
+            borderRadius: 3,
+            boxShadow: `0 8px 32px ${alpha(theme.palette.primary.main, 0.2)}`
+          }
         }
       }}
     >
@@ -139,12 +141,20 @@ export const EditFragmentDialog: React.FC<EditFragmentDialogProps> = ({
                   tags: Array.isArray(currentFragment.tags) ? currentFragment.tags : 
                         (typeof currentFragment.tags === 'string' ? 
                           JSON.parse(currentFragment.tags as string) : []),
-                  categories: currentFragment.categories || [],
+                  categories: Array.isArray(currentFragment.categories) ? 
+                    currentFragment.categories.map(cat => 
+                      // Si c'est déjà un objet avec id et name, le garder tel quel
+                      typeof cat === 'object' && cat !== null && 'id' in cat && 'name' in cat ? 
+                        cat as {id: number, name: string} :
+                        // Sinon, si c'est un number, chercher la catégorie correspondante
+                        categories.find(c => c.id === (typeof cat === 'number' ? cat : parseInt(cat as string))) || 
+                        { id: typeof cat === 'number' ? cat : parseInt(cat as string), name: `Category ${cat}` }
+                    ) : [],
                   activity_name: currentFragment.activity_name === null ? undefined : currentFragment.activity_name,
                   activity_id: currentFragment.activity_id === null ? undefined : currentFragment.activity_id
                 }}
                 categories={categories}
-                onUpdate={handleFragmentUpdate} // Use our converter function
+                onUpdate={handleFragmentUpdate}
                 onCancel={onClose}
                 refreshCategories={fetchCategories}
               />

@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { query, withConnection } from '@/lib/db';
+import { getServerSession } from "next-auth/next";
+import authOptions from "@/lib/auth";
+import { getUser } from '@/lib/auth';
 
 // Get all corrections for a class
 export async function GET(
@@ -7,6 +10,17 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    // Get the user from both auth systems
+    const session = await getServerSession(authOptions);
+    const customUser = await getUser();
+    
+    // Use either auth system, starting with custom auth
+    const userId = customUser?.id || session?.user?.id;
+    
+    if (!userId) {
+      return NextResponse.json({ error: 'utilisateur non authentifié' }, { status: 401 });
+    }
+
     // Await the params
     const { id } = await params;
     const classId = parseInt(id);
@@ -22,28 +36,32 @@ export async function GET(
       return NextResponse.json({ error: 'Class not found' }, { status: 404 });
     }
     
-    // Get corrections with their activity information
+    // Get corrections with their activity information and include points data
     const corrections = await query(`
       SELECT 
         c.*,
         a.id as activity_id,
-        a.name as activity_name
+        a.name as activity_name,
+        a.points as activity_points,
+        a.parts_names as activity_parts_names,
+        CONCAT(s.first_name, ' ', s.last_name) as student_name
       FROM 
-        corrections c
+        corrections_autres c
       JOIN
-        activities a ON c.activity_id = a.id
+        activities_autres a ON c.activity_id = a.id
+      LEFT JOIN
+        students s ON c.student_id = s.id
       WHERE 
         c.class_id = ?
     `, [classId]);
     
-    // Format the response to match the expected structure
+    // Format the response to match the CorrectionAutreEnriched structure
     const formattedCorrections = (corrections as any[]).map(c => ({
       ...c,
-      activity: {
-        id: c.activity_id,
-        name: c.activity_name
-      },
-      activity_name: undefined // Remove redundant field
+      // Calculate score percentage if possible
+      score_percentage: c.grade !== null && c.grade !== undefined 
+        ? Number(((c.grade / 20) * 100).toFixed(2))
+        : null
     }));
     
     return NextResponse.json(formattedCorrections);
@@ -59,6 +77,17 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    // Get the user from both auth systems
+    const session = await getServerSession(authOptions);
+    const customUser = await getUser();
+    
+    // Use either auth system, starting with custom auth
+    const userId = customUser?.id || session?.user?.id;
+    
+    if (!userId) {
+      return NextResponse.json({ error: 'utilisateur non authentifié' }, { status: 401 });
+    }
+    
     // Await the params
     const { id } = await params;
     const classId = parseInt(id);
@@ -84,7 +113,7 @@ export async function POST(
     await withConnection(async (connection) => {
       for (const correctionId of correction_ids) {
         await connection.query(
-          'UPDATE corrections SET class_id = ? WHERE id = ?',
+          'UPDATE corrections_autres SET class_id = ? WHERE id = ?',
           [classId, Number(correctionId)]
         );
       }

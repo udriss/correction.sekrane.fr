@@ -22,6 +22,7 @@ import {
 } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import { useSearchContext, Fragment, Category } from './SearchContext';
+import ErrorDisplay from '@/components/ui/ErrorDisplay';
 
 interface EditFragmentFormProps {
   fragment: Fragment;
@@ -35,6 +36,7 @@ function EditFragmentForm({ fragment, categories, onSuccess, onCancel }: EditFra
   const [selectedCategories, setSelectedCategories] = useState<number[]>([]);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [errorDetails, setErrorDetails] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
   
   // Improved initial category loading with separate API call
@@ -44,47 +46,61 @@ function EditFragmentForm({ fragment, categories, onSuccess, onCancel }: EditFra
       try {
         // Load complete fragment details
         const response = await fetch(`/api/fragments/${fragment.id}`);
-        if (response.ok) {
-          const data = await response.json();
-          setContent(data.content || fragment.content);
-          
-          // Extract category IDs with better handling
-          let categoryIds: number[] = [];
-          
-          if (data.categories) {
-            if (Array.isArray(data.categories)) {
-              categoryIds = data.categories.map((cat: any) => 
-                typeof cat === 'object' && cat !== null && 'id' in cat ? cat.id : 
-                typeof cat === 'number' ? cat : 
-                null
-              ).filter(Boolean);
-            }
-          } else if (data.category_id) {
-            categoryIds = [data.category_id];
-          }
-          
-          
-          setSelectedCategories(categoryIds);
-        } else {
-          // Fallback handling
-          let categoryIds: number[] = [];
-          
-          if (fragment.categories) {
-            if (Array.isArray(fragment.categories)) {
-              categoryIds = fragment.categories.map((cat: any) => 
-                typeof cat === 'object' && cat !== null && 'id' in cat ? cat.id : 
-                typeof cat === 'number' ? cat : 
-                null
-              ).filter(Boolean);
-            }
-          } else if (fragment.category_id) {
-            categoryIds = [fragment.category_id];
-          }
-          
-          setSelectedCategories(categoryIds);
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || 'Erreur lors du chargement des détails du fragment');
         }
-      } catch (err) {
+        
+        const data = await response.json();
+        setContent(data.content || fragment.content);
+        
+        // Extract category IDs with better handling
+        let categoryIds: number[] = [];
+        
+        if (data.categories) {
+          if (Array.isArray(data.categories)) {
+            categoryIds = data.categories.map((cat: any) => 
+              typeof cat === 'object' && cat !== null && 'id' in cat ? cat.id : 
+              typeof cat === 'number' ? cat : 
+              null
+            ).filter(Boolean);
+          }
+        } else if (data.category_id) {
+          categoryIds = [data.category_id];
+        }
+        
+        setSelectedCategories(categoryIds);
+      } catch (err: any) {
         console.error('Error loading fragment details:', err);
+        setError(err.message || 'Erreur lors du chargement des détails du fragment');
+        
+        // Gestion standardisée des erreurs
+        if (err.details) {
+          setErrorDetails(err.details);
+        } else {
+          setErrorDetails({
+            code: 'LOAD_ERROR',
+            statusCode: 500,
+            message: 'Une erreur s\'est produite lors du chargement des détails du fragment'
+          });
+        }
+        
+        // Fallback handling for categories
+        let categoryIds: number[] = [];
+        
+        if (fragment.categories) {
+          if (Array.isArray(fragment.categories)) {
+            categoryIds = fragment.categories.map((cat: any) => 
+              typeof cat === 'object' && cat !== null && 'id' in cat ? cat.id : 
+              typeof cat === 'number' ? cat : 
+              null
+            ).filter(Boolean);
+          }
+        } else if (fragment.category_id) {
+          categoryIds = [fragment.category_id];
+        }
+        
+        setSelectedCategories(categoryIds);
       } finally {
         setIsLoading(false);
       }
@@ -97,11 +113,24 @@ function EditFragmentForm({ fragment, categories, onSuccess, onCancel }: EditFra
     setSelectedCategories(newCategories);
   };
   
+  const clearError = () => {
+    setError(null);
+    setErrorDetails(null);
+  };
+  
   const handleSave = async () => {
-    if (!content.trim()) return;
+    if (!content.trim()) {
+      setError('Le contenu du fragment est requis');
+      setErrorDetails({
+        code: 'VALIDATION_ERROR',
+        field: 'content',
+        validationErrors: [{ field: 'content', message: 'Le contenu est requis' }]
+      });
+      return;
+    }
     
     setIsSaving(true);
-    setError(null);
+    clearError();
     
     try {
       const response = await fetch(`/api/fragments`, {
@@ -118,7 +147,7 @@ function EditFragmentForm({ fragment, categories, onSuccess, onCancel }: EditFra
       
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to save fragment');
+        throw new Error(errorData.error || 'Échec de l\'enregistrement du fragment');
       }
       
       const updatedFragment = await response.json();
@@ -138,7 +167,18 @@ function EditFragmentForm({ fragment, categories, onSuccess, onCancel }: EditFra
       onSuccess(formattedFragment);
     } catch (error: any) {
       console.error('Error saving fragment:', error);
-      setError(error.message || 'Error saving fragment');
+      
+      // Gestion standardisée des erreurs
+      if (error.details) {
+        setError(error.message || 'Erreur lors de l\'enregistrement du fragment');
+        setErrorDetails(error.details);
+      } else {
+        setError(error.message || 'Erreur lors de l\'enregistrement du fragment');
+        setErrorDetails({
+          code: 'SAVE_ERROR',
+          message: error.message || 'Une erreur s\'est produite lors de l\'enregistrement du fragment'
+        });
+      }
     } finally {
       setIsSaving(false);
     }
@@ -147,9 +187,15 @@ function EditFragmentForm({ fragment, categories, onSuccess, onCancel }: EditFra
   return (
     <Box>
       {error && (
-        <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>
-          {error}
-        </Alert>
+        <ErrorDisplay 
+          error={error}
+          errorDetails={errorDetails}
+          onRefresh={() => {
+            setError('');
+            window.location.reload();
+          }}
+          withRefreshButton = {true}
+        />
       )}
       
       {isLoading ? (
@@ -168,6 +214,7 @@ function EditFragmentForm({ fragment, categories, onSuccess, onCancel }: EditFra
             onChange={(e) => setContent(e.target.value)}
             variant="outlined"
             sx={{ mb: 3 }}
+            error={!!errorDetails?.validationErrors?.some((err: any) => err.field === 'content')}
           />
           
           <CategorySelect 

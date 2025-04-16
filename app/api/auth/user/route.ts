@@ -7,7 +7,10 @@ export async function GET() {
     const token = (await cookies()).get('auth_token')?.value;
     
     if (!token) {
-      return NextResponse.json({ user: null }, { status: 401 });
+      return NextResponse.json({ 
+        user: null, 
+        error: "aucun token d'authentification trouvé" 
+      }, { status: 401 });
     }
     
     const secret = new TextEncoder().encode(process.env.JWT_SECRET || 'changeme');
@@ -22,6 +25,18 @@ export async function GET() {
     });
   } catch (error) {
     console.error('Error verifying token:', error);
-    return NextResponse.json({ user: null }, { status: 401 });
+    
+    // Extraire et retourner les détails de l'erreur
+    const errorMessage = error instanceof Error 
+      ? error.message 
+      : "Erreur inconnue lors de la vérification du token";
+      
+    // Retourner à la fois le statut d'erreur et les détails
+    return NextResponse.json({ 
+      user: null, 
+      error: errorMessage,
+      errorType: error instanceof Error ? error.name : 'UnknownError',
+      errorDetails: process.env.NODE_ENV === 'development' ? String(error) : undefined
+    }, { status: 401 });
   }
 }

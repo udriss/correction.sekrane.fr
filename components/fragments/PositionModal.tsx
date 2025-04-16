@@ -4,7 +4,10 @@ import {
   Button, TextField, Box, Typography, Alert
 } from '@mui/material';
 import { updateFragmentPosition } from '@/lib/services/fragmentService';
+// Importer le type Fragment depuis FragmentEditModal pour assurer la cohérence
 import { Fragment } from '@/lib/types';
+// Import du composant ErrorDisplay
+import ErrorDisplay from '@/components/ui/ErrorDisplay';
 
 interface PositionModalProps {
   open: boolean;
@@ -23,7 +26,14 @@ const PositionModal: React.FC<PositionModalProps> = ({
     fragment?.position_order?.toString() || '0'
   );
   const [error, setError] = useState<string | null>(null);
+  const [errorDetails, setErrorDetails] = useState<any | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Fonction pour effacer les erreurs
+  const clearError = () => {
+    setError(null);
+    setErrorDetails(null);
+  };
 
   // Mettre à jour la position lorsque le fragment change
   React.useEffect(() => {
@@ -49,17 +59,35 @@ const PositionModal: React.FC<PositionModalProps> = ({
     // Validation finale
     if (isNaN(newPosition) || newPosition < 0) {
       setError('Veuillez entrer une valeur numérique positive');
+      setErrorDetails({ field: 'position', type: 'validation' });
       return;
     }
 
+    // Effacer les erreurs précédentes
+    clearError();
+    
     try {
       setIsSubmitting(true);
       const result = await updateFragmentPosition(fragment.id, newPosition);
       onSuccess(result.fragments);
       onClose();
     } catch (err) {
+      console.error('Erreur lors de la mise à jour de la position:', err);
+      
+      // Gestion détaillée des erreurs
       setError('Erreur lors de la mise à jour de la position');
-      console.error(err);
+      
+      // Capturer les détails de l'erreur pour affichage
+      if (err instanceof Error) {
+        setErrorDetails({
+          message: err.message,
+          stack: err.stack,
+          // Pour les erreurs avec des détails supplémentaires
+          ...(err as any).details || {}
+        });
+      } else if (typeof err === 'object' && err !== null) {
+        setErrorDetails(err);
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -71,9 +99,12 @@ const PositionModal: React.FC<PositionModalProps> = ({
       <DialogContent>
         <Box sx={{ my: 2 }}>
           {error && (
-            <Alert severity="error" sx={{ mb: 2 }}>
-              {error}
-            </Alert>
+            <ErrorDisplay 
+              error={error}
+              errorDetails={errorDetails}
+              withRefreshButton={false}
+              onRefresh={clearError}
+            />
           )}
           <Typography variant="body2" sx={{ mb: 2, color: 'text.secondary' }}>
             Choisissez la position du fragment dans la liste. Les positions commencent à 0.
@@ -86,7 +117,16 @@ const PositionModal: React.FC<PositionModalProps> = ({
             fullWidth
             value={position}
             onChange={handlePositionChange}
-            inputProps={{ inputMode: 'numeric', pattern: '[0-9]*' }}
+            slotProps={{
+              input: {
+                inputProps: {
+                  min: 0,
+                  step: 1,
+                  type: 'number',
+                  pattern: '[0-9]*',
+                },
+              }
+            }}
             variant="outlined"
             error={!!error}
           />

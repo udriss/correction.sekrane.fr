@@ -69,7 +69,7 @@ const CorrectionHeader: React.FC<CorrectionHeaderProps> = ({
   handleToggleActive,
   email = '',
   setEmail = () => {},
-  correctionStatus = 'ACTIVE',
+  correctionStatus,
   handleChangeStatus = () => {},
   isStatusChanging = false,
 }) => {
@@ -95,10 +95,9 @@ const CorrectionHeader: React.FC<CorrectionHeaderProps> = ({
 
   
   // Add type guards around student_name usage
-  const displayName = correction.student_name || `${correction.activity_name || 'Activité'} - Sans nom`;
+  const displayName = firstName + ' ' +  lastName || `${correction.activity_name || 'Activité'} - Sans nom`;
   // Mise à jour: utiliser le status au lieu de active
   const isActive = correction.status === 'ACTIVE' || (correction.status === undefined && (correction.active === 1 || correction.active === true));
-
 
 
   // Update parent state and handle form submission

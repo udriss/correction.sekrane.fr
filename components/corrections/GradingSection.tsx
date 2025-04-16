@@ -46,6 +46,20 @@ const GradingSection: React.FC<GradingSectionProps> = ({
   const [isUpdating, setIsUpdating] = useState(false);
   // Hook pour les notifications
   const { enqueueSnackbar } = useSnackbar();
+  // Référence pour contrôler la fréquence des notifications
+  const lastNotificationTimeRef = useRef<number>(0);
+  // Délai minimum entre les notifications en millisecondes (5 secondes)
+  const MIN_NOTIFICATION_DELAY = 5000;
+  
+  // Fonction pour afficher des notifications avec contrôle de fréquence
+  const showNotification = (message: string, variant: 'success' | 'error' | 'info' | 'warning') => {
+    const now = Date.now();
+    // Vérifier si suffisamment de temps s'est écoulé depuis la dernière notification
+    if (now - lastNotificationTimeRef.current > MIN_NOTIFICATION_DELAY) {
+      enqueueSnackbar(message, { variant });
+      lastNotificationTimeRef.current = now;
+    }
+  };
   
   // Vérifier si la pénalité actuelle correspond au cas "travail non rendu"
   useEffect(() => {
@@ -97,7 +111,7 @@ const GradingSection: React.FC<GradingSectionProps> = ({
           })
           .then(() => {
             // Notification de succès avec enqueueSnackbar
-            enqueueSnackbar('Note mise à jour avec succès', { variant: 'success' });
+            showNotification('Note mise à jour avec succès', 'success');
             
             // Mise à jour des messages de statut uniquement, pas de mise à jour de l'état global
             const event = new CustomEvent('gradeUpdated', { 
@@ -108,7 +122,7 @@ const GradingSection: React.FC<GradingSectionProps> = ({
           .catch(err => {
             console.error('Erreur lors de la mise à jour de la note:', err);
             // Notification d'erreur avec enqueueSnackbar
-            enqueueSnackbar('Erreur lors de la mise à jour de la note', { variant: 'error' });
+            showNotification('Erreur lors de la mise à jour de la note', 'error');
             
             const event = new CustomEvent('gradeError', { 
               detail: { message: 'Erreur lors de la mise à jour de la note' } 
@@ -141,7 +155,7 @@ const GradingSection: React.FC<GradingSectionProps> = ({
         handleUpdatePenalty(newPenaltyValue)
           .then(() => {
             // Notification de succès avec enqueueSnackbar
-            enqueueSnackbar('Pénalité mise à jour avec succès', { variant: 'success' });
+            showNotification('Pénalité mise à jour avec succès', 'success');
             
             // Pas besoin de mettre à jour l'UI car le composant parent le fera
             const event = new CustomEvent('penaltyUpdated', { 
@@ -152,7 +166,7 @@ const GradingSection: React.FC<GradingSectionProps> = ({
           .catch(err => {
             console.error('Erreur lors de la mise à jour de la pénalité:', err);
             // Notification d'erreur
-            enqueueSnackbar('Erreur lors de la mise à jour de la pénalité', { variant: 'error' });
+            showNotification('Erreur lors de la mise à jour de la pénalité', 'error');
           })
           .finally(() => {
             setIsUpdating(false); // Réactiver les sliders
@@ -195,12 +209,12 @@ const GradingSection: React.FC<GradingSectionProps> = ({
 
   // Calculer la note finale selon la règle demandée
   const calculateFinalGrade = (grade: number, penalty: number): number => {
-    if (grade < 6) {
-      // Si la note est inférieure à 6, on garde la note originale
+    if (grade < 5) {
+      // Si la note est inférieure à 5, on garde la note originale
       return grade;
     } else {
-      // Sinon, on prend le maximum entre (note-pénalité) et 6
-      return Math.max(grade - penalty, 6);
+      // Sinon, on prend le maximum entre (note-pénalité) et 5
+      return Math.max(grade - penalty, 5);
     }
   };
 
@@ -350,7 +364,7 @@ const GradingSection: React.FC<GradingSectionProps> = ({
                     updatePenaltyOnly(parseFloat(newPenalty));
                   }}
                   min={0}
-                  max={16}
+                  max={15}
                   step={0.5}
                   valueLabelDisplay="auto"
                   marks
@@ -388,12 +402,12 @@ const GradingSection: React.FC<GradingSectionProps> = ({
                   
                   // Appliquer la règle pour la note finale
                   let finalGrade;
-                  if (rawTotal < 6) {
-                    // Si la note brute est < 6, on garde cette note
+                  if (rawTotal < 5) {
+                    // Si la note brute est < 5, on garde cette note
                     finalGrade = Math.max(0, rawTotal);
                   } else {
-                    // Sinon, on prend le maximum entre (note-pénalité) et 6
-                    finalGrade = Math.max(rawTotal - penaltyValue, 6);
+                    // Sinon, on prend le maximum entre (note-pénalité) et 5
+                    finalGrade = Math.max(rawTotal - penaltyValue, 5);
                   }
                   
                   return isNaN(finalGrade) ? 0 : finalGrade;
@@ -421,12 +435,12 @@ const GradingSection: React.FC<GradingSectionProps> = ({
                   
                   // Appliquer la règle pour la note finale
                   let finalGrade;
-                  if (rawTotal < 6) {
-                    // Si la note brute est < 6, on garde cette note
+                  if (rawTotal < 5) {
+                    // Si la note brute est < 5, on garde cette note
                     finalGrade = Math.max(0, rawTotal);
                   } else {
-                    // Sinon, on prend le maximum entre (note-pénalité) et 6
-                    finalGrade = Math.max(rawTotal - penaltyValue, 6);
+                    // Sinon, on prend le maximum entre (note-pénalité) et 5
+                    finalGrade = Math.max(rawTotal - penaltyValue, 5);
                   }
                   
                   // Toujours s'assurer que la note n'est pas négative

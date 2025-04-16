@@ -11,7 +11,6 @@ import {
   Card, 
   CardContent, 
   CardActions,
-  IconButton, 
   Tooltip, 
   Chip, 
   Divider, 
@@ -19,21 +18,16 @@ import {
   Alert,
   Grid,
   alpha,
-  Skeleton
 } from '@mui/material';
 import GradientBackground from '@/components/ui/GradientBackground';
 import PatternBackground from '@/components/ui/PatternBackground';
 import ErrorDisplay from '@/components/ui/ErrorDisplay';
 import Link from 'next/link';
 import LoadingSpinner from '@/components/LoadingSpinner';
-import StudentEditDialog from '@/components/students/StudentEditDialog';
+
 
 // Icons
 import PersonIcon from '@mui/icons-material/Person';
-import EditIcon from '@mui/icons-material/Edit';
-import ShareIcon from '@mui/icons-material/Share';
-import EmailIcon from '@mui/icons-material/Email';
-import BookIcon from '@mui/icons-material/Book';
 import SchoolIcon from '@mui/icons-material/School';
 import GradeIcon from '@mui/icons-material/Grade';
 import AssignmentIcon from '@mui/icons-material/Assignment';
@@ -50,10 +44,10 @@ interface Student {
   first_name: string;
   last_name: string;
   email: string;
-  className?: string;
-  classId?: number;
   gender?: 'M' | 'F' | 'N';
   group?: string;
+  // Ajouter les informations sur toutes les classes
+  allClasses?: { classId: number; className: string; sub_class?: string | null }[];
 }
 
 interface Correction {
@@ -64,13 +58,9 @@ interface Correction {
   class_id: number;
   class_name: string;
   submission_date: string;
-  grade: string | number; // Peut être renvoyé comme string par l'API
+  grade: string | number;
   content?: string;
-  content_data?: any; // Un objet déjà parsé par l'API
-  experimental_points: number;
-  theoretical_points: number;
-  experimental_points_earned: string | number;
-  theoretical_points_earned: string | number;
+  content_data?: any;
   penalty: string | number;
   deadline: string;
   group_id: number;
@@ -79,6 +69,9 @@ interface Correction {
   student_last_name: string;
   created_at: string;
   updated_at: string;
+  points?: number[]; // Points maximum pour chaque partie
+  parts_names?: string[]; // Noms des parties
+  points_earned?: number[]; // Points gagnés pour chaque partie
   max_points?: number; // Calculé côté client
   score_percentage?: number; // Calculé côté client
   final_grade?: number | null; // Note finale calculée côté client
@@ -100,29 +93,89 @@ interface StudentStats {
     submission_date: string;
   }[];
   grade_trend?: 'up' | 'down' | 'stable';
+  parts_averages?: number[];
 }
 
 export default function StudentCorrectionsPage() {
   const params = useParams();
-  const router = useRouter();
   const studentId = params?.id;
   
   const [student, setStudent] = useState<Student | null>(null);
   const [corrections, setCorrections] = useState<Correction[]>([]);
   const [stats, setStats] = useState<StudentStats | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<Error | string | null>(null);
   const [shareUrl, setShareUrl] = useState<string>('');
   
   // États pour la gestion de l'édition d'étudiant
-  const [editingStudent, setEditingStudent] = useState<Student | null>(null);
-  const [openEditDialog, setOpenEditDialog] = useState(false);
-  const [selectedClasses, setSelectedClasses] = useState<{id: number, name: string}[]>([]);
-  const [availableSubgroups, setAvailableSubgroups] = useState<string[]>([]);
-  const [loadingSubgroups, setLoadingSubgroups] = useState(false);
   const [editError, setEditError] = useState<string | null>(null);
   const [classes, setClasses] = useState<any[]>([]);
   const [errorDetails, setErrorDetails] = useState<any>(null);
+
+  // Gérer la récupération du share code et rediriger vers la page de feedback
+  const [shareUrls, setShareUrls] = useState<Map<number, string>>(new Map());
+  const [loadingShareCodes, setLoadingShareCodes] = useState<Map<number, boolean>>(new Map());
+  const [shareCodeErrors, setShareCodeErrors] = useState<Map<number, string>>(new Map());
+
+  // Fonction pour récupérer le code de partage d'une correction
+  const getShareUrl = async (correctionId: number) => {
+    // Vérifier si on a déjà l'URL pour cette correction
+    if (shareUrls.has(correctionId)) {
+      return shareUrls.get(correctionId);
+    }
+
+    // Marquer comme en cours de chargement
+    setLoadingShareCodes(prev => new Map(prev).set(correctionId, true));
+    setShareCodeErrors(prev => new Map(prev).set(correctionId, ''));
+
+    try {
+      const response = await fetch(`/api/corrections_autres/${correctionId}/share`);
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(errorText || `Erreur ${response.status}: Impossible de récupérer le lien de partage`);
+      }
+      
+      const data = await response.json();
+      
+      // Construire l'URL complète
+      const shareUrl = `${window.location.origin}/feedback/${data.code}`;
+      
+      // Stocker l'URL pour une utilisation ultérieure
+      setShareUrls(prev => new Map(prev).set(correctionId, shareUrl));
+      return shareUrl;
+    } catch (error) {
+      console.error('Erreur lors de la récupération du code de partage:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Erreur inconnue';
+      setShareCodeErrors(prev => new Map(prev).set(correctionId, errorMessage));
+      return null;
+    } finally {
+      setLoadingShareCodes(prev => new Map(prev).set(correctionId, false));
+    }
+  };
+
+  // Fonction pour créer un lien et le suivre au lieu d'utiliser window.open
+  const handleOpenFeedback = async (correctionId: number) => {
+    try {
+      setLoadingShareCodes(prev => new Map(prev).set(correctionId, true));
+      const url = await getShareUrl(correctionId);
+      setLoadingShareCodes(prev => new Map(prev).set(correctionId, false));
+      
+      if (url) {
+        // Créer un élément <a> invisible et simuler un clic utilisateur
+        const link = document.createElement('a');
+        link.href = url;
+        link.target = '_blank';
+        link.rel = 'noopener noreferrer';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      }
+    } catch (error) {
+      console.error("Erreur lors de l'ouverture du feedback:", error);
+      setLoadingShareCodes(prev => new Map(prev).set(correctionId, false));
+    }
+  };
 
   useEffect(() => {
     const fetchData = async () => {
@@ -135,15 +188,51 @@ export default function StudentCorrectionsPage() {
         // Récupérer les informations de l'étudiant
         const studentResponse = await fetch(`/api/students/${studentId}`);
         if (!studentResponse.ok) {
-          setError('Étudiant non trouvé');
+          const errorData = await studentResponse.json().catch(() => ({ error: 'Étudiant non trouvé' }));
+          // Créer une instance d'Error et y attacher les détails
+          const error = new Error('Erreur lors du chargement des données de l\'étudiant');
+          (error as any).details = errorData.details || {};
+          setError(error.message);
           setErrorDetails({
-            status: studentResponse.status,
-            statusText: studentResponse.statusText
+            message: typeof error === 'string' ? error : error.message,
+            status: errorData.status || 500,
+            statusText: errorData.statusText || '',
+            details: errorData.error || 'Une erreur est survenue lors du chargement des données'
           });
           setLoading(false);
           return;
         }
         const studentData = await studentResponse.json();
+        
+        // Récupérer toutes les classes de l'étudiant
+        const studentClassesResponse = await fetch(`/api/students/${studentId}/classes`);
+        if (studentClassesResponse.ok) {
+          const studentClassesData = await studentClassesResponse.json();
+          
+          // Formater les données des classes pour correspondre à l'interface Student.allClasses
+          const formattedClasses = studentClassesData.map((classItem: any) => {
+            // Gérer les deux formats possibles de réponse de l'API
+            if (classItem.class) {
+              // Format où chaque élément a une propriété 'class'
+              return {
+                classId: classItem.class.id,
+                className: classItem.class.name,
+                sub_class: classItem.sub_class
+              };
+            } else {
+              // Format où chaque élément est directement un objet de classe
+              return {
+                classId: classItem.id || classItem.class_id,
+                className: classItem.name || classItem.class_name,
+                sub_class: classItem.sub_class || classItem.subclass
+              };
+            }
+          });
+          
+          // Mettre à jour les données de l'étudiant avec les classes
+          studentData.allClasses = formattedClasses;
+        }
+        
         setStudent(studentData);
         
         // Récupérer toutes les classes pour le dialog d'édition
@@ -156,34 +245,35 @@ export default function StudentCorrectionsPage() {
         // Récupérer les corrections de l'étudiant
         const correctionsResponse = await fetch(`/api/students/${studentId}/corrections`);
         if (!correctionsResponse.ok) {
-          setError('Erreur lors du chargement des corrections');
+          const errorData = await correctionsResponse.json().catch(() => ({ error: 'Erreur lors du chargement des corrections' }));
+          // Créer une instance d'Error et y attacher les détails
+          const error = new Error('Erreur lors du chargement des corrections : ' + errorData.error || 'Erreur lors du chargement des corrections');
+          (error as any).details = errorData.details || {};
+          setError(error.message);
           setErrorDetails({
             status: correctionsResponse.status,
-            statusText: correctionsResponse.statusText
+            statusText: correctionsResponse.statusText,
+            ...errorData.details || {}
           });
           setLoading(false);
           return;
         }
         const correctionsData = await correctionsResponse.json();
-        
         // Enrichir les corrections avec le pourcentage de score et les points max
         const enrichedCorrections = correctionsData.map((correction: any) => {
           // S'assurer que les valeurs numériques sont traitées comme des nombres
           const grade = typeof correction.grade === 'string' ? parseFloat(correction.grade) : correction.grade;
-          const experimentalPoints = typeof correction.experimental_points === 'string' ? 
-            parseFloat(correction.experimental_points) : correction.experimental_points;
-          const theoreticalPoints = typeof correction.theoretical_points === 'string' ? 
-            parseFloat(correction.theoretical_points) : correction.theoretical_points;
-            
-          const maxPoints = experimentalPoints + theoreticalPoints;
+          
+          // Calculer le total des points maximum à partir du tableau points
+          const maxPoints = correction.points ? 
+            correction.points.reduce((sum: number, p: number) => sum + (typeof p === 'number' ? p : parseFloat(String(p))), 0) : 
+            20; // Fallback à 20 si aucun point n'est défini
+          
           const scorePercentage = maxPoints > 0 ? (grade / maxPoints) * 100 : 0;
           
-          // Ne pas essayer de parser content_data car c'est déjà un objet
           return {
             ...correction,
             grade: grade,
-            experimental_points: experimentalPoints,
-            theoretical_points: theoreticalPoints,
             max_points: maxPoints,
             score_percentage: scorePercentage
           };
@@ -195,12 +285,17 @@ export default function StudentCorrectionsPage() {
         );
         
         setCorrections(sortedCorrections);
-        
+
+
         // Récupérer les statistiques de l'étudiant
         const statsResponse = await fetch(`/api/students/${studentId}/stats`);
-        if (statsResponse.ok) {
+        if (!statsResponse.ok) {
+          // On ne bloque pas le chargement pour les stats, on continue
+          console.warn('Impossible de charger les statistiques de l\'étudiant');
+        } else {
           const statsData = await statsResponse.json();
-          
+
+
           // Calculer la tendance des notes
           if (statsData.recent_corrections && statsData.recent_corrections.length >= 2) {
             const sortedCorrections = [...statsData.recent_corrections].sort(
@@ -227,10 +322,15 @@ export default function StudentCorrectionsPage() {
         // Générer l'URL de partage
         const baseUrl = window.location.origin;
         setShareUrl(`${baseUrl}/shared/students/${studentId}/corrections`);
-        
+
+
       } catch (err) {
         console.error('Erreur:', err);
-        setError(err instanceof Error ? err.message : 'Une erreur est survenue');
+        if (err instanceof Error) {
+          setError(err.message || 'Une erreur est survenue lors du chargement des données');
+        } else {
+          setError('Une erreur est survenue lors du chargement des données');
+        }
       } finally {
         setLoading(false);
       }
@@ -260,290 +360,9 @@ export default function StudentCorrectionsPage() {
     return 'error';
   };
   
-  // Fonction pour partager les corrections
-  const handleShare = async () => {
-    try {
-      if (navigator.share) {
-        await navigator.share({
-          title: `Corrections de ${student?.first_name} ${student?.last_name}`,
-          text: `Relevé de notes de ${student?.first_name} ${student?.last_name}`,
-          url: shareUrl
-        });
-      } else {
-        // Copier le lien dans le presse-papier
-        await navigator.clipboard.writeText(shareUrl);
-        alert('Lien copié dans le presse-papier !');
-      }
-    } catch (err) {
-      console.error('Erreur lors du partage:', err);
-    }
-  };
-  
-  // Fonction pour envoyer un email à l'étudiant
-  const handleSendEmail = () => {
-    if (!student?.email) return;
-    
-    const subject = `Vos corrections`;
-    const body = `Bonjour ${student.first_name},
 
-Vous pouvez consulter vos corrections à l'adresse suivante :
-${shareUrl}
 
-Cordialement,
-Votre enseignant`;
-    
-    window.location.href = `mailto:${student.email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-  };
-  
-  // Fonctions pour l'édition de l'étudiant
-  const fetchClassSubgroups = async (classId: number) => {
-    try {
-      setLoadingSubgroups(true);
-      const response = await fetch(`/api/classes/${classId}`);
-      
-      if (!response.ok) {
-        throw new Error('Error loading class data');
-      }
-      
-      const classData = await response.json();
-      
-      // If the class has a defined number of subclasses
-      if (classData.nbre_subclasses) {
-        const groups = Array.from({ length: classData.nbre_subclasses }, (_, i) => (i + 1).toString());
-        setAvailableSubgroups(groups);
-      } else {
-        setAvailableSubgroups([]);
-      }
-    } catch (error) {
-      console.error('Error loading subgroups:', error);
-      setAvailableSubgroups([]);
-    } finally {
-      setLoadingSubgroups(false);
-    }
-  };
 
-  const handleEditClick = async () => {
-    if (!student) return;
-    
-    setEditingStudent(student);
-    setEditError(null);
-    
-    try {
-      // Get all classes for the student
-      const studentClassesResponse = await fetch(`/api/students/${student.id}/classes`);
-      
-      if (studentClassesResponse.ok) {
-        const allStudentClasses = await studentClassesResponse.json();
-        
-        // Map classes to the format expected by the Autocomplete component
-        const mappedClasses = allStudentClasses.map((cls: any) => ({
-          id: cls.id,
-          name: cls.name
-        }));
-        
-        setSelectedClasses(mappedClasses);
-        
-        // If the student has a main class, retrieve its subgroups
-        if (student.classId) {
-          fetchClassSubgroups(student.classId);
-        }
-      } else {
-        // Fallback if we can't retrieve all classes
-        if (student.classId) {
-          const studentClass = classes.find(c => c.id === student.classId);
-          if (studentClass) {
-            setSelectedClasses([{ id: studentClass.id, name: studentClass.name }]);
-            fetchClassSubgroups(student.classId);
-          } else {
-            setSelectedClasses([]);
-          }
-        } else {
-          setSelectedClasses([]);
-        }
-      }
-    } catch (error) {
-      console.error('Error retrieving student classes:', error);
-      // Fallback in case of error
-      if (student.classId) {
-        const studentClass = classes.find(c => c.id === student.classId);
-        if (studentClass) {
-          setSelectedClasses([{ id: studentClass.id, name: studentClass.name }]);
-        } else {
-          setSelectedClasses([]);
-        }
-      } else {
-        setSelectedClasses([]);
-      }
-    }
-    
-    setOpenEditDialog(true);
-  };
-
-  const handleEditClose = () => {
-    setOpenEditDialog(false);
-    setEditingStudent(null);
-    setEditError(null);
-  };
-
-  const handleEditSave = async () => {
-    if (!editingStudent || !editingStudent.id) return;
-    setEditError(null);
-    
-    try {
-      // Explicitly format each field to ensure they are correctly sent
-      const studentData = {
-        id: editingStudent.id,
-        first_name: editingStudent.first_name,
-        last_name: editingStudent.last_name,
-        email: editingStudent.email,
-        gender: editingStudent.gender || 'N',
-        classId: selectedClasses.length > 0 ? selectedClasses[0].id : null,
-        group: editingStudent.group || null,
-      };
-      
-      // 1. Update student basic information
-      const response = await fetch(`/api/students/${editingStudent.id}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(studentData),
-      });
-      
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('Error response:', errorText);
-        
-        try {
-          const errorData = JSON.parse(errorText);
-          throw new Error(errorData.message || 'Error during update');
-        } catch (e) {
-          throw new Error(`Error ${response.status}: ${errorText || 'Unknown error'}`);
-        }
-      }
-      
-      const updatedStudent = await response.json();
-      
-      // 2. Class association management - first update the main class
-      if (studentData.classId) {
-        const updateClassResponse = await fetch(`/api/classes/${studentData.classId}/students/${editingStudent.id}`, {
-          method: 'PATCH',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            sub_class: studentData.group
-          }),
-        });
-        
-        if (!updateClassResponse.ok) {
-          console.warn('Warning: Group update failed');
-        }
-      }
-      
-      // 3. Handle additional classes
-      // Get current classes
-      const currentClassesResponse = await fetch(`/api/students/${editingStudent.id}/classes`);
-      if (currentClassesResponse.ok) {
-        const currentClasses = await currentClassesResponse.json();
-        
-        // For each selected class
-        for (const selectedClass of selectedClasses) {
-          const classExists = currentClasses.some((c: any) => c.id === selectedClass.id);
-          
-          if (!classExists) {
-            // Add the student to this class if not already there
-            await fetch(`/api/classes/${selectedClass.id}/students`, {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify({
-                student_id: editingStudent.id,
-                first_name: editingStudent.first_name,
-                last_name: editingStudent.last_name,
-                email: editingStudent.email,
-                gender: editingStudent.gender || 'N',
-                sub_class: selectedClass.id === studentData.classId ? studentData.group : null
-              }),
-            });
-          } else if (selectedClass.id === studentData.classId && studentData.group) {
-            // Update the subgroup if it's the main class
-            await fetch(`/api/classes/${selectedClass.id}/students/${editingStudent.id}`, {
-              method: 'PATCH',
-              headers: {
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify({
-                sub_class: studentData.group
-              }),
-            });
-          }
-        }
-        
-        // Remove the student from unselected classes
-        for (const currentClass of currentClasses) {
-          if (!selectedClasses.some(c => c.id === currentClass.id)) {
-            try {
-              await fetch(`/api/classes/${currentClass.id}/students/${editingStudent.id}`, {
-                method: 'DELETE',
-              });
-            } catch (error) {
-              console.error(`Error removing student from class ${currentClass.id}:`, error);
-            }
-          }
-        }
-      }
-      
-      // Close dialog and refresh data
-      setOpenEditDialog(false);
-      setEditingStudent(null);
-      setSelectedClasses([]);
-      
-      // Refresh the student data
-      const refreshStudentResponse = await fetch(`/api/students/${studentId}`);
-      if (refreshStudentResponse.ok) {
-        const refreshedStudentData = await refreshStudentResponse.json();
-        setStudent(refreshedStudentData);
-      }
-      
-    } catch (err) {
-      console.error('Error during update:', err);
-      setEditError(`Update error: ${err instanceof Error ? err.message : 'Unknown error'}`);
-    }
-  };
-  
-  // Calculer la note finale selon la règle établie
-  const calculateFinalGrade = (grade: number, penalty: number = 0): number => {
-    if (grade < 6) {
-      // Si la note est inférieure à 6, on garde la note originale
-      return grade;
-    } else {
-      // Sinon, on prend le maximum entre (note-pénalité) et 6
-      return Math.max(grade - penalty, 6);
-    }
-  };
-
-  // Déterminer la note finale à afficher
-  const getFinalGrade = (correction: Correction): number => {
-    // Si final_grade est déjà défini, l'utiliser
-    if (correction.final_grade !== undefined && correction.final_grade !== null) {
-      return typeof correction.final_grade === 'number' 
-        ? correction.final_grade 
-        : parseFloat(String(correction.final_grade));
-    }
-    
-    // Sinon calculer la note en fonction de la règle
-    const grade = typeof correction.grade === 'number'
-      ? correction.grade
-      : parseFloat(String(correction.grade || 0));
-    
-    const penalty = typeof correction.penalty === 'number'
-      ? correction.penalty
-      : parseFloat(String(correction.penalty || 0));
-    
-    return calculateFinalGrade(grade, penalty);
-  };
 
   if (loading) {
     return (
@@ -555,15 +374,16 @@ Votre enseignant`;
       </Container>
     );
   }
-  
+
   if (error || !student) {
     return (
       <Container maxWidth="lg" className="py-8">
         <div className="container mx-auto px-4 py-2 flex justify-center">
-          <div className="w-full max-w-lg animate-slide-in">
+          <div className="w-full max-w-4xl animate-slide-in">
             <Paper className="p-6 overflow-hidden relative" elevation={3}>
               <ErrorDisplay 
                 error={error || "Étudiant non trouvé"} 
+                errorDetails={errorDetails}
                 onRefresh={() => window.location.reload()}
                 withRefreshButton={true}
               />
@@ -583,7 +403,6 @@ Votre enseignant`;
       </Container>
     );
   }
-  
   return (
     <Container maxWidth="lg" className="py-8">
       {/* Header avec info étudiant */}
@@ -619,44 +438,43 @@ Votre enseignant`;
               
                 <Box>
                   <Typography variant="h4" fontWeight={700} color="text.primary">
-                    {student.first_name} {student.last_name}
+                    {student.first_name} {student.last_name?.charAt(0)?.toUpperCase()}.
                   </Typography>
-                  <Typography variant="subtitle1" color="text.secondary" sx={{ opacity: 0.9, display: 'flex', alignItems: 'center', gap: 1 }}>
-                    <SchoolIcon fontSize="small" />
-                    {student.className || 'Non assigné à une classe'}
-                  </Typography>
+                  
+                  {/* Afficher toutes les classes de l'étudiant sans distinction */}
+                  {student.allClasses && student.allClasses.length > 0 ? (
+                    <Box sx={{ mt: 0.5 }}>
+                      <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                        {student.allClasses.map((cls, index) => (
+                          <Chip 
+                            key={index}
+                            size="small"
+                            label={
+                              <Typography variant="subtitle1" color="text.secondary" sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
+                                <SchoolIcon fontSize="small" />
+                                {cls.className} {cls.sub_class ? `Groupe ${cls.sub_class}` : ''}
+                              </Typography>
+                              
+                              
+                              }
+                            sx={{ 
+                              backgroundColor: (theme) => alpha(theme.palette.primary.main, 0.1),
+                              color: 'primary.main',
+                              fontSize: '0.8rem'
+                            }}
+                          />
+                        ))}
+                      </Box>
+                    </Box>
+                  ) : (
+                    <Typography variant="subtitle1" color="text.secondary" sx={{ opacity: 0.9, display: 'flex', alignItems: 'center', gap: 1 }}>
+                      <SchoolIcon fontSize="small" />
+                      Non assigné à une classe
+                    </Typography>
+                  )}
                 </Box>
               </Box>
-              
-              <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
-                <Button
-                  variant="contained"
-                  color="secondary"
-                  startIcon={<EditIcon />}
-                  onClick={handleEditClick}
-                >
-                  Modifier
-                </Button>
-                
-                <Tooltip title="Partager les corrections">
-                  <IconButton 
-                    onClick={handleShare}
-                    className="bg-white/20 hover:bg-white/30"
-                  >
-                    <ShareIcon />
-                  </IconButton>
-                </Tooltip>
-                
-                <Tooltip title={`Envoyer un email à ${student.email}`}>
-                  <IconButton 
-                    onClick={handleSendEmail}
-                    className="bg-white/20 hover:bg-white/30"
-                    disabled={!student.email}
-                  >
-                    <EmailIcon />
-                  </IconButton>
-                </Tooltip>
-              </Box>
+
             </Box>
           </PatternBackground>
         </GradientBackground>
@@ -709,8 +527,12 @@ Votre enseignant`;
                 )}
                 <Typography variant="overline" color="text.secondary">Moyenne</Typography>
                 <Typography variant="h3" fontWeight="bold" color="text.primary">
-                  {stats?.average_grade !== null && stats?.average_grade !== undefined && typeof stats?.average_grade === 'number' 
-                    ? stats.average_grade.toFixed(1) 
+                    {stats?.average_grade !== null && stats?.average_grade !== undefined
+                    ? (typeof stats.average_grade === 'number'
+                      ? stats.average_grade.toFixed(1)
+                      : !isNaN(Number(stats.average_grade))
+                        ? Number(stats.average_grade).toFixed(1)
+                        : '-')
                     : '-'}
                 </Typography>
                 <Typography variant="overline" color="text.secondary">
@@ -730,8 +552,12 @@ Votre enseignant`;
               }}>
                 <Typography variant="overline" color="text.secondary">Meilleure note</Typography>
                 <Typography variant="h3" fontWeight="bold" color="text.primary">
-                  {stats?.highest_grade !== null && stats?.highest_grade !== undefined && typeof stats?.highest_grade === 'number' 
-                    ? stats.highest_grade.toFixed(1) 
+                    {stats?.highest_grade !== null && stats?.highest_grade !== undefined
+                    ? (typeof stats.highest_grade === 'number'
+                      ? stats.highest_grade.toFixed(1)
+                      : !isNaN(Number(stats.highest_grade))
+                        ? Number(stats.highest_grade).toFixed(1)
+                        : '-')
                     : '-'}
                 </Typography>
                 <Typography variant="overline" color="text.secondary">
@@ -740,40 +566,6 @@ Votre enseignant`;
               </Paper>
             </Grid>
             
-            <Grid size={{ xs: 12, sm: 6, md: 2 }}>
-              <Paper sx={{ 
-                p: 2, 
-                textAlign: 'center', 
-                height: '100%',
-                bgcolor: (theme) => alpha(theme.palette.myBoxes.primary, 0.5),
-                backdropFilter: 'blur(5px)',
-                borderRadius: 2,
-                display: 'flex',
-                flexDirection: 'column',
-              }}>
-                <Typography variant="overline" color="text.secondary">Points moyens</Typography>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, justifyContent: 'center' }}>
-                  <ScienceIcon color="primary" sx={{ fontSize: 16 }} />
-                  <Typography variant="body2" fontWeight="medium">
-                    {stats?.average_experimental_points !== null && 
-                     stats?.average_experimental_points !== undefined && 
-                     typeof stats?.average_experimental_points === 'number'
-                      ? stats.average_experimental_points.toFixed(1)
-                      : '0'} exp.
-                  </Typography>
-                </Box>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, justifyContent: 'center', mt: 1 }}>
-                  <MenuBookIcon color="secondary" sx={{ fontSize: 16 }} />
-                  <Typography variant="body2" fontWeight="medium">
-                    {stats?.average_theoretical_points !== null && 
-                     stats?.average_theoretical_points !== undefined && 
-                     typeof stats?.average_theoretical_points === 'number'
-                      ? stats.average_theoretical_points.toFixed(1)
-                      : '0'} théo.
-                  </Typography>
-                </Box>
-              </Paper>
-            </Grid>
           </Grid>
         </Box>
       </Paper>
@@ -816,17 +608,6 @@ Votre enseignant`;
                 }}
               >
                 <CardContent sx={{ flexGrow: 1 }}>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2 }}>
-                    <Typography variant="h6" fontWeight="bold" noWrap>
-                      {correction.activity_name}
-                    </Typography>
-                    <Chip 
-                      color={getGradeColor(correction.score_percentage ?? 0)}
-                      label={`${correction.grade} / ${correction.max_points}`}
-                      icon={<GradeIcon />}
-                    />
-                  </Box>
-                  
                   <Box sx={{ mb: 2 }}>
                     <Typography 
                       variant="body2" 
@@ -834,7 +615,7 @@ Votre enseignant`;
                       sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}
                     >
                       <CalendarTodayIcon fontSize="small" />
-                      {formatDate(correction.submission_date)}
+                        {new Date(correction.submission_date).toLocaleDateString('fr-FR', { year: 'numeric', month: 'short', day: 'numeric' })}
                     </Typography>
                     
                     <Typography 
@@ -852,22 +633,20 @@ Votre enseignant`;
                   </Typography>
                   
                   <Grid container spacing={1} sx={{ mb: 1 }}>
-                    <Grid size={{ xs: 6 }}>
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                        <ScienceIcon color="primary" fontSize="small" />
-                        <Typography variant="body2" fontWeight="medium">
-                          Expérimental: {correction.experimental_points} pts
-                        </Typography>
-                      </Box>
-                    </Grid>
-                    <Grid size={{ xs: 6 }}>
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                        <MenuBookIcon color="secondary" fontSize="small" />
-                        <Typography variant="body2" fontWeight="medium">
-                          Théorique: {correction.theoretical_points} pts
-                        </Typography>
-                      </Box>
-                    </Grid>
+                    {correction.parts_names?.map((partName, index) => (
+                        <Grid size={{ xs: 6 }} key={index}>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                            {index === 0 ? (
+                              <ScienceIcon color="primary" fontSize="small" />
+                            ) : (
+                              <MenuBookIcon color="secondary" fontSize="small" />
+                            )}
+                            <Typography variant="body2" fontWeight="medium">
+                              {partName}: {correction.points_earned?.[index] || 0} / {correction.points?.[index] || 0} pts
+                            </Typography>
+                          </Box>
+                        </Grid>
+                    ))}
                   </Grid>
                   
                   <Box sx={{ mt: 2 }}>
@@ -889,15 +668,36 @@ Votre enseignant`;
                 <Divider />
                 
                 <CardActions>
-                  <Button 
-                    size="small" 
-                    startIcon={<EditIcon />}
-                    component={Link}
-                    href={`/corrections/${correction.id}`}
-                    sx={{ flexGrow: 1 }}
-                  >
-                    Voir/Modifier
-                  </Button>
+                  {loadingShareCodes.get(correction.id) ? (
+                    <Button 
+                      size="small" 
+                      startIcon={<LoadingSpinner size="sm" />}
+                      disabled
+                      sx={{ flexGrow: 1 }}
+                    >
+                      Chargement...
+                    </Button>
+                  ) : shareCodeErrors.get(correction.id) ? (
+                    <Tooltip title={`Impossible de récupérer le lien de partage : ${shareCodeErrors.get(correction.id)}`}>
+                      <Button 
+                        size="small" 
+                        startIcon={<AssignmentIcon />}
+                        disabled
+                        sx={{ flexGrow: 1 }}
+                      >
+                        Feedback indisponible
+                      </Button>
+                    </Tooltip>
+                  ) : (
+                    <Button 
+                      size="small" 
+                      startIcon={<AssignmentIcon />}
+                      onClick={() => handleOpenFeedback(correction.id)}
+                      sx={{ flexGrow: 1 }}
+                    >
+                      Voir Feedback
+                    </Button>
+                  )}
                 </CardActions>
               </Card>
             </Grid>
@@ -905,45 +705,8 @@ Votre enseignant`;
         </Grid>
       )}
       
-      {/* Actions en bas de page */}
-      <Box sx={{ mt: 4, display: 'flex', justifyContent: 'space-between' }}>
-        <Button
-          variant="outlined"
-          startIcon={<PersonIcon />}
-          component={Link}
-          href={`/students/${studentId}`}
-        >
-          Retour au profil
-        </Button>
-        
-        <Button
-          variant="outlined"
-          color="success"
-          startIcon={<AssignmentIcon />}
-          component={Link}
-          href={`/corrections/unique?studentId=${studentId}`}
-        >
-          Ajouter une correction
-        </Button>
-      </Box>
+
       
-      {/* Modal d'édition */}
-      <StudentEditDialog
-        open={openEditDialog}
-        student={editingStudent ? {
-          ...editingStudent,
-          gender: editingStudent.gender || 'N'  // Provide default 'N' if gender is undefined
-        } : null}
-        classes={classes}
-        selectedClasses={selectedClasses}
-        availableSubgroups={availableSubgroups}
-        loadingSubgroups={loadingSubgroups}
-        onClose={handleEditClose}
-        onSave={handleEditSave}
-        onStudentChange={(student) => setEditingStudent(student as any)}
-        onSelectedClassesChange={setSelectedClasses}
-        fetchClassSubgroups={fetchClassSubgroups}
-      />
       
       {/* Display edit errors if necessary */}
       {editError && (

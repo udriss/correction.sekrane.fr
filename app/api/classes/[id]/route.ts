@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { query, withConnection } from '@/lib/db';
 import { Class } from '@/lib/types';
-
+import { getServerSession } from "next-auth/next";
+import authOptions from "@/lib/auth";
+import { getUser } from '@/lib/auth';
 
 // Get a single class with all relevant information
 export async function GET(
@@ -9,6 +11,17 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    // Get the user from both auth systems
+    const session = await getServerSession(authOptions);
+    const customUser = await getUser();
+    
+    // Use either auth system, starting with custom auth
+    const userId = customUser?.id || session?.user?.id;
+    
+    if (!userId) {
+      return NextResponse.json({ error: 'utilisateur non authentifié' }, { status: 401 });
+    }
+
     // Await the params
     const { id } = await params;
     const classId = parseInt(id);
@@ -42,7 +55,11 @@ export async function GET(
     return NextResponse.json(classData);
   } catch (error) {
     console.error('Error fetching class:', error);
-    return NextResponse.json({ error: 'Failed to fetch class data' }, { status: 500 });
+    // Renvoyer l'erreur avec tous ses détails pour un meilleur débogage
+    return NextResponse.json({ 
+      error: error instanceof Error ? error.message : 'Erreur inconnue',
+      details: error 
+    }, { status: 500 });
   }
 }
 
@@ -52,6 +69,17 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    // Get the user from both auth systems
+    const session = await getServerSession(authOptions);
+    const customUser = await getUser();
+    
+    // Use either auth system, starting with custom auth
+    const userId = customUser?.id || session?.user?.id;
+    
+    if (!userId) {
+      return NextResponse.json({ error: 'utilisateur non authentifié' }, { status: 401 });
+    }
+
     // Await the params
     const { id } = await params;
     const classId = parseInt(id);
@@ -86,7 +114,11 @@ export async function PUT(
     return NextResponse.json(updatedClass[0]);
   } catch (error) {
     console.error('Error updating class:', error);
-    return NextResponse.json({ error: 'Failed to update class' }, { status: 500 });
+    // Renvoyer l'erreur avec tous ses détails pour un meilleur débogage
+    return NextResponse.json({ 
+      error: error instanceof Error ? error.message : 'Erreur inconnue',
+      details: error 
+    }, { status: 500 });
   }
 }
 
@@ -96,6 +128,17 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    // Get the user from both auth systems
+    const session = await getServerSession(authOptions);
+    const customUser = await getUser();
+    
+    // Use either auth system, starting with custom auth
+    const userId = customUser?.id || session?.user?.id;
+    
+    if (!userId) {
+      return NextResponse.json({ error: 'utilisateur non authentifié' }, { status: 401 });
+    }
+
     // Await the params
     const { id } = await params;
     const classId = parseInt(id);
@@ -123,7 +166,11 @@ export async function DELETE(
     return NextResponse.json({ success: true, message: 'Class deleted successfully' });
   } catch (error) {
     console.error('Error deleting class:', error);
-    return NextResponse.json({ error: 'Failed to delete class' }, { status: 500 });
+    // Renvoyer l'erreur avec tous ses détails pour un meilleur débogage
+    return NextResponse.json({ 
+      error: error instanceof Error ? error.message : 'Erreur inconnue',
+      details: error 
+    }, { status: 500 });
   }
 }
 
@@ -133,6 +180,17 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    // Get the user from both auth systems
+    const session = await getServerSession(authOptions);
+    const customUser = await getUser();
+    
+    // Use either auth system, starting with custom auth
+    const userId = customUser?.id || session?.user?.id;
+    
+    if (!userId) {
+      return NextResponse.json({ error: 'utilisateur non authentifié' }, { status: 401 });
+    }
+    
     // Await the params
     const { id } = await params;
     const classId = parseInt(id);
@@ -167,6 +225,10 @@ export async function PATCH(
     return NextResponse.json(updatedClass[0]);
   } catch (error) {
     console.error('Error updating class:', error);
-    return NextResponse.json({ error: 'Failed to update class' }, { status: 500 });
+    // Renvoyer l'erreur avec tous ses détails pour un meilleur débogage
+    return NextResponse.json({ 
+      error: error instanceof Error ? error.message : 'Erreur inconnue',
+      details: error 
+    }, { status: 500 });
   }
 }

@@ -12,7 +12,7 @@ import { useSnackbar } from 'notistack';
 import QrCodeIcon from '@mui/icons-material/QrCode';
 import { Student } from '@/lib/types';
 import { Correction as ProviderCorrection } from '@/app/components/CorrectionsDataProvider';
-
+import { Correction } from '@/lib/types';
 interface QRCodeTabProps {
   classData: any;
   filteredCorrections: ProviderCorrection[];
@@ -77,18 +77,6 @@ const QRCodeTab: React.FC<QRCodeTabProps> = ({
         group: {
           name: groupName || 'Classe',
           activity_name: activityName || 'Activité'
-        },
-        generateShareCode: async (correctionId) => {
-          const response = await fetch(`/api/corrections/${correctionId}/share`, {
-            method: 'POST',
-          });
-          const data = await response.json();
-          return { isNew: true, code: data.code };
-        },
-        getExistingShareCode: async (correctionId) => {
-          const response = await fetch(`/api/corrections/${correctionId}/share`);
-          const data = await response.json();
-          return { exists: data.exists, code: data.code };
         },
         students,
         activities

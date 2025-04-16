@@ -1,21 +1,20 @@
 import React from 'react';
-import Link from 'next/link';
-import { 
-  Box, 
-  Typography, 
-  Paper, 
-  Button, 
+import {
+  Box,
+  Button,
+  Typography,
   Container,
-  useTheme
+  Paper
 } from '@mui/material';
+import Link from 'next/link';
+// Remove unused imports: ArrowBackIcon and H1Title
+import { useTheme } from '@mui/material/styles';
 import AssignmentLateIcon from '@mui/icons-material/AssignmentLate';
 import AssignmentIcon from '@mui/icons-material/Assignment';
 import ErrorIcon from '@mui/icons-material/Error';
 import FindInPageIcon from '@mui/icons-material/FindInPage';
 import HomeIcon from '@mui/icons-material/Home';
-import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import { motion } from 'framer-motion';
-import H1Title from '@/components/ui/H1Title';
 
 interface CorrectionNotFoundProps {
   message?: string;
@@ -167,6 +166,13 @@ const CorrectionNotFound: React.FC<CorrectionNotFoundProps> = ({ message }) => {
         <Box className="bg-gray-50 px-6 py-4 border-t border-gray-200">
           <Typography variant="body2" className="text-center text-gray-500">
             Si vous pensez qu'il s'agit d'une erreur, veuillez contacter votre enseignant.
+          </Typography>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+            La correction n&apos;a pas été trouvée.
+          </Typography>
+
+          <Typography variant="body2" color="text.secondary">
+            Assurez-vous d&apos;avoir l&apos;URL correcte ou essayez de vous reconnecter.
           </Typography>
         </Box>
       </Paper>

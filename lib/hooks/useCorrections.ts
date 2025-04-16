@@ -49,7 +49,8 @@ export function useCorrections(correctionId: string) {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [savingGrade, setSavingGrade] = useState(false);
-  const [error, setError] = useState('');
+  const [error, setError] = useState<Error | string | null>(null);
+  const [errorDetails, setErrorDetails] = useState<any | null>(null);
   const [correctionNotFound, setCorrectionNotFound] = useState(false); // Nouvel état pour suivre si la correction existe
   const [successMessage, setSuccessMessage] = useState('');
   const [editedName, setEditedName] = useState('');
@@ -79,18 +80,27 @@ export function useCorrections(correctionId: string) {
   const fetchCorrectionData = useCallback(async (onActivityIdCallback?: (activityId: number) => void) => {
     setLoading(true);
     setCorrectionNotFound(false); // Réinitialiser l'état
+    setError('');
+    setErrorDetails(null);
     try {
       const response = await fetch(`/api/corrections/${correctionId}`);
       
       // Vérifier si la correction existe
       if (response.status === 404) {
         setCorrectionNotFound(true);
-        //setError('Correction introuvable');
+        setError('Correction introuvable');
+        setErrorDetails({ status: 404, message: 'La correction demandée n\'existe pas ou a été supprimée' });
         return;
       }
       
       if (!response.ok) {
-        throw new Error('Échec de récupération de la correction');
+        const errorData = await response.json().catch(() => ({ error: 'Échec de récupération de la correction' }));
+        // Créer une instance d'Error et y attacher les détails
+        const error = new Error(errorData.error || 'Échec de récupération de la correction');
+        (error as any).details = errorData.details || {};
+        setError(error.message);
+        setErrorDetails((error as any).details);
+        throw error;
       }
       
       const data = await response.json();
@@ -98,7 +108,8 @@ export function useCorrections(correctionId: string) {
       // Vérifier si la réponse contient une correction valide
       if (!data || !data.id) {
         setCorrectionNotFound(true);
-        //setError('Correction introuvable ou invalide');
+        setError('Correction introuvable ou invalide');
+        setErrorDetails({ message: 'Les données de correction reçues ne sont pas valides' });
         return;
       }
       
@@ -132,10 +143,24 @@ export function useCorrections(correctionId: string) {
     } catch (error) {
       console.error('Error fetching correction:', error);
       setError('Échec du chargement des données de correction.');
+      // Si l'erreur contient des détails (comme c'est le cas pour une réponse d'API avec détails)
+      if ((error as any)?.details) {
+        setErrorDetails((error as any).details);
+      } else if (typeof error === 'object' && error !== null) {
+        // Récupérer toutes les informations sur l'erreur pour affichage
+        setErrorDetails({
+          message: (error as Error).message,
+          stack: (error as Error).stack,
+          // Pour les erreurs network ou Response, récupérer ce qu'on peut
+          status: (error as any).status,
+          statusText: (error as any).statusText,
+          name: (error as Error).name
+        });
+      }
     } finally {
       setLoading(false);
     }
-  }, [correctionId, setFirstName, setLastName, setEmail, setEditedName, setContentItems, setCorrection, setError, setLoading]);
+  }, [correctionId, setFirstName, setLastName, setEmail, setEditedName, setContentItems, setCorrection, setError, setErrorDetails, setLoading]);
 
   // Save the correction
   const handleSaveCorrection = useCallback(async () => {
@@ -467,9 +492,10 @@ export function useCorrections(correctionId: string) {
     setEditedName(`${first} ${last}`.trim());
   }, []);
 
-  // Fonction pour effacer l'erreur (nécessaire pour ErrorDisplay)
+  // Fonction pour effacer l'erreur et ses détails (nécessaire pour ErrorDisplay)
   const clearError = useCallback(() => {
     setError('');
+    setErrorDetails(null);
   }, []);
 
   return {

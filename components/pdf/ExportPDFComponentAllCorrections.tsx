@@ -29,11 +29,7 @@ import {
 import { useSnackbar } from 'notistack';
 import QrCodeIcon from '@mui/icons-material/QrCode';
 import TableChartIcon from '@mui/icons-material/TableChart';
-import GroupIcon from '@mui/icons-material/Group';
-import SchoolIcon from '@mui/icons-material/School';
-import MenuBookIcon from '@mui/icons-material/MenuBook';
 import { Student } from '@/lib/types';
-import { Correction as ProviderCorrection } from '@/app/components/CorrectionsDataProvider';
 import ArrangementOptions from './ArrangementOptions';
 import ExportFormatOptions from './ExportFormatOptions';
 import ErrorDisplay from '@/components/ui/ErrorDisplay';
@@ -1139,18 +1135,6 @@ const ExportPDFComponentAllCorrections: React.FC<ExportPDFComponentAllCorrection
           name: 'Toutes les classes',
           activity_name: activityName || 'Activité'
         },
-        generateShareCode: async (correctionId) => {
-          const response = await fetch(`/api/corrections/${correctionId}/share`, {
-            method: 'POST',
-          });
-          const data = await response.json();
-          return { isNew: true, code: data.code };
-        },
-        getExistingShareCode: async (correctionId) => {
-          const response = await fetch(`/api/corrections/${correctionId}/share`);
-          const data = await response.json();
-          return { exists: data.exists, code: data.code };
-        },
         students,
         activities
       });
@@ -1329,10 +1313,10 @@ const ExportPDFComponentAllCorrections: React.FC<ExportPDFComponentAllCorrection
                       <TableCell>{className}</TableCell>
                       <TableCell>{activity?.name}</TableCell>
                       <TableCell align="right">
-                        {correction.experimental_points_earned} / {activity?.experimental_points}
+
                       </TableCell>
                       <TableCell align="right">
-                        {correction.theoretical_points_earned} / {activity?.theoretical_points}
+
                       </TableCell>
                       <TableCell align="center">
                         <Chip 

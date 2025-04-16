@@ -63,7 +63,7 @@ export async function GET() {
     
     // Convert the map to an array
     const consolidatedStudents = Array.from(studentMap.values());
-    
+
     return NextResponse.json(consolidatedStudents);
   } catch (error) {
     console.error('Database error:', error);

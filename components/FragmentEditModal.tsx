@@ -14,35 +14,24 @@ import {
   Select,
   MenuItem,
   Chip,
-  Alert,
   IconButton,
   FormHelperText,
   Typography,
+  Alert,
 } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import SaveIcon from '@mui/icons-material/Save';
 import AddIcon from '@mui/icons-material/Add';
 import CategorySelector from '@/components/CategorySelector';
 import LoadingSpinner from '@/components/LoadingSpinner';
+import ErrorDisplay from '@/components/ui/ErrorDisplay';
+import { Fragment } from '@/lib/types';
 
 interface Activity {
   id: number;
   name: string;
 }
 
-export interface Fragment {
-  id: number;
-  content: string;
-  category: string;
-  tags?: string[];
-  activity_id?: number | null;
-  activity_name?: string;
-  user_id?: string;
-  created_at?: string;
-  updated_at?: string;
-  isOwner?: boolean;
-  isModified?: boolean; // Add the isModified computed property
-}
 
 interface FragmentEditModalProps {
   open: boolean;
@@ -50,7 +39,7 @@ interface FragmentEditModalProps {
   fragment?: Fragment | null;
   activityId?: number | null;
   onSave: (fragment: Fragment) => Promise<void>;
-  categories: string[];
+  categories: Array<{id: number, name: string}>;
   activities: Activity[];
 }
 
@@ -73,6 +62,7 @@ const FragmentEditModal: React.FC<FragmentEditModalProps> = ({
   // UI state
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [errorDetails, setErrorDetails] = useState<any>(null);
   const [success, setSuccess] = useState('');
   
   // Initialize form data when fragment or modal opens
@@ -92,8 +82,15 @@ const FragmentEditModal: React.FC<FragmentEditModalProps> = ({
     
     // Reset state when modal opens
     setError('');
+    setErrorDetails(null);
     setSuccess('');
   }, [fragment, defaultActivityId, open]);
+  
+  // Fonction pour réinitialiser les erreurs
+  const clearError = () => {
+    setError('');
+    setErrorDetails(null);
+  };
   
   // Handle form submission
   const handleSubmit = async (e: React.FormEvent) => {
@@ -102,25 +99,35 @@ const FragmentEditModal: React.FC<FragmentEditModalProps> = ({
     // Validate required fields
     if (!content.trim()) {
       setError('Le contenu du fragment est requis');
+      setErrorDetails({
+        code: 'VALIDATION_ERROR',
+        field: 'content',
+        validationErrors: [{ field: 'content', message: 'Le contenu est requis' }]
+      });
       return;
     }
     
     if (!category.trim()) {
       setError('La catégorie est requise');
+      setErrorDetails({
+        code: 'VALIDATION_ERROR',
+        field: 'category',
+        validationErrors: [{ field: 'category', message: 'La catégorie est requise' }]
+      });
       return;
     }
     
     setLoading(true);
-    setError('');
+    clearError();
     
     try {
       // Create fragment object with updated data
       const updatedFragment: Fragment = {
         id: fragment?.id || 0,
         content,
-        category,
         tags,
         activity_id: activityId,
+        categories: categories.filter(cat => cat.name === category) // Utiliser la catégorie sélectionnée
       };
       
       // Call the onSave function passed by the parent
@@ -133,9 +140,22 @@ const FragmentEditModal: React.FC<FragmentEditModalProps> = ({
         onClose();
       }, 1000);
       
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error saving fragment:', err);
-      setError((err as Error).message || 'Erreur lors de l\'enregistrement du fragment');
+      
+      // Gestion standardisée des erreurs
+      if (err.details) {
+        // Si l'erreur contient déjà des détails structurés
+        setError(err.message || 'Erreur lors de l\'enregistrement du fragment');
+        setErrorDetails(err.details);
+      } else {
+        // Erreur standard
+        setError((err as Error).message || 'Erreur lors de l\'enregistrement du fragment');
+        setErrorDetails({
+          code: 'SAVE_ERROR',
+          message: err.message || 'Une erreur s\'est produite lors de l\'enregistrement du fragment'
+        });
+      }
     } finally {
       setLoading(false);
     }
@@ -171,9 +191,15 @@ const FragmentEditModal: React.FC<FragmentEditModalProps> = ({
       <DialogContent dividers>
         <form id="fragment-form" onSubmit={handleSubmit}>
           {error && (
-            <Alert severity="error" sx={{ mb: 2 }}>
-              {error}
-            </Alert>
+            <ErrorDisplay 
+              error={error}
+              errorDetails={errorDetails}
+              onRefresh={() => {
+                setError('');
+                window.location.reload();
+              }}
+              withRefreshButton={true}
+            />
           )}
           
           {success && (
@@ -199,6 +225,7 @@ const FragmentEditModal: React.FC<FragmentEditModalProps> = ({
               }
             }}
             disabled={loading}
+            error={!!errorDetails?.validationErrors?.some((err: any) => err.field === 'content')}
           />
           
           <Box sx={{ display: 'flex', gap: 2, mt: 3 }}>

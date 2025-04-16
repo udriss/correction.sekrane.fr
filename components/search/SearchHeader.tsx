@@ -61,25 +61,29 @@ export default function SearchHeader() {
             placeholder="Rechercher..."
             value={searchInputValue}
             onChange={(e) => setSearchInputValue(e.target.value)}
-            InputProps={{
-              startAdornment: (
-                <InputAdornment position="start">
-                  <SearchIcon />
-                </InputAdornment>
-              ),
-              endAdornment: (
-                <InputAdornment position="end">
-                  {isWaitingToSearch && (
-                    <CircularProgress size={20} color="inherit" sx={{ mr: 1 }} />
-                  )}
-                  {searchInputValue && (
-                    <IconButton onClick={handleClearSearch} edge="end">
-                      <ClearIcon />
-                    </IconButton>
-                  )}
-                </InputAdornment>
-              )
-            }}
+            slotProps={{
+              input: { 
+                inputProps: { 
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <SearchIcon  />
+                    </InputAdornment>
+                  ),
+                  endAdornment: (
+                    <InputAdornment position="end">
+                      {isWaitingToSearch && (
+                        <CircularProgress size={20} color="inherit" sx={{ mr: 1 }} />
+                      )}
+                      {searchInputValue && (
+                        <IconButton onClick={handleClearSearch} edge="end">
+                          <ClearIcon />
+                        </IconButton>
+                      )}
+                    </InputAdornment>
+                  )
+                  },
+              }
+              }}
           />
           <Button
             type="submit"

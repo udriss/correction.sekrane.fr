@@ -53,18 +53,14 @@ export async function GET(
       gender: studentData[0].gender,
       created_at: studentData[0].created_at,
       updated_at: studentData[0].updated_at,
-      // Informations optionnelles qui pourraient être présentes
-      code: studentData[0].code || null,
-      phone: studentData[0].phone || null,
-      classId: studentData[0].class_id || null,
-      group: studentData[0].sub_class || null
+      group: studentData[0].group || null
     };
     
     return NextResponse.json(student);
   } catch (error) {
     console.error('Erreur lors de la récupération de l\'étudiant:', error);
     return NextResponse.json(
-      { error: 'Erreur lors de la récupération des informations de l\'étudiant' }, 
+      { error: error }, 
       { status: 500 }
     );
   }

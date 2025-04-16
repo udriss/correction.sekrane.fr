@@ -24,6 +24,22 @@ import SearchIcon from '@mui/icons-material/Search';
 
 import { Activity } from '@/lib/activity';
 import { Student, Class, ClassStudent } from '@/lib/types';
+import ErrorDisplay from '@/components/ui/ErrorDisplay';
+
+// Interface pour les détails d'erreur standardisés
+interface ErrorDetails {
+  message?: string;
+  code?: string;
+  field?: string;
+  suggestion?: string;
+  details?: string;
+  statusCode?: number;
+  validationErrors?: Array<{
+    field: string;
+    message: string;
+  }>;
+  [key: string]: any;
+}
 
 interface SingleCorrectionFormProps {
   activityId: string;
@@ -54,12 +70,19 @@ const SingleCorrectionForm: React.FC<SingleCorrectionFormProps> = ({
   
   // États UI
   const [loading, setLoading] = useState<boolean>(false);
-  const [error, setError] = useState<string>('');
+  const [error, setError] = useState<string | null>(null);
+  const [errorDetails, setErrorDetails] = useState<ErrorDetails | null>(null);
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [showAddStudent, setShowAddStudent] = useState<boolean>(false);
   const [newStudentName, setNewStudentName] = useState<string>('');
   const [newStudentEmail, setNewStudentEmail] = useState<string>('');
   
+  // Fonction pour effacer les erreurs
+  const clearError = () => {
+    setError(null);
+    setErrorDetails(null);
+  };
+
   // Calculer la note totale
   const totalScore = (experimentalScore !== '' ? experimentalScore : 0) + 
                      (theoreticalScore !== '' ? theoreticalScore : 0);
@@ -138,14 +161,33 @@ const SingleCorrectionForm: React.FC<SingleCorrectionFormProps> = ({
   const fetchStudents = async () => {
     try {
       const response = await fetch('/api/students');
-      if (!response.ok) throw new Error("Erreur lors de la récupération des étudiants");
+      if (!response.ok) {
+        const errorData = await response.json();
+        // Créer une instance d'Error et y attacher les détails
+        const error = new Error('Erreur lors du chargement des étudiants : ' + (errorData.error || 'Erreur inconnue'));
+        (error as any).details = errorData.details || {};
+        setErrorDetails({
+          message: error.message,
+          code: errorData.code || 'API_ERROR',
+          details: (error as any).details,
+          suggestion: errorData.suggestion || 'Réessayez plus tard'
+        });
+        throw error;
+      }
       
       const data = await response.json();
       setStudents(data);
       setFilteredStudents(data);
-    } catch (err) {
+    } catch (err: any) {
       console.error('Erreur:', err);
-      setError("Erreur lors du chargement des étudiants");
+      if (!errorDetails) {
+        setErrorDetails({ 
+          message: err.message || "Erreur lors du chargement des étudiants",
+          code: err.code || 'FETCH_ERROR',
+          details: err.details || {},
+          suggestion: 'Vérifiez votre connexion internet et réessayez'
+        });
+      }
     }
   };
   
@@ -153,13 +195,32 @@ const SingleCorrectionForm: React.FC<SingleCorrectionFormProps> = ({
   const fetchClasses = async () => {
     try {
       const response = await fetch('/api/classes');
-      if (!response.ok) throw new Error("Erreur lors de la récupération des classes");
+      if (!response.ok) {
+        const errorData = await response.json();
+        // Créer une instance d'Error et y attacher les détails
+        const error = new Error('Erreur lors du chargement des classes : ' + (errorData.error || 'Erreur inconnue'));
+        (error as any).details = errorData.details || {};
+        setErrorDetails({
+          message: error.message,
+          code: errorData.code || 'API_ERROR',
+          details: (error as any).details,
+          suggestion: errorData.suggestion || 'Réessayez plus tard'
+        });
+        throw error;
+      }
       
       const data = await response.json();
       setClasses(data);
-    } catch (err) {
+    } catch (err: any) {
       console.error('Erreur:', err);
-      setError("Erreur lors du chargement des classes");
+      if (!errorDetails) {
+        setErrorDetails({ 
+          message: err.message || "Erreur lors du chargement des classes",
+          code: err.code || 'FETCH_ERROR',
+          details: err.details || {},
+          suggestion: 'Vérifiez votre connexion internet et réessayez'
+        });
+      }
     }
   };
   
@@ -167,13 +228,32 @@ const SingleCorrectionForm: React.FC<SingleCorrectionFormProps> = ({
   const fetchClassStudents = async () => {
     try {
       const response = await fetch('/api/class-students');
-      if (!response.ok) throw new Error("Erreur lors de la récupération des relations classe-étudiant");
+      if (!response.ok) {
+        const errorData = await response.json();
+        // Créer une instance d'Error et y attacher les détails
+        const error = new Error('Erreur lors du chargement des relations classe-étudiant : ' + (errorData.error || 'Erreur inconnue'));
+        (error as any).details = errorData.details || {};
+        setErrorDetails({
+          message: error.message,
+          code: errorData.code || 'API_ERROR',
+          details: (error as any).details,
+          suggestion: errorData.suggestion || 'Réessayez plus tard'
+        });
+        throw error;
+      }
       
       const data = await response.json();
       setClassStudents(data);
-    } catch (err) {
+    } catch (err: any) {
       console.error('Erreur:', err);
-      setError("Erreur lors du chargement des relations classe-étudiant");
+      if (!errorDetails) {
+        setErrorDetails({ 
+          message: err.message || "Erreur lors du chargement des relations classe-étudiant",
+          code: err.code || 'FETCH_ERROR',
+          details: err.details || {},
+          suggestion: 'Vérifiez votre connexion internet et réessayez'
+        });
+      }
     }
   };
   
@@ -193,23 +273,23 @@ const SingleCorrectionForm: React.FC<SingleCorrectionFormProps> = ({
     e.preventDefault();
     
     if (!activityId) {
-      setError("Veuillez sélectionner une activité");
+      setErrorDetails({ message: "Veuillez sélectionner une activité" });
       return;
     }
     
     if (!selectedStudentId) {
-      setError("Veuillez sélectionner un étudiant");
+      setErrorDetails({ message: "Veuillez sélectionner un étudiant" });
       return;
     }
     
     if (experimentalScore === '' || theoreticalScore === '') {
-      setError("Veuillez entrer toutes les notes");
+      setErrorDetails({ message: "Veuillez entrer toutes les notes" });
       return;
     }
     
     try {
       setLoading(true);
-      setError('');
+      setErrorDetails(null);
       
       const correctionData = {
         activity_id: activityId,
@@ -229,7 +309,16 @@ const SingleCorrectionForm: React.FC<SingleCorrectionFormProps> = ({
       
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.error || "Erreur lors de la création de la correction");
+        // Créer une instance d'Error et y attacher les détails
+        const error = new Error('Erreur lors de la création de la correction : ' + (errorData.error || 'Erreur inconnue'));
+        (error as any).details = errorData.details || {};
+        setErrorDetails({
+          message: error.message,
+          code: errorData.code || 'API_ERROR',
+          details: (error as any).details,
+          suggestion: errorData.suggestion || 'Vérifiez les données saisies et réessayez'
+        });
+        throw error;
       }
       
       const data = await response.json();
@@ -239,9 +328,17 @@ const SingleCorrectionForm: React.FC<SingleCorrectionFormProps> = ({
         onSuccess(data.id.toString());
       }
       
-    } catch (err) {
+    } catch (err: any) {
       console.error('Erreur:', err);
-      setError(err instanceof Error ? err.message : "Erreur lors de la création de la correction");
+      if (!errorDetails) {
+        // Si errorDetails n'est pas déjà défini par le bloc if (!response.ok)
+        setErrorDetails({ 
+          message: err.message || "Erreur lors de la création de la correction",
+          code: err.code || 'UNKNOWN_ERROR',
+          details: err.details || {},
+          suggestion: err.suggestion || 'Veuillez réessayer ultérieurement'
+        });
+      }
     } finally {
       setLoading(false);
     }
@@ -250,12 +347,18 @@ const SingleCorrectionForm: React.FC<SingleCorrectionFormProps> = ({
   // Ajouter un nouvel étudiant
   const handleAddStudent = async () => {
     if (!newStudentName || !newStudentEmail) {
-      setError("Veuillez remplir tous les champs pour ajouter un étudiant");
+      setErrorDetails({ 
+        message: "Veuillez remplir tous les champs pour ajouter un étudiant",
+        code: 'VALIDATION_ERROR',
+        field: !newStudentName ? 'name' : 'email',
+        suggestion: 'Tous les champs sont obligatoires'
+      });
       return;
     }
     
     try {
       setLoading(true);
+      setErrorDetails(null);
       
       // 1. Créer l'étudiant
       const studentData = {
@@ -273,7 +376,16 @@ const SingleCorrectionForm: React.FC<SingleCorrectionFormProps> = ({
       
       if (!studentResponse.ok) {
         const errorData = await studentResponse.json();
-        throw new Error(errorData.error || "Erreur lors de l'ajout de l'étudiant");
+        // Créer une instance d'Error et y attacher les détails
+        const error = new Error("Erreur lors de l'ajout de l'étudiant : " + (errorData.error || 'Erreur inconnue'));
+        (error as any).details = errorData.details || {};
+        setErrorDetails({
+          message: error.message,
+          code: errorData.code || 'API_ERROR',
+          details: (error as any).details,
+          suggestion: errorData.suggestion || "Vérifiez les informations de l'étudiant"
+        });
+        throw error;
       }
       
       const newStudent = await studentResponse.json();
@@ -294,7 +406,8 @@ const SingleCorrectionForm: React.FC<SingleCorrectionFormProps> = ({
         });
         
         if (!linkResponse.ok) {
-          console.warn("L'étudiant a été créé mais n'a pas pu être associé à la classe");
+          const errorData = await linkResponse.json();
+          console.warn("L'étudiant a été créé mais n'a pas pu être associé à la classe", errorData);
           // On ne lance pas d'erreur ici pour ne pas bloquer le processus
         } else {
           // Ajouter la nouvelle relation à notre état
@@ -312,9 +425,17 @@ const SingleCorrectionForm: React.FC<SingleCorrectionFormProps> = ({
       setNewStudentEmail('');
       setShowAddStudent(false);
       
-    } catch (err) {
+    } catch (err: any) {
       console.error('Erreur:', err);
-      setError(err instanceof Error ? err.message : "Erreur lors de l'ajout de l'étudiant");
+      if (!errorDetails) {
+        // Si errorDetails n'est pas déjà défini par le bloc if (!studentResponse.ok)
+        setErrorDetails({ 
+          message: err.message || "Erreur lors de l'ajout de l'étudiant",
+          code: err.code || 'UNKNOWN_ERROR',
+          details: err.details || {},
+          suggestion: err.suggestion || 'Veuillez réessayer ultérieurement'
+        });
+      }
     } finally {
       setLoading(false);
     }
@@ -337,10 +458,16 @@ const SingleCorrectionForm: React.FC<SingleCorrectionFormProps> = ({
         </Typography>
       </div>
       
-      {error && (
-        <Alert severity="error" className="mb-4">
-          {error}
-        </Alert>
+      {errorDetails && (
+        <ErrorDisplay 
+          error={errorDetails.message || "Une erreur s'est produite"}
+          errorDetails={errorDetails}
+          onRefresh={() => {
+            setError('');
+            window.location.reload();
+          }}
+          withRefreshButton = {true}
+        />
       )}
       
       <form onSubmit={handleSubmit}>

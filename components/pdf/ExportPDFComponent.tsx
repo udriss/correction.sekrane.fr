@@ -2,15 +2,6 @@ import React, { useState } from 'react';
 import { 
   Typography, 
   Box, 
-  FormControl, 
-  InputLabel, 
-  Select, 
-  MenuItem, 
-  Divider, 
-  Card, 
-  CardContent, 
-  CardActions, 
-  Button, 
   Alert,
   TableContainer,
   Table,
@@ -20,27 +11,17 @@ import {
   TableCell,
   Chip,
   Paper,
-  Radio,
-  RadioGroup,
-  FormControlLabel,
-  FormLabel,
   Tabs,
   Tab,
-  Grid,
   TablePagination
 } from '@mui/material';
-import { useSnackbar } from 'notistack';
 import QrCodeIcon from '@mui/icons-material/QrCode';
-import SaveIcon from '@mui/icons-material/Save';
-import FileDownloadIcon from '@mui/icons-material/FileDownload';
 import TableChartIcon from '@mui/icons-material/TableChart';
-import GroupIcon from '@mui/icons-material/Group';
-import SchoolIcon from '@mui/icons-material/School';
-import MenuBookIcon from '@mui/icons-material/MenuBook';
-import { Correction, Student } from '@/lib/types';
+import { Student } from '@/lib/types';
 import { Correction as ProviderCorrection } from '@/app/components/CorrectionsDataProvider';
 import NotesTab from './NotesTab';
 import QRCodeTab from './QRCodeTab';
+
 
 interface ExportPDFComponentProps {
   classData: any;
@@ -60,8 +41,6 @@ interface ExportPDFComponentProps {
 // Types pour les options d'export
 type ArrangementType = 'student' | 'class' | 'subclass' | 'activity';
 type SubArrangementType = 'student' | 'class' | 'subclass' | 'activity' | 'none';
-type ExportFormat = 'pdf' | 'csv' | 'xlsx';
-type ViewType = 'detailed' | 'simplified';
 
 const ExportPDFComponent: React.FC<ExportPDFComponentProps> = ({
   classData,
@@ -81,7 +60,6 @@ const ExportPDFComponent: React.FC<ExportPDFComponentProps> = ({
   const [arrangement, setArrangement] = useState<ArrangementType>('student');
   const [subArrangement, setSubArrangement] = useState<SubArrangementType>('activity');
   const [activeTab, setActiveTab] = useState<number>(0);
-  const { enqueueSnackbar } = useSnackbar();
 
   // États pour la pagination
   const [page, setPage] = useState(0);

@@ -1,7 +1,6 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
 import { ActivityAutre } from '@/lib/types';
 import { 
   Paper, 
@@ -17,8 +16,7 @@ import {
   Container,
   List,
   ListItem,
-  ListItemIcon,
-  ListItemText
+  ListItemIcon
 } from '@mui/material';
 import Link from 'next/link';
 import AssignmentIcon from '@mui/icons-material/Assignment';
@@ -32,7 +30,6 @@ import GradeTwoToneIcon from '@mui/icons-material/GradeTwoTone';
 import SpeedIcon from '@mui/icons-material/Speed';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import FiberManualRecordIcon from '@mui/icons-material/FiberManualRecord';
-import dynamic from 'next/dynamic';
 
 
 export default function CorrectionsAutrePage({ params }: { params: Promise<{ id: string }> }) {
@@ -40,11 +37,11 @@ export default function CorrectionsAutrePage({ params }: { params: Promise<{ id:
   const unwrappedParams = React.use(params);
   const { id } = unwrappedParams;
   const activityId = id;
-  const router = useRouter();
   
   const [activity, setActivity] = useState<ActivityAutre | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');  
+  // Supprimer la variable error qui n'est pas utilisée mais garder la fonction setError pour les cas d'erreur
+  const [, setError] = useState('');  
 
   useEffect(() => {
       const fetchActivity = async () => {
@@ -95,7 +92,7 @@ export default function CorrectionsAutrePage({ params }: { params: Promise<{ id:
             </Typography>
             </Box>
             <Alert severity="warning" sx={{ mb: 3 }}>
-              L'activité demandée n'existe pas ou a été supprimée.
+              L&apos;activité demandée n&apos;existe pas ou a été supprimée.
             </Alert>
             <Button
               variant="outlined"
@@ -176,7 +173,7 @@ export default function CorrectionsAutrePage({ params }: { params: Promise<{ id:
                   boxShadow: '0 4px 15px rgba(0,0,0,0.15)'
                 }}
               >
-                Retour à l'activité
+                Retour à l&apos;activité
               </Button>
             </Box>
           </GradientBackground>
@@ -276,7 +273,7 @@ export default function CorrectionsAutrePage({ params }: { params: Promise<{ id:
                       <FiberManualRecordIcon fontSize='small' sx={{fontSize:8, color: 'text.secondary' }} />
                     </ListItemIcon>
                     <Typography variant="body2">
-                      corriger un seul travail d'étudiant
+                      corriger un seul travail d&apos;étudiant
                     </Typography>
                   </ListItem>
                   <ListItem sx={{ py: 0.5 }}>

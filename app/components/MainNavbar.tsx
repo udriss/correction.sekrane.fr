@@ -238,14 +238,14 @@ export default function MainNavbar() {
                   transformOrigin={{ horizontal: 'center', vertical: 'top' }}
                   anchorOrigin={{ horizontal: 'center', vertical: 'bottom' }}
                 >
-                  <MenuItem component={Link} href="/activities">
+                  <MenuItem component={Link} href="/activities_autres">
                     <ListItemIcon>
                       <FormatListBulletedIcon fontSize="small" />
                     </ListItemIcon>
                     <ListItemText primary="Liste des activités" />
                   </MenuItem>
                   
-                  <MenuItem component={Link} href="/activities/new">
+                  <MenuItem component={Link} href="/activities_autres/new">
                     <ListItemIcon>
                       <AddIcon fontSize="small" />
                     </ListItemIcon>
@@ -254,14 +254,14 @@ export default function MainNavbar() {
                   
                   <Divider />
 
-                  <MenuItem component={Link} href="/corrections">
+                  <MenuItem component={Link} href="/corrections_autres">
                     <ListItemIcon>
                       <AssignmentIcon fontSize="small" />
                     </ListItemIcon>
                     <ListItemText primary="Liste des corrections" />
                   </MenuItem>
 
-                  <MenuItem component={Link} href="/corrections/new">
+                  <MenuItem component={Link} href="/corrections_autres/new">
                     <ListItemIcon>
                       <AddIcon fontSize="small" />
                     </ListItemIcon>
@@ -323,14 +323,14 @@ export default function MainNavbar() {
                   transformOrigin={{ horizontal: 'center', vertical: 'top' }}
                   anchorOrigin={{ horizontal: 'center', vertical: 'bottom' }}
                 >
-                  <MenuItem component={Link} href="/classes">
+                  <MenuItem component={Link} href="/classes_autres">
                     <ListItemIcon>
                       <FormatListBulletedIcon fontSize="small" />
                     </ListItemIcon>
                     <ListItemText primary="Liste des classes" />
                   </MenuItem>
                   
-                  <MenuItem component={Link} href="/classes/new">
+                  <MenuItem component={Link} href="/classes_autres/new">
                     <ListItemIcon>
                       <AddIcon fontSize="small" />
                     </ListItemIcon>

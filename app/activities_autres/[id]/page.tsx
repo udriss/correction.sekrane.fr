@@ -1,9 +1,8 @@
 'use client';
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { ActivityAutre } from '@/lib/types';
-import { CorrectionAutre } from '@/lib/types';
+import { ActivityAutre, CorrectionAutre, CorrectionAutreEnriched, Student } from '@/lib/types';
 import LoadingSpinner from '@/components/LoadingSpinner';
 import { 
   Button, 
@@ -15,13 +14,10 @@ import {
   Container, 
   Tabs, 
   Tab,
-  SelectChangeEvent, 
-  FormControlLabel, 
   Box, 
   FormHelperText, 
-  Switch,
   Chip,
-  Divider
+  alpha
 } from '@mui/material';
 import EditIcon from '@mui/icons-material/Edit';
 import SaveIcon from '@mui/icons-material/Save';
@@ -32,11 +28,16 @@ import { useSnackbar } from 'notistack';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import QrCodeIcon from '@mui/icons-material/QrCode';
 import MenuBookIcon from '@mui/icons-material/MenuBook';
-import ScienceIcon from '@mui/icons-material/Science';
 import AddIcon from '@mui/icons-material/Add';
 import DragIndicatorIcon from '@mui/icons-material/DragIndicator';
 import GradientBackground from '@/components/ui/GradientBackground';
 import ErrorDisplay from '@/components/ui/ErrorDisplay';
+import ActivityStatsGraphs from '@/components/ActivityStatsGraphs';
+import ExportPDFComponentAutre from '@/components/pdfAutre/ExportPDFComponentAutre';
+// Import FragmentsList et le type Fragment
+import FragmentsList from '@/components/FragmentsList';
+import { Fragment } from '@/lib/types';
+import { getBatchShareCodes } from '@/lib/services/shareService';
 
 export default function ActivityAutreDetail({ params }: { params: Promise<{ id: string }> }) {
   // Unwrap the params Promise using React.use()
@@ -47,9 +48,15 @@ export default function ActivityAutreDetail({ params }: { params: Promise<{ id: 
   const router = useRouter();
 
   const [activity, setActivity] = useState<ActivityAutre | null>(null);
-  const [corrections, setCorrections] = useState<CorrectionAutre[]>([]);
+  const [corrections, setCorrections] = useState<CorrectionAutreEnriched[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+  const [error, setError] = useState<Error | string | null>(null);
+  const [errorDetails, setErrorDetails] = useState<any | null>(null);
+  
+  // États pour la gestion des fragments
+  const [fragments, setFragments] = useState<Fragment[]>([]);
+  const [loadingFragments, setLoadingFragments] = useState(false);
+  const [fragmentsError, setFragmentsError] = useState('');
   
   const { enqueueSnackbar } = useSnackbar();
   
@@ -61,12 +68,30 @@ export default function ActivityAutreDetail({ params }: { params: Promise<{ id: 
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
   
+  // États pour la fonction ExportPDFComponentAutre
+  const [students, setStudents] = useState<Student[]>([]);
+  const [selectedSubGroup, setSelectedSubGroup] = useState<string>('');
+  const [filteredCorrections, setFilteredCorrections] = useState<CorrectionAutre[]>([]);
+  
+  // Calculated values for subclasses
+  const uniqueSubClasses = useMemo(() => {
+    if (!students.length) return [];
+    
+    // Extract all sub_class values from students
+    const subClasses = students
+      .filter(student => student.sub_class !== undefined && student.sub_class !== null)
+      .map(student => student.sub_class?.toString());
+    
+    // Remove duplicates
+    return Array.from(new Set(subClasses)).sort((a, b) => Number(a) - Number(b));
+  }, [students]);
+
   // Récupérer le tab initial depuis l'URL ou utiliser 0 par défaut
   const initialTabValue = useMemo(() => {
     const tabParam = searchParams.get('tab');
     if (tabParam !== null) {
       const tabIndex = parseInt(tabParam, 10);
-      if (!isNaN(tabIndex) && tabIndex >= 0 && tabIndex <= 3) {
+      if (!isNaN(tabIndex) && tabIndex >= 0 && tabIndex <= 4) {
         return tabIndex;
       }
     }
@@ -84,7 +109,14 @@ export default function ActivityAutreDetail({ params }: { params: Promise<{ id: 
         // Fetch activity details
         const activityResponse = await fetch(`/api/activities_autres/${activityId}`);
         if (!activityResponse.ok) {
-          throw new Error('Erreur lors du chargement de l\'activité');
+          const errorData = await activityResponse.json();
+          
+          // Créer une instance d'Error et y attacher les détails
+          const error = new Error('Erreur lors du chargement de l\'activité : ' + (errorData.error || 'Erreur lors du chargement de l\'activité'));
+          (error as any).details = errorData.details || {};
+          setError(error);
+          setErrorDetails(errorData.details || {});
+          throw error;
         } 
         const activityData = await activityResponse.json();
         setActivity(activityData);
@@ -101,20 +133,61 @@ export default function ActivityAutreDetail({ params }: { params: Promise<{ id: 
         // Fetch corrections for this activity
         const correctionsResponse = await fetch(`/api/activities_autres/${activityId}/corrections`);
         if (!correctionsResponse.ok) {
-          throw new Error('Erreur lors du chargement des corrections');
+          const errorData = await correctionsResponse.json();
+          // Créer une instance d'Error et y attacher les détails
+          const error = new Error('Erreur lors du chargement des corrections : ' + (errorData.error || 'Erreur lors du chargement des corrections'));
+          (error as any).details = errorData.details || {};
+          setError(error);
+          setErrorDetails(errorData.details || {});
+          throw error;
         }
         const correctionsData = await correctionsResponse.json();
         setCorrections(correctionsData);
       } catch (err) {
         console.error('Erreur:', err);
-        setError('Erreur lors du chargement des données');
+        // Si nous n'avons pas déjà défini l'erreur (avec des détails) ci-dessus
+        if (!error) {
+          setError(err instanceof Error ? err : new Error(String(err)));
+        }
       } finally {
         setLoading(false);
+        
       }
     };
     
     fetchActivityAndCorrections();
   }, [activityId]);
+
+  useEffect(() => {
+    const fetchStudentsAndClasses = async () => {
+      try {
+        // Récupérer les étudiants
+        const studentsResponse = await fetch('/api/students');
+        if (studentsResponse.ok) {
+          const studentsData = await studentsResponse.json();
+          setStudents(studentsData);
+        }
+        
+        // Récupérer les classes associées à cette activité
+        const classesResponse = await fetch(`/api/activities_autres/${activityId}/classes`);
+        if (classesResponse.ok) {
+          const classesData = await classesResponse.json();
+          setFilteredCorrections(corrections);
+        }
+      } catch (err) {
+        console.error('Erreur lors du chargement des étudiants et des classes:', err);
+      }
+    };
+    
+    if ((tabValue === 4 || tabValue === 2) && corrections.length > 0) {
+      fetchStudentsAndClasses();
+    }
+  }, [tabValue, corrections, activityId, error]);
+
+  // Définir une variable activities à partir de l'activité courante
+  const activities = useMemo(() => {
+    return activity ? [activity] : [];
+  }, [activity]);
 
   // Fonction pour gérer l'ajout d'une nouvelle partie
   const handleAddPart = () => {
@@ -141,9 +214,18 @@ export default function ActivityAutreDetail({ params }: { params: Promise<{ id: 
 
   // Fonction pour gérer les changements de points d'une partie
   const handlePartPointsChange = (index: number, value: string) => {
-    const points = parseInt(value, 10);
+    // Vérifier si la valeur est un nombre valide
+    const numericValue = parseFloat(value);
     const newParts = [...parts];
-    newParts[index].points = isNaN(points) ? 0 : points;
+    
+    // Si c'est un nombre valide, utiliser cette valeur
+    if (!isNaN(numericValue)) {
+      newParts[index].points = numericValue;
+    } else {
+      // Sinon, remettre à 0
+      newParts[index].points = 0;
+    }
+    
     setParts(newParts);
   };
   
@@ -167,11 +249,6 @@ export default function ActivityAutreDetail({ params }: { params: Promise<{ id: 
     }
     
     setErrors({});
-  };
-  
-  // Fonction pour réinitialiser les erreurs
-  const clearError = () => {
-    setError('');
   };
 
   // Validation du formulaire
@@ -285,6 +362,38 @@ export default function ActivityAutreDetail({ params }: { params: Promise<{ id: 
     router.replace(`/activities_autres/${activityId}?${params.toString()}`, { scroll: false });
   };
 
+  // Fonction pour charger les fragments de l'activité, mémorisée avec useCallback
+  const fetchFragmentsForActivity = useCallback(async (activityId: string | number) => {
+    if (!activityId) return;
+    
+    setLoadingFragments(true);
+    setFragmentsError('');
+    try {
+      const response = await fetch(`/api/activities_autres/${activityId}/fragments`);
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(`Erreur (${response.status}): ${errorData.message || response.statusText}`);
+      }
+      const data = await response.json();
+      setFragments(data);
+    } catch (err) {
+      console.error('Erreur lors du chargement des fragments:', err);
+      setFragmentsError((err as Error).message);
+      enqueueSnackbar(`Erreur lors du chargement des fragments: ${(err as Error).message}`, { 
+        variant: 'error' 
+      });
+    } finally {
+      setLoadingFragments(false);
+    }
+  }, [enqueueSnackbar]); // Inclure seulement les dépendances stables
+
+  // Charger les fragments lorsque l'onglet correspondant est sélectionné
+  useEffect(() => {
+    if (tabValue === 1 && activityId) { // Changer l'index selon la position du nouvel onglet
+      fetchFragmentsForActivity(activityId);
+    }
+  }, [tabValue, activityId, fetchFragmentsForActivity]);
+
   // Composant pour afficher les parties de l'activité (utilisé en mode lecture)
   const renderParts = () => {
     if (!activity || !activity.parts_names || !activity.points) {
@@ -297,13 +406,42 @@ export default function ActivityAutreDetail({ params }: { params: Promise<{ id: 
           Barème ({totalPoints} points au total)
         </Typography>
         
-        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+        <Box sx={{ display: 'flex', flexDirection: 'row', gap: 1 }}>
           {activity.parts_names.map((name, index) => (
             <Chip
               key={index}
-              icon={index % 2 === 0 ? <MenuBookIcon /> : <ScienceIcon />}
-              label={`${name}: ${activity.points[index]} points`}
-              color={index % 2 === 0 ? "primary" : "secondary"}
+              label={
+                      <Box sx={{ 
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        justifyContent: 'space-between',
+                        width: '100%'
+                      }}>
+                        <Typography variant="body2" sx={{ fontWeight: 700 }}>
+                        <MenuBookIcon fontSize='medium'
+                          sx={{ 
+                          mr:1,
+                          color: theme => alpha(theme.palette.text.primary, 0.6),
+                        }}
+                          /> {name}
+                        </Typography>
+                        <Box 
+                          component="span"
+                          sx={{ 
+                            ml: 1, 
+                            bgcolor: 'rgba(25, 118, 210, 0.12)',
+                            px: 1,
+                            py: 0.2,
+                            borderRadius: 1,
+                            fontSize: '0.75rem',
+                            fontWeight: 'bold'
+                          }}
+                        >
+                          {activity.points[index]} pts
+                        </Box>
+                      </Box>
+                    }
+              color={"primary"}
               variant="outlined"
               sx={{ maxWidth: 'fit-content' }}
             />
@@ -324,11 +462,16 @@ export default function ActivityAutreDetail({ params }: { params: Promise<{ id: 
   if (error) {
     return (
       <div className="container mx-auto px-4 py-8 flex justify-center">
-        <div className="w-full max-w-lg animate-slide-in">
+        <div className="w-full max-w-4xl animate-slide-in">
           <Paper className="p-6 overflow-hidden relative" elevation={3}>
             <ErrorDisplay 
               error={error} 
-              onRefresh={clearError}
+              errorDetails={errorDetails}
+              onRefresh={() => {
+                setError(null);
+                setErrorDetails(null);
+                window.location.reload();
+              }}
               withRefreshButton={true}
             />
           </Paper>
@@ -365,6 +508,8 @@ export default function ActivityAutreDetail({ params }: { params: Promise<{ id: 
                 color='primary'
                 component={Link}
                 href="/activities_autres"
+                target="_blank"
+                rel="noopener noreferrer"
                 className="mr-2 bg-white/20 hover:bg-white/30"
                 sx={{ transform: 'translateX(-10px)' }}
               >
@@ -408,6 +553,8 @@ export default function ActivityAutreDetail({ params }: { params: Promise<{ id: 
                 color='primary'
                 component={Link}
                 href="/activities_autres"
+                target="_blank"
+                rel="noopener noreferrer"
                 className="mr-2 bg-white/20 hover:bg-white/30"
                 sx={{ transform: 'translateX(-10px)' }}
               >
@@ -417,7 +564,7 @@ export default function ActivityAutreDetail({ params }: { params: Promise<{ id: 
                 {activity.name}
                 <IconButton
                   onClick={handleEditClick}
-                  size="small"
+                  size="large"
                   color="primary"
                   aria-label="edit"
                 >
@@ -428,7 +575,7 @@ export default function ActivityAutreDetail({ params }: { params: Promise<{ id: 
                     <IconButton
                       onClick={handleCancelDelete}
                       color="inherit"
-                      size="medium"
+                      size="large"
                       title="Annuler la suppression"
                     >
                       <CloseIcon />
@@ -436,7 +583,7 @@ export default function ActivityAutreDetail({ params }: { params: Promise<{ id: 
                     <IconButton
                       onClick={handleConfirmDelete}
                       color="success"
-                      size="medium"
+                      size="large"
                       title="Confirmer la suppression"
                     >
                       <CheckIcon />
@@ -446,7 +593,7 @@ export default function ActivityAutreDetail({ params }: { params: Promise<{ id: 
                   <IconButton
                     onClick={handleDeleteClick}
                     color="error"
-                    size="medium"
+                    size="large"
                     title="Supprimer cette activité"
                   >
                     <DeleteIcon />
@@ -465,8 +612,10 @@ export default function ActivityAutreDetail({ params }: { params: Promise<{ id: 
             scrollButtons="auto"
           >
             <Tab label="Détails" />
+            <Tab label="Fragments" />
             <Tab label="Corrections" />
             <Tab label="Statistiques" />
+            <Tab label="Export PDF" icon={<QrCodeIcon />} iconPosition="start" />
           </Tabs>
         </Box>
         
@@ -535,11 +684,12 @@ export default function ActivityAutreDetail({ params }: { params: Promise<{ id: 
                               type="number"
                               value={part.points}
                               onChange={(e) => handlePartPointsChange(index, e.target.value)}
-                              InputProps={{
-                                startAdornment: index % 2 === 0 ? <MenuBookIcon sx={{ mr: 1, color: 'secondary.main' }} /> : <ScienceIcon sx={{ mr: 1, color: 'primary.main' }} />,
+                              slotProps={{
+                                input: { 
+                                  inputProps: { min: 0, step: 0.5 },
+                                 }
                               }}
                               sx={{ width: '150px' }}
-                              inputProps={{ min: 0, step: 1 }}
                             />
                           </Box>
                           
@@ -550,8 +700,6 @@ export default function ActivityAutreDetail({ params }: { params: Promise<{ id: 
                           >
                             <DeleteIcon />
                           </IconButton>
-                          
-                          {index < parts.length - 1 && <Divider />}
                         </Box>
                       ))}
                     </Paper>
@@ -572,8 +720,32 @@ export default function ActivityAutreDetail({ params }: { params: Promise<{ id: 
             </div>
           )}
           
-          {/* Deuxième onglet: corrections */}
+          {/* Deuxième onglet: fragments */}
           {tabValue === 1 && (
+            <div>
+              <Typography variant="body2" color="textSecondary" sx={{ mb: 2 }}>
+                Les fragments sont des morceaux de texte réutilisables pour vos corrections.
+              </Typography>
+              {loadingFragments ? (
+                <div className="py-10 flex justify-center max-w-[400px] mx-auto">
+                  <LoadingSpinner size="md" text="Chargement des fragments" />
+                </div>
+              ) : (
+                <FragmentsList
+                  fragments={fragments}
+                  onUpdate={fetchFragmentsForActivity}
+                  activityId={parseInt(activityId)}
+                  error={fragmentsError}
+                  showTitle={true}
+                  showIcon={true}
+                  showEmpty={true}
+                />
+              )}
+            </div>
+          )}
+          
+          {/* Troisième onglet: corrections */}
+          {tabValue === 2 && (
             <div>
               <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
                 <Typography variant="h6">
@@ -609,33 +781,39 @@ export default function ActivityAutreDetail({ params }: { params: Promise<{ id: 
                     <Box key={correction.id} sx={{ 
                       p: 2, 
                       borderBottom: index < corrections.length - 1 ? '1px solid rgba(0,0,0,0.12)' : 'none',
-                      backgroundColor: correction.active === 0 ? 'rgba(0,0,0,0.04)' : 'transparent'
+                      backgroundColor: correction.status !== 'ACTIVE' ? 'rgba(0,0,0,0.04)' : 'transparent'
                     }}>
                       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                         <Typography variant="subtitle1" fontWeight="bold">
-                          {correction.student_id ? `Correction pour l'étudiant #${correction.student_id}` : 'Correction sans étudiant assigné'}
-                          {correction.active === 0 && (
+                          {correction.student_id ? (students.find(s => s.id === correction.student_id) ? 
+                            `Correction pour ${students.find(s => s.id === correction.student_id)?.first_name} ${students.find(s => s.id === correction.student_id)?.last_name}` 
+                            : `Correction pour l&apos;étudiant #${correction.student_id}`) 
+                          : 'Correction sans étudiant assigné'}
+                          {correction.status && correction.status !== 'ACTIVE' && (
                             <Chip 
                               size="small" 
-                              color="error" 
-                              label="Inactive" 
+                              color={correction.status === 'DEACTIVATED' ? 'error' : 
+                                     correction.status === 'ABSENT' ? 'warning' : 
+                                     correction.status === 'NON_RENDU' ? 'info' : 'error'} 
+                              label={correction.status === 'DEACTIVATED' ? 'Désactivée' : 
+                                     correction.status === 'ABSENT' ? 'Absent' : 
+                                     correction.status === 'NON_RENDU' ? 'Non rendu' : 'Inactive'} 
                               sx={{ ml: 1, height: 20, fontSize: '0.7rem' }}
                             />
                           )}
                         </Typography>
-                        <Typography variant="h6" color="primary">
-                          {correction.grade ? `${correction.grade}/20` : 'Non noté'}
+                        <Typography variant="h6" color={correction.status === 'ACTIVE' ? "primary" : "text.disabled"}>
+                          {correction.status === 'ACTIVE' 
+                            ? (correction.final_grade ? `${correction.final_grade} / 20` : 'Non noté')
+                            : "NaN"}
                         </Typography>
                       </Box>
                       
                       <Box sx={{ mt: 1, display: 'flex', flexDirection: 'column', gap: 1 }}>
                         {Array.isArray(correction.points_earned) && activity.parts_names.map((name, idx) => (
-                          <Box key={idx} sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                          <Box key={idx} sx={{ display: 'flex', justifyContent: 'end' }}>
                             <Typography variant="body2">
-                              {name}:
-                            </Typography>
-                            <Typography variant="body2" fontWeight="medium">
-                              {correction.points_earned[idx]} / {activity.points[idx]} pts
+                              {name} : {correction.points_earned[idx]} / {activity.points[idx]} pts
                             </Typography>
                           </Box>
                         ))}
@@ -646,16 +824,20 @@ export default function ActivityAutreDetail({ params }: { params: Promise<{ id: 
                           size="small"
                           variant="outlined"
                           component={Link}
-                          href={`/corrections_autres/${correction.id}`}
+                          href={`/feedback/${correction.shareCode}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
                         >
-                          Voir les détails
+                          Feedback
                         </Button>
                         <Button
                           size="small"
                           variant="outlined"
                           color="primary"
                           component={Link}
-                          href={`/corrections_autres/${correction.id}/edit`}
+                          href={`/corrections_autres/${correction.id}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
                         >
                           Modifier
                         </Button>
@@ -668,7 +850,7 @@ export default function ActivityAutreDetail({ params }: { params: Promise<{ id: 
           )}
           
           {/* Troisième onglet: statistiques */}
-          {tabValue === 2 && (
+          {tabValue === 3 && (
             <div>
               <Typography variant="h6" gutterBottom>
                 Statistiques
@@ -680,13 +862,21 @@ export default function ActivityAutreDetail({ params }: { params: Promise<{ id: 
                 </Typography>
                 
                 <Typography variant="body1" >
-                  Nombre de corrections actives: <strong>{corrections.filter(c => c.active !== 0).length}</strong>
+                  Nombre de corrections actives: <strong>{corrections.filter(c => c.status === 'ACTIVE').length}</strong>
                 </Typography>
                 
                 <Typography variant="body1" >
                   Note moyenne: <strong>
-                    {corrections.length > 0
-                      ? (corrections.reduce((sum, c) => sum + (c.grade || 0), 0) / corrections.length).toFixed(2)
+                    {corrections.filter(c => c.status === 'ACTIVE').length > 0
+                      ? (corrections.filter(c => c.status === 'ACTIVE').reduce((sum, c) => {
+                          // Convertir final_grade en nombre pour s'assurer que la somme fonctionne correctement
+                          const grade = typeof c.final_grade === 'string' 
+                            ? parseFloat(c.final_grade) 
+                            : (c.final_grade || 0);
+                          
+                          return sum + (isNaN(grade) ? 0 : grade);
+                        }, 0) / 
+                         corrections.filter(c => c.status === 'ACTIVE').length).toFixed(2)
                       : 'N/A'}
                   </strong>
                 </Typography>
@@ -738,7 +928,35 @@ export default function ActivityAutreDetail({ params }: { params: Promise<{ id: 
                   </Box>
                 );
               })}
+              
+              {/* Ajout du composant ActivityStatsGraphs */}
+              <Box sx={{ mt: 4 }}>
+                <ActivityStatsGraphs activityId={parseInt(id)} />
+              </Box>
             </div>
+          )}
+          
+          {/* Quatrième onglet: Export PDF */}
+          {tabValue === 4 && (
+            <Box sx={{ py: 2 }}>
+              <ExportPDFComponentAutre
+                classData={{ id: activity?.id || 0, name: activity?.name || 'Activité' }}
+                corrections={filteredCorrections as CorrectionAutreEnriched[]}
+                activities={[{ id: activity?.id || 0, name: activity?.name || 'Activité', parts_names: activity?.parts_names || [], points: activity?.points || [] }]}
+                students={students}
+                filterActivity={activity?.id || 0}
+                setFilterActivity={() => {}} // Non utilisable dans ce contexte
+                filterSubClass={selectedSubGroup === '' ? 'all' : selectedSubGroup}
+                setFilterSubClass={(value) => setSelectedSubGroup(value === 'all' ? '' : value)}
+                uniqueSubClasses={uniqueSubClasses.filter(subClass => subClass !== undefined).map(subClass => ({ id: subClass || "0", name: `Groupe ${subClass}` }))}
+                uniqueActivities={[{ id: activity?.id || 0, name: activity?.name || 'Activité' }]}
+                getActivityById={(activityId) => activities.find((a: ActivityAutre) => a.id === activityId)}
+                getStudentById={(studentId) => {
+                  return students.find(s => s.id === studentId);
+                }}
+                getBatchShareCodes={getBatchShareCodes}
+              />
+            </Box>
           )}
         </Box>
       </Paper>

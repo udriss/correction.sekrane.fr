@@ -15,7 +15,8 @@ import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import LockIcon from '@mui/icons-material/Lock';
 import useAuth from '@/hooks/useAuth';
 import LoadingSpinner from '@/components/LoadingSpinner';
-import FragmentEditModal, { Fragment } from '@/components/FragmentEditModal';
+import FragmentEditModal from '@/components/FragmentEditModal';
+import { Fragment } from '@/lib/types';
 
 interface Activity {
   id: number;
@@ -31,7 +32,7 @@ export default function EditFragmentPage() {
   
   const [fragment, setFragment] = useState<Fragment | null>(null);
   const [activities, setActivities] = useState<Activity[]>([]);
-  const [categories, setCategories] = useState<string[]>([]);
+  const [categories, setCategories] = useState<Array<{id: number, name: string}>>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   
@@ -61,7 +62,7 @@ export default function EditFragmentPage() {
         }
         
         // Fetch activities
-        const activitiesResponse = await fetch('/api/activities');
+        const activitiesResponse = await fetch('/api/activities_autres');
         if (activitiesResponse.ok) {
           const activitiesData = await activitiesResponse.json();
           setActivities(activitiesData);

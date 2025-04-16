@@ -3,12 +3,26 @@ import { getActivityAutreById } from '@/lib/activityAutre';
 import { getUser } from '@/lib/auth';
 import { createCorrectionAutre } from '@/lib/correctionAutre';
 import { withConnection } from '@/lib/db';
+import { getServerSession } from "next-auth/next";
+import authOptions from "@/lib/auth";
+
 
 export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    // Get the user from both auth systems
+    const session = await getServerSession(authOptions);
+    const customUser = await getUser();
+    
+    // Use either auth system, starting with custom auth
+    const userId = customUser?.id || session?.user?.id;
+    
+    if (!userId) {
+      return NextResponse.json({ error: 'utilisateur non authentifié' }, { status: 401 });
+    }
+
     // Attendre la résolution de la promise params
     const { id } = await params;
     const activityId = parseInt(id);

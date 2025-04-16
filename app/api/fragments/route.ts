@@ -87,7 +87,7 @@ export async function GET(request: NextRequest) {
           ', (SELECT GROUP_CONCAT(fc.category_id) FROM fragments_categories fc WHERE fc.fragment_id = f.id) as category_ids' : 
           ', NULL as category_ids'}
         FROM fragments f
-        LEFT JOIN activities a ON f.activity_id = a.id
+        LEFT JOIN activities_autres a ON f.activity_id = a.id
         WHERE 1=1
       `;
 
@@ -181,7 +181,13 @@ export async function POST(request: NextRequest) {
     // Check if user is authenticated
     if (!userId) {
       return NextResponse.json(
-        { error: 'Authentification requise' },
+        { 
+          error: 'Authentification requise',
+          details: {
+            reason: 'auth_required',
+            message: 'authentification requise pour ajouter un fragment'
+          }
+        },
         { status: 401 }
       );
     }
@@ -194,7 +200,13 @@ export async function POST(request: NextRequest) {
     // Validate required fields
     if (!fragmentData.content) {
       return NextResponse.json(
-        { error: 'Un contenu est requis' },
+        { 
+          error: 'un contenu requis est manquant',
+          details: {
+            field: 'content',
+            reason: 'missing_required_field'
+          }
+        },
         { status: 400 }
       );
     }
@@ -289,7 +301,7 @@ export async function POST(request: NextRequest) {
             ', (SELECT GROUP_CONCAT(fc.category_id) FROM fragments_categories fc WHERE fc.fragment_id = f.id) as category_ids' :
             ', NULL as category_ids'}
           FROM fragments f
-          LEFT JOIN activities a ON f.activity_id = a.id
+          LEFT JOIN activities_autres a ON f.activity_id = a.id
           WHERE f.id = ?
         `;
         
@@ -376,7 +388,13 @@ export async function PUT(request: NextRequest) {
     
     if (!userId) {
       return NextResponse.json(
-        { error: 'Authentication required' },
+        { 
+          error: 'authentification requise',
+          details: {
+            reason: 'auth_required',
+            message: 'authentification requise pour modifier un fragment'
+          }
+        },
         { status: 401 }
       );
     }
@@ -387,7 +405,13 @@ export async function PUT(request: NextRequest) {
     // Ensure we have an ID
     if (!fragmentData.id) {
       return NextResponse.json(
-        { error: 'Fragment ID is required for updates' },
+        { 
+          error: 'ID de fragment requis pour la mise à jour',
+          details: {
+            field: 'id',
+            reason: 'missing_required_field'
+          }
+        },
         { status: 400 }
       );
     }
@@ -497,7 +521,7 @@ export async function PUT(request: NextRequest) {
         (SELECT GROUP_CONCAT(fc.category_id) 
         FROM fragments_categories fc WHERE fc.fragment_id = f.id) as category_ids
          FROM fragments f
-         LEFT JOIN activities a ON f.activity_id = a.id
+         LEFT JOIN activities_autres a ON f.activity_id = a.id
          WHERE f.id = ?`,
         [fragmentId]
       );
@@ -587,12 +611,16 @@ export async function DELETE(
     
     if (!userId) {
       return NextResponse.json(
-        { error: 'Authentication required' },
+        { 
+          error: 'Authentification requise',
+          details: {
+            reason: 'auth_required',
+            message: 'Vous devez être connecté pour supprimer un fragment'
+          }
+        },
         { status: 401 }
       );
     }
-    
-
     
     return await withConnection(async (connection) => {
       // Vérifier d'abord si le fragment est utilisé dans des corrections
@@ -606,8 +634,11 @@ export async function DELETE(
       if (usageCount > 0) {
         return NextResponse.json(
           { 
-            error: 'This fragment is used in corrections and cannot be deleted',
-            usageCount: usageCount
+            error: 'Ce fragment est utilisé dans des corrections et ne peut pas être supprimé',
+            details: {
+              reason: 'fragment_in_use',
+              usageCount: usageCount
+            }
           },
           { status: 409 }
         );
@@ -621,7 +652,13 @@ export async function DELETE(
       
       if (!Array.isArray(ownerRows) || ownerRows.length === 0) {
         return NextResponse.json(
-          { error: 'Fragment not found' },
+          { 
+            error: 'Fragment non trouvé',
+            details: {
+              fragmentId: fragmentId,
+              reason: 'resource_not_found'
+            }
+          },
           { status: 404 }
         );
       }
@@ -637,7 +674,14 @@ export async function DELETE(
       
       if (userIdStr !== fragmentUserIdStr) {
         return NextResponse.json(
-          { error: 'You are not authorized to delete this fragment' },
+          { 
+            error: 'vous n\'êtes pas autorisé à supprimer ce fragment',
+            details: {
+              reason: 'unauthorized_action',
+              fragmentOwner: fragmentUserIdStr,
+              requestUser: userIdStr
+            }
+          },
           { status: 403 }
         );
       }

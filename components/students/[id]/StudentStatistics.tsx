@@ -16,18 +16,18 @@ import {
 import TrendingUpIcon from '@mui/icons-material/TrendingUp';
 import TrendingDownIcon from '@mui/icons-material/TrendingDown';
 import GradeDistributionChart from './charts/GradeDistributionChart';
-import { Correction, StudentStats } from './types';
+import { StudentStats } from './types';
+import { CorrectionAutreEnriched } from '@/lib/types';
 import { getGradeColor, getMuiColorProps } from './utils/gradeUtils';
 
 interface StudentStatisticsProps {
-  corrections: Correction[];
+  corrections: CorrectionAutreEnriched[];
   stats: StudentStats;
 }
-
 export default function StudentStatistics({ corrections, stats }: StudentStatisticsProps) {
   const getActivityDistributionData = () => {
     const activityMap = new Map();
-    
+
     corrections
       .filter(c => c.grade !== null && c.activity_id)
       .forEach(c => {
@@ -54,11 +54,11 @@ export default function StudentStatistics({ corrections, stats }: StudentStatist
 
   return (
     <Grid container spacing={3}>
-      <Grid size={{ xs: 12, md: 6 }}>
+      <Grid size={{ xs: 12,}}>
         <GradeDistributionChart corrections={corrections} stats={stats} />
       </Grid>
       
-      <Grid size={{ xs: 12, md: 6 }}>
+      <Grid size={{ xs: 12,}}>
         <Paper elevation={2} sx={{ p: 3, borderRadius: 2, height: '100%' }}>
           <Typography variant="h6" gutterBottom>
             Détails par activité

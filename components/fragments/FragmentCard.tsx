@@ -1,58 +1,48 @@
 'use client';
 
-import React, { useState, useRef } from 'react';
-import { 
-  Card, 
-  CardContent, 
-  Typography, 
-  Box, 
-  Chip, 
-  IconButton, 
-  Tooltip,
+import React, { useState } from 'react';
+import {
+  Card,
+  CardContent,
+  CardActions,
+  Typography,
+  IconButton,
+  Box,
   Dialog,
   DialogTitle,
   DialogContent,
   DialogActions,
   Button,
+  Paper,
+  Alert,
+  Chip,
+  Tooltip,
   alpha,
-  useTheme,
-  Paper
+  Theme,
+  CircularProgress
 } from '@mui/material';
-import MoreVertIcon from '@mui/icons-material/MoreVert';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
-import AddIcon from '@mui/icons-material/Add';
-import { useDrag, useDrop } from 'react-dnd';
+import CheckIcon from '@mui/icons-material/Check';
 import { Fragment } from '@/lib/types';
-import FragmentEditor from './FragmentEditor';
+import { FragmentEditor } from '@/components/fragments';
 
-// Interface pour les props de la carte de fragment
 interface FragmentCardProps {
   fragment: Fragment;
-  index?: number;
   isEditing?: boolean;
-  categories?: Array<{id: number, name: string}>;
+  categories: Array<{id: number, name: string}>;
   onEdit?: () => void;
   onCancelEdit?: () => void;
   onUpdate?: (fragment: Fragment) => void;
   onDelete?: () => void;
   onAddToCorrection?: () => void;
-  moveFragment?: (dragIndex: number, hoverIndex: number) => void;
-  refreshCategories?: () => Promise<void>;
+  refreshCategories: () => Promise<void>;
   renderPositionChip?: () => React.ReactNode;
-}
-
-// Type d'item pour le drag and drop
-interface DragItem {
-  index: number;
-  id: string;
-  type: string;
 }
 
 export default function FragmentCard({ 
   fragment, 
-  index = 0, 
   isEditing = false,
   categories = [],
   onEdit, 
@@ -60,59 +50,18 @@ export default function FragmentCard({
   onUpdate, 
   onDelete,
   onAddToCorrection,
-  moveFragment,
   refreshCategories,
   renderPositionChip
 }: FragmentCardProps) {
-  // Remove menuAnchor state since we're no longer using it
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
-  const theme = useTheme();
 
-  // Référence pour le drag and drop
-  const ref = useRef<HTMLDivElement>(null);
-
-  // Configuration du drag and drop si moveFragment est fourni
-  const [{ isDragging }, drag] = useDrag(() => ({
-    type: 'fragment',
-    item: { id: fragment.id, index },
-    collect: (monitor) => ({
-      isDragging: !!monitor.isDragging(),
-    }),
-    canDrag: !!moveFragment,
-  }));
-
-  const [, drop] = useDrop<DragItem>({
-    accept: 'fragment',
-    hover(item, monitor) {
-      if (!ref.current || !moveFragment) {
-        return;
-      }
-      const dragIndex = item.index;
-      const hoverIndex = index;
-
-      // Ne pas remplacer les éléments avec eux-mêmes
-      if (dragIndex === hoverIndex) {
-        return;
-      }
-
-      moveFragment(dragIndex, hoverIndex);
-      item.index = hoverIndex;
-    },
-  });
-
-  // Configurer le drag and drop si disponible
-  if (moveFragment) {
-    drag(drop(ref));
-  }
-
-  // Normaliser les tags pour s'assurer qu'ils sont toujours un tableau
+  // Normaliser les tags pour l'affichage
   const normalizedTags = React.useMemo(() => {
-    
-    if (Array.isArray(fragment.tags)) {
-      return [...fragment.tags]; // Retourne une copie pour éviter les problèmes de référence
-    } else if (typeof fragment.tags === 'string') {
+    if (!fragment.tags) return [];
+    if (Array.isArray(fragment.tags)) return fragment.tags;
+    if (typeof fragment.tags === 'string') {
       try {
         return JSON.parse(fragment.tags);
       } catch (e) {
@@ -120,12 +69,9 @@ export default function FragmentCard({
         return [];
       }
     }
-    return []
-  }, [fragment.tags, fragment._updateKey]); // Dépend aussi de _updateKey pour forcer la réévaluation
+    return [];
+  }, [fragment.tags, fragment._updateKey]);
 
-
-
-  
   const handleEditClick = () => {
     if (onEdit) {
       onEdit();
@@ -184,127 +130,83 @@ export default function FragmentCard({
     );
   }
 
-  // Styles pour l'état de glisser-déposer
-  const cardStyle = {
-    opacity: isDragging ? 0.4 : 1,
-    cursor: moveFragment ? 'move' : 'default',
-  };
-
-  
   return (
-    <div ref={ref} style={cardStyle}>
-      <Card elevation={2} sx={{ mb: 1, borderRadius: 2 }}>
-        <CardContent>
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 1 }}>
-            <Box>
-              {fragment.activity_name && (
-                <Chip 
-                  size="small" 
-                  color="primary" 
-                  label={fragment.activity_name} 
-                  sx={{ mb: 1, mr: 1 }}
-                />
-              )}
-              {renderPositionChip && renderPositionChip()}
-              {fragment.isModified && (
-                <Chip 
-                  size="small" 
-                  label="Modifié" 
-                  color="secondary"
-                  sx={{ mb: 1, mr: 1 }}
-                />
-              )}
-              {fragment.usage_count && fragment.usage_count > 0 && (
-                <Tooltip title="Nombre d'utilisations">
-                  <Chip 
-                    size="small" 
-                    label={`Utilisé ${fragment.usage_count} fois`}
-                    sx={{ mb: 1 }}
-                  />
-                </Tooltip>
-              )}
-            </Box>
-            
-            <Box sx={{ display: 'flex' }}>
-              {onAddToCorrection && (
-                <Tooltip title="Ajouter à la correction">
-                  <IconButton 
-                    size="small"
-                    color="primary"
-                    onClick={handleAddToCorrection}
-                  >
-                    <AddIcon fontSize="small" />
-                  </IconButton>
-                </Tooltip>
-              )}
-              
-              {fragment.isOwner && (
-                <>
-                  <Tooltip title="Modifier">
-                    <IconButton 
-                      size="small"
-                      onClick={handleEditClick}
-                      aria-label="edit"
-                    >
-                      <EditIcon fontSize="small" />
-                    </IconButton>
-                  </Tooltip>
-                  
-                  <Tooltip title="Copier">
-                    <IconButton 
-                      size="small"
-                      onClick={handleCopyClick}
-                      aria-label="copy"
-                    >
-                      <ContentCopyIcon fontSize="small" />
-                    </IconButton>
-                  </Tooltip>
-                  
-                  <Tooltip title="Supprimer">
-                    <IconButton 
-                      size="small"
-                      onClick={handleDeleteClick}
-                      aria-label="delete"
-                      color="error"
-                    >
-                      <DeleteIcon fontSize="small" />
-                    </IconButton>
-                  </Tooltip>
-                </>
-              )}
-            </Box>
+    <Card variant="outlined" sx={{
+      position: 'relative',}}
+      >
+      <CardContent>
+        {renderPositionChip && renderPositionChip()}
+        
+        <Typography variant="body1" sx={{ whiteSpace: 'pre-wrap', my: 2.5 }}>
+          {fragment.content}
+        </Typography>
+        
+        {normalizedTags.length > 0 && (
+          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+            {normalizedTags.map((tag: string, idx: number) => (
+              <Chip 
+                key={`${tag}-${idx}`} 
+                label={tag} 
+                size="small" 
+                variant="outlined"
+                sx={{
+                  bgcolor: (theme: Theme) => alpha(theme.palette.primary.light, 0.05),
+                  color: (theme: Theme) => theme.palette.primary.dark,
+                  '&.MuiChip-outlined': {
+                    borderColor: (theme: Theme) => theme.palette.primary.main,
+                  },
+                }}
+              />
+            ))}
           </Box>
-          
-          <Typography variant="body1" sx={{ whiteSpace: 'pre-wrap', mb: 2 }}>
-            {fragment.content}
-          </Typography>
-          
-          {normalizedTags.length > 0 && (
-            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
-              {normalizedTags.map((tag: string, idx: number) => (
-                <Chip 
-                  key={`${tag}-${idx}`} 
-                  label={tag} 
-                  size="small" 
-                  variant="outlined"
-                />
-              ))}
-            </Box>
-          )}
-        </CardContent>
-      </Card>
-      
+        )}
+      </CardContent>
 
+      <CardActions>
+        <Tooltip title="Modifier">
+          <IconButton 
+            size="medium"
+            onClick={handleEditClick}
+          >
+            <EditIcon fontSize="medium" />
+          </IconButton>
+        </Tooltip>
+        
+        <Tooltip title="Copier">
+          <IconButton 
+            size="medium"
+            onClick={handleCopyClick}
+          >
+            <ContentCopyIcon fontSize="medium" />
+          </IconButton>
+        </Tooltip>
+        
+        <Tooltip title="Supprimer">
+          <IconButton 
+            size="medium"
+            onClick={handleDeleteClick}
+            color="error"
+          >
+            <DeleteIcon fontSize="medium" />
+          </IconButton>
+        </Tooltip>
+
+        {onAddToCorrection && (
+          <Tooltip title="Ajouter à la correction">
+            <IconButton 
+              size="medium"
+              onClick={handleAddToCorrection}
+              sx={{ ml: 'auto' }}
+            >
+              <CheckIcon fontSize="medium" />
+            </IconButton>
+          </Tooltip>
+        )}
+      </CardActions>
 
       <Dialog
         open={isDeleteDialogOpen}
         onClose={() => !isDeleting && setIsDeleteDialogOpen(false)}
-        aria-labelledby="delete-fragment-dialog-title"
-        sx = {
-          {
-            borderRadius: 3,
-          boxShadow: `0 8px 32px ${alpha(theme.palette.error.main, 0.2)}`}
-        }
       >
         <DialogTitle>Confirmer la suppression</DialogTitle>
         <DialogContent>
@@ -319,15 +221,17 @@ export default function FragmentCard({
           </Paper>
           
           {deleteError && (
-            <Typography color="error" sx={{ mt: 2 }}>
+            <Alert severity="error" sx={{ mt: 2 }}>
               {deleteError}
-            </Typography>
+            </Alert>
           )}
         </DialogContent>
         <DialogActions>
           <Button 
             onClick={() => setIsDeleteDialogOpen(false)} 
             disabled={isDeleting}
+            variant='outlined'
+            sx={{ color: (theme: Theme) => theme.palette.secondary.dark }}
           >
             Annuler
           </Button>
@@ -335,11 +239,12 @@ export default function FragmentCard({
             onClick={handleDeleteConfirm} 
             color="error" 
             disabled={isDeleting}
+            startIcon={isDeleting ? <CircularProgress size={16} /> : null}
           >
             {isDeleting ? 'Suppression...' : 'Supprimer'}
           </Button>
         </DialogActions>
       </Dialog>
-    </div>
+    </Card>
   );
 }

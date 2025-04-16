@@ -16,8 +16,10 @@ import {
 export interface Activity {
 	id: number;
 	name: string;
-	experimental_points: number;
-	theoretical_points: number;
+	experimental_points?: number; // Rendu optionnel
+	theoretical_points?: number; // Rendu optionnel
+	points?: number[]; // Ajout du tableau de points pour les activités de type "autre"
+	parts_names?: string[]; // Ajout des noms des parties pour les activités de type "autre"
 }
 
 interface AssociateActivitiesModalProps {
@@ -88,7 +90,11 @@ export default function AssociateActivitiesModal({
 							</ListItemIcon>
 							<ListItemText
 								primary={activity.name}
-								secondary={`Points: Exp: ${activity.experimental_points}, Théo: ${activity.theoretical_points}`}
+									secondary={
+										activity.points && activity.points.length > 0 
+											? `Points: ${activity.points.reduce((sum, point) => sum + point, 0)} (${activity.points.length} ${activity.parts_names ? 'parties' : 'points'})`
+											: `Points: Exp: ${activity.experimental_points || 0}, Théo: ${activity.theoretical_points || 0}`
+									}
 								/>
 							{initialSelectedIds.includes(activity.id) && (
 								<Typography variant="caption" color="primary" sx={{ ml: 1 }}>

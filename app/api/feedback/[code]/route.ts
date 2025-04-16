@@ -10,7 +10,6 @@ export async function GET(
   { params }: { params: Promise<{ code: string }> }
 ) {
   try {
-
     // Get the user from both auth systems
     const session = await getServerSession(authOptions);
     const customUser = await getUser();
@@ -48,32 +47,73 @@ export async function GET(
 
       const correctionId = (shares[0] as any).correction_id;
 
-      // Récupérer la correction avec les notes et utiliser le champ final_grade de la base de données
-      // NOTE: La valeur de 'grade' peut être soit:
-      // 1. La valeur stockée explicitement dans la base de données (si non NULL)
-      // 2. OU la somme de experimental_points_earned + theoretical_points_earned (si grade est NULL)
-      // Ce qui peut créer une discordance si grade a été manuellement défini à une valeur
-      // différente de la somme des points.
-      const [rows] = await connection.query(
-        `SELECT c.*, a.name as activity_name, a.experimental_points, a.theoretical_points,
-            CONCAT(s.first_name, ' ', LEFT(s.last_name, 1), '.') as student_name,
-            IFNULL(c.grade, (c.experimental_points_earned + c.theoretical_points_earned)) as grade, 
-            IFNULL(c.penalty, 0) as penalty,
-            IFNULL(c.final_grade, 
-                  CASE 
-                    WHEN IFNULL(c.grade, (c.experimental_points_earned + c.theoretical_points_earned)) < 6 
-                      THEN IFNULL(c.grade, (c.experimental_points_earned + c.theoretical_points_earned))
-                    ELSE GREATEST((IFNULL(c.grade, (c.experimental_points_earned + c.theoretical_points_earned)) - IFNULL(c.penalty, 0)), 6)
-                  END
-            ) as final_grade
-         FROM corrections c 
-         JOIN activities a ON c.activity_id = a.id 
-         LEFT JOIN students s ON c.student_id = s.id
-         WHERE c.id = ?`,
+      // Vérifiez d'abord si c'est une correction dans la table corrections_autres (nouveau système)
+      const [autreResult] = await connection.query(
+        `SELECT 1 FROM corrections_autres WHERE id = ?`,
         [correctionId]
       );
 
+      let correction;
       
+
+      // Récupérer la correction avec les tableaux points et parts_names pour le nouveau système
+      const [rows] = await connection.query(
+        `SELECT 
+          c.*, 
+          a.name as activity_name, 
+          a.points, 
+          a.parts_names,
+          CONCAT(s.first_name, ' ', LEFT(s.last_name, 1), '.') as student_name,
+          IFNULL(c.grade, 
+                  (SELECT SUM(CAST(JSON_VALUE(points_earned, '$[*]') AS DECIMAL(10,2))) 
+                  FROM JSON_TABLE(
+                    c.points_earned,
+                    '$[*]' COLUMNS (
+                      point DECIMAL(10,2) PATH '$'
+                    )
+                  ) as points_table)
+          ) as grade,
+          IFNULL(c.penalty, 0) as penalty,
+          IFNULL(c.final_grade, 
+                CASE 
+                  WHEN IFNULL(c.grade, 
+                              (SELECT SUM(CAST(JSON_VALUE(points_earned, '$[*]') AS DECIMAL(10,2))) 
+                                FROM JSON_TABLE(
+                                  c.points_earned,
+                                  '$[*]' COLUMNS (
+                                    point DECIMAL(10,2) PATH '$'
+                                  )
+                                ) as points_table)
+                  ) < 5 
+                    THEN IFNULL(c.grade, 
+                                (SELECT SUM(CAST(JSON_VALUE(points_earned, '$[*]') AS DECIMAL(10,2))) 
+                                  FROM JSON_TABLE(
+                                    c.points_earned,
+                                    '$[*]' COLUMNS (
+                                      point DECIMAL(10,2) PATH '$'
+                                    )
+                                  ) as points_table)
+                    )
+                  ELSE GREATEST((IFNULL(c.grade, 
+                                        (SELECT SUM(CAST(JSON_VALUE(points_earned, '$[*]') AS DECIMAL(10,2))) 
+                                        FROM JSON_TABLE(
+                                          c.points_earned,
+                                          '$[*]' COLUMNS (
+                                            point DECIMAL(10,2) PATH '$'
+                                          )
+                                        ) as points_table)
+                                ) - IFNULL(c.penalty, 0)), 5)
+                END
+          ) as final_grade,
+          sc.code as shareCode
+        FROM corrections_autres c 
+        JOIN activities_autres a ON c.activity_id = a.id 
+        LEFT JOIN students s ON c.student_id = s.id
+        LEFT JOIN share_codes sc ON sc.correction_id = c.id AND sc.is_active = TRUE AND sc.code = ?
+        WHERE c.id = ?`,
+        [code, correctionId]
+      );
+
 
       if (!Array.isArray(rows) || rows.length === 0) {
         return NextResponse.json(
@@ -82,7 +122,31 @@ export async function GET(
         );
       }
 
-      const correction = rows[0] as any;
+      correction = rows[0] as any;
+
+      // Conversion des points_earned et points de JSON à tableau
+      try {
+        correction.points_earned = correction.points_earned;
+      } catch (e) {
+        console.error('Erreur de parsing points_earned:', e);
+        correction.points_earned = [];
+      }
+
+      try {
+        correction.points = correction.points;
+      } catch (e) {
+        console.error('Erreur de parsing points:', e);
+        correction.points = [];
+      }
+
+      try {
+        correction.parts_names = correction.parts_names;
+      } catch (e) {
+        console.error('Erreur de parsing parts_names:', e);
+        correction.parts_names = [];
+      }
+
+
 
       // Si content_data existe et est une string, parser en JSON
       if (correction.content_data && typeof correction.content_data === 'string') {
@@ -91,15 +155,6 @@ export async function GET(
         } catch (e) {
           console.error('Erreur de parsing content_data:', e);
         }
-      }
-
-      // Si la correction n'a pas de grade ou penalty enregistrés, les mettre à jour pour une utilisation future
-      if (correction.grade === null || correction.penalty === null) {
-        const totalGrade = parseFloat(correction.experimental_points_earned || 0) + parseFloat(correction.theoretical_points_earned || 0);
-        await connection.query(
-          `UPDATE corrections SET grade = ?, penalty = 0 WHERE id = ? AND (grade IS NULL OR penalty IS NULL)`,
-          [totalGrade, correctionId]
-        );
       }
 
       // Ajouter l'information que cette correction est accédée via un lien de partage
@@ -143,109 +198,3 @@ export async function GET(
   }
 }
 
-export async function POST(
-  request: Request,
-  { params }: { params: Promise<{ code: string }> }
-) {
-  try {
-    // Get the code from params using the new async pattern
-    const { code } = await params;
-    
-    // Check if code is valid
-    if (!code || code === 'undefined' || code === 'null') {
-      return NextResponse.json({ error: 'Code de partage invalide' }, { status: 400 });
-    }
-    
-    // Try to parse the code as integer if needed
-    const codeValue = parseInt(code);
-    
-    if (isNaN(codeValue)) {
-      return NextResponse.json({ error: 'Code de partage invalide' }, { status: 400 });
-    }
-    
-    // Récupérer les données du corps de la requête
-    const body = await request.json();
-    
-    
-    // Utiliser withConnection pour s'assurer que les connexions sont libérées
-    return await withConnection(async (connection) => {
-      // D'abord récupérer l'ID de la correction à partir du code de partage
-      const [rows] = await connection.query(
-        `SELECT correction_id FROM shared_corrections WHERE share_code = ?`, 
-        [codeValue]
-      );
-      
-      if (!Array.isArray(rows) || rows.length === 0) {
-        return NextResponse.json(
-          { error: 'Code de partage invalide' },
-          { status: 404 }
-        );
-      }
-      
-      const correctionId = (rows[0] as any).correction_id;
-      
-      // Préparer les données pour la mise à jour
-      const contentData = {
-        fragments: body.fragments || []
-      };
-      
-      // Mettre à jour la correction avec toutes les données nécessaires
-      const [updateResult] = await connection.query(
-        `UPDATE corrections 
-         SET content = ?, 
-             content_data = ?,
-             student_id = ?,
-             experimental_points_earned = ?,
-             theoretical_points_earned = ?
-         WHERE id = ?`,
-        [
-          body.content || '',
-          JSON.stringify(contentData),
-          body.student_id,
-          body.experimental_points_earned,
-          body.theoretical_points_earned,
-          correctionId
-        ]
-      );
-      
-      // Récupérer la correction mise à jour
-      const [updatedRows] = await connection.query(
-        `SELECT c.*, a.name as activity_name, a.experimental_points, a.theoretical_points,
-         CONCAT(s.first_name, ' ', s.last_name) as student_name
-         FROM corrections c
-         JOIN activities a ON c.activity_id = a.id
-         LEFT JOIN students s ON c.student_id = s.id
-         WHERE c.id = ?`,
-        [correctionId]
-      );
-      
-      if (!Array.isArray(updatedRows) || updatedRows.length === 0) {
-        return NextResponse.json(
-          { error: 'Erreur lors de la récupération de la correction mise à jour' },
-          { status: 500 }
-        );
-      }
-      
-      // Traitement de content_data pour le convertir en objet
-      const correction = updatedRows[0] as any;
-      try {
-        if (correction.content_data && typeof correction.content_data === 'string') {
-          correction.content_data = JSON.parse(correction.content_data);
-        }
-      } catch (e) {
-        console.error('Erreur parsing content_data', e);
-        correction.content_data = { fragments: [] };
-      }
-      
-      
-      
-      return NextResponse.json(correction);
-    });
-  } catch (error) {
-    console.error('Erreur lors de la sauvegarde de la correction:', error);
-    return NextResponse.json(
-      { error: 'Erreur lors de la sauvegarde de la correction' },
-      { status: 500 }
-    );
-  }
-}

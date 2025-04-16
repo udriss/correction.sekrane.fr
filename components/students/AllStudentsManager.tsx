@@ -152,7 +152,7 @@ const AllStudentsManagerNEW: React.FC<AllStudentsManagerProps> = ({
     if (searchTerm && 
         !(student.first_name.toLowerCase().includes(searchTerm.toLowerCase()) || 
           student.last_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          student.email.toLowerCase().includes(searchTerm.toLowerCase()))) {
+          (student.email ?? '').toLowerCase().includes(searchTerm.toLowerCase()))) {
       return false;
     }
     
@@ -856,12 +856,12 @@ const AllStudentsManagerNEW: React.FC<AllStudentsManagerProps> = ({
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 sx={{ flexGrow: 1, maxWidth: 300 }}
-                InputProps={{
-                  startAdornment: (
-                    <InputAdornment position="start">
-                      <SearchIcon />
-                    </InputAdornment>
-                  ),
+                slotProps={{
+                  input: { 
+                    startAdornment: <InputAdornment position="start">
+                    <SearchIcon />
+                  </InputAdornment>,
+                    }
                 }}
               />
 

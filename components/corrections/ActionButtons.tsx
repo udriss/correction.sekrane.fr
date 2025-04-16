@@ -1,13 +1,17 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Paper, IconButton, CircularProgress, Chip, Switch, FormControlLabel, Tooltip } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import UndoIcon from '@mui/icons-material/Undo';
 import SaveIcon from '@mui/icons-material/Save';
 import ShareIcon from '@mui/icons-material/Share';
+import VisibilityIcon from '@mui/icons-material/Visibility';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
+import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 import AutorenewIcon from '@mui/icons-material/Autorenew';
 import ImageUploader from '@/app/components/ImageUploader';
 import { Typography } from '@mui/material';
+import * as shareService from '@/lib/services/shareService';
+
 interface ActionButtonsProps {
   addNewParagraph: () => void;
   addNewImage: (imageUrl: string) => void;
@@ -41,6 +45,22 @@ const ActionButtons: React.FC<ActionButtonsProps> = ({
   setAutoSaveActive = () => {},
   lastAutoSave = null
 }) => {
+  const [shareCode, setShareCode] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (correctionId) {
+      shareService.getExistingShareCode(correctionId)
+        .then(response => {
+          if (response.exists && response.code) {
+            setShareCode(response.code);
+          }
+        })
+        .catch(err => {
+          console.error('Erreur lors de la vérification du code de partage:', err);
+        });
+    }
+  }, [correctionId]);
+
   // Formatter la date de dernière sauvegarde automatique
   const formatLastSaveTime = () => {
     if (!lastAutoSave) return '';
@@ -65,6 +85,10 @@ const ActionButtons: React.FC<ActionButtonsProps> = ({
     }
   };
 
+  const getShareUrl = () => {
+    return shareCode ? `${window.location.origin}/feedback/${shareCode}` : '';
+  };
+
   return (
     <Paper className="p-4 shadow mb-6 flex justify-between items-center">
       <div className="flex space-x-2">
@@ -82,6 +106,38 @@ const ActionButtons: React.FC<ActionButtonsProps> = ({
           correctionId={correctionId}
           onImageUploaded={addNewImage} 
         />
+        <IconButton
+          onClick={handleUndo}
+          color="inherit"
+          disabled={historyLength === 0}
+          size="medium"
+          title="Annuler la dernière modification"
+        >
+          <UndoIcon />
+        </IconButton>
+        <IconButton
+          onClick={() => {
+            updatePreview();
+            handleCopyToClipboard();
+          }}
+          color="success"
+          size="medium"
+          title="Copier dans le presse-papier"
+        >
+          <ContentCopyIcon />
+        </IconButton>
+        <IconButton
+          onClick={() => {
+            updatePreview();
+            handleSaveCorrection();
+          }}
+          color="primary"
+          size="medium"
+          disabled={saving}
+          title="Sauvegarder la correction"
+        >
+          {saving ? <CircularProgress size={20} /> : <SaveIcon />}
+        </IconButton>
       </div>
       
       {/* Indicateur de sauvegarde automatique */}
@@ -118,46 +174,26 @@ const ActionButtons: React.FC<ActionButtonsProps> = ({
       </div>
       
       <div className="space-x-2 flex justify-end items-center">
-        <IconButton
-          onClick={handleUndo}
-          color="inherit"
-          disabled={historyLength === 0}
-          size="medium"
-          title="Annuler la dernière modification"
-        >
-          <UndoIcon />
-        </IconButton>
-        <IconButton
-          onClick={() => {
-            updatePreview();
-            handleSaveCorrection();
-          }}
-          color="primary"
-          size="medium"
-          disabled={saving}
-          title="Sauvegarder la correction"
-        >
-          {saving ? <CircularProgress size={20} /> : <SaveIcon />}
-        </IconButton>
-        <IconButton
-          color="primary"
-          onClick={() => setShareModalOpen(true)}
-          size="medium"
-          title="Partager la correction"
-        >
-          <ShareIcon />
-        </IconButton>
-        <IconButton
-          onClick={() => {
-            updatePreview();
-            handleCopyToClipboard();
-          }}
-          color="success"
-          size="medium"
-          title="Copier dans le presse-papier"
-        >
-          <ContentCopyIcon />
-        </IconButton>
+        <Tooltip title={shareCode ? "Cette correction est déjà partagée" : "Partager la correction"}>
+          <IconButton
+            color={shareCode ? "success" : "primary"}
+            onClick={() => setShareModalOpen(true)}
+            size="medium"
+          >
+            {shareCode ? <VisibilityIcon /> : <ShareIcon />}
+          </IconButton>
+        </Tooltip>
+        {shareCode && (
+          <Tooltip title="Ouvrir le lien de partage">
+            <IconButton
+              onClick={() => window.open(getShareUrl(), '_blank')}
+              color="info"
+              size="medium"
+            >
+              <OpenInNewIcon />
+            </IconButton>
+          </Tooltip>
+        )}
       </div>
     </Paper>
   );

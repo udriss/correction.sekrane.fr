@@ -272,10 +272,10 @@ export default function EmailFeedback({
       rawTotal = expGrade + theoGrade;
       
       // Calculer la note finale selon la règle
-      if (rawTotal < 6) {
+      if (rawTotal < 5) {
         finalGrade = rawTotal;
       } else {
-        finalGrade = Math.max(rawTotal - penaltyValue, 6);
+        finalGrade = Math.max(rawTotal - penaltyValue, 5);
       }
     }
 
@@ -283,15 +283,15 @@ export default function EmailFeedback({
     let penaltyExplanation = '';
     
     if (penaltyValue > 0) {
-      if (rawTotal >= 6) {
+      if (rawTotal >= 5) {
         const calculatedGrade = rawTotal - penaltyValue;
-        if (calculatedGrade < 6) {
+        if (calculatedGrade < 5) {
           penaltyExplanation = `
           <div style="margin: 15px 0; padding: 15px; border-left: 4px solid #FFD700; background-color: #FFFDF0;">
             <p style="margin-top: 0; font-weight: bold;">💡 À propos de votre note :</p>
             <p>Sans pénalité, votre note brute aurait été de <strong>${rawTotal.toFixed(1)}/20</strong>.</p>
             <p>Une pénalité de <strong>${penaltyValue} points</strong> a été appliquée, ce qui aurait normalement donné une note de <strong>${calculatedGrade.toFixed(1)}/20</strong>.</p>
-            <p>Cependant, pour les notes ≥ 6/20, nous appliquons un seuil minimum de 6/20 après pénalité. <strong>Votre note finale est donc de 6/20</strong>.</p>
+            <p>Cependant, pour les notes ≥ 5/20, nous appliquons un seuil minimum de 5/20 après pénalité. <strong>Votre note finale est donc de 5/20</strong>.</p>
           </div>`;
         } else {
           penaltyExplanation = `
@@ -299,15 +299,15 @@ export default function EmailFeedback({
             <p style="margin-top: 0; font-weight: bold;">💡 À propos de votre note :</p>
             <p>Sans pénalité, votre note brute aurait été de <strong>${rawTotal.toFixed(1)}/20</strong>.</p>
             <p>Une pénalité de <strong>${penaltyValue} points</strong> a été appliquée, donnant une note finale de <strong>${finalGrade.toFixed(1)}/20</strong>.</p>
-            <p>Pour rappel, si la pénalité avait fait descendre votre note en dessous de 6/20, vous auriez bénéficié du seuil minimum de 6/20.</p>
+            <p>Pour rappel, si la pénalité avait fait descendre votre note en dessous de 5/20, vous auriez bénéficié du seuil minimum de 5/20.</p>
           </div>`;
         }
       } else {
         penaltyExplanation = `
         <div style="margin: 15px 0; padding: 15px; border-left: 4px solid #FFD700; background-color: #FFFDF0;">
           <p style="margin-top: 0; font-weight: bold;">💡 À propos de votre note :</p>
-          <p>Votre note brute est de <strong>${rawTotal.toFixed(1)}/20</strong>, ce qui est inférieur au seuil de 6/20.</p>
-          <p>La pénalité de <strong>${penaltyValue} points</strong> n'a donc pas été appliquée, conformément à nos règles qui préservent les notes inférieures à 6/20.</p>
+          <p>Votre note brute est de <strong>${rawTotal.toFixed(1)}/20</strong>, ce qui est inférieur au seuil de 5/20.</p>
+          <p>La pénalité de <strong>${penaltyValue} points</strong> n'a donc pas été appliquée, conformément à nos règles qui préservent les notes inférieures à 5/20.</p>
         </div>`;
       }
     }
@@ -845,8 +845,10 @@ export default function EmailFeedback({
               rows={15}
               fullWidth
               value={generateDefaultMessage(student?.first_name || '', shareUrl).text}
-              InputProps={{
-                readOnly: true,
+              slotProps={{
+                input: { 
+                  inputProps: { "aria-readonly": true },
+                 }
               }}
               sx={{ 
                 bgcolor: 'action.hover',

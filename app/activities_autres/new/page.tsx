@@ -14,7 +14,6 @@ import {
   Divider,
   Chip,
   FormHelperText,
-  Alert
 } from '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import AddIcon from '@mui/icons-material/Add';
@@ -237,15 +236,15 @@ export default function NewActivityAutrePage() {
             </Box>
             
             <Paper variant="outlined" sx={{ p: 2 }}>
-              {parts.map((part, index) => (
-                <Box key={index} sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 2 }}>
+              {parts.map((part, i) => (
+                <Box key={i} sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 2 }}>
                   <DragIndicatorIcon color="disabled" sx={{ cursor: 'grab' }} />
                   
                   <Box sx={{ flexGrow: 1, display: 'flex', gap: 2, flexWrap: 'wrap' }}>
                     <TextField
-                      label={`Nom de la partie ${index + 1}`}
+                      label={`Nom de la partie ${i + 1}`}
                       value={part.name}
-                      onChange={(e) => handlePartNameChange(index, e.target.value)}
+                      onChange={(e) => handlePartNameChange(i, e.target.value)}
                       sx={{ flexGrow: 1, minWidth: '200px' }}
                       required
                     />
@@ -254,19 +253,21 @@ export default function NewActivityAutrePage() {
                       label="Points"
                       type="number"
                       value={part.points}
-                      onChange={(e) => handlePartPointsChange(index, e.target.value)}
-                      InputProps={{
-                        startAdornment: index % 2 === 0 
+                      onChange={(e) => handlePartPointsChange(i, e.target.value)}
+                      slotProps={{
+                        input: { 
+                          inputProps: { min: 0, step: .5 },
+                          startAdornment: i % 2 === 0 
                           ? <MenuBookIcon sx={{ mr: 1, color: 'secondary.main' }} /> 
                           : <ScienceIcon sx={{ mr: 1, color: 'primary.main' }} />,
+                         }
                       }}
                       sx={{ width: '150px' }}
-                      inputProps={{ min: 0, step: 1 }}
                     />
                   </Box>
                   
                   <IconButton
-                    onClick={() => handleRemovePart(index)}
+                    onClick={() => handleRemovePart(i)}
                     color="error"
                     size="small"
                   >

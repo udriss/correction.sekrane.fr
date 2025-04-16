@@ -55,7 +55,7 @@ export default function FragmentsLibraryPage() {
   const [filteredFragments, setFilteredFragments] = useState<Fragment[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+  const [error, setError] = useState<Error | string | null>(null);
   
   const [searchQuery, setSearchQuery] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('all');
@@ -115,10 +115,17 @@ export default function FragmentsLibraryPage() {
   const fetchActivities = useCallback(async () => {
     try {
       setLoadingActivities(true);
-      const response = await fetch('/api/activities');
+      const response = await fetch('/api/activities_autres');
+      
       if (!response.ok) {
-        throw new Error('Erreur lors du chargement des activités');
+        const errorData = await response.json().catch(() => ({ error: 'Erreur lors du chargement des activités' }));
+        // Créer une instance d'Error et y attacher les détails
+        const error = new Error('Erreur lors du chargement des activités : ' + errorData.error || 'Erreur lors du chargement des activités');
+        (error as any).details = errorData.details || {};
+        setError(error.message);
+        throw error;
       }
+      
       const data = await response.json();
       setActivities(data);
       
@@ -128,7 +135,11 @@ export default function FragmentsLibraryPage() {
       }
     } catch (err) {
       console.error('Error fetching activities:', err);
-      setError('Impossible de charger les activités. Veuillez réessayer plus tard.');
+      if (err instanceof Error) {
+        setError(err.message || 'Impossible de charger les activités. Veuillez réessayer plus tard.');
+      } else {
+        setError('Impossible de charger les activités. Veuillez réessayer plus tard.');
+      }
     } finally {
       setLoadingActivities(false);
     }
@@ -224,9 +235,16 @@ export default function FragmentsLibraryPage() {
       }
       
       const response = await fetch(`/api/fragments?${queryParams.toString()}`);
+      
       if (!response.ok) {
-        throw new Error('Erreur lors du chargement des fragments');
+        const errorData = await response.json().catch(() => ({ error: 'Erreur lors du chargement des fragments' }));
+        // Créer une instance d'Error et y attacher les détails
+        const error = new Error('Erreur lors du chargement des fragments : ' + errorData.error || 'Erreur lors du chargement des fragments');
+        (error as any).details = errorData.details || {};
+        setError(error.message);
+        throw error;
       }
+      
       const data = await response.json();
       setFragments(data);
       
@@ -242,12 +260,16 @@ export default function FragmentsLibraryPage() {
       
     } catch (err) {
       console.error('Error fetching fragments:', err);
-      setError('Impossible de charger les fragments. Veuillez réessayer plus tard.');
+      if (err instanceof Error) {
+        setError(err.message);
+      } else {
+        setError('Impossible de charger les fragments. Veuillez réessayer plus tard.');
+      }
       setFragmentsData(prev => ({...prev, isStale: true}));
     } finally {
       setLoading(false);
     }
-  }, [userOnly, categoryFilter, searchQuery, isAuthenticated]);
+  }, [userOnly, categoryFilter, searchQuery, isAuthenticated, categories]);
   
   const fetchCategories = useCallback(async (): Promise<void> => {
     try {

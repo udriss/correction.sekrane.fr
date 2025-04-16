@@ -1,28 +1,18 @@
 import React, { useState } from 'react';
 import {
   Box,
-  Card,
-  CardContent,
-  Typography,
   Grid,
-  Chip,
-  IconButton,
-  Tooltip,
   Button,
   Alert,
-  Paper
+  CircularProgress,
+  Typography
 } from '@mui/material';
-import { format } from 'date-fns';
-import { fr } from 'date-fns/locale';
-import DeleteIcon from '@mui/icons-material/Delete';
-import EditIcon from '@mui/icons-material/Edit';
-import VisibilityIcon from '@mui/icons-material/Visibility';
 import ErrorDisplay from '../ui/ErrorDisplay';
-import LoadingSpinner from '../LoadingSpinner';
+import CorrectionCardAutre from '@/components/allCorrections/CorrectionCard';
 import { CorrectionAutreEnriched } from '@/lib/types';
-import Link from 'next/link';
 import { useBatchDelete } from '@/hooks/useBatchDelete';
-import { alpha } from '@mui/material/styles';
+import { changeCorrectionAutreStatus } from '@/lib/services/correctionsAutresService';
+import { useSnackbar } from 'notistack';
 
 interface CorrectionsListAutresProps {
   filteredCorrections: CorrectionAutreEnriched[];
@@ -33,6 +23,7 @@ interface CorrectionsListAutresProps {
   highlightedIds?: string[];
   recentFilter?: boolean;
   refreshCorrections?: () => Promise<void>;
+  isLoading?: boolean; // Ajout d'une propriété pour indiquer l'état de chargement
 }
 
 export default function CorrectionsListAutres({
@@ -43,9 +34,11 @@ export default function CorrectionsListAutres({
   getGradeColor,
   highlightedIds = [],
   recentFilter = false,
-  refreshCorrections
+  refreshCorrections,
+  isLoading = false
 }: CorrectionsListAutresProps) {
   const { batchDeleteMode, selectedCorrections, setSelectedCorrections, deletingCorrections } = useBatchDelete();
+  const { enqueueSnackbar } = useSnackbar();
 
   const [localSelected, setLocalSelected] = useState<string[]>([]);
 
@@ -58,9 +51,38 @@ export default function CorrectionsListAutres({
     setSelectedCorrections(newSelected);
   };
 
+  // Handle changing the status of a correction to a specific value
+  const handleChangeStatus = async (correctionId: number, newStatus: string): Promise<void> => {
+    try {
+      await changeCorrectionAutreStatus(correctionId, newStatus);
+      
+      // Rafraîchir la liste des corrections si nécessaire
+      if (refreshCorrections) {
+        await refreshCorrections();
+      }
+      
+      enqueueSnackbar(`Statut de la correction mis à jour avec succès`, { variant: 'success' });
+    } catch (error) {
+      console.error('Erreur lors du changement de statut:', error);
+      enqueueSnackbar(`Erreur lors de la mise à jour du statut: ${error instanceof Error ? error.message : 'Erreur inconnue'}`, { variant: 'error' });
+    }
+  };
+
   // Si une erreur est présente, on l'affiche
   if (error) {
     return <ErrorDisplay error={error} />;
+  }
+
+  // Afficher un spinner pendant le chargement
+  if (isLoading) {
+    return (
+      <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', py: 4 }}>
+        <CircularProgress sx={{ mb: 2 }} />
+        <Typography variant="body1" color="text.secondary">
+          Chargement des corrections en cours...
+        </Typography>
+      </Box>
+    );
   }
 
   // Si aucune correction n'est trouvée
@@ -92,127 +114,21 @@ export default function CorrectionsListAutres({
     <Grid container spacing={2}>
       {filteredCorrections.map((correction) => {
         const isHighlighted = highlightedIds.includes(correction.id.toString());
-        const isSelected = selectedCorrections.includes(correction.id.toString());
-        const isDeleting = Boolean(deletingCorrections.has(correction.id.toString()));
 
         return (
           <Grid 
-          size={{ xs: 12, sm:6, md: 4 }}
+            size={{ xs: 12, md: 6, lg: 4 }}
             key={correction.id}
           >
-            <Card 
-              sx={{ 
-                position: 'relative',
-                height: '100%',
-                transition: 'all 0.2s ease-in-out',
-                ...(isHighlighted && {
-                  border: '2px solid',
-                  borderColor: 'primary.main',
-                  boxShadow: (theme) => `0 0 15px ${alpha(theme.palette.primary.main, 0.5)}`
-                }),
-                ...(isSelected && {
-                  border: '2px solid',
-                  borderColor: 'secondary.main',
-                  boxShadow: (theme) => `0 0 15px ${alpha(theme.palette.secondary.main, 0.5)}`
-                })
-              }}
-            >
-              <CardContent>
-                {/* En-tête avec la note */}
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 2 }}>
-                  <Chip 
-                    label={correction.grade?.toFixed(2)}
-                    color={getGradeColor(correction.grade || 0)}
-                    size="medium"
-                    sx={{ fontSize: '1.1rem', fontWeight: 'bold' }}
-                  />
-                  <Box sx={{ display: 'flex', gap: 1 }}>
-                    {/* Actions sur la correction */}
-                    <Tooltip title="Voir">
-                      <IconButton 
-                        size="small"
-                        component={Link}
-                        href={`/corrections_autres/${correction.id}`}
-                      >
-                        <VisibilityIcon fontSize="small" />
-                      </IconButton>
-                    </Tooltip>
-                    <Tooltip title="Modifier">
-                      <IconButton 
-                        size="small"
-                        component={Link}
-                        href={`/corrections_autres/${correction.id}/edit`}
-                      >
-                        <EditIcon fontSize="small" />
-                      </IconButton>
-                    </Tooltip>
-                    {batchDeleteMode && (
-                      <Tooltip title={isSelected ? "Désélectionner" : "Sélectionner"}>
-                        <IconButton
-                          size="small"
-                          onClick={() => handleCorrectionSelect(correction.id.toString())}
-                          color={isSelected ? "secondary" : "default"}
-                          disabled={isDeleting}
-                        >
-                          {isDeleting ? (
-                            <Box sx={{ width: 20, height: 20, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                              <LoadingSpinner />
-                            </Box>
-                          ) : (
-                            <DeleteIcon fontSize="small" />
-                          )}
-                        </IconButton>
-                      </Tooltip>
-                    )}
-                  </Box>
-                </Box>
-
-                {/* Informations principales */}
-                <Typography variant="h6" component="div" gutterBottom noWrap>
-                  {correction.activity_name || 'Activité inconnue'}
-                </Typography>
-
-                <Typography variant="body2" color="text.secondary" gutterBottom>
-                  {correction.student_name || 'Étudiant inconnu'}
-                </Typography>
-
-                <Typography variant="body2" color="text.secondary" gutterBottom>
-                  {correction.class_name || 'Classe inconnue'}
-                </Typography>
-
-                {/* Points par partie */}
-                <Box sx={{ mt: 2 }}>
-                  <Typography variant="caption" color="text.secondary">
-                    Points par partie:
-                  </Typography>
-                  <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mt: 1 }}>
-                    {correction.points_earned.map((points, index) => (
-                      <Chip
-                        key={index}
-                        label={`P${index + 1}: ${points}`}
-                        size="small"
-                        variant="outlined"
-                      />
-                    ))}
-                  </Box>
-                </Box>
-
-                {/* Date de soumission */}
-                <Typography 
-                  variant="caption" 
-                  color="text.secondary" 
-                  sx={{ 
-                    display: 'block',
-                    mt: 2,
-                    fontStyle: 'italic'
-                  }}
-                >
-                  {correction.submission_date 
-                    ? format(new Date(correction.submission_date), 'PP', { locale: fr })
-                    : 'Date non spécifiée'}
-                </Typography>
-              </CardContent>
-            </Card>
+            <CorrectionCardAutre 
+              correction={correction}
+              highlighted={isHighlighted}
+              getGradeColor={getGradeColor}
+              showClass={true}
+              showStudent={true}
+              showActivity={true}
+              onChangeStatus={handleChangeStatus}
+            />
           </Grid>
         );
       })}

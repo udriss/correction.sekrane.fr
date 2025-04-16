@@ -19,10 +19,10 @@ import {
 } from '@mui/material';
 import ShareIcon from '@mui/icons-material/Share';
 import CopyIcon from '@mui/icons-material/ContentCopy';
-import LinkIcon from '@mui/icons-material/Link';
 import CheckIcon from '@mui/icons-material/Check';
 import * as shareService from '@/lib/services/shareService';
 import SearchIcon from '@mui/icons-material/Search';
+import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 
 interface ShareModalProps {
   open: boolean;
@@ -91,59 +91,18 @@ export default function ShareModal({ open, onClose, correctionId, onShareSuccess
     }
   };
 
-  // Fonction pour copier l'URL dans le presse-papiers avec gestion d'erreur améliorée
-  const handleCopyLink = () => {
+  // Fonction pour copier l'URL dans le presse-papiers
+  const handleCopyLink = async () => {
     if (!shareUrl) return;
     
     setError(''); // Clear previous errors
     
     try {
-      // Method 1: Modern Clipboard API
-      if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
-        navigator.clipboard.writeText(shareUrl)
-          .then(() => {
-            
-            setCopied(true);
-            setTimeout(() => setCopied(false), 2000);
-          })
-          .catch(err => {
-            console.error('Clipboard API error:', err);
-            // Try fallback
-            tryFallbackCopy();
-          });
-      } 
-      // Method 2: execCommand fallback
-      else {
-        tryFallbackCopy();
-      }
+      await navigator.clipboard.writeText(shareUrl);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
     } catch (err) {
-      console.error('Copy error:', err);
-      showManualCopyInstructions();
-    }
-  };
-  
-  // Fallback copy method
-  const tryFallbackCopy = () => {
-    try {
-      // Check if we have a reference to the TextField
-      if (textFieldRef.current) {
-        // Select the text field content
-        textFieldRef.current.select();
-        textFieldRef.current.setSelectionRange(0, 99999); // For mobile devices
-        
-        // Try to use document.execCommand
-        const successful = document.execCommand('copy');
-        if (successful) {
-          
-          setCopied(true);
-          setTimeout(() => setCopied(false), 2000);
-          return;
-        }
-      }
-      // If we get here, both methods failed
-      showManualCopyInstructions();
-    } catch (err) {
-      console.error('Fallback copy error:', err);
+      console.error('Clipboard API error:', err);
       showManualCopyInstructions();
     }
   };
@@ -199,7 +158,6 @@ export default function ShareModal({ open, onClose, correctionId, onShareSuccess
                   }
                 }}
                 onClick={() => {
-                  // Use the ref directly instead of e.target
                   if (textFieldRef.current) {
                     textFieldRef.current.select();
                   }
@@ -208,6 +166,14 @@ export default function ShareModal({ open, onClose, correctionId, onShareSuccess
               <Tooltip title={copied ? "Copié !" : "Copier le lien"}>
                 <IconButton onClick={handleCopyLink} color={copied ? "success" : "primary"}>
                   {copied ? <CheckIcon /> : <CopyIcon />}
+                </IconButton>
+              </Tooltip>
+              <Tooltip title="Ouvrir le lien de partage">
+                <IconButton
+                  onClick={() => window.open(shareUrl, '_blank')}
+                  color="info"
+                >
+                  <OpenInNewIcon />
                 </IconButton>
               </Tooltip>
             </Box>

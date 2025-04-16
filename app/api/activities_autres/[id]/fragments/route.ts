@@ -9,15 +9,21 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    // Get the user from both auth systems
+    const session = await getServerSession(authOptions);
+    const customUser = await getUser();
+    
+    // Use either auth system, starting with custom auth
+    const userId = customUser?.id || session?.user?.id;
+    
+    if (!userId) {
+      return NextResponse.json({ error: 'utilisateur non authentifié' }, { status: 401 });
+    }
+
     // Await the params
     const { id } = await params;
     const activityId = parseInt(id);
 
-    // Authentication check
-    const session = await getServerSession(authOptions);
-    const customUser = await getUser(request);
-    const userId = customUser?.id || session?.user?.id;
-    
     if (!userId) {
       return NextResponse.json({ error: 'Non autorisé' }, { status: 401 });
     }
@@ -35,7 +41,7 @@ export async function GET(
       
       // Récupérer les fragments associés à cette activité autre
       const fragments = await query<any[]>(`
-        SELECT * FROM fragments_autres 
+        SELECT * FROM fragments
         WHERE activity_id = ? OR (? IS NULL AND activity_id IS NULL)
         ORDER BY position_order ASC, id ASC
       `, [activityId, activityId]);
@@ -47,7 +53,7 @@ export async function GET(
             const categories = await query<any[]>(`
               SELECT c.id, c.name 
               FROM categories c
-              JOIN fragments_autres_categories fc ON c.id = fc.category_id
+              JOIN fragments_categories fc ON c.id = fc.category_id
               WHERE fc.fragment_id = ?
             `, [fragment.id]);
 
@@ -127,18 +133,21 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    // Get the user from both auth systems
+    const session = await getServerSession(authOptions);
+    const customUser = await getUser();
+    
+    // Use either auth system, starting with custom auth
+    const userId = customUser?.id || session?.user?.id;
+    
+    if (!userId) {
+      return NextResponse.json({ error: 'utilisateur non authentifié' }, { status: 401 });
+    }
+
     // Await the params
     const { id } = await params;
     const activityId = parseInt(id);
 
-    // Authentication check
-    const session = await getServerSession(authOptions);
-    const customUser = await getUser(request);
-    const userId = customUser?.id || session?.user?.id;
-    
-    if (!userId) {
-      return NextResponse.json({ error: 'Non autorisé' }, { status: 401 });
-    }
 
 
     if (isNaN(activityId)) {
@@ -155,7 +164,7 @@ export async function POST(
     // Calculer la position maximale actuelle
     const maxPositionResult = await query<any[]>(`
       SELECT MAX(position_order) as max_position 
-      FROM fragments_autres 
+      FROM fragments 
       WHERE activity_id = ?
     `, [activityId]);
     
@@ -164,7 +173,7 @@ export async function POST(
 
     // Créer le fragment
     const result = await query<any>(`
-      INSERT INTO fragments_autres (content, activity_id, position_order, user_id) 
+      INSERT INTO fragments (content, activity_id, position_order, user_id) 
       VALUES (?, ?, ?, ?)
     `, [content, activityId, newPosition, userId]);
 
@@ -179,21 +188,21 @@ export async function POST(
       const flatValues = values.flat();
       
       await query(`
-        INSERT INTO fragments_autres_categories (fragment_id, category_id) 
+        INSERT INTO fragments (fragment_id, category_id) 
         VALUES ${placeholders}
       `, flatValues);
     }
 
     // Récupérer le fragment créé
     const fragment = await query<any[]>(`
-      SELECT * FROM fragments_autres WHERE id = ?
+      SELECT * FROM fragments WHERE id = ?
     `, [fragmentId]);
 
     // Récupérer les catégories associées
     const fragmentCategories = await query<any[]>(`
       SELECT c.id, c.name 
       FROM categories c
-      JOIN fragments_autres_categories fc ON c.id = fc.category_id
+      JOIN fragments_categories fc ON c.id = fc.category_id
       WHERE fc.fragment_id = ?
     `, [fragmentId]);
 

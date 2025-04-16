@@ -49,6 +49,7 @@ export default function ClassStudentsManagerModal({
   const [classData, setClassData] = useState<ClassData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [errorDetails, setErrorDetails] = useState<any | null>(null);
   const [studentStats, setStudentStats] = useState({
     total: 0,
     withCorrections: 0
@@ -61,12 +62,15 @@ export default function ClassStudentsManagerModal({
   const fetchClassData = async () => {
     try {
       setLoading(true);
+      setError(null);
+      setErrorDetails(null);
       
       // Fetch class details
       const classResponse = await fetch(`/api/classes/${classId}`);
       
       if (classResponse.status === 404) {
         setError('Classe non trouvée');
+        setErrorDetails({ message: 'La classe demandée n\'existe pas' });
         setLoading(false);
         return;
       }
@@ -77,7 +81,13 @@ export default function ClassStudentsManagerModal({
       }
       
       if (!classResponse.ok) {
-        throw new Error('Erreur lors du chargement des données de la classe');
+        const errorData = await classResponse.json().catch(() => ({ error: 'Erreur lors du chargement des données de la classe' }));
+        // Créer une instance d'Error et y attacher les détails
+        const error = new Error('Erreur lors du chargement des données de la classe : ' + (errorData.error || 'Erreur lors du chargement des données de la classe'));
+        (error as any).details = errorData.details || {};
+        setError(error.message);
+        setErrorDetails((error as any).details);
+        throw error;
       }
       
       const classDataResponse = await classResponse.json();
@@ -86,7 +96,11 @@ export default function ClassStudentsManagerModal({
       // Fetch students stats
       const statsResponse = await fetch(`/api/classes/${classId}/stats`);
       
-      if (statsResponse.ok) {
+      if (!statsResponse.ok) {
+        const errorData = await statsResponse.json().catch(() => ({ error: 'Erreur lors du chargement des statistiques' }));
+        console.warn('Problème lors du chargement des statistiques:', errorData);
+        // Ne pas bloquer le chargement de la page, juste logger l'erreur
+      } else {
         const statsData = await statsResponse.json();
         setStudentStats({
           total: statsData?.total_students || 0,
@@ -96,6 +110,24 @@ export default function ClassStudentsManagerModal({
     } catch (err) {
       console.error('Erreur:', err);
       setError('Une erreur est survenue lors du chargement des données.');
+      
+      // Si l'erreur contient des détails (comme c'est le cas pour une réponse d'API avec détails)
+      if ((err as any)?.details) {
+        setErrorDetails((err as any).details);
+      } else if (typeof err === 'object' && err !== null) {
+        // Récupérer toutes les informations sur l'erreur pour affichage
+        setErrorDetails({
+          message: (err as Error).message,
+          stack: (err as Error).stack,
+          // Pour les erreurs network ou Response, récupérer ce qu'on peut
+          status: (err as any).status,
+          statusText: (err as any).statusText,
+          // Autres propriétés potentielles d'erreur
+          code: (err as any).code,
+          sqlMessage: (err as any).sqlMessage,
+          sql: (err as any).sql
+        });
+      }
     } finally {
       setLoading(false);
     }
@@ -137,9 +169,11 @@ export default function ClassStudentsManagerModal({
         <DialogContent>
           <ErrorDisplay 
             error={error}
+            errorDetails={errorDetails}
             withRefreshButton={true}
             onRefresh={() => {
               setError(null);
+              setErrorDetails(null);
               if (classId && open) {
                 setLoading(true);
                 fetchClassData();

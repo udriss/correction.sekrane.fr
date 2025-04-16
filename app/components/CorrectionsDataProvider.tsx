@@ -25,7 +25,11 @@ export interface Correction {
   sub_class?: string | null;
   student_sub_class?: string | null; // Ajout de la propriété student_sub_class
   active?: number; // Ajout du champ active pour identifier les corrections actives/inactives
-  final_grade?: number | null; // Note finale: si (grade-penalty) < 6 et grade >= 6 alors 6, si grade < 6 alors grade, sinon (grade-penalty)
+  final_grade?: number | null; // Note finale: si (grade-penalty) < 5 et grade >= 5 alors 5, si grade < 5 alors grade, sinon (grade-penalty)
+  points?: number[] | null; // Points de la correction
+  points_earned : number[]; // Points obtenus, 
+  content: string | null; // Contenu de la correction, 
+  group_id: number | null; // ID du groupe
 }
 
 // Définition de l'interface Student pour typer correctement les étudiants

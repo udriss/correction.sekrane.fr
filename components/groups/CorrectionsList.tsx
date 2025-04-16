@@ -1,56 +1,41 @@
-import React, { useState } from 'react';
-import { 
-  List, 
-  ListItem, 
-  Typography, 
-  Paper, 
-  Box, 
-  Grid, 
-  Button,
-  IconButton,
-  Chip,
-  Tooltip,
-  Link as MuiLink,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
-  CircularProgress,
-  Collapse,
+import React from 'react';
+import Typography from '@mui/material/Typography';
+import Box from '@mui/material/Box';
+import Button from '@mui/material/Button';
+import IconButton from '@mui/material/IconButton';
+import Chip from '@mui/material/Chip';
+import Tooltip from '@mui/material/Tooltip';
+import Link from 'next/link';
+import {
   Table,
   TableBody,
   TableCell,
   TableContainer,
   TableHead,
   TableRow,
-  TextField,
-  Slider,
   FormControl,
   InputLabel,
   Select,
-  MenuItem
+  MenuItem,
+  Slider,
+  CircularProgress
 } from '@mui/material';
-import CalendarMonthIcon from '@mui/icons-material/CalendarMonth';
-import DeleteIcon from '@mui/icons-material/Delete';
-import SchoolIcon from '@mui/icons-material/School';
-import PersonIcon from '@mui/icons-material/Person';
-import AssignmentIcon from '@mui/icons-material/Assignment';
-import AssignmentTurnedInIcon from '@mui/icons-material/AssignmentTurnedIn';
-import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
-import ExpandLessIcon from '@mui/icons-material/ExpandLess';
-import QrCodeIcon from '@mui/icons-material/QrCode';
+
+// Import only the icons that are used
 import GradeIcon from '@mui/icons-material/Grade';
-import VisibilityIcon from '@mui/icons-material/Visibility';
-import ShareIcon from '@mui/icons-material/Share';
-import DeleteForeverIcon from '@mui/icons-material/DeleteForever';
-import RemoveCircleOutlineIcon from '@mui/icons-material/RemoveCircleOutline';
-import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 import SaveIcon from '@mui/icons-material/Save';
 import CloseIcon from '@mui/icons-material/Close';
 import PersonAddAltIcon from '@mui/icons-material/PersonAddAlt';
+import VisibilityIcon from '@mui/icons-material/Visibility';
+import ShareIcon from '@mui/icons-material/Share';
+import OpenInNewIcon from '@mui/icons-material/OpenInNew';
+import RemoveCircleOutlineIcon from '@mui/icons-material/RemoveCircleOutline';
+import DeleteForeverIcon from '@mui/icons-material/DeleteForever';
 
-import Link from 'next/link';
 import { Correction, CorrectionWithShareCode } from '@/lib/types';
+import { useRouter } from 'next/router';
+import { useTheme } from '@mui/material/styles';
+import LoadingSpinner from '@/components/LoadingSpinner';
 
 // Type guard correctement implémenté pour vérifier si une correction a un shareCode
 function hasShareCode(correction: Correction): correction is CorrectionWithShareCode {

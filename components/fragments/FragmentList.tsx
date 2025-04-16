@@ -1,7 +1,5 @@
 import React from 'react';
 import { Box } from '@mui/material';
-import { DndProvider } from 'react-dnd';
-import { HTML5Backend } from 'react-dnd-html5-backend';
 import { Fragment } from '@/lib/types';
 import FragmentCard from './FragmentCard';
 
@@ -14,11 +12,9 @@ interface FragmentListProps {
   onUpdate: (fragment: Fragment) => void;
   onDelete: (id: number) => void;
   onAddToCorrection?: (fragment: Fragment) => void;
-  moveFragment: (dragIndex: number, hoverIndex: number) => void;
   refreshCategories: () => Promise<void>;
   renderPositionChip?: (fragment: Fragment) => React.ReactNode;
 }
-
 
 const FragmentList: React.FC<FragmentListProps> = ({
   fragments,
@@ -29,35 +25,27 @@ const FragmentList: React.FC<FragmentListProps> = ({
   onUpdate,
   onDelete,
   onAddToCorrection,
-  moveFragment,
   refreshCategories,
   renderPositionChip
 }) => {
-
-  
-  
   return (
-    <DndProvider backend={HTML5Backend}>
-      <Box sx={{ maxHeight: 900, overflowY: 'auto', p: 0.5, '& > *': { mb: 1.5 } }}>
-        {fragments.map((fragment, index) => (
-          <FragmentCard
-            key={`fragment-${fragment.id}`}
-            fragment={fragment}
-            index={index}
-            isEditing={fragment.id === editingFragmentId}
-            categories={categories}
-            onEdit={() => onEdit(fragment.id)}
-            onCancelEdit={onCancelEdit}
-            onUpdate={onUpdate}
-            onDelete={() => onDelete(fragment.id)}
-            onAddToCorrection={onAddToCorrection ? () => onAddToCorrection(fragment) : undefined}
-            moveFragment={moveFragment}
-            refreshCategories={refreshCategories}
-            renderPositionChip={renderPositionChip ? () => renderPositionChip(fragment) : undefined}
-          />
-        ))}
-      </Box>
-    </DndProvider>
+    <Box sx={{ maxHeight: 900, overflowY: 'auto', p: 0.5, '& > *': { mb: 1.5 }, position: 'relative' }}>
+      {fragments.map((fragment) => (
+        <FragmentCard
+          key={`fragment-${fragment.id}`}
+          fragment={fragment}
+          isEditing={fragment.id === editingFragmentId}
+          categories={categories}
+          onEdit={() => onEdit(fragment.id)}
+          onCancelEdit={onCancelEdit}
+          onUpdate={onUpdate}
+          onDelete={() => onDelete(fragment.id)}
+          onAddToCorrection={onAddToCorrection ? () => onAddToCorrection(fragment) : undefined}
+          refreshCategories={refreshCategories}
+          renderPositionChip={renderPositionChip ? () => renderPositionChip(fragment) : undefined}
+        />
+      ))}
+    </Box>
   );
 };
 

@@ -488,13 +488,17 @@ const StudentEditDialog: React.FC<StudentEditDialogProps> = ({
               fullWidth
               value={student.first_name || ''}
               onChange={(e) => onStudentChange({ ...student, first_name: e.target.value })}
-              InputProps={{
-                startAdornment: (
-                  <InputAdornment position="start">
-                    <PersonOutlineIcon fontSize="small" />
-                  </InputAdornment>
-                ),
-              }}
+              slotProps={{
+                input: { 
+                  inputProps: { 
+                    startAdornment: (
+                      <InputAdornment position="start">
+                        <PersonOutlineIcon fontSize="small" />
+                      </InputAdornment>
+                    )
+                   },
+                }
+                }}
             />
           </Grid>
           <Grid size={{ xs: 12, sm: 6, md: 6, lg: 4 }}>
@@ -503,13 +507,17 @@ const StudentEditDialog: React.FC<StudentEditDialogProps> = ({
               fullWidth
               value={student.last_name || ''}
               onChange={(e) => onStudentChange({ ...student, last_name: e.target.value })}
-              InputProps={{
-                startAdornment: (
-                  <InputAdornment position="start">
-                    <PersonOutlineIcon fontSize="small" />
-                  </InputAdornment>
-                ),
-              }}
+              slotProps={{
+                input: { 
+                  inputProps: { 
+                    startAdornment: (
+                      <InputAdornment position="start">
+                        <PersonOutlineIcon fontSize="small" />
+                      </InputAdornment>
+                    )
+                   },
+                }
+                }}
             />
           </Grid>
           <Grid size={{ xs: 12, sm: 6, md: 6, lg: 4 }}>
@@ -542,13 +550,17 @@ const StudentEditDialog: React.FC<StudentEditDialogProps> = ({
                   </Box>
                 ) : null
               }
-              InputProps={{
-                startAdornment: (
-                  <InputAdornment position="start">
-                    <EmailIcon fontSize="small" color={validationErrors.email ? "error" : "inherit"} />
-                  </InputAdornment>
-                ),
-              }}
+              slotProps={{
+                input: { 
+                  inputProps: { 
+                    startAdornment: (
+                      <InputAdornment position="start">
+                        <PersonOutlineIcon fontSize="small" />
+                      </InputAdornment>
+                    )
+                   },
+                }
+                }}
             />
           </Grid>
           <Grid size={{ xs: 12, sm: 6, md: 6, lg: 4 }}>

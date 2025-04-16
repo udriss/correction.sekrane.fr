@@ -22,18 +22,26 @@ interface SimpleStudent {
 interface QRCodePDFOptions {
   corrections: Partial<Correction>[] | any[]; // Pour accepter les deux types de correction
   group: { name: string; activity_name?: string } | null;
-  generateShareCode: (correctionId: string | number) => Promise<{ isNew: boolean; code: string }>;
-  getExistingShareCode: (correctionId: string | number) => Promise<{ exists: boolean; code?: string }>;
+  // generateShareCode?: (correctionId: string | number) => Promise<{ isNew: boolean; code: string }>;
+  // getExistingShareCode?: (correctionId: string | number) => Promise<{ exists: boolean; code?: string }>;
   onSuccess?: (updatedCorrections: CorrectionWithShareCode[]) => void;
   students?: (Student | SimpleStudent)[]; // Accepte les deux formats d'étudiants
   activities?: Activity[]; // Ajouter un tableau d'activités optionnel
+  includeDetails?: boolean; // Nouvelle option pour contrôler l'affichage des détails
 }
 
 // Fonction utilitaire pour récupérer le nom complet d'un étudiant
-function getStudentFullName(studentId: number | null, students: (Student | SimpleStudent)[]): string {
+function getStudentFullName(studentId: number | null, students: (Student | SimpleStudent)[], includeDetails: boolean = true): string {
   if (!studentId) return 'Sans nom';
   const student = students.find(s => s.id === studentId);
   if (!student) return 'Sans nom';
+
+  // Afficher uniquement le prénom + la première lettre du nom si includeDetails est false
+  if (!includeDetails) {
+    return `${student.first_name} ${student.last_name.charAt(0)}.`;
+  }
+  
+  // Sinon afficher le nom complet
   return `${student.first_name} ${student.last_name}`;
 }
 
@@ -48,11 +56,12 @@ function getActivityName(activityId: number | null, activities: Activity[]): str
 export async function generateQRCodePDF({
   corrections,
   group,
-  generateShareCode,
-  getExistingShareCode,
+  //generateShareCode,
+  //getExistingShareCode,
   onSuccess,
   students = [], // Valeur par défaut : tableau vide
-  activities = [] // Valeur par défaut : tableau vide
+  activities = [], // Valeur par défaut : tableau vide
+  includeDetails = true // Valeur par défaut : afficher les détails complets
 }: QRCodePDFOptions): Promise<string | null> {
   try {
     if (!corrections || corrections.length === 0) {
@@ -67,8 +76,64 @@ export async function generateQRCodePDF({
     });
 
     // Créer un dictionnaire des codes de partage pour chaque correction
-    // au lieu de modifier directement les objets corrections
     const shareCodes: Record<number, string> = {};
+    
+    // Vérifier d'abord si certaines corrections n'ont pas de code de partage
+    const correctionsWithoutQR = corrections.filter(c => 
+      !('shareCode' in c) || !(c as any).shareCode
+    );
+    
+    // Si des corrections n'ont pas de code de partage, en créer en lot
+    if (correctionsWithoutQR.length > 0) {
+      try {
+        // Créer des codes de partage en lot
+        const correctionIds = correctionsWithoutQR.map(c => c.id);
+        const response = await fetch('/api/share/batch', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ correctionIds }),
+        });
+        
+        if (response.ok) {
+          
+        }
+      } catch (error) {
+        console.error('Erreur lors de la création des codes de partage:', error);
+      }
+    }
+    
+    // Récupérer tous les codes de partage en une seule requête
+    try {
+      // Collecter les IDs des corrections
+      const correctionIds = corrections
+        .filter(c => c.id !== undefined)
+        .map(c => c.id);
+        
+      // Récupérer les codes de partage en lot
+      const queryParams = new URLSearchParams();
+      correctionIds.forEach(id => queryParams.append('correctionIds[]', id.toString()));
+      
+      const shareResponse = await fetch(`/api/share/batch?${queryParams.toString()}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        }
+      });
+      
+      if (shareResponse.ok) {
+        const shareData = await shareResponse.json();
+        // Stocker les codes de partage dans le dictionnaire
+        for (const [correctionId, code] of Object.entries(shareData)) {
+          shareCodes[Number(correctionId)] = code as string;
+        }
+      } else {
+        console.warn('Impossible de récupérer les codes de partage en lot');
+      }
+    } catch (error) {
+      console.error('Erreur lors de la récupération des codes de partage:', error);
+    }
     
     // Récupérer les informations pertinentes
     const firstCorrection = corrections[0];
@@ -223,37 +288,16 @@ export async function generateQRCodePDF({
       let shareCode;
       
       try {
-        // Appel à l'API pour vérifier si un code de partage existe déjà
-        const existingShareResponse = await fetch(`/api/corrections/${correction.id}/share`);
-        const existingShareData = await existingShareResponse.json();
+        // Au lieu d'appeler l'API pour chaque correction, utiliser les codes 
+        // déjà stockés dans le dictionnaire shareCodes
+        // Si le code n'est pas encore présent, on utilisera une valeur temporaire
+        shareCode = correction.id && shareCodes[correction.id] 
+          ? shareCodes[correction.id] 
+          : `TEMP-${correction.id}`;
         
-        if (existingShareData.exists && existingShareData.code) {
-          // Un code existe déjà, l'utiliser
-          shareCode = existingShareData.code;
-        } else {
-          // Aucun code existant, en générer un nouveau via l'API
-          const generateResponse = await fetch(`/api/corrections/${correction.id}/share`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json'
-            }
-          });
-          
-          if (!generateResponse.ok) {
-            throw new Error(`Impossible de générer un code de partage pour la correction ${correction.id}`);
-          }
-          
-          const result = await generateResponse.json();
-          shareCode = result.code;
-        }
       } catch (error) {
         console.error(`Erreur lors de la gestion du code de partage pour la correction ${correction.id}:`, error);
         shareCode = `ERROR-${correction.id}`;
-      }
-      
-      // Stocker le code dans notre dictionnaire au lieu de modifier l'objet correction
-      if (correction.id) {
-        shareCodes[correction.id] = shareCode;
       }
       
       // Generate QR code URL
@@ -324,7 +368,7 @@ export async function generateQRCodePDF({
       doc.setFontSize(12);
       
       // Récupérer le nom de l'étudiant à partir de son ID et de la liste des étudiants
-      const studentName = getStudentFullName(correction.student_id, students);
+      const studentName = getStudentFullName(correction.student_id, students, includeDetails);
       
       // Ajouter une indication visuelle pour les corrections inactives dans le nom
       if (!isActive) {
@@ -343,7 +387,7 @@ export async function generateQRCodePDF({
       doc.text(displayUrl, x + qrSize / 2, y + qrSize + 18, { align: 'center' });
       
       // Afficher la note pour les corrections actives
-      if (isActive && correction.grade !== undefined) {
+      if (isActive && correction.grade !== undefined && includeDetails) {
         const grade = typeof correction.grade === 'number' ? correction.grade.toFixed(1) : correction.grade;
         doc.setFont('helvetica', 'bold');
         

@@ -1,9 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { query, withConnection } from '@/lib/db';
+import { getServerSession } from "next-auth/next";
+import authOptions from "@/lib/auth";
+import { getUser } from '@/lib/auth';
 
 // Get all classes
 export async function GET() {
   try {
+    // Get the user from both auth systems
+    const session = await getServerSession(authOptions);
+    const customUser = await getUser();
+    
+    // Use either auth system, starting with custom auth
+    const userId = customUser?.id || session?.user?.id;
+    
+    if (!userId) {
+      return NextResponse.json({ error: 'utilisateur non authentifié' }, { status: 401 });
+    }
     // Get all classes
     const classes = await query(`
       SELECT * FROM classes ORDER BY created_at DESC
@@ -31,7 +44,10 @@ export async function GET() {
     return NextResponse.json(classesWithCounts);
   } catch (error) {
     console.error('Error fetching classes:', error);
-    return NextResponse.json({ error: 'Failed to fetch classes' }, { status: 500 });
+    return NextResponse.json({ 
+      error: error,
+      details: error 
+    }, { status: 500 });
   }
 }
 
@@ -78,6 +94,9 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(newClass, { status: 201 });
   } catch (error) {
     console.error('Error creating class:', error);
-    return NextResponse.json({ error: 'Failed to create class' }, { status: 500 });
+    return NextResponse.json({ 
+      error: error,
+      details: error 
+    }, { status: 500 });
   }
 }

@@ -643,9 +643,9 @@ export function SearchContextProvider({ children }: { children: React.ReactNode 
   const getResultLink = (table: string, id: number) => {
     switch (table) {
       case 'categories': return '#'; // Return '#' instead of `/categories/${id}`
-      case 'classes': return `/classes/${id}`;
+      case 'classes': return `/classes_autres/${id}`;
       case 'students': return `/students/${id}`;
-      case 'activities': return `/activities/${id}`;
+      case 'activities': return `/activities_autres/${id}`;
       case 'fragments': return `/fragments/`;
       default: return '#';
     }

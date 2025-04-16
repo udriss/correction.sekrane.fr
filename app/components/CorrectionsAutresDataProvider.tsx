@@ -56,6 +56,7 @@ interface ContextValue {
   clearAllFilters: () => void;
   refreshCorrections: () => Promise<void>;
   errorString: string;
+  isLoading: boolean; // Ajout de la propriété isLoading
 }
 
 const CorrectionsAutresContext = createContext<ContextValue | undefined>(undefined);
@@ -73,6 +74,7 @@ export default function CorrectionsAutresProvider({ children, initialFilters, in
   const [corrections, setCorrections] = useState<CorrectionAutre[]>([]);
   const [metaData, setMetaData] = useState<MetaData>({ activities: [], students: [], classes: [] });
   const [errorString, setErrorString] = useState('');
+  const [isLoading, setIsLoading] = useState<boolean>(true); // Ajout de l'état isLoading
   const [sortOptions, setSortOptions] = useState<SortOptions>(initialSort || {
     field: 'submission_date',
     direction: 'desc'
@@ -93,6 +95,7 @@ export default function CorrectionsAutresProvider({ children, initialFilters, in
   const [activeFilters, setActiveFilters] = useState<string[]>([]);
 
   const fetchCorrections = useCallback(async () => {
+    setIsLoading(true); // Activation de l'état de chargement
     try {
       const response = await fetch('/api/corrections_autres');
       if (!response.ok) throw new Error('Failed to fetch corrections');
@@ -102,10 +105,13 @@ export default function CorrectionsAutresProvider({ children, initialFilters, in
       console.error('Error fetching corrections:', error);
       setErrorString('Erreur lors du chargement des corrections');
       enqueueSnackbar('Erreur lors du chargement des corrections', { variant: 'error' });
+    } finally {
+      setIsLoading(false); // Désactivation de l'état de chargement une fois terminé
     }
   }, [enqueueSnackbar]);
 
   const fetchMetaData = useCallback(async () => {
+    setIsLoading(true); // Activation de l'état de chargement
     try {
       const [activitiesRes, studentsRes, classesRes] = await Promise.all([
         fetch('/api/activities_autres'),
@@ -128,6 +134,8 @@ export default function CorrectionsAutresProvider({ children, initialFilters, in
       console.error('Error fetching metadata:', error);
       setErrorString('Erreur lors du chargement des données');
       enqueueSnackbar('Erreur lors du chargement des données', { variant: 'error' });
+    } finally {
+      setIsLoading(false); // Désactivation de l'état de chargement une fois terminé
     }
   }, [enqueueSnackbar]);
 
@@ -182,7 +190,8 @@ export default function CorrectionsAutresProvider({ children, initialFilters, in
     removeFilter,
     clearAllFilters,
     refreshCorrections,
-    errorString
+    errorString,
+    isLoading // Référence à l'état isLoading au lieu d'une valeur en dur
   };
 
   return (

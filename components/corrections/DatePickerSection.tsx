@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Box, Alert, Typography } from '@mui/material';
+import { Box, Alert, Typography, CircularProgress } from '@mui/material';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import dayjs from 'dayjs';
 
@@ -8,6 +8,7 @@ interface DatePickerSectionProps {
   submissionDate: dayjs.Dayjs | null;
   handleDeadlineDateChange: (newDate: dayjs.Dayjs | null) => void;
   handleSubmissionDateChange: (newDate: dayjs.Dayjs | null) => void;
+  saving?: boolean; // Indicateur de sauvegarde en cours (optionnel)
 }
 
 const DatePickerSection: React.FC<DatePickerSectionProps> = ({
@@ -15,6 +16,7 @@ const DatePickerSection: React.FC<DatePickerSectionProps> = ({
   submissionDate,
   handleDeadlineDateChange,
   handleSubmissionDateChange,
+  saving = false, // Valeur par défaut à false si non fournie
 }) => {
   // État local pour suivre si les dates ont été modifiées depuis le dernier rendu
   const [datesChanged, setDatesChanged] = useState(false);
@@ -42,31 +44,59 @@ const DatePickerSection: React.FC<DatePickerSectionProps> = ({
   return (
     <>
       <div className="flex flex-wrap justify-around gap-4 mb-2">
-        <Box>
+        <Box sx={{ position: 'relative' }}>
           <DatePicker
             label="Date limite de rendu"
             value={deadlineDate}
             onChange={onDeadlineChange}
+            disabled={saving}
             slotProps={{ 
               textField: { 
                 size: 'small',
-                helperText: "Date d'échéance du travail" 
+                helperText: "Date d'échéance du travail",
+                disabled: saving
               }
             }}
           />
+          {saving && (
+            <CircularProgress
+              size={24}
+              sx={{
+                position: 'absolute',
+                top: '50%',
+                right: '-30px',
+                marginTop: '-12px',
+                marginLeft: '-12px',
+              }}
+            />
+          )}
         </Box>
-        <Box>
+        <Box sx={{ position: 'relative' }}>
           <DatePicker
             label="Date de rendu effective"
             value={submissionDate}
             onChange={onSubmissionChange}
+            disabled={saving}
             slotProps={{ 
               textField: { 
                 size: 'small',
-                helperText: "Date réelle de rendu par l'étudiant" 
+                helperText: "Date réelle de rendu par l'étudiant",
+                disabled: saving
               }
             }}
           />
+          {saving && (
+            <CircularProgress
+              size={24}
+              sx={{
+                position: 'absolute',
+                top: '50%',
+                right: '-30px',
+                marginTop: '-12px',
+                marginLeft: '-12px',
+              }}
+            />
+          )}
         </Box>
       </div>
       <div className="flex justify-start items-center my-2 w-full">
@@ -95,6 +125,11 @@ const DatePickerSection: React.FC<DatePickerSectionProps> = ({
               </div>
             </Alert>
           </Box>
+        )}
+        {saving && (
+          <Typography variant="caption" color="text.secondary" sx={{ ml: 2 }}>
+            Enregistrement des dates...
+          </Typography>
         )}
       </div>
     </>

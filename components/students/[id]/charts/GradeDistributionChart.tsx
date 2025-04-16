@@ -18,10 +18,11 @@ import {
   Legend,
   Cell
 } from 'recharts';
-import { Correction, StudentStats } from '../types';
+import { StudentStats } from '../types';
+import { CorrectionAutreEnriched } from '@/lib/types';
 
 interface GradeDistributionChartProps {
-  corrections: Correction[];
+  corrections: CorrectionAutreEnriched[];
   stats: StudentStats;
 }
 

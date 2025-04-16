@@ -1,7 +1,6 @@
 // Types communs pour les exports PDF
 import { Student } from '@/lib/types';
-import { Correction as ProviderCorrection } from '@/app/components/CorrectionsDataProvider';
-
+import { CorrectionAutreEnriched } from '@/lib/types';
 export type ArrangementType = 'student' | 'class' | 'subclass' | 'activity';
 export type SubArrangementType = 'student' | 'class' | 'subclass' | 'activity' | 'none';
 export type ExportFormat = 'pdf' | 'csv' | 'xlsx';
@@ -24,7 +23,7 @@ export interface CellStyle {
 
 export interface ExportPDFComponentProps {
   classData: any;
-  corrections: ProviderCorrection[];
+  corrections: CorrectionAutreEnriched[];
   activities: any[];
   students: Student[];
   filterActivity: number | 'all';
@@ -39,7 +38,7 @@ export interface ExportPDFComponentProps {
 
 // Types pour les props du composant d'export PDF pour toutes les corrections
 export interface ExportPDFComponentAllCorrectionsProps {
-  corrections: ProviderCorrection[];
+  corrections: CorrectionAutreEnriched[];
   activities: any[];
   students: Student[];
   filterActivity: number | 'all';
@@ -178,7 +177,7 @@ export const getCorrectionCellStyle = (cellValue: any): {
   // Si c'est une chaîne, vérifier les statuts spéciaux
   if (typeof cellValue === 'string') {
     if (cellValue === 'NON NOTÉ MANUEL') {
-      console.log('Correction non notée manuellement détectée');
+      
       return {
         color: 'CC0000', // Rouge
         backgroundColor: 'FFEEEE', // Rouge très pâle
@@ -262,7 +261,7 @@ export const getCorrectionCellStyle = (cellValue: any): {
 };
 
 // Fonction pour convertir un statut en texte lisible
-export const getStatusLabel = (correction: ProviderCorrection): string => {
+export const getStatusLabel = (correction: CorrectionAutreEnriched): string => {
   if ((correction as any).placeholder) {
     return "NON NOTÉ";
   } else if (correction.status) {

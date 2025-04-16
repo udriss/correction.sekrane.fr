@@ -16,9 +16,18 @@ import CodeIcon from '@mui/icons-material/Code';
 import GradientBackground from '@/components/ui/GradientBackground';
 import PatternBackground from '@/components/ui/PatternBackground';
 
+// Étendre le type Error pour inclure les propriétés d'erreur SQL potentielles
+interface ExtendedError extends Error {
+  code?: string;
+  sqlMessage?: string;
+  sqlState?: string;
+  errno?: number;
+  sql?: string;
+}
+
 interface ErrorDisplayProps {
   error: string | Error | null;
-  errorDetails?: any;
+  errorDetails?: Record<string, any>;
   withRefreshButton?: boolean;
   onRefresh?: () => void;
 }
@@ -40,6 +49,34 @@ const ErrorDisplay: React.FC<ErrorDisplayProps> = ({
   
   // Extraire le stack trace si disponible
   const stackTrace = typeof error === 'object' && error instanceof Error ? error.stack : null;
+
+  // Formater les détails d'erreur pour l'affichage
+  const formattedDetails = (() => {
+    // Si errorDetails est fourni explicitement, l'utiliser
+    if (errorDetails) {
+      return errorDetails;
+    }
+    
+    // Sinon, essayer d'extraire les détails de l'objet error s'il s'agit d'un objet
+    if (typeof error === 'object' && error !== null) {
+      const extendedError = error as Record<string, any>;
+      return {
+        code: extendedError.code,
+        sqlMessage: extendedError.sqlMessage,
+        sqlState: extendedError.sqlState,
+        errno: extendedError.errno,
+        sql: extendedError.sql,
+        stack: extendedError.stack,
+      };
+    }
+    
+    return {};
+  })();
+
+  // Vérifier si nous avons des détails pertinents à afficher
+  const hasDetails = Object.entries(formattedDetails).some(([_, value]) => 
+    value !== undefined && value !== null
+  );
 
   return (
     <Paper elevation={4} sx={{ 
@@ -75,7 +112,7 @@ const ErrorDisplay: React.FC<ErrorDisplayProps> = ({
         </Typography>
         
         {/* Conditional error details display */}
-        {showFullError && errorDetails && (
+        {showFullError && hasDetails && (
           <Box sx={{ 
             mt: 2, 
             p: 3, 
@@ -88,32 +125,55 @@ const ErrorDisplay: React.FC<ErrorDisplayProps> = ({
             maxHeight: '300px',
             overflow: 'auto'
           }}>
-            {errorDetails.sqlMessage && (
+            {/* Erreurs SQL */}
+            {formattedDetails.sqlMessage && (
               <Box sx={{ mb: 2 }}>
                 <Typography variant="caption" component="div" color="error.dark" sx={{ fontWeight: 'bold' }}>
-                  SQL Message:
+                  Erreur SQL :
                 </Typography>
                 <Typography variant="caption" component="div" sx={{ ml: 1 }}>
-                  {errorDetails.sqlMessage}
+                  {formattedDetails.sqlMessage}
                 </Typography>
               </Box>
             )}
             
-            {errorDetails.code && (
+            {formattedDetails.code && (
               <Box sx={{ mb: 2 }}>
                 <Typography variant="caption" component="div" color="error.dark" sx={{ fontWeight: 'bold' }}>
-                  Code:
+                  Code :
                 </Typography>
                 <Typography variant="caption" component="div" sx={{ ml: 1 }}>
-                  {errorDetails.code}
+                  {formattedDetails.code}
                 </Typography>
               </Box>
             )}
             
-            {errorDetails.sql && (
+            {formattedDetails.errno && (
               <Box sx={{ mb: 2 }}>
                 <Typography variant="caption" component="div" color="error.dark" sx={{ fontWeight: 'bold' }}>
-                  Requête SQL:
+                  Numéro d'erreur :
+                </Typography>
+                <Typography variant="caption" component="div" sx={{ ml: 1 }}>
+                  {formattedDetails.errno}
+                </Typography>
+              </Box>
+            )}
+            
+            {formattedDetails.sqlState && (
+              <Box sx={{ mb: 2 }}>
+                <Typography variant="caption" component="div" color="error.dark" sx={{ fontWeight: 'bold' }}>
+                  État SQL :
+                </Typography>
+                <Typography variant="caption" component="div" sx={{ ml: 1 }}>
+                  {formattedDetails.sqlState}
+                </Typography>
+              </Box>
+            )}
+            
+            {formattedDetails.sql && (
+              <Box sx={{ mb: 2 }}>
+                <Typography variant="caption" component="div" color="error.dark" sx={{ fontWeight: 'bold' }}>
+                  Requête SQL :
                 </Typography>
                 <Typography 
                   variant="caption" 
@@ -128,15 +188,16 @@ const ErrorDisplay: React.FC<ErrorDisplayProps> = ({
                     wordBreak: 'break-word' 
                   }}
                 >
-                  {errorDetails.sql}
+                  {formattedDetails.sql}
                 </Typography>
               </Box>
             )}
             
-            {errorDetails.stack && (
+            {/* Stack Trace */}
+            {formattedDetails.stack && formattedDetails.stack !== stackTrace && (
               <Box sx={{ mb: 2 }}>
                 <Typography variant="caption" component="div" color="error.dark" sx={{ fontWeight: 'bold' }}>
-                  Stack Trace:
+                  Stack Trace :
                 </Typography>
                 <Typography 
                   variant="caption" 
@@ -147,32 +208,41 @@ const ErrorDisplay: React.FC<ErrorDisplayProps> = ({
                     wordBreak: 'break-word' 
                   }}
                 >
-                  {typeof errorDetails.stack === 'string'
-                    ? errorDetails.stack.split('\n').slice(1).join('\n')
-                    : JSON.stringify(errorDetails.stack, null, 2)}
+                  {typeof formattedDetails.stack === 'string'
+                    ? formattedDetails.stack.split('\n').slice(1).join('\n')
+                    : JSON.stringify(formattedDetails.stack, null, 2)}
                 </Typography>
               </Box>
             )}
             
-            {/* Si aucun des champs spécifiques n'est présent, afficher l'objet complet */}
-            {!errorDetails.sqlMessage && !errorDetails.code && !errorDetails.sql && !errorDetails.stack && (
-              <Typography 
-                variant="caption" 
-                component="pre" 
-                sx={{ 
-                  ml: 1, 
-                  whiteSpace: 'pre-wrap', 
-                  wordBreak: 'break-word' 
-                }}
-              >
-                {JSON.stringify(errorDetails, null, 2)}
-              </Typography>
-            )}
+            {/* Autres détails */}
+            {Object.entries(formattedDetails).filter(([key, value]) => 
+              value !== undefined && 
+              value !== null && 
+              !['sqlMessage', 'code', 'errno', 'sqlState', 'sql', 'stack'].includes(key)
+            ).map(([key, value]) => (
+              <Box key={key} sx={{ mb: 2 }}>
+                <Typography variant="caption" component="div" color="error.dark" sx={{ fontWeight: 'bold' }}>
+                  {key.charAt(0).toUpperCase() + key.slice(1)}:
+                </Typography>
+                <Typography 
+                  variant="caption" 
+                  component="pre" 
+                  sx={{ 
+                    ml: 1, 
+                    whiteSpace: 'pre-wrap', 
+                    wordBreak: 'break-word' 
+                  }}
+                >
+                  {typeof value === 'object' ? JSON.stringify(value, null, 2) : String(value)}
+                </Typography>
+              </Box>
+            ))}
           </Box>
         )}
         
         {/* Stack trace display if available */}
-        {stackTrace && showFullError && (
+        {stackTrace && showFullError && !formattedDetails.stack && (
           <Box sx={{ 
             mt: 2, 
             p: 2, 
@@ -215,17 +285,30 @@ const ErrorDisplay: React.FC<ErrorDisplayProps> = ({
             </Button>
           )}
           
-          {(errorDetails || stackTrace) && (
+          {/* N'afficher le bouton que s'il y a des détails à montrer */}
+          {(hasDetails || stackTrace) && (
             <Button
-              variant={showFullError ? "outlined" : "contained"}
-              color={showFullError ? "secondary" : "error"}
+              variant={showFullError ? "outlined" : "outlined"}
               onClick={() => setShowFullError(!showFullError)}
               startIcon={<CodeIcon />}
               fullWidth
-              sx={{ py: 1.5 }}
+              sx={theme => ({
+              py: 1.5,
+              color: showFullError ? theme.palette.secondary.dark : theme.palette.text.primary,
+              borderColor: showFullError ? theme.palette.secondary.dark : undefined,
+              backgroundColor: showFullError
+                ? theme.palette.background.paper
+                : theme.palette.background.paper,
+              '&:hover': {
+                backgroundColor: showFullError
+                ? theme.palette.grey[100]
+                : theme.palette.grey[100],
+                borderColor: theme.palette.secondary.dark,
+              },
+              })}
             >
               <Typography variant="button" fontWeight="bold">
-                {showFullError ? 'Masquer les détails' : 'Voir les détails'}
+              {showFullError ? 'Masquer les détails' : 'Voir les détails'}
               </Typography>
             </Button>
           )}

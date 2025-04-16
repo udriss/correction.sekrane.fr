@@ -38,13 +38,6 @@ import {
   Grid
 } from '@mui/material';
 
-import EditIcon from '@mui/icons-material/Edit';
-import DeleteIcon from '@mui/icons-material/Delete';
-import ArrowBackIcon from '@mui/icons-material/ArrowBack';
-import CheckIcon from '@mui/icons-material/Check';
-import CloseIcon from '@mui/icons-material/Close';
-import MenuBookIcon from '@mui/icons-material/MenuBook';
-import ScienceIcon from '@mui/icons-material/Science';
 import AssignmentIcon from '@mui/icons-material/Assignment';
 import DescriptionIcon from '@mui/icons-material/Description';
 import FormatQuoteIcon from '@mui/icons-material/FormatQuote';
@@ -55,19 +48,19 @@ import GradientBackground from '@/components/ui/GradientBackground';
 import PatternBackground from '@/components/ui/PatternBackground';
 import LoadingSpinner from '@/components/LoadingSpinner';
 import CorrectionHeader from '@/components/corrections/CorrectionHeader';
-import DatePickerSection from '@/components/corrections/DatePickerSection';
 import CorrectionContentEditor from '@/components/corrections/CorrectionContentEditor';
 import ActionButtons from '@/components/corrections/ActionButtons';
-import GradingSection from '@/components/corrections/GradingSection';
-import StatusMessages from '@/components/corrections/StatusMessages';
-import EmailFeedback from '@/components/corrections/EmailFeedback';
 import DuplicateCorrection from '@/components/corrections/DuplicateCorrection';
 import { FragmentsSidebar } from '@/components/fragments';
-import ContentEditor from '@/components/editor/ContentEditor';
+import GradingSectionAutres from '@/components/corrections_autres/GradingSectionAutres';
+import DatePickerSection from '@/components/corrections/DatePickerSection';
+import ErrorDisplay from '@/components/ui/ErrorDisplay';
+import StatusMessages from '@/components/corrections/StatusMessages';
+import ShareModal from '@/app/components/ShareModal';
 
 // Use our custom hooks
 import { useFragments } from '@/lib/hooks/useFragments';
-import { useCorrections } from '@/lib/hooks/useCorrections';
+import { useCorrectionsAutres } from '@/lib/hooks/useCorrectionsAutres';
 
 export default function CorrectionAutreDetail({ params }: { params: Promise<{ id: string }> }) {
   // Unwrap the Promise for params using React.use in client components
@@ -77,93 +70,361 @@ export default function CorrectionAutreDetail({ params }: { params: Promise<{ id
   const router = useRouter();
   const theme = useTheme();
   const { enqueueSnackbar } = useSnackbar();
-
+  const [shareModalOpen, setShareModalOpen] = useState(false)
   // Use our custom hooks
   const fragmentsHook = useFragments();
-  const correctionsHook = useCorrections(correctionId);
+  const correctionsHook = useCorrectionsAutres(correctionId);
 
-  // Local state for this component
+  // Destructure values from correction hook
+  const {
+    correction,
+    contentItems,
+    history,
+    loading,
+    saving,
+    error,
+    successMessage,
+    editedName,
+    isEditingName,
+    confirmingDelete,
+    correctionNotFound,
+    activity,
+    setContentItems,
+    setError,
+    clearError,
+    setSuccessMessage,
+    setEditedName,
+    setIsEditingName,
+    saveToHistory,
+    handleUndo,
+    fetchCorrectionData,
+    handleSaveCorrection,
+    handleSaveName,
+    handleDelete,
+    handleCancelDelete,
+    handleToggleActive,
+    handleChangeStatus,
+    updatePointsEarned,
+    setCorrection,
+    saveDates,
+    setSaving,
+    firstName,
+    lastName,
+    email,
+    setFirstName,
+    setLastName,
+    setEmail,
+    correctionStatus,
+  } = correctionsHook;
+
+  // Local state for this component (uniquement ceux qui ne sont pas fournis par le hook)
   const [renderedHtml, setRenderedHtml] = useState<string>('');
-  const [contentItems, setContentItems] = useState<ContentItem[]>([]);
-  const [newFragmentContent, setNewFragmentContent] = useState('');
-  const [showAddFragment, setShowAddFragment] = useState(false);
   const [copiedMessage, setCopiedMessage] = useState('');
-  const [shareModalOpen, setShareModalOpen] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(true);
-  const [history, setHistory] = useState<ContentItem[][]>([]);
   const [autoSaveActive, setAutoSaveActive] = useState(true);
   const [lastAutoSave, setLastAutoSave] = useState<Date | null>(null);
   const autoSaveTimerRef = useRef<NodeJS.Timeout>();
-
   const [deadlineDate, setDeadlineDate] = useState<dayjs.Dayjs | null>(null);
   const [submissionDate, setSubmissionDate] = useState<dayjs.Dayjs | null>(null);
   const [saveDateTimeout, setSaveDateTimeout] = useState<NodeJS.Timeout | null>(null);
-
-  const [correction, setCorrection] = useState<CorrectionAutre | null>(null);
-  const [activity, setActivity] = useState<ActivityAutre | null>(null);
-  const [student, setStudent] = useState<Student | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-  const [confirmingDelete, setConfirmingDelete] = useState(false);
-  const [isStatusChanging, setIsStatusChanging] = useState(false);
-  const [correctionStatus, setCorrectionStatus] = useState<string>('ACTIVE');
-  const [isActive, setIsActive] = useState<boolean>(true);
-
-  // Add missing state variables
-  const [editedName, setEditedName] = useState('');
-  const [isEditingName, setIsEditingName] = useState(false);
-  const [saving, setSaving] = useState(false);
+  const [saveGradeTimeout, setSaveGradeTimeout] = useState<NodeJS.Timeout | null>(null);
+  // Determine if the correction is active
+  const isActive = correction?.active === 1 || correction?.status === 'ACTIVE';
 
   // Pour le calcul du pourcentage et de la note finale
   const totalPointsEarned = correction?.points_earned?.reduce((sum, points) => sum + points, 0) || 0;
   const totalPossiblePoints = activity?.points?.reduce((sum, points) => sum + points, 0) || 0;
   const percentage = totalPossiblePoints > 0 ? (totalPointsEarned / totalPossiblePoints) * 100 : 0;
 
-  // Fonction pour formater la date
-  const formatDate = (dateString: string | undefined) => {
-    if (!dateString) return 'Non spécifiée';
-    return new Date(dateString).toLocaleDateString('fr-FR');
+  // État pour indiquer si la pénalité est activée
+  const isPenaltyEnabled = correction?.penalty !== undefined && correction?.penalty !== null;
+
+  // Initialiser les dates lorsque correction change
+  useEffect(() => {
+    if (correction) {
+      // Conversion des dates au format dayjs si elles existent
+      setDeadlineDate(correction.deadline ? dayjs(correction.deadline) : null);
+      setSubmissionDate(correction.submission_date ? dayjs(correction.submission_date) : null);
+    }
+  }, [correction]);
+
+  // Fonction de sauvegarde des dates
+  const handleSaveDates = async (deadline: string | null, submissionDate: string | null) => {
+    try {
+      if (!correction) {
+        throw new Error('Correction non trouvée');
+      }
+      
+      setError('');
+      setSaving(true);
+      
+      const response = await fetch(`/api/corrections_autres/${correction.id || correctionId}/dates`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          deadline: deadline,
+          submission_date: submissionDate,
+        }),
+      });
+  
+      if (!response.ok) {
+        const errorData = await response.json();
+        // Créer une instance d'Error et y attacher les détails
+        const error = new Error('Erreur lors de la sauvegarde des dates : ' + (errorData.message || 'Échec de sauvegarde des dates'));
+        (error as any).details = errorData.details || {};
+        setError(error.message);
+        throw error;
+      }
+  
+      const updatedCorrection = await response.json();
+      
+      // Mettre à jour l'état local avec les dates et garder toutes les autres propriétés
+      setCorrection(prev => {
+        if (!prev) return null;
+        return {
+          ...prev,
+          deadline: updatedCorrection.deadline,
+          submission_date: updatedCorrection.submission_date
+        };
+      });
+  
+      setSuccessMessage('Dates sauvegardées avec succès');
+      setTimeout(() => setSuccessMessage(''), 3000);
+      return true;
+    } catch (err: any) {
+      setError(`Erreur lors de la sauvegarde des dates: ${err.message}`);
+      return false;
+    } finally {
+      setSaving(false);
+    }
   };
 
-  useEffect(() => {
-    const fetchCorrectionDetails = async () => {
-      try {
-        setLoading(true);
-
-        // Récupérer les détails de la correction
-        const correctionResponse = await fetch(`/api/corrections_autres/${correctionId}`);
-        if (!correctionResponse.ok) {
-          throw new Error('Erreur lors du chargement de la correction');
+    // Function to update an item's content
+    const updateItem = (index: number, content: string) => {
+      saveToHistory();
+      setContentItems(prevItems => {
+        const newItems = [...prevItems];
+        const item = newItems[index];
+        
+        if (item.isFromFragment && item.content !== content) {
+          newItems[index] = {
+            ...item,
+            content: content,
+            isFromFragment: false,
+            wasFromFragment: true,
+          };
+        } else {
+          newItems[index] = {
+            ...item,
+            content: content
+          };
         }
-        const correctionData = await correctionResponse.json();
-        setCorrection(correctionData);
-
-        // Récupérer les détails de l'activité associée
-        const activityResponse = await fetch(`/api/activities_autres/${correctionData.activity_id}`);
-        if (!activityResponse.ok) {
-          throw new Error('Erreur lors du chargement de l\'activité associée');
-        }
-        const activityData = await activityResponse.json();
-        setActivity(activityData);
-
-        // Récupérer les détails de l'étudiant si disponible
-        if (correctionData.student_id) {
-          const studentResponse = await fetch(`/api/students/${correctionData.student_id}`);
-          if (studentResponse.ok) {
-            const studentData = await studentResponse.json();
-            setStudent(studentData);
-          }
-        }
-      } catch (err) {
-        console.error('Erreur:', err);
-        setError(`Erreur: ${(err as Error).message}`);
-      } finally {
-        setLoading(false);
-      }
+        
+        setTimeout(() => {
+          const updatedHtml = generateHtmlFromItems(newItems);
+          setRenderedHtml(updatedHtml);
+        }, 0);
+        
+        return newItems;
+      });
     };
+  
 
-    fetchCorrectionDetails();
-  }, [correctionId]);
+  // Fonction pour calculer et appliquer la pénalité de retard
+  const calculateAndApplyLatePenalty = (deadlineDate: dayjs.Dayjs, submissionDate: dayjs.Dayjs) => {
+    // Calculer les jours de retard
+    const daysLate = submissionDate.diff(deadlineDate, 'day');
+    
+    // Appliquer la pénalité si plus d'un jour de retard (2 points par jour)
+    if (daysLate > 1) {
+      const calculatedPenalty = Math.min(15, (daysLate - 1) * 2); // Soustraire 1 jour de période de grâce, puis 2 points par jour
+      
+      // Mettre à jour uniquement la pénalité en utilisant l'endpoint dédié
+      handleUpdatePenaltyWithGrade(calculatedPenalty)
+        .then(() => {
+          // Afficher une notification sur la pénalité automatique
+          setSuccessMessage(`Pénalité de ${calculatedPenalty} points appliquée pour ${daysLate} jours de retard (1 jour de grâce accordé)`);
+          setTimeout(() => setSuccessMessage(''), 5000);
+        })
+        .catch(err => {
+          console.error("Erreur lors de l'application de la pénalité:", err);
+          setError("Erreur lors de l'application de la pénalité");
+          setTimeout(() => setError(''), 5000);
+        });
+    } else {
+      // Si la soumission n'est pas en retard ou seulement 1 jour de retard, supprimer toute pénalité automatique existante
+      if (isPenaltyEnabled) {
+        // Mettre uniquement la pénalité à zéro en utilisant l'endpoint dédié
+        handleUpdatePenaltyWithGrade(0)
+          .then(() => {
+            // Afficher une notification sur la suppression de la pénalité
+            const message = daysLate === 1 
+              ? 'Jour de grâce accordé : 1 jour de retard sans pénalité' 
+              : 'Pénalité de retard supprimée car le rendu est à temps';
+            
+            setSuccessMessage(message);
+            setTimeout(() => setSuccessMessage(''), 5000);
+          })
+          .catch(err => {
+            console.error("Erreur lors de la suppression de la pénalité:", err);
+            setError("Erreur lors de la suppression de la pénalité");
+            setTimeout(() => setError(''), 5000);
+          });
+      }
+    }
+  };
+
+  // Fonction qui met à jour à la fois la pénalité et recalcule la note finale
+  const handleUpdatePenaltyWithGrade = async (penaltyValue: number) => {
+    try {
+      if (!correction || !activity) {
+        throw new Error('Données de correction ou d\'activité manquantes');
+      }
+
+      // Récupérer les points actuels
+      const currentPointsEarned = correction.points_earned || [];
+      
+      // Calculer la note totale et finale avec la nouvelle pénalité
+      const totalEarned = currentPointsEarned.reduce((sum, points) => sum + points, 0);
+      
+      // Calculer la note finale selon les règles
+      let finalGrade;
+      if (totalEarned < 5) {
+        // Si note < 5, on garde cette note
+        finalGrade = totalEarned;
+      } else {
+        // Sinon on prend max(note-pénalité, 5)
+        finalGrade = Math.max(totalEarned - penaltyValue, 5);
+      }
+
+      // Envoyer à la fois la pénalité et la note finale mises à jour
+      const response = await fetch(`/api/corrections_autres/${correction.id}/grade`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          points_earned: currentPointsEarned,
+          grade: totalEarned,
+          final_grade: finalGrade,
+          penalty: penaltyValue
+        }),
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to update penalty and grade');
+      }
+      
+      const data = await response.json();
+      
+      // Mettre à jour l'état local avec toutes les valeurs mises à jour
+      setCorrection(prev => {
+        if (!prev) return null;
+        return {
+          ...prev,
+          penalty: penaltyValue,
+          grade: totalEarned,
+          final_grade: finalGrade
+        };
+      });
+      
+      // Émettre un événement pour informer les autres composants
+      const event = new CustomEvent('gradeUpdated', { 
+        detail: { 
+          message: 'Pénalité mise à jour',
+          correction: {
+            penalty: penaltyValue,
+            grade: totalEarned,
+            final_grade: finalGrade
+          }
+        } 
+      });
+      window.dispatchEvent(event);
+      
+      return data;
+    } catch (error) {
+      console.error("Erreur lors de la mise à jour de la pénalité:", error);
+      throw error;
+    }
+  };
+
+  // Gestionnaires de modification de date
+  const handleDeadlineDateChange = (newDate: dayjs.Dayjs | null) => {
+    setDeadlineDate(newDate);
+    
+    // Effacer tout timeout existant
+    if (saveDateTimeout) {
+      clearTimeout(saveDateTimeout);
+    }
+    
+    // Définir un nouveau timeout pour sauvegarder après 1 seconde d'inactivité
+    const timeout = setTimeout(() => {
+      if (correction) {
+        // Utiliser la fonction qui ne touche pas aux notes
+        handleSaveDates(
+          newDate ? newDate.format('YYYY-MM-DD') : null,
+          submissionDate ? submissionDate.format('YYYY-MM-DD') : null
+        ).then(() => {
+          // Calculer la pénalité si les deux dates sont définies
+          if (newDate && submissionDate) {
+            calculateAndApplyLatePenalty(newDate, submissionDate);
+          }
+        });
+      }
+    }, 1000);
+    
+    setSaveDateTimeout(timeout);
+  };
+
+  const handleSubmissionDateChange = (newDate: dayjs.Dayjs | null) => {
+    setSubmissionDate(newDate);
+    
+    // Effacer tout timeout existant
+    if (saveDateTimeout) {
+      clearTimeout(saveDateTimeout);
+    }
+    
+    // Définir un nouveau timeout pour sauvegarder après 1 seconde d'inactivité
+    const timeout = setTimeout(() => {
+      if (correction) {
+        // Utiliser la fonction qui ne touche pas aux notes
+        handleSaveDates(
+          deadlineDate ? deadlineDate.format('YYYY-MM-DD') : null,
+          newDate ? newDate.format('YYYY-MM-DD') : null
+        ).then(() => {
+          // Calculer la pénalité si les deux dates sont définies
+          if (deadlineDate && newDate) {
+            calculateAndApplyLatePenalty(deadlineDate, newDate);
+          }
+        });
+      }
+    }, 1000);
+    
+    setSaveDateTimeout(timeout);
+  };
+
+  // Destructure values from fragment hook
+ const {
+  setSelectedActivityId,
+  fetchFragmentsForActivity,
+  fetchAllActivities,
+  handleAddFragment: addFragment,
+} = fragmentsHook;
+
+
+
+
+  // Initialize data on component mount
+  useEffect(() => {
+    // Fetch activities and correction, then set selected activity to the correction's activity
+    fetchAllActivities();
+    fetchCorrectionData(activityId => {
+      setSelectedActivityId(activityId);
+      fetchFragmentsForActivity(activityId);
+    });
+  }, [fetchAllActivities, fetchCorrectionData, setSelectedActivityId, fetchFragmentsForActivity]);
 
   // Effect to handle auto-save functionality
   useEffect(() => {
@@ -193,50 +454,61 @@ export default function CorrectionAutreDetail({ params }: { params: Promise<{ id
     };
   }, [correction, autoSaveActive, history.length, contentItems]);
 
-  // Function to save current state to history
-  const saveToHistory = () => {
-    setHistory(prev => [...prev, [...contentItems]]);
-  };
+  // Écouter les événements de mise à jour des grades/pénalités
+  useEffect(() => {
+    // Fonction pour mettre à jour la correction à partir des événements
+    const handleGradeUpdate = (event: CustomEvent) => {
+      if (event.detail) {
+        const updateType = event.detail.updateType;
+        const correctionUpdate = event.detail.correction;
 
-  // Function to undo last change
-  const handleUndo = () => {
-    if (history.length > 0) {
-      const previousState = history[history.length - 1];
-      setContentItems(previousState);
-      setHistory(prev => prev.slice(0, -1));
-    }
-  };
+        // Mise à jour partielle (seulement la note ou la pénalité) - pas besoin de recharger les fragments
+        if (updateType === 'gradeOnly' || updateType === 'penaltyOnly') {
+          // Mettre à jour l'objet correction sans recharger la page
+          setCorrection(prev => {
+            if (!prev) return null;
+            return {
+              ...prev,
+              ...correctionUpdate
+            };
+          });
+        } 
+        // Mise à jour complète - pourrait nécessiter de recharger les fragments
+        else {
+          // Mettre à jour l'objet correction sans recharger la page
+          setCorrection(prev => {
+            if (!prev) return null;
+            return {
+              ...prev,
+              ...correctionUpdate
+            };
+          });
+        }
+      }
+    };
+
+    // Gérer les erreurs spécifiques aux notes
+    const handleGradeError = (event: CustomEvent) => {
+      if (event.detail && event.detail.message) {
+        setError(event.detail.message);
+        setTimeout(() => setError(''), 5000);
+      }
+    };
+
+    // Ajouter les écouteurs d'événements
+    window.addEventListener('gradeUpdated', handleGradeUpdate as EventListener);
+    window.addEventListener('penaltyUpdated', handleGradeUpdate as EventListener);
+    window.addEventListener('gradeError', handleGradeError as EventListener);
+    
+    // Nettoyer les écouteurs lors du démontage du composant
+    return () => {
+      window.removeEventListener('gradeUpdated', handleGradeUpdate as EventListener);
+      window.removeEventListener('penaltyUpdated', handleGradeUpdate as EventListener);
+      window.removeEventListener('gradeError', handleGradeError as EventListener);
+    };
+  }, [setCorrection, setError]);
 
   // Function to update an item's content
-  const updateItem = (index: number, content: string) => {
-    saveToHistory();
-    setContentItems(prevItems => {
-      const newItems = [...prevItems];
-      const item = newItems[index];
-      
-      if (item.isFromFragment && item.content !== content) {
-        newItems[index] = {
-          ...item,
-          content: content,
-          isFromFragment: false,
-          wasFromFragment: true,
-        };
-      } else {
-        newItems[index] = {
-          ...item,
-          content: content
-        };
-      }
-      
-      setTimeout(() => {
-        const updatedHtml = generateHtmlFromItems(newItems);
-        setRenderedHtml(updatedHtml);
-      }, 0);
-      
-      return newItems;
-    });
-  };
-
   // Move an item (for drag and drop)
   const moveItem = (dragIndex: number, hoverIndex: number) => {
     saveToHistory();
@@ -312,77 +584,8 @@ export default function CorrectionAutreDetail({ params }: { params: Promise<{ id
     setContentItems(prev => [...prev, ...newItems]);
   };
 
-  // Function to save correction
-  const handleSaveCorrection = async () => {
-    try {
-      // Get the formatted content from contentItems
-      const formattedContent = extractFormattedText(contentItems);
 
-      const response = await fetch(`/api/corrections_autres/${correctionId}`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          content: formattedContent,
-          // Include other fields that need to be updated
-          deadline: deadlineDate?.toISOString(),
-          submission_date: submissionDate?.toISOString(),
-          active: isActive ? 1 : 0,
-          status: correctionStatus
-        }),
-      });
 
-      if (!response.ok) {
-        throw new Error('Failed to save correction');
-      }
-
-      setHistory([]); // Clear history after successful save
-      enqueueSnackbar('Correction sauvegardée avec succès', { variant: 'success' });
-    } catch (error) {
-      console.error('Error saving correction:', error);
-      enqueueSnackbar('Erreur lors de la sauvegarde', { variant: 'error' });
-      throw error;
-    }
-  };
-
-  const handleEditClick = () => {
-    router.push(`/corrections_autres/${correctionId}/edit`);
-  };
-
-  const handleDeleteClick = () => {
-    setConfirmingDelete(true);
-  };
-
-  const handleCancelDelete = () => {
-    setConfirmingDelete(false);
-  };
-
-  const handleConfirmDelete = async () => {
-    try {
-      const response = await fetch(`/api/corrections_autres/${correctionId}`, {
-        method: 'DELETE',
-      });
-      
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Erreur lors de la suppression de la correction');
-      }
-      
-      enqueueSnackbar('Correction supprimée avec succès', { variant: 'success' });
-      
-      // Rediriger vers la page de l'activité
-      if (activity) {
-        router.push(`/activities_autres/${activity.id}?tab=1`);
-      } else {
-        router.push('/activities_autres');
-      }
-    } catch (err) {
-      console.error('Erreur:', err);
-      enqueueSnackbar(`Erreur: ${(err as Error).message}`, { variant: 'error' });
-      setConfirmingDelete(false);
-    }
-  };
 
   // Function to toggle drawer open/close
   const toggleDrawer = () => {
@@ -413,107 +616,6 @@ export default function CorrectionAutreDetail({ params }: { params: Promise<{ id
     );
   };
 
-  // Function to handle name changes
-  const handleSaveName = async () => {
-    try {
-      const response = await fetch(`/api/corrections_autres/${correctionId}`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          name: editedName
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to update name');
-      }
-
-      setIsEditingName(false);
-      setCorrection(prev => prev ? { ...prev, name: editedName } : null);
-      enqueueSnackbar('Nom mis à jour avec succès', { variant: 'success' });
-    } catch (error) {
-      console.error('Error updating name:', error);
-      enqueueSnackbar('Erreur lors de la mise à jour du nom', { variant: 'error' });
-    }
-  };
-
-  // Function to handle deletion
-  const handleDelete = async () => {
-    try {
-      const response = await fetch(`/api/corrections_autres/${correctionId}`, {
-        method: 'DELETE',
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to delete correction');
-      }
-
-      enqueueSnackbar('Correction supprimée avec succès', { variant: 'success' });
-      router.push('/activities_autres');
-    } catch (error) {
-      console.error('Error deleting correction:', error);
-      enqueueSnackbar('Erreur lors de la suppression', { variant: 'error' });
-    }
-  };
-
-  // Function to toggle active status
-  const handleToggleActive = async () => {
-    try {
-      const newActive = !isActive;
-      const response = await fetch(`/api/corrections_autres/${correctionId}`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          active: newActive ? 1 : 0
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to toggle active status');
-      }
-
-      setIsActive(newActive);
-      setCorrection(prev => prev ? { ...prev, active: newActive ? 1 : 0 } : null);
-      enqueueSnackbar('Statut mis à jour avec succès', { variant: 'success' });
-    } catch (error) {
-      console.error('Error toggling active status:', error);
-      enqueueSnackbar('Erreur lors de la mise à jour du statut', { variant: 'error' });
-    }
-  };
-
-  // Function to handle status changes
-  const handleChangeStatus = async (newStatus: string) => {
-    setIsStatusChanging(true);
-    try {
-      const response = await fetch(`/api/corrections_autres/${correctionId}/status`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          status: newStatus
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to update status');
-      }
-
-      setCorrectionStatus(newStatus);
-      setIsActive(newStatus === 'ACTIVE');
-      enqueueSnackbar('Statut mis à jour avec succès', { variant: 'success' });
-    } catch (error) {
-      console.error('Error changing status:', error);
-      enqueueSnackbar('Erreur lors de la mise à jour du statut', { variant: 'error' });
-    } finally {
-      setIsStatusChanging(false);
-    }
-  };
-
   if (loading) {
     return (
       <div className="container max-w-[400px] mx-auto px-4 py-8 flex justify-center">
@@ -522,44 +624,47 @@ export default function CorrectionAutreDetail({ params }: { params: Promise<{ id
     );
   }
 
+  // Utiliser le composant ErrorDisplay avec les paramètres supportés
+  // Plus besoin de transformer l'erreur, le composant ErrorDisplay s'en charge
   if (error) {
     return (
-      <Container maxWidth="md" className="py-8">
-        <Paper className="p-6">
-          <Alert severity="error">
-            <AlertTitle>Erreur</AlertTitle>
-            {error}
-          </Alert>
+      <Container maxWidth="md" sx={{ py: 4 }}>
+        <ErrorDisplay 
+          error={error}
+          withRefreshButton={true}
+          onRefresh={() => {
+            setError('');
+            window.location.reload();
+          }}
+        />
+        <Box sx={{ mt: 2, textAlign: 'center' }}>
           <Button 
             variant="outlined" 
             component={Link} 
             href="/activities_autres" 
-            className="mt-4"
           >
             Retour aux activités
           </Button>
-        </Paper>
+        </Box>
       </Container>
     );
   }
 
   if (!correction || !activity) {
     return (
-      <Container maxWidth="md" className="py-8">
-        <Paper className="p-6">
-          <Alert severity="warning">
-            <AlertTitle>Attention</AlertTitle>
-            Correction non trouvée
-          </Alert>
+      <Container maxWidth="md" sx={{ py: 4 }}>
+        <ErrorDisplay 
+          error="Correction non trouvée"
+        />
+        <Box sx={{ mt: 2, textAlign: 'center' }}>
           <Button 
             variant="outlined" 
             component={Link} 
-            href="/activities_autres" 
-            className="mt-4"
+            href="/activities_autres"
           >
             Retour aux activités
           </Button>
-        </Paper>
+        </Box>
       </Container>
     );
   }
@@ -613,15 +718,14 @@ export default function CorrectionAutreDetail({ params }: { params: Promise<{ id
                     handleDelete={handleDelete}
                     handleCancelDelete={handleCancelDelete}
                     handleToggleActive={handleToggleActive}
-                    firstName={student?.first_name  || ''}
-                    lastName={student?.last_name || ''}
-                    setFirstName={(value) => correctionsHook.setFirstName?.(value)}
-                    setLastName={(value) => correctionsHook.setLastName?.(value)}
-                    email={student?.email || ''}
-                    setEmail={(value) => correctionsHook.setEmail?.(value)}
+                    firstName={firstName  || 'Étudiant'}
+                    lastName={lastName || '#'}
+                    setFirstName={(value) => setFirstName?.(value)}
+                    setLastName={(value) => setLastName?.(value)}
+                    email={email || 'Adresse mail introuvable'}
+                    setEmail={(value) => setEmail?.(value)}
                     correctionStatus={correctionStatus}
                     handleChangeStatus={handleChangeStatus}
-                    isStatusChanging={isStatusChanging}
                   />
                 </GradientBackground>
               </Box>
@@ -644,10 +748,12 @@ export default function CorrectionAutreDetail({ params }: { params: Promise<{ id
                   flexDirection: 'column',
                   borderRight: { xs: 'none', lg: `1px solid ${alpha(theme.palette.divider, 0.3)}` }
                 }}>
+                  {/* Titre de section */}
+                
                   <Box sx={{ display: 'flex', justifyContent:'space-around', gap: 2, mb: 3 }}>
                     <EmailFeedbackAutre 
                       correctionId={correctionId} 
-                      student={student}
+                      student={correction.student_data as Student}
                       points_earned={correction.points_earned}
                       activityName={activity?.name}
                       activity_parts_names={activity?.parts_names}
@@ -657,6 +763,10 @@ export default function CorrectionAutreDetail({ params }: { params: Promise<{ id
                     <DuplicateCorrection correctionId={correctionId} />
                   </Box>
                   
+                  <Typography variant="h6" fontWeight="bold" sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <AssignmentIcon color="secondary" />
+                    Contenu de la correction
+                  </Typography>
                   {/* Content editor component */}
                   <Card sx={{ 
                     flexGrow: 1, 
@@ -698,79 +808,137 @@ export default function CorrectionAutreDetail({ params }: { params: Promise<{ id
                       lastAutoSave={lastAutoSave}
                     />
                   </Box>
-                </Box>
 
-                {/* Content and grading section */}
-                <Box sx={{ mb: 4 }}>
-                  <Typography variant="h6" gutterBottom>
-                    Contenu et notation
+                  {/* Erreur et messages de statut */}
+                  <ErrorDisplay 
+                    error={error} 
+                    onRefresh={() => {
+                  setError('');
+                  window.location.reload();
+                }}
+                  />
+                  
+                  {/* Status messages component */}
+                  <StatusMessages
+                    successMessage={successMessage}
+                    copiedMessage={copiedMessage}
+                    error={''} // Remplacer error par une chaîne vide puisque nous utilisons ErrorDisplay
+                  />
+
+                  {/* Titre de section */}
+                  <Typography variant="h6" fontWeight="bold" sx={{ mt: 4, mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <DescriptionIcon color="secondary" />
+                    Informations et notation
                   </Typography>
-                  <Grid container spacing={3}>
-                    {/* Points earned input fields */}
-                    <Grid size={{ xs: 12 }}>
-                      <Typography variant="subtitle1" gutterBottom>
-                        Points par partie
-                      </Typography>
-                      {activity?.parts_names.map((partName, index) => (
-                        <Box key={index} sx={{ mb: 2 }}>
-                          <Typography variant="body2" color="text.secondary">
-                            {partName} (max: {activity.points[index]} points)
-                          </Typography>
-                          <TextField
-                            type="number"
-                            value={correction.points_earned?.[index] || 0}
-                            onChange={async (e) => {
-                              const newValue = parseFloat(e.target.value);
-                              const newPointsEarned = [...(correction.points_earned || [])];
-                              newPointsEarned[index] = newValue;
-                              
-                              try {
-                                const response = await fetch(`/api/corrections_autres/${correctionId}/points`, {
-                                  method: 'PUT',
-                                  headers: { 'Content-Type': 'application/json' },
-                                  body: JSON.stringify({ points_earned: newPointsEarned })
-                                });
-                                
-                                if (!response.ok) throw new Error('Failed to update points');
-                                
-                                setCorrection(prev => ({
-                                  ...prev!,
-                                  points_earned: newPointsEarned
-                                }));
-                                
-                                enqueueSnackbar('Points mis à jour', { variant: 'success' });
-                              } catch (error) {
-                                console.error('Error updating points:', error);
-                                enqueueSnackbar('Erreur lors de la mise à jour des points', { variant: 'error' });
-                              }
-                            }}
-                            InputProps={{
-                              inputProps: { 
-                                min: 0, 
-                                max: activity.points[index],
-                                step: 0.5
-                              }
-                            }}
-                            size="small"
-                            fullWidth
-                          />
-                        </Box>
-                      ))}
-                    </Grid>
 
-                    {/* Content editor */}
-                    <Grid size={{ xs: 12 }}>
-                      <ContentEditor
-                        correction={correction}
-                        activityName={activity?.name}
-                        activityId={activity?.id}
-                        studentData={student}
-                        studentId={correction.student_id || undefined}
-                        classId={correction.class_id || undefined}
-                        points_earned={correction.points_earned || []}
+                  {/* Container pour les cartes avec position relative pour le CircularProgress */}
+                  <Box sx={{ position: 'relative' }}>
+                    {/* Overlay de chargement global */}
+                    {saving && (
+                      <Box
+                        sx={{
+                          position: 'absolute',
+                          top: 0,
+                          left: 0,
+                          right: 0,
+                          bottom: 0,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          backgroundColor: theme => alpha(theme.palette.background.paper, 0.7),
+                          zIndex: 5,
+                          borderRadius: 2,
+                          backdropFilter: 'blur(2px)'
+                        }}
+                      >
+                        <CircularProgress size={50} thickness={4} />
+                      </Box>
+                    )}
+
+                    {/* Date picker section */}
+                    <Card sx={{ 
+                      p: 3, 
+                      borderRadius: 2,
+                      mb: 3,
+                      border: '1px solid',
+                      borderColor: alpha(theme.palette.primary.main, 0.2)
+                    }}>
+                      <DatePickerSection
+                        deadlineDate={deadlineDate}
+                        submissionDate={submissionDate}
+                        handleDeadlineDateChange={handleDeadlineDateChange}
+                        handleSubmissionDateChange={handleSubmissionDateChange}
+                        saving={false} /* Désactive le CircularProgress local */
                       />
-                    </Grid>
-                  </Grid>
+                    </Card>
+
+                    {/* Grading section component */}
+                    <Card sx={{ 
+                      p: 3, 
+                      borderRadius: 2,
+                      border: '1px solid',
+                      borderColor: alpha(theme.palette.primary.main, 0.2)
+                    }}>
+                      <GradingSectionAutres
+                        pointsEarned={correction.points_earned || []}
+                        totalPoints={activity.points || []}
+                        partNames={activity.parts_names || []}
+                        isPenaltyEnabled={correction.penalty !== undefined && correction.penalty !== null}
+                        penalty={correction.penalty?.toString() || '0'}
+                        setPointsEarned={(index, value) => {
+                          const newPointsEarned = [...(correction.points_earned || [])];
+                          newPointsEarned[index] = value;
+                          updatePointsEarned(newPointsEarned);
+                        }}
+                        setPenalty={(value) => {
+                          setCorrection(prev => ({
+                            ...prev!,
+                            penalty: parseFloat(value)
+                          }));
+                        }}
+                        saveGradeTimeout={saveGradeTimeout}
+                        setSaveGradeTimeout={setSaveGradeTimeout}
+                        correction={correction}
+                        saving={false} /* Désactive le CircularProgress local */
+                        setSaving={(value) => {
+                          // Réutiliser la fonction setSaving du hook ou la simuler si non disponible
+                          if (correctionsHook.setSaving) {
+                            correctionsHook.setSaving(value);
+                          } else {
+                            // Fallback en utilisant l'état local
+                            // Cette partie est exécutée seulement si setSaving n'est pas disponible dans le hook
+                          }
+                        }}
+                        // Fonction pour mettre à jour uniquement la pénalité
+                        handleUpdatePenalty={async (penaltyValue) => {
+                          try {
+                            const response = await fetch(`/api/corrections_autres/${correction.id}/penalty`, {
+                              method: 'PUT',
+                              headers: {
+                                'Content-Type': 'application/json',
+                              },
+                              body: JSON.stringify({
+                                penalty: penaltyValue
+                              }),
+                            });
+                            
+                            if (!response.ok) throw new Error('Failed to update penalty');
+                            
+                            // Mettre à jour l'état local
+                            setCorrection(prev => ({
+                              ...prev!,
+                              penalty: penaltyValue
+                            }));
+                            
+                            return await response.json();
+                          } catch (error) {
+                            console.error("Erreur lors de la mise à jour de la pénalité:", error);
+                            throw error;
+                          }
+                        }}
+                      />
+                    </Card>
+                  </Box>
                 </Box>
 
                 {/* Colonne latérale - Fragments */}
@@ -786,7 +954,7 @@ export default function CorrectionAutreDetail({ params }: { params: Promise<{ id
                     Fragments et modèles
                   </Typography>
                   <FragmentsSidebar 
-                    correction={correction}
+                    correctionActivityId={correction.activity_id}
                     onAddFragmentToCorrection={handleAddFragmentToCorrection}
                     inCorrectionContext={true}
                   />
@@ -815,7 +983,7 @@ export default function CorrectionAutreDetail({ params }: { params: Promise<{ id
                     <IconButton onClick={toggleDrawer} size="small"><ChevronRightIcon /></IconButton>
                   </Box>
                   <FragmentsSidebar 
-                    correction={correction}
+                    correctionActivityId={correction.activity_id}
                     onAddFragmentToCorrection={handleAddFragmentToCorrection}
                     inCorrectionContext={true}
                   />
@@ -847,6 +1015,13 @@ export default function CorrectionAutreDetail({ params }: { params: Promise<{ id
               </Box>
             </Paper>
           </Zoom>
+
+          {/* Share modal */}
+          <ShareModal
+            open={shareModalOpen}
+            onClose={() => setShareModalOpen(false)}
+            correctionId={correctionId}
+          />
         </Container>
       </LocalizationProvider>
     </DndProvider>

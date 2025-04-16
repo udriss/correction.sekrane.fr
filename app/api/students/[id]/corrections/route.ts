@@ -45,16 +45,16 @@ export async function GET(
         `SELECT 
            c.*,
            a.name AS activity_name, 
-           a.experimental_points, 
-           a.theoretical_points,
+           a.points,
+           a.parts_names,
            cl.name AS class_name,
            s.first_name AS student_first_name,
            s.last_name AS student_last_name,
            CONCAT(s.first_name, ' ', s.last_name) AS student_name
          FROM 
-           corrections c
+           corrections_autres c
          LEFT JOIN 
-           activities a ON c.activity_id = a.id
+           activities_autres a ON c.activity_id = a.id
          LEFT JOIN
            classes cl ON c.class_id = cl.id
          LEFT JOIN
@@ -90,6 +90,31 @@ export async function GET(
           }
         }
 
+        // Parser les points et parts_names qui sont stockés en JSON dans la base de données
+        let points = [];
+        try {
+          points = correction.points ? correction.points : [];
+        } catch (e) {
+          console.error("Erreur lors du parsing des points:", e);
+          points = [];
+        }
+
+        let partsNames = [];
+        try {
+          partsNames = correction.parts_names ? correction.parts_names : [];
+        } catch (e) {
+          console.error("Erreur lors du parsing des parts_names:", e);
+          partsNames = [];
+        }
+
+        let pointsEarned = [];
+        try {
+          pointsEarned = correction.points_earned ? correction.points_earned : [];
+        } catch (e) {
+          console.error("Erreur lors du parsing des points_earned:", e);
+          pointsEarned = [];
+        }
+
         return {
           id: correction.id,
           activity_id: correction.activity_id,
@@ -101,8 +126,10 @@ export async function GET(
           penalty: correction.penalty,
           deadline: correction.deadline,
           submission_date: correction.submission_date,
-          experimental_points_earned: correction.experimental_points_earned,
-          theoretical_points_earned: correction.theoretical_points_earned,
+          points: points,
+          parts_names: partsNames,
+          points_earned: pointsEarned,
+          final_grade: correction.final_grade,
           group_id: correction.group_id,
           class_id: correction.class_id,
           student_id: correction.student_id,
@@ -110,9 +137,7 @@ export async function GET(
           student_first_name: correction.student_first_name || '',
           student_last_name: correction.student_last_name || '',
           activity_name: correction.activity_name || 'Activité inconnue',
-          class_name: correction.class_name || 'Sans classe',
-          experimental_points: correction.experimental_points || 0,
-          theoretical_points: correction.theoretical_points || 0
+          class_name: correction.class_name || 'Sans classe'
         };
       });
       
@@ -120,8 +145,23 @@ export async function GET(
     });
   } catch (error) {
     console.error('Erreur lors de la récupération des corrections:', error);
+    let errorMessage = '';
+    let errorDetails = '';
+    
+    
+    if (error instanceof Error) {
+      errorMessage = error.message;
+      errorDetails = error.stack || '';
+    } else if (typeof error === 'string') {
+      errorMessage = error;
+    }
     return NextResponse.json(
-      { error: 'Erreur lors de la récupération des corrections', details: String(error) },
+      { 
+        error: error,
+        details: errorDetails,
+        status: 500,
+        statusText: 'Internal Server Error'
+      }, 
       { status: 500 }
     );
   }

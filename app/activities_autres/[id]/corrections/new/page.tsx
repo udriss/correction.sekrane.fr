@@ -1,7 +1,6 @@
 'use client';
 
-import React from 'react';
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { ActivityAutre } from '@/lib/types';
 import { 
@@ -10,7 +9,6 @@ import {
   Box, 
   Alert, 
   CircularProgress, 
-  TextField,
   Button,
   IconButton,
   FormControl,
@@ -55,8 +53,15 @@ export default function NewCorrectionAutrePage({ params }: { params: Promise<{ i
   const [error, setError] = useState('');
   const router = useRouter();
   const [classId, setClassId] = useState<number | null>(null);
-  const [activityClasses, setActivityClasses] = useState<any[]>([]);
-  const [unassociatedClasses, setUnassociatedClasses] = useState<any[]>([]);
+  
+  // Correction du typage pour inclure la propriété nbre_subclasses
+  interface ClassWithSubclasses {
+    id: number;
+    name: string;
+    nbre_subclasses?: number;
+  }
+  const [activityClasses, setActivityClasses] = useState<ClassWithSubclasses[]>([]);
+  const [unassociatedClasses, setUnassociatedClasses] = useState<ClassWithSubclasses[]>([]);
   const [filteredStudents, setFilteredStudents] = useState<Student[]>([]);
   const [originalStudents, setOriginalStudents] = useState<Student[]>([]);
   const [showConfirmation, setShowConfirmation] = useState(false);
@@ -100,7 +105,7 @@ export default function NewCorrectionAutrePage({ params }: { params: Promise<{ i
         
         // 1. Récupérer les classes associées à cette activité
         const associatedClassesResponse = await fetch(`/api/activities_autres/${activityId}/classes`);
-        let associatedClasses: any[] = [];
+        let associatedClasses: { id: number; name: string }[] = [];
         
         if (associatedClassesResponse.ok) {
           associatedClasses = await associatedClassesResponse.json();
@@ -115,7 +120,7 @@ export default function NewCorrectionAutrePage({ params }: { params: Promise<{ i
           
           // Identifier les classes non associées
           const associatedIds = new Set(associatedClasses.map(c => c.id));
-          const unassociated = allClasses.filter((c: any) => !associatedIds.has(c.id));
+          const unassociated = allClasses.filter((c: { id: number; name: string }) => !associatedIds.has(c.id));
           
           setUnassociatedClasses(unassociated);
         }
@@ -235,7 +240,7 @@ export default function NewCorrectionAutrePage({ params }: { params: Promise<{ i
     e.preventDefault();
     
     // Vérifications préalables à la soumission
-    let warnings = [];
+    const warnings = [];
     
     if (!classId) {
       warnings.push("Aucune classe n'est sélectionnée. La correction sera ajoutée sans association à une classe.");
@@ -299,7 +304,12 @@ export default function NewCorrectionAutrePage({ params }: { params: Promise<{ i
       await new Promise(resolve => setTimeout(resolve, 1000));
       
       // Inclure la sous-classe dans la requête si elle est définie
-      const requestData: any = { 
+      const requestData: {
+        student_id: number | null;
+        class_id: number | null;
+        content: string;
+        sub_class?: string;
+      } = { 
         student_id: studentId,
         class_id: classId,
         content: '' 
@@ -373,7 +383,7 @@ export default function NewCorrectionAutrePage({ params }: { params: Promise<{ i
               </Typography>
             </Box>
             <Alert severity="warning" sx={{ mb: 3 }}>
-              L'activité demandée n'existe pas ou a été supprimée.
+              L&apos;activité demandée n&apos;existe pas ou a été supprimée.
             </Alert>
             <Button
               variant="outlined"

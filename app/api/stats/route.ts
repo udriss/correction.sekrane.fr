@@ -26,6 +26,9 @@ export async function GET(request: NextRequest) {
     const studentId = url.searchParams.get('studentId');
     const showInactive = url.searchParams.get('showInactive') === 'true';
     
+    // Condition pour filtrer les corrections inactives
+    const activeCondition = showInactive ? '' : "c.status = 'ACTIVE'";
+    
     // Create filter objects for different queries
     const filters = {
       classId,
@@ -34,9 +37,6 @@ export async function GET(request: NextRequest) {
       studentId,
       showInactive
     };
-
-    // Condition pour filtrer les corrections inactives
-    const activeCondition = showInactive ? '' : 'c.active = 1';
 
     // 1. Récupération des statistiques globales des corrections
     // For global stats, we need to join with other tables to apply class filter
@@ -60,7 +60,7 @@ export async function GET(request: NextRequest) {
 
     // Ajout du filtre d'activité
     if (!showInactive) {
-      globalWhereConditions.push('c.active = 1');
+      globalWhereConditions.push("c.status = 'ACTIVE'");
     }
 
     // For global stats, we need to add joins if filtering by class
@@ -117,7 +117,7 @@ export async function GET(request: NextRequest) {
 
     // Ajout du filtre d'activité
     if (!showInactive) {
-      gradeDistWhereConditions.push('c.active = 1');
+      gradeDistWhereConditions.push("c.status = 'ACTIVE'");
     }
 
     // Add joins if filtering by class
@@ -187,7 +187,7 @@ export async function GET(request: NextRequest) {
 
     // Filtre pour les corrections actives
     if (!showInactive) {
-      activityWhereConditions.push('(c.active = 1 OR c.active IS NULL)');
+      activityWhereConditions.push("(c.status = 'ACTIVE' OR c.status IS NULL)");
     }
 
     // Add joins if filtering by class
@@ -252,7 +252,7 @@ export async function GET(request: NextRequest) {
 
     // Filtre pour les corrections actives
     if (!showInactive) {
-      classWhereConditions.push('(c.active = 1 OR c.id IS NULL)');
+      classWhereConditions.push("(c.status = 'ACTIVE' OR c.id IS NULL)");
     }
 
     if (classId) {
@@ -304,7 +304,7 @@ export async function GET(request: NextRequest) {
 
     // Filtre pour les corrections actives
     if (!showInactive) {
-      gradeEvolWhereConditions.push('c.active = 1');
+      gradeEvolWhereConditions.push("c.status = 'ACTIVE'");
     }
 
     // Add joins if filtering by class
@@ -361,7 +361,7 @@ export async function GET(request: NextRequest) {
 
     // Filtre pour les corrections actives
     if (!showInactive) {
-      topActWhereConditions.push('c.active = 1');
+      topActWhereConditions.push("c.status = 'ACTIVE'");
     }
 
     // Add joins if filtering by class
@@ -459,7 +459,7 @@ export async function GET(request: NextRequest) {
     let inactiveCountQuery = `
       SELECT COUNT(*) as count
       FROM corrections
-      WHERE active = 0
+      WHERE status = 'DEACTIVATED'
     `;
     
     let inactiveCountParams: any[] = [];

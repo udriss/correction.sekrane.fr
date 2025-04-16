@@ -732,7 +732,7 @@ const NotesTab: React.FC<NotesTabProps> = ({
       // Regrouper les étudiants (lignes) et les activités (colonnes)
       const studentMap: Record<string, Record<string, any>> = {};
       const activitySet = new Set<string>();
-      console.log('corrections', corrections);
+      
       corrections.forEach(c => {
         const student = getStudentById(c.student_id);
         const activity = getActivityById(c.activity_id);

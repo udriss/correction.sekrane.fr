@@ -56,17 +56,19 @@ export const SearchAndFilterBar: React.FC<SearchAndFilterBarProps> = ({
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             onKeyDown={(e) => { if (e.key === 'Enter') handleSearch(); }}
-            InputProps={{
-              startAdornment: <SearchIcon fontSize="small" sx={{ mr: 1, color: 'text.secondary' }} />,
-              endAdornment: (
-                <IconButton 
-                  size="small" 
-                  onClick={handleSearch}
-                  sx={{ ml: -1 }}
-                >
-                  <SearchIcon fontSize="small" />
-                </IconButton>
-              )
+            slotProps={{
+              input: { 
+                startAdornment: <SearchIcon fontSize="small" sx={{ mr: 1, color: 'text.secondary' }} />,
+                endAdornment: (
+                  <IconButton 
+                    size="small" 
+                    onClick={handleSearch}
+                    sx={{ ml: -1 }}
+                  >
+                    <SearchIcon fontSize="small" />
+                  </IconButton>
+                )
+                }
             }}
             fullWidth
           />

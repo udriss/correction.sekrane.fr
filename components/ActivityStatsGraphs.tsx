@@ -23,8 +23,6 @@ import {
   FormControlLabel,
   Switch,
   Button,
-  RadioGroup,
-  Radio
 } from '@mui/material';
 import ClearIcon from '@mui/icons-material/Clear';
 import ViewAgendaIcon from '@mui/icons-material/ViewAgenda';
@@ -141,9 +139,14 @@ const ActivityStatsGraphs: React.FC<ActivityStatsGraphsProps> = ({ activityId })
 
     try {
       // Fetch associated classes for this activity
-      const classesResponse = await fetch(`/api/activities/${activityId}/classes`);
+      const classesResponse = await fetch(`/api/activities_autres/${activityId}/classes`);
       if (!classesResponse.ok) {
-        throw new Error('Failed to fetch classes');
+        const errorData = await classesResponse.json().catch(() => ({ error: 'Erreur lors du chargement des classes' }));
+        // Créer une instance d'Error et y attacher les détails
+        const error = new Error('Erreur lors du chargement des classes : ' + errorData.error || 'Erreur lors du chargement des classes');
+        (error as any).details = errorData.details || {};
+        setError(error.message);
+        throw error;
       }
       
       let classesData;
@@ -157,11 +160,17 @@ const ActivityStatsGraphs: React.FC<ActivityStatsGraphsProps> = ({ activityId })
         console.error('Error parsing classes data:', error);
         setClasses([]);
       }
+      
 
       // Fetch groups for this activity (manual grouping)
-      const groupsResponse = await fetch(`/api/activities/${activityId}/groups`);
+      const groupsResponse = await fetch(`/api/activities_autres/${activityId}/groups`);
       if (!groupsResponse.ok) {
-        throw new Error('Failed to fetch groups');
+        const errorData = await groupsResponse.json().catch(() => ({ error: 'Erreur lors du chargement des groupes' }));
+        // Créer une instance d'Error et y attacher les détails
+        const error = new Error('Erreur lors du chargement des groupes : ' + errorData.error || 'Erreur lors du chargement des groupes');
+        (error as any).details = errorData.details || {};
+        setError(error.message);
+        throw error;
       }
       
       let groupsData;
@@ -208,27 +217,25 @@ const ActivityStatsGraphs: React.FC<ActivityStatsGraphsProps> = ({ activityId })
 
       // Fetch grade statistics for this activity with all categorization
       const statsResponse = await fetch(
-        `/api/activities/${activityId}/stats?includeInactive=${includeInactive}`
+        `/api/activities_autres/${activityId}/statsGroups?includeInactive=${includeInactive}`
       );
       if (!statsResponse.ok) {
-        const errorData = await statsResponse.json();
-        throw new Error(
-          errorData.details?.message || 
-          errorData.error || 
-          'Failed to fetch statistics'
-        );
+        const errorData = await statsResponse.json().catch(() => ({ error: 'Erreur lors du chargement des statistiques' }));
+        // Créer une instance d'Error et y attacher les détails
+        const error = new Error('Erreur lors du chargement des statistiques : ' + errorData.error || 'Erreur lors du chargement des statistiques');
+        (error as any).details = errorData.details || {};
+        setError(error.message);
+        throw error;
       }
       
       let statsData;
       try {
         statsData = await statsResponse.json();
-        if (!Array.isArray(statsData)) {
-          statsData = [];
-        }
+
         
         // Make sure we have the "Sans groupe" category if needed
-        const noGroupStats = statsData.find(stat => stat.groupId === 0);
-        if (!noGroupStats && statsData.some(stat => stat.groupId === 0)) {
+        const noGroupStats = statsData.find((stat: GradeStats) => stat.groupId === 0);
+        if (!noGroupStats && statsData.some((stat: GradeStats) => stat.groupId === 0)) {
           statsData.push({
             groupId: 0,
             groupName: 'Sans groupe',
@@ -679,9 +686,8 @@ const ActivityStatsGraphs: React.FC<ActivityStatsGraphsProps> = ({ activityId })
   const totalCorrections = filteredStats.reduce((acc, stat) => acc + stat.count, 0);
 
   return (
-    <Card>
-      <CardContent sx={{ p: 3 }}>
-        <Box sx={{ mb: 3 }}>
+    <Box sx={{ mb: 3 }}>
+        <Box >
           <Typography variant="body2" color="text.secondary">
             Les statistiques incluent {totalCorrections} notes au total.
             Moyenne générale: {calculateOverallAverage()}/20.
@@ -987,8 +993,7 @@ const ActivityStatsGraphs: React.FC<ActivityStatsGraphsProps> = ({ activityId })
             </Grid>
           )}
         </Grid>
-      </CardContent>
-    </Card>
+    </Box>
   );
 };
 

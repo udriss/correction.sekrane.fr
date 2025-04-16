@@ -1,44 +1,27 @@
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import {
-  Container, Paper, Typography, Box, Chip, Button, 
-  IconButton, Menu, MenuItem, TextField, FormControl,
-  InputLabel, Select, Badge, Divider, ListItemIcon, ListItemText,
-  SelectChangeEvent, InputAdornment, Tabs, Tab, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle,
-  ToggleButton, ToggleButtonGroup
+  Container, Paper, Typography, Box, Chip, Button, Menu, MenuItem, TextField, FormControl,
+  InputLabel, Select, ListItemIcon, ListItemText,
+   Tabs, Tab, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle,
 } from '@mui/material';
 import Grid from '@mui/material/Grid';
 import { useSnackbar } from 'notistack';
-import { CorrectionAutre, CorrectionAutreWithShareCode, ActivityAutre } from '@/lib/types';
+import { ActivityAutre } from '@/lib/types';
 import { Student as BaseStudent } from '@/lib/types';
-import ExportPDFComponentAllCorrections from '@/components/pdf/ExportPDFComponentAllCorrections';
+
 
 // Icons
-import SearchIcon from '@mui/icons-material/Search';
 import FilterAltIcon from '@mui/icons-material/FilterAlt';
 import SortIcon from '@mui/icons-material/Sort';
 import GradeIcon from '@mui/icons-material/Grade';
 import AssignmentIcon from '@mui/icons-material/Assignment';
 import CalendarIcon from '@mui/icons-material/CalendarToday';
-import SchoolIcon from '@mui/icons-material/School';
-import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward';
-import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward';
-import VisibilityIcon from '@mui/icons-material/Visibility';
-import GroupIcon from '@mui/icons-material/Group';
-import DeleteIcon from '@mui/icons-material/Delete';
-import CheckIcon from '@mui/icons-material/Check';
-import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
-import RecentActorsIcon from '@mui/icons-material/RecentActors';
 import { alpha, useTheme } from '@mui/material/styles';
-
-import ErrorDisplay from '@/components/ui/ErrorDisplay';
 import GradientBackground from '@/components/ui/GradientBackground';
 import PatternBackground from '@/components/ui/PatternBackground';
-import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
-import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
-import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import dayjs from 'dayjs';
 
 // Custom hooks and providers
@@ -52,26 +35,7 @@ import StudentsListAutres from '@/components/allCorrectionsAutres/StudentsListAu
 import ChronologyListAutres from '@/components/allCorrectionsAutres/ChronologyListAutres';
 import ExportPDFComponentAllCorrectionsAutres from '@/components/pdf/ExportPDFComponentAllCorrectionsAutres';
 
-interface MetaData {
-  activities: ActivityAutre[];
-  students: BaseStudent[];
-  classes: {
-    id: number;
-    name: string;
-  }[];
-}
 
-interface Filters {
-  search: string;
-  classId: string;
-  studentId: string;
-  activityId: string;
-  dateFrom: dayjs.Dayjs | null;
-  dateTo: dayjs.Dayjs | null;
-  minGrade?: string;
-  maxGrade?: string;
-  correctionId?: string;
-}
 
 export default function CorrectionsAutresPage() {
   const searchParams = useSearchParams();
@@ -308,7 +272,7 @@ function CorrectionsContent() {
       const activity = metaData.activities.find(a => a.id === correction.activity_id);
       const student = metaData.students.find(s => s.id === correction.student_id);
       const classInfo = metaData.classes.find(c => c.id === correction.class_id);
-
+      
       // Calculate total points and grade
       const totalPoints = activity ? activity.points.reduce((sum, p) => sum + p, 0) : 20;
       const earnedPoints = correction.points_earned ? correction.points_earned.reduce((sum, p) => sum + p, 0) : 0;
@@ -323,12 +287,13 @@ function CorrectionsContent() {
         theoretical_points_earned: 0,
         grade: calculatedGrade,
         score_percentage: (calculatedGrade / 20) * 100,
-        status: correction.active === 1 ? 'ACTIVE' : 'INACTIVE'
       };
     });
   }, [filteredCorrections, metaData]);
 
-  console.log('adaptedCorrections', adaptCorrections);
+  
+
+  
   return (
     <Container maxWidth="lg" sx={{ py: 4 }}>
       {/* Header */}

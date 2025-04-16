@@ -16,8 +16,10 @@ import {
   Tooltip,
   Divider,
   Chip,
-  Alert
+  Alert,
+  Stack
 } from '@mui/material';
+import { grey } from '@mui/material/colors';
 import Grid from '@mui/material/Grid';
 
 import AddIcon from '@mui/icons-material/Add';
@@ -27,20 +29,24 @@ import SearchIcon from '@mui/icons-material/Search';
 import FilterListIcon from '@mui/icons-material/FilterList';
 import CheckIcon from '@mui/icons-material/Check';
 import CloseIcon from '@mui/icons-material/Close';
+import LocalOfferIcon from '@mui/icons-material/LocalOffer';
+import SortIcon from '@mui/icons-material/Sort';
 
-// Import the existing FragmentEditModal component and its Fragment type
-import FragmentEditModal, { Fragment as EditModalFragment } from '@/components/FragmentEditModal';
 
-// Use the imported Fragment type for consistency
-type Fragment = EditModalFragment;
+import FragmentEditModal from '@/components/FragmentEditModal';
+
+import PositionModal from '@/components/fragments/PositionModal';
+import { Fragment } from '@/lib/types';
+
+
 
 // Update the props interface to match the imported Fragment type
 interface FragmentsListProps {
   fragments: Fragment[];
   activityId: number;
   // Props d'origine
-  onAddFragment?: (fragmentData: Omit<EditModalFragment, 'id' | 'activity_id' | 'created_at' | 'updated_at'>) => Promise<void>;
-  onUpdateFragment?: (id: number, fragmentData: Partial<EditModalFragment>) => Promise<void>;
+  onAddFragment?: (fragmentData: Omit<Fragment, 'id' | 'activity_id' | 'created_at' | 'updated_at'>) => Promise<void>;
+  onUpdateFragment?: (id: number, fragmentData: Partial<Fragment>) => Promise<void>;
   onDeleteFragment?: (id: number) => Promise<void>;
   // Nouvelles props
   onUpdate?: (activityId: string | number) => Promise<void>;
@@ -71,11 +77,32 @@ const FragmentsList: React.FC<FragmentsListProps> = ({
   const [editingFragment, setEditingFragment] = useState<Fragment | null>(null);
   const [fragmentToDelete, setFragmentToDelete] = useState<number | null>(null);
   const [isProcessingDelete, setIsProcessingDelete] = useState(false);
+  
+  // État pour le modal de position
+  const [positionModalOpen, setPositionModalOpen] = useState(false);
+  const [fragmentForPosition, setFragmentForPosition] = useState<Fragment | null>(null);
 
   // Categories and activities
-  const [categories, setCategories] = useState<string[]>(['Expérimental', 'Théorique', 'Général']);
+  const [categories, setCategories] = useState<Array<{id: number, name: string}>>([]);
   const [activities, setActivities] = useState<{id: number, name: string}[]>([]);
   
+  // Fetch categories from API
+  useEffect(() => {
+    const fetchCategories = async () => {
+      try {
+        const response = await fetch('/api/categories');
+        if (response.ok) {
+          const categoriesData = await response.json();
+          setCategories(categoriesData);
+        }
+      } catch (error) {
+        console.error('Failed to fetch categories:', error);
+      }
+    };
+    
+    fetchCategories();
+  }, []);
+
   // Filter state
   const [searchQuery, setSearchQuery] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('all');
@@ -85,7 +112,7 @@ const FragmentsList: React.FC<FragmentsListProps> = ({
   useEffect(() => {
     const fetchActivities = async () => {
       try {
-        const response = await fetch('/api/activities');
+        const response = await fetch('/api/activities_autres');
         if (response.ok) {
           const activitiesData = await response.json();
           setActivities(activitiesData.map((activity: any) => ({
@@ -135,16 +162,16 @@ const FragmentsList: React.FC<FragmentsListProps> = ({
     setEditModalOpen(true);
   };
 
-  const handleSaveFragment = async (fragment: EditModalFragment): Promise<void> => {
+  const handleSaveFragment = async (fragment: Fragment): Promise<void> => {
     if (editingFragment) {
       const { content, category } = fragment;
       if (onUpdateFragment) {
-        await onUpdateFragment(editingFragment.id, { content, category } as Partial<EditModalFragment>);
+        await onUpdateFragment(editingFragment.id, { content, category } as Partial<Fragment>);
       }
     } else {
       const { content, category } = fragment;
       if (onAddFragment) {
-        await onAddFragment({ content, category } as Omit<EditModalFragment, 'id' | 'activity_id' | 'created_at' | 'updated_at'>);
+        await onAddFragment({ content, category } as Omit<Fragment, 'id' | 'activity_id' | 'created_at' | 'updated_at'>);
       }
     }
     setEditModalOpen(false);
@@ -181,6 +208,20 @@ const FragmentsList: React.FC<FragmentsListProps> = ({
     }
   };
 
+  // Handler pour ouvrir le modal de position
+  const handleOpenPositionModal = (fragment: Fragment) => {
+    setFragmentForPosition(fragment);
+    setPositionModalOpen(true);
+  };
+
+  // Handler pour gérer la mise à jour des positions
+  const handlePositionSuccess = async (updatedFragments: any[]) => {
+    // Si onUpdate est fourni, utiliser le pour actualiser la liste des fragments
+    if (onUpdate) {
+      await onUpdate(activityId);
+    }
+  };
+
   // Get unique categories from fragments for the filter
   const getUniqueCategories = () => {
     const uniqueCategories = new Set<string>();
@@ -214,8 +255,12 @@ const FragmentsList: React.FC<FragmentsListProps> = ({
             size="small"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            InputProps={{
-              startAdornment: <SearchIcon fontSize="small" sx={{ mr: 1, color: 'text.secondary' }} />
+            slotProps={{
+              input: { 
+                startAdornment: (
+                  <SearchIcon fontSize="small" sx={{ mr: 1, color: 'text.secondary' }} />
+                ),
+               }
             }}
             sx={{ flexGrow: 1 }}
           />
@@ -277,21 +322,60 @@ const FragmentsList: React.FC<FragmentsListProps> = ({
         ) : (
           filteredFragments.map(fragment => (
             <Grid size={{ xs: 12, sm: 6, md: 4 }} key={fragment.id}>
-              <Card variant="outlined" sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-                {/* Category chip in top right */}
-                <Box sx={{ position: 'relative', pt: 1, px: 2 }}>
-                  <Chip 
-                    label={fragment.category || 'Général'} 
-                    size="small" 
-                    color="primary" 
-                    variant="outlined"
-                    sx={{ position: 'absolute', top: 8, right: 8 }}
-                  />
-                </Box>
-                <CardContent sx={{ flexGrow: 1, pt: 3 }}>
-                  <Typography variant="body1" sx={{ whiteSpace: 'pre-wrap' }}>
+              <Card variant="outlined" sx={{ height: '100%', display: 'flex', flexDirection: 'column', position: 'relative' }}>
+                <CardContent sx={{ flexGrow: 1, pt: 5 }}>
+                  {/* Texte tronqué avec ... si trop long */}
+                  <Typography variant="body1" sx={{ 
+                    whiteSpace: 'pre-wrap',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    display: '-webkit-box',
+                    WebkitLineClamp: 4,
+                    WebkitBoxOrient: 'vertical'
+                  }}>
                     {fragment.content}
                   </Typography>
+                  
+                  {/* Afficher les tags s'il y en a */}
+                  <Stack direction="row" spacing={1} sx={{ mt: 2, flexWrap: 'wrap', gap: 1 }}>                   
+                    {/* Chip cliquable pour la position */}
+                    <Box sx={{ position: 'absolute', top: 8, right: 8 }}>
+                      <Tooltip title="Modifier la position">
+                        <Chip
+                          size="small"
+                          icon={<SortIcon />}
+                          label={`Pos: ${fragment.position_order || 0}`}
+                          variant="filled"
+                          color="primary"
+                          onClick={() => handleOpenPositionModal(fragment)}
+                          sx={{ cursor: 'pointer' }}
+                        />
+                      </Tooltip>
+                    </Box>
+                    
+                    {/* Tags existants avec couleur grey[200] */}
+                    {fragment.tags && fragment.tags.length > 0 && 
+                      fragment.tags.map((tag, index) => (
+                        <Chip
+                          key={index}
+                          size="small"
+                          icon={<LocalOfferIcon />}
+                          label={
+                            <Typography variant="overline" fontSize="0.6rem">
+                              {tag}
+                            </Typography>
+                          }
+                          variant="filled"
+                          sx={{ 
+                            backgroundColor: grey[200],
+                            "& .MuiChip-icon": { 
+                              color: "text.secondary" 
+                            }
+                          }}
+                        />
+                      ))
+                    }
+                  </Stack>
                 </CardContent>
                 <Divider />
                 <CardActions>
@@ -355,6 +439,14 @@ const FragmentsList: React.FC<FragmentsListProps> = ({
         onSave={handleSaveFragment}
         categories={categories}
         activities={activities}
+      />
+
+      {/* Modal pour la gestion des positions */}
+      <PositionModal
+        open={positionModalOpen}
+        onClose={() => setPositionModalOpen(false)}
+        fragment={fragmentForPosition}
+        onSuccess={handlePositionSuccess}
       />
     </Box>
   );

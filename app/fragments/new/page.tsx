@@ -15,7 +15,8 @@ import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import LockIcon from '@mui/icons-material/Lock';
 import LoadingSpinner from '@/components/LoadingSpinner';
 import useAuth from '@/hooks/useAuth';
-import FragmentEditModal, { Fragment } from '@/components/FragmentEditModal';
+import FragmentEditModal from '@/components/FragmentEditModal';
+import { Fragment } from '@/lib/types';
 
 interface Activity {
   id: number;
@@ -45,7 +46,7 @@ export default function NewFragmentPage() {
   );
   
   const [activities, setActivities] = useState<Activity[]>([]);
-  const [categories, setCategories] = useState<string[]>([]);
+  const [categories, setCategories] = useState<Array<{id: number, name: string}>>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -67,20 +68,17 @@ export default function NewFragmentPage() {
     async function fetchData() {
       try {
         // Fetch activities
-        const activitiesResponse = await fetch('/api/activities');
+        const activitiesResponse = await fetch('/api/activities_autres');
         if (activitiesResponse.ok) {
           const activitiesData = await activitiesResponse.json();
           setActivities(activitiesData);
         }
         
-        // Fetch fragments to extract unique categories
-        const fragmentsResponse = await fetch('/api/fragments');
-        if (fragmentsResponse.ok) {
-          const fragmentsData = await fragmentsResponse.json();
-          const uniqueCategories = Array.from(
-            new Set(fragmentsData.map((f: any) => f.category))
-          ).filter(Boolean);
-          setCategories(uniqueCategories as string[]);
+        // Fetch categories directly from the categories API
+        const categoriesResponse = await fetch('/api/categories');
+        if (categoriesResponse.ok) {
+          const categoriesData = await categoriesResponse.json();
+          setCategories(categoriesData);
         }
       } catch (err) {
         console.error('Error fetching data:', err);
