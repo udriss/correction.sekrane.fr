@@ -296,7 +296,7 @@ export default function ActivitiesAutresPage() {
                 </Box>
                 
                 <Box>
-                  <Typography variant="h4" fontWeight={700} color="text.primary">Activités avec parties dynamiques</Typography>
+                  <Typography variant="h4" fontWeight={700} color="text.primary">Activités</Typography>
                   <Typography variant="subtitle1" color="text.secondary" sx={{ opacity: 0.9 }}>
                     Ajoutez et gérez les activités avec barème flexible
                   </Typography>

@@ -37,6 +37,7 @@ interface QRCodePDFOptions {
   arrangement?: ArrangementType; // Type d'arrangement (class, student, activity, subclass)
   subArrangement?: SubArrangementType; // Sous-arrangement (student, activity, class, subclass, none)
   groupedData?: any; // Données déjà organisées selon l'arrangement choisi
+  skipGrouping?: boolean; // Indique si le regroupement doit être ignoré
 }
 
 /**
@@ -268,7 +269,78 @@ function organizeGroupBySubArrangement(
 
   // Trier les corrections au sein de chaque sous-groupe
   Object.keys(result).forEach(key => {
-    result[key] = sortCorrectionsByStudentName(result[key], students);
+    // D'abord, grouper par student_id pour s'assurer que les étudiants sont regroupés
+    const studentGroups: Record<number, Partial<CorrectionAutreEnriched>[]> = {};
+    
+    result[key].forEach(correction => {
+      const studentId = correction.student_id || 0;
+      if (!studentGroups[studentId]) {
+        studentGroups[studentId] = [];
+      }
+      studentGroups[studentId].push(correction);
+    });
+    
+    // Ensuite, pour chaque étudiant, trier ses corrections
+    const sortedCorrections: Partial<CorrectionAutreEnriched>[] = [];
+    
+    // Trier d'abord les IDs des étudiants par ordre alphabétique de leur nom
+    const sortedStudentIds = Object.keys(studentGroups).sort((aStr, bStr) => {
+      const a = parseInt(aStr);
+      const b = parseInt(bStr);
+      const studentA = students.find(s => s.id === a);
+      const studentB = students.find(s => s.id === b);
+      
+      if (!studentA && !studentB) return a - b;
+      if (!studentA) return 1;
+      if (!studentB) return -1;
+      
+      const nameA = `${studentA.last_name} ${studentA.first_name}`;
+      const nameB = `${studentB.last_name} ${studentB.first_name}`;
+      
+      return nameA.localeCompare(nameB, 'fr', { sensitivity: 'base' });
+    });
+    
+    // Ajouter les corrections de chaque étudiant dans l'ordre
+    sortedStudentIds.forEach(studentIdStr => {
+      const studentId = parseInt(studentIdStr);
+      const studentCorrections = studentGroups[studentId];
+      
+      // Pour activity subArrangement, conserver toutes les activités groupées même si statuts différents
+      if (subArrangement === 'activity') {
+        studentCorrections.sort((a, b) => {
+          // D'abord par ID d'activité pour grouper les mêmes activités
+          if (a.activity_id !== b.activity_id) {
+            const aId = a.activity_id ?? 0;
+            const bId = b.activity_id ?? 0;
+            return aId - bId;
+          }
+          
+          // Ensuite par statut actif en premier
+          const aActive = a.status === 'ACTIVE' || (!a.status && a.active !== 0);
+          const bActive = b.status === 'ACTIVE' || (!a.status && b.active !== 0);
+          
+          if (aActive && !bActive) return -1;
+          if (!aActive && bActive) return 1;
+          
+          return 0;
+        });
+      } else {
+        // Pour les autres sous-arrangements, trier normalement par statut actif en premier
+        studentCorrections.sort((a, b) => {
+          const aActive = a.status === 'ACTIVE' || (!a.status && a.active !== 0);
+          const bActive = a.status === 'ACTIVE' || (!a.status && b.active !== 0);
+          
+          if (aActive && !bActive) return -1;
+          if (!aActive && bActive) return 1;
+          
+          return 0;
+        });
+      }
+      
+      sortedCorrections.push(...studentCorrections);
+    });
+    
+    result[key] = sortedCorrections;
   });
 
   return result;
@@ -383,31 +455,60 @@ function addCorrectionStylingAndInfo(
   const isPlaceholder = correction.placeholder === true || correction.noQRCode === true;
   
   if (isPlaceholder) {
-    // Dessiner un carré avec un motif hachuré pour indiquer l'absence de correction
-    doc.setDrawColor(200, 0, 0); // Rouge pour la bordure
-    doc.setLineWidth(1);
-    doc.rect(x, y, qrSize, qrSize);
+    // Créer un gradient pour un effet plus doux et stylisé
+    const gradientColors = {
+      start: [245, 108, 108], // Rouge clair
+      end: [200, 60, 60]      // Rouge foncé
+    };
     
-    // Ajouter des hachures diagonales
-    doc.setDrawColor(200, 0, 0);
-    doc.setLineWidth(0.5);
+    // Dessiner un rectangle avec coins arrondis
+    doc.setFillColor(250, 250, 250); // Fond blanc cassé
+    doc.setDrawColor(gradientColors.start[0], gradientColors.start[1], gradientColors.start[2]);
+    doc.setLineWidth(1.5);
     
-    // Diagonales dans les deux sens
-    for (let i = 0; i <= qrSize; i += 5) {
-      doc.line(x + i, y, x, y + i); // Diagonale descendante
-      doc.line(x + qrSize - i, y, x + qrSize, y + i); // Diagonale montante
+    // Rectangle avec coins arrondis (simulation)
+    const radius = 3.5;
+    doc.roundedRect(x, y, qrSize, qrSize, radius, radius, 'FD');
+    
+    // Créer un motif élégant au lieu de simples hachures
+    doc.setDrawColor(gradientColors.end[0], gradientColors.end[1], gradientColors.end[2]);
+    doc.setLineWidth(0.7);
+    
+    // Motif de cercles concentriques
+    const center = {x: x + qrSize/2, y: y + qrSize/2-2};
+    const maxRadius = qrSize * 0.4;
+    for (let r = maxRadius; r > 0; r -= maxRadius/4) {
+      doc.circle(center.x, center.y, r);
     }
     
-    // Ajouter un X au milieu
-    doc.setLineWidth(1.5);
-    doc.line(x + 5, y + 5, x + qrSize - 5, y + qrSize - 5);
-    doc.line(x + qrSize - 5, y + 5, x + 5, y + qrSize - 5);
+    // Symbole d'alerte stylisé
+    doc.setFillColor(gradientColors.end[0], gradientColors.end[1], gradientColors.end[2]);
+    const iconSize = qrSize * 0.3;
     
-    // Ajouter un message "NON NOTÉ" au centre du carré
+    // Triangle d'alerte
+    doc.triangle(
+      center.x, center.y - iconSize/1.5,
+      center.x - iconSize/2-2, center.y + iconSize/2,
+      center.x + iconSize/2+2, center.y + iconSize/2,
+      'F'
+    );
+    
+    // Point d'exclamation (cercle blanc)
+    doc.setFillColor(255, 255, 255);
+    doc.circle(center.x, center.y, iconSize/8, 'F');
+    
+    // Texte plus élégant
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(9);
-    doc.setTextColor(200, 0, 0);
-    doc.text('NON NOTÉ', x + qrSize/2, y + qrSize/2, { align: 'center' });
+    doc.setFontSize(10);
+    doc.setTextColor(gradientColors.end[0], gradientColors.end[1], gradientColors.end[2]);
+    
+    // Ajouter une ombre légère pour le texte (simulée par un texte légèrement décalé)
+    doc.setTextColor(150, 150, 150, 0.5);
+    doc.text('NON NOTÉ', center.x + 0.1, center.y + iconSize + 7.3, { align: 'center' });
+    
+    // Texte principal
+    doc.setTextColor(gradientColors.end[0], gradientColors.end[1], gradientColors.end[2]);
+    doc.text('NON NOTÉ', center.x, center.y + iconSize + 7.2, { align: 'center' });
     
     // Réinitialiser les couleurs
     doc.setDrawColor(0, 0, 0);
@@ -502,31 +603,33 @@ function addCorrectionStylingAndInfo(
     // Note si disponible
     if (correction.grade !== undefined && correction.grade !== null) {
       const gradeY = textY + (isActive ? 6 : 12);
-      
-      // Formater la note (2 décimales max)
+
+      // Formater la note (1 décimale max)
       let formattedGrade = correction.grade.toString();
       if (formattedGrade.includes('.')) {
-        formattedGrade = parseFloat(formattedGrade).toFixed(2);
-        // Supprimer les zéros inutiles à la fin (.00 -> 0, 14.50 -> 14.5)
-        formattedGrade = formattedGrade.replace(/\.?0+$/, '');
+      formattedGrade = parseFloat(formattedGrade).toFixed(1);
+      // Supprimer les zéros inutiles à la fin (.00 -> 0, 14.50 -> 14.5)
+      formattedGrade = formattedGrade.replace(/\.?0+$/, '');
       }
-      
+
       // Trouver l'activité correspondante pour obtenir les points
       const activity = correction.activity_id ? activities.find(a => a.id === correction.activity_id) : null;
       const points = activity?.points;
-      
-      // Ajouter le barème si disponible
-      let gradeText = `Note: ${formattedGrade}`;
-      if (points !== undefined) {
-        gradeText += `Barème : [${points}]`;
-      }
-      
+
+      // Afficher la note sur une ligne
+      let gradeText = `Note : ${formattedGrade}`;
       doc.text(gradeText, textX, gradeY, { align: 'center' });
+
+      // Afficher le barème sur la ligne suivante si disponible
+      if (points !== undefined) {
+      let pointsText = `Barème : [${points.toString().replace(',', ';')}]`;
+      doc.text(pointsText, textX, gradeY + 5, { align: 'center' });
+      }
     }
     
     // URL encodée dans le QR code (en très petit)
     doc.setFontSize(8);
-    doc.text(qrData, textX, textY + (isActive ? (correction.grade !== undefined ? 11 : 6) : (correction.grade !== undefined ? 16 : 12)), { align: 'center' });
+    doc.text(qrData, textX, textY + (isActive ? (correction.grade !== undefined ? 17 : 11) : (correction.grade !== undefined ? 21 : 17)), { align: 'center' });
   }
 }
 
@@ -1034,29 +1137,40 @@ export async function generateQRCodePDF({
   activities = [], // Valeur par défaut : tableau vide
   includeDetails = true, // Valeur par défaut : afficher les détails complets
   arrangement = 'class', // Valeur par défaut : organisation par classe
-  subArrangement = 'student' // Valeur par défaut : sous-organisation par étudiant
+  subArrangement = 'student', // Valeur par défaut : sous-organisation par étudiant
+  groupedData = null, // Données déjà organisées selon l'arrangement
+  skipGrouping = false // Permet d'éviter de réorganiser les données déjà traitées
 }: QRCodePDFOptions): Promise<string | null> {
   try {
     if (!corrections || corrections.length === 0) {
       throw new Error('No corrections provided');
     }
 
-    console.log('corrections', corrections);
     
-    // Trier les corrections par nom d'étudiant
+    
+    // Trier les corrections par nom d'étudiant (utilisé même si nous avons des données organisées)
     let sortedCorrections = sortCorrectionsByStudentName(corrections, students);
+    
+    // Déterminer les données organisées à utiliser
+    let organizedData;
+    
+    if (skipGrouping && groupedData) {
+      // Utiliser directement les données déjà organisées
+      
+      organizedData = groupedData;
+    } else {
+      // Organiser les corrections selon les options choisies
+      organizedData = organizeBySubArrangement(
+        sortedCorrections,
+        arrangement as ArrangementType,
+        subArrangement as SubArrangementType,
+        students,
+        activities
+      );
+    }
 
-    // Organiser les corrections selon l'arrangement et le sous-arrangement spécifiés
-    let organizedData = organizeBySubArrangement(
-      sortedCorrections,
-      arrangement as ArrangementType,
-      subArrangement as SubArrangementType,
-      students,
-      activities
-    );
-
-    console.log('arrangement', arrangement);
-    console.log('subArrangement', subArrangement);
+    
+    
 
     // Create a new jsPDF instance
     const doc = new jsPDF({

@@ -5,7 +5,7 @@ import authOptions from "@/lib/auth";
 import { getUser } from '@/lib/auth';
 import { createLogEntry } from '@/lib/services/logsService';
 
-// API pour mettre à jour le statut d'une correction autre
+// API pour mettre à jour le statut et potentiellement les notes d'une correction autre
 export async function PUT(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -33,26 +33,36 @@ export async function PUT(
     const requestData = await request.json();
     
     // Gérer à la fois le nouveau système de statut et l'ancien booléen active
-    let status;
-    let activeValue;
-    
+    let status: string;
+    let activeValue: number;
+    let gradeUpdate: number | null | undefined = undefined;
+    let penaltyUpdate: number | null | undefined = undefined;
+    let finalGradeUpdate: number | null | undefined = undefined;
+    let updateGrades = false;
+
     if ('status' in requestData) {
-      // Nouveau système avec énumération status
-      status = requestData.status;
-      
-      // Vérifier que le status est valide
+      status = requestData.status as string; // Assert type as string
       const validStatuses = ['ACTIVE', 'DEACTIVATED', 'ABSENT', 'NON_RENDU', 'NON_NOTE'];
-      if (!validStatuses.includes(status)) {
-        return NextResponse.json(
-          { error: 'Statut invalide' },
-          { status: 400 }
-        );
+      // Ensure status is a string before checking includes
+      if (typeof status !== 'string' || !validStatuses.includes(status)) {
+        return NextResponse.json({ error: 'Statut invalide' }, { status: 400 });
       }
-      
-      // Définir active en fonction du statut
       activeValue = status === 'ACTIVE' ? 1 : 0;
+
+      // Check if grade updates are included in the payload (sent from the hook)
+      if ('grade' in requestData && 'penalty' in requestData && 'final_grade' in requestData) {
+          // Ensure the types are correct (number or null)
+          gradeUpdate = requestData.grade === undefined ? undefined : (requestData.grade as number | null);
+          penaltyUpdate = requestData.penalty === undefined ? undefined : (requestData.penalty as number | null);
+          finalGradeUpdate = requestData.final_grade === undefined ? undefined : (requestData.final_grade as number | null);
+          // Only set updateGrades to true if all values are explicitly provided (even if null)
+          if (gradeUpdate !== undefined && penaltyUpdate !== undefined && finalGradeUpdate !== undefined) {
+             updateGrades = true;
+          }
+      }
+
     } else if ('active' in requestData) {
-      // Ancien système avec booléen active
+      // Handle legacy active toggle if needed, though status should be preferred
       activeValue = requestData.active ? 1 : 0;
       status = activeValue ? 'ACTIVE' : 'DEACTIVATED';
     } else {
@@ -62,10 +72,15 @@ export async function PUT(
       );
     }
 
+    // Ensure status and activeValue are defined before proceeding
+    if (status === undefined || activeValue === undefined) {
+       return NextResponse.json({ error: 'Erreur interne: status ou active non défini' }, { status: 500 });
+    }
+
     return await withConnection(async (connection) => {
       // Récupérer l'état actuel pour logging
       const [currentState] = await connection.query(
-        'SELECT status, active, activity_id, student_id FROM corrections_autres WHERE id = ?',
+        'SELECT status, active, grade, penalty, final_grade, activity_id, student_id FROM corrections_autres WHERE id = ?',
         [correctionId]
       );
       
@@ -78,15 +93,29 @@ export async function PUT(
       
       const currentData = currentState[0] as any;
       
-      // Mettre à jour le statut de la correction
-      const [result] = await connection.query(
-        'UPDATE corrections_autres SET status = ?, active = ? WHERE id = ?',
-        [
-          status, 
-          activeValue, 
-          correctionId
-        ]
-      );
+      // Construire la requête SQL dynamiquement
+      let sql = 'UPDATE corrections_autres SET status = ?, active = ?';
+      // Ensure status and activeValue are not undefined before adding to params
+      const sqlParams: (string | number | null)[] = [status, activeValue];
+
+      if (updateGrades) {
+        // Ensure grade updates are not undefined before adding
+        if (gradeUpdate !== undefined && penaltyUpdate !== undefined && finalGradeUpdate !== undefined) {
+            sql += ', grade = ?, penalty = ?, final_grade = ?';
+            // Explicitly cast to expected types for the query
+            sqlParams.push(gradeUpdate as number | null, penaltyUpdate as number | null, finalGradeUpdate as number | null);
+        } else {
+            // Should not happen if updateGrades is true, but good for safety
+            console.warn('updateGrades is true, but grade values are undefined. Skipping grade update.');
+            updateGrades = false; // Correct the flag
+        }
+      }
+
+      sql += ' WHERE id = ?';
+      sqlParams.push(correctionId);
+
+      // Mettre à jour la correction
+      const [result] = await connection.query(sql, sqlParams);
       
       const updateResult = result as any;
       if (!updateResult || !updateResult.affectedRows || updateResult.affectedRows === 0) {
@@ -96,23 +125,35 @@ export async function PUT(
         );
       }
 
+      // Préparer les métadonnées pour le log
+      const logMetadata: any = {
+        old_status: currentData.status,
+        new_status: status,
+        old_active: currentData.active,
+        new_active: activeValue,
+        activity_id: currentData.activity_id,
+        student_id: currentData.student_id
+      };
+
+      if (updateGrades) {
+        logMetadata.old_grade = currentData.grade;
+        logMetadata.new_grade = gradeUpdate;
+        logMetadata.old_penalty = currentData.penalty;
+        logMetadata.new_penalty = penaltyUpdate;
+        logMetadata.old_final_grade = currentData.final_grade;
+        logMetadata.new_final_grade = finalGradeUpdate;
+      }
+
       // Créer un log pour le changement de statut
       await createLogEntry({
         action_type: 'UPDATE_STATUS_CORRECTION_AUTRE',
-        description: `Changement de statut de la correction autre #${correctionId} : ${currentData.status || 'Non défini'} -> ${status}`,
+        description: `Changement statut/notes correction autre #${correctionId}: Statut ${currentData.status || 'N/A'}->${status}${updateGrades ? ', Notes modifiées' : ''}`,
         entity_type: 'correction_autre',
         entity_id: correctionId,
         user_id: customUser?.id,
         username: customUser?.username,
         ip_address: request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || 'unknown',
-        metadata: {
-          old_status: currentData.status,
-          new_status: status,
-          old_active: currentData.active,
-          new_active: activeValue,
-          activity_id: currentData.activity_id,
-          student_id: currentData.student_id
-        }
+        metadata: logMetadata
       });
       
       // Récupérer des informations supplémentaires pour le retour
@@ -126,23 +167,32 @@ export async function PUT(
         [correctionId]
       );
       
-      // Retourner la correction mise à jour avec des infos supplémentaires
-      return NextResponse.json({ 
-        id: correctionId, 
+      // Construire la réponse
+      const responsePayload: any = {
+        id: correctionId,
         status,
         active: activeValue,
         ...(Array.isArray(activityInfo) && activityInfo.length > 0 ? activityInfo[0] : {})
-      });
+      };
+
+      if (updateGrades) {
+        // Ensure grade updates are not undefined before adding to response
+        responsePayload.grade = gradeUpdate !== undefined ? gradeUpdate : null; 
+        responsePayload.penalty = penaltyUpdate !== undefined ? penaltyUpdate : null;
+        responsePayload.final_grade = finalGradeUpdate !== undefined ? finalGradeUpdate : null;
+      }
+
+      return NextResponse.json(responsePayload);
     });
   } catch (error) {
-    console.error('Erreur lors de la mise à jour du statut:', error);
+    console.error('Erreur lors de la mise à jour du statut/notes:', error);
     
     // Logger l'erreur
     try {
       const user = await getUser(request);
       await createLogEntry({
         action_type: 'UPDATE_STATUS_ERROR_CORRECTION_AUTRE',
-        description: `Erreur lors de la mise à jour du statut d'une correction autre: ${(error as Error).message}`,
+        description: `Erreur lors de la mise à jour du statut/notes d'une correction autre: ${(error as Error).message}`,
         user_id: user?.id,
         username: user?.username,
         ip_address: request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || 'unknown'
@@ -152,7 +202,7 @@ export async function PUT(
     }
     
     return NextResponse.json(
-      { error: 'Erreur serveur lors de la mise à jour du statut' },
+      { error: 'Erreur serveur lors de la mise à jour du statut/notes' },
       { status: 500 }
     );
   }

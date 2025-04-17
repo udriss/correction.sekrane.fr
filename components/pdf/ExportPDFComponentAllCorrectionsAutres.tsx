@@ -36,6 +36,7 @@ import {
   escapeCSV
 } from './types';
 import { allCorrectionsAutreDataProcessingService } from '@/components/pdfAutre/allCorrectionsAutreDataProcessingService';
+import { Student, CorrectionAutreEnriched } from '@/lib/types';
 
 interface Activity {
   id: number;
@@ -238,6 +239,26 @@ const ExportPDFComponentAllCorrectionsAutres: React.FC<any> = ({
     }
   };
 
+  // Fonction utilitaire pour formater la note
+  const formatGrade = (grade: any) => {
+    let formattedGrade = '';
+    if (grade !== undefined) {
+    if (typeof grade === 'number') {
+      formattedGrade = grade.toFixed(1);
+    } else if (!isNaN(Number(grade))) {
+      formattedGrade = Number(grade).toFixed(1);
+    } else {
+      formattedGrade = grade;
+    }
+    // Remove trailing .0 or .00 and replace '.' by ','
+    if (typeof formattedGrade === 'string') {
+      formattedGrade = formattedGrade.replace(/\.?0+$/, '').replace('.', ',');
+    }
+    return formattedGrade;
+    }
+    return '';
+  };
+
   // Fonction pour générer le PDF
   const generatePDF = async (groupedData: any) => {
     try {
@@ -249,12 +270,12 @@ const ExportPDFComponentAllCorrectionsAutres: React.FC<any> = ({
       // Configurer l'en-tête du document
       doc.setFont('helvetica');
       doc.setFontSize(16);
-      doc.text('Récapitulatif des notes - Corrections avec barème dynamique', 20, 20);
+      doc.text('Récapitulatif des notes — Corrections avec barème dynamique', 20, 20);
       
       // Informations de filtrage
       doc.setFontSize(12);
-      doc.text(`Date d'export: ${new Date().toLocaleDateString('fr-FR', { year: 'numeric', month: 'long', day: 'numeric' })}`, 20, 30);
-      doc.text(`Activité: ${filterActivity === 'all' ? 'Toutes' : uniqueActivities.find((a: Activity) => a.id === filterActivity)?.name}`, 20, 40);
+      doc.text(`Date d'export : ${new Date().toLocaleDateString('fr-FR', { year: 'numeric', month: 'long', day: 'numeric' })}`, 20, 30);
+      doc.text(`Activité : ${filterActivity === 'all' ? 'Toutes' : uniqueActivities.find((a: Activity) => a.id === filterActivity)?.name}`, 20, 40);
       
       // Position de départ pour le contenu du PDF
       let yPosition = 50;
@@ -325,11 +346,9 @@ const ExportPDFComponentAllCorrectionsAutres: React.FC<any> = ({
                 default:
                   // Pour les corrections actives normales
                   statusDisplay = 'ACTIVE';
-                  gradeDisplay = c.grade !== undefined ? 
-                    `${typeof c.grade === 'number' ? c.grade.toFixed(1) : c.grade}/20` : 
-                    'Non noté';
+                    gradeDisplay = c.grade !== undefined ? `${formatGrade(c.grade)} / 20` : 'Non noté';
                   pointsDisplay = Array.isArray(c.points_earned) ? 
-                    c.points_earned.join(' / ') : 
+                    '[' + c.points_earned.join(' ; ') + ']' : 
                     'N/A';
               }
             } else if (c.active === 0) {
@@ -339,10 +358,10 @@ const ExportPDFComponentAllCorrectionsAutres: React.FC<any> = ({
             } else {
               // Cas standard pour les corrections actives
               gradeDisplay = c.grade !== undefined ? 
-                `${typeof c.grade === 'number' ? c.grade.toFixed(1) : c.grade}/20` : 
+                `${formatGrade(c.grade)} / 20` : 
                 'Non noté';
               pointsDisplay = Array.isArray(c.points_earned) ? 
-                c.points_earned.join(' / ') : 
+                '[' + c.points_earned.join(' ; ') + ']' : 
                 'N/A';
             }
             
@@ -406,8 +425,9 @@ const ExportPDFComponentAllCorrectionsAutres: React.FC<any> = ({
                   data.cell.styles.fillColor = [255, 242, 230]; // Orange très pâle
                   data.cell.styles.fontStyle = 'italic';
                 } else if (cellValue === 'DÉSACTIVÉ') {
-                  data.cell.styles.fillColor = [242, 242, 242]; // Gris très pâle
-                  data.cell.styles.fontStyle = 'italic';
+                    data.cell.styles.fillColor = [242, 242, 242]; // Gris très pâle
+                    data.cell.styles.fontStyle = 'italic';
+                    
                 } else if (cellValue === 'N/A') {
                   data.cell.styles.fillColor = [238, 238, 238]; // Gris clair
                   data.cell.styles.fontStyle = 'italic';
@@ -427,6 +447,30 @@ const ExportPDFComponentAllCorrectionsAutres: React.FC<any> = ({
                       data.cell.styles.fontStyle = 'bold';
                     }
                   }
+                }
+              }
+            },
+            // Add didDrawCell hook to draw custom content
+            didDrawCell: function(data: any) {
+              // Check if the cell is in the relevant columns (Points, Note, Statut)
+              if (data.column.index >= 2 && data.column.index <= 4) {
+                const cellValue = data.cell.raw;
+                if (cellValue === 'DÉSACTIVÉ') {
+                  // Draw a diagonal line (strikethrough)
+                  doc.setDrawColor(230, 230, 230); // Set line color (e.g., gray)
+                  doc.setLineWidth(0.2);
+                  doc.line(
+                    data.cell.x, 
+                    data.cell.y, 
+                    data.cell.x + data.cell.width, 
+                    data.cell.y + data.cell.height
+                  );
+                  doc.line(
+                    data.cell.x + data.cell.width, 
+                    data.cell.y, 
+                    data.cell.x , 
+                    data.cell.y + data.cell.height
+                  );
                 }
               }
             }
@@ -467,8 +511,9 @@ const ExportPDFComponentAllCorrectionsAutres: React.FC<any> = ({
             doc.rect(20, yPosition - 7, doc.internal.pageSize.width - 40, 16);
             
             // Ajouter un effet d'ombre légère (en dessinant un rectangle gris en dessous)
-            doc.setFillColor(210, 210, 210);
-            doc.rect(22, yPosition - 5, doc.internal.pageSize.width - 40, 16, 'F');
+            doc.setFillColor(250, 250, 250);
+            doc.rect(18, yPosition - 9, doc.internal.pageSize.width - 40, 16, 'F');
+            doc.setFillColor(240, 240, 245);
             doc.rect(20, yPosition - 7, doc.internal.pageSize.width - 40, 16, 'F');
             
             // Déterminer le type de sous-arrangement (classe, groupe ou activité)
@@ -485,13 +530,15 @@ const ExportPDFComponentAllCorrectionsAutres: React.FC<any> = ({
             doc.setTextColor(0, 51, 153); // Bleu foncé pour le texte
             
             // Ajouter un emoji ou indicateur visuel selon le type de sous-arrangement
-            let prefixIcon = '◆ '; // Par défaut
-            if (subArrangement === 'class') prefixIcon = '🏫 ';
-            else if (subArrangement === 'activity') prefixIcon = '📝 ';
-            else if (subArrangement === 'student') prefixIcon = '👤 ';
-            else if (subArrangement === 'subclass') prefixIcon = '👥 ';
+            // Icônes Unicode accessibles pour le PDF (compatibles PDF, pas d'emoji couleur)
+            let prefixIcon = '';
+            if (subArrangement === 'class') prefixIcon = '\u{1F393} ';      // 🎓
+            else if (subArrangement === 'activity') prefixIcon = '\u{1F4D6} '; // 📖
+            else if (subArrangement === 'student') prefixIcon = '\u{1F464} ';  // 👤
+            else if (subArrangement === 'subclass') prefixIcon = '\u{1F465} '; // 👥
             
-            doc.text(`${prefixIcon}${subArrangementType}: ${subKey}`, 30, yPosition + 2);
+            // doc.text(`${prefixIcon}${subArrangementType}: ${subKey}`, 30, yPosition + 2);
+            doc.text(`${subArrangementType} : ${subKey}`, 30, yPosition + 2);
             
             // Réinitialiser la couleur du texte
             doc.setTextColor(0, 0, 0);
@@ -500,6 +547,24 @@ const ExportPDFComponentAllCorrectionsAutres: React.FC<any> = ({
             
             // Vérifier que subValue a des corrections
             if (subValue.corrections && subValue.corrections.length > 0) {
+
+              // --- Ajout du tri par nom d'étudiant ---
+              subValue.corrections.sort((a: CorrectionAutreEnriched, b: CorrectionAutreEnriched) => {
+                const studentA = getStudentById(a.student_id) as Student | undefined;
+                const studentB = getStudentById(b.student_id) as Student | undefined;
+
+                const nameA = studentA ? `${studentA.last_name} ${studentA.first_name}` : '';
+                const nameB = studentB ? `${studentB.last_name} ${studentB.first_name}` : '';
+
+                // Handle cases where student might not be found
+                if (!nameA && !nameB) return 0;
+                if (!nameA) return 1; // Put corrections without student info last
+                if (!nameB) return -1; // Put corrections without student info last
+
+                return nameA.localeCompare(nameB, 'fr', { sensitivity: 'base' });
+              });
+              // --- Fin de l'ajout du tri ---
+
               const tableData = subValue.corrections.map((c: any) => {
                 const activity = getActivityById(c.activity_id);
                 const student = getStudentById(c.student_id);
@@ -543,10 +608,10 @@ const ExportPDFComponentAllCorrectionsAutres: React.FC<any> = ({
                       // Pour les corrections actives normales
                       statusDisplay = 'ACTIVE';
                       gradeDisplay = c.grade !== undefined ? 
-                        `${typeof c.grade === 'number' ? c.grade.toFixed(1) : c.grade}/20` : 
+                        `${formatGrade(c.grade)} / 20` : 
                         'Non noté';
                       pointsDisplay = Array.isArray(c.points_earned) ? 
-                        c.points_earned.join(' / ') : 
+                        '[' + c.points_earned.join(' ; ') + ']' : 
                         'N/A';
                   }
                 } else if (c.active === 0) {
@@ -556,15 +621,15 @@ const ExportPDFComponentAllCorrectionsAutres: React.FC<any> = ({
                 } else {
                   // Cas standard pour les corrections actives
                   gradeDisplay = c.grade !== undefined ? 
-                    `${typeof c.grade === 'number' ? c.grade.toFixed(1) : c.grade}/20` : 
+                    `${formatGrade(c.grade)} / 20` : 
                     'Non noté';
                   pointsDisplay = Array.isArray(c.points_earned) ? 
-                    c.points_earned.join(' / ') : 
+                    '[' + c.points_earned.join(' ; ') + ']' : 
                     'N/A';
                 }
                 
                 return [
-                  student ? `${student.first_name} ${student.last_name}` : 'N/A',
+                  student ? `${student.first_name} ${student.last_name ? student.last_name.substring(0, 2).toUpperCase()+'.' : ''}` : 'N/A',
                   activity?.name || `Activité ${c.activity_id}`,
                   pointsDisplay,
                   gradeDisplay,
@@ -572,84 +637,114 @@ const ExportPDFComponentAllCorrectionsAutres: React.FC<any> = ({
                 ];
               });
               
-              const autoTable = require('jspdf-autotable').default;
-              autoTable(doc, {
+                const autoTable = require('jspdf-autotable').default;
+                autoTable(doc, {
                 head: [['Étudiant', 'Activité', 'Points par partie', 'Note', 'Statut']],
                 body: tableData,
                 startY: yPosition,
                 styles: { fontSize: 10 },
-                headStyles: { fillColor: [41, 128, 185] },
-                margin: { left: 30, right: 30 }, // Marge indentée pour les sous-tableaux
+                headStyles: { fillColor: [41, 128, 185], halign: 'center' },
+                columnStyles: {
+                  0: { halign: 'left' }, // Première colonne (Étudiant) alignée à gauche
+                  1: { halign: 'center' },
+                  2: { halign: 'center' },
+                  3: { halign: 'center' },
+                  4: { halign: 'center' },
+                },
+                margin: { left: 10, right: 10 }, // Marge indentée pour les sous-tableaux
                 didParseCell: function(data: any) {
                   // Style pour les cellules des étudiants
                   if (data.column.index === 0) {
-                    data.cell.styles.fontStyle = 'bold';
+                  data.cell.styles.fontStyle = 'bold';
                   }
                   
                   // Styles basés sur le statut (indice 4)
                   if (data.column.index === 4) {
-                    const statusValue = data.cell.raw;
-                    switch (statusValue) {
-                      case 'NON NOTÉ':
-                        data.cell.styles.fillColor = [255, 238, 238]; // Rouge très pâle
-                        data.cell.styles.fontStyle = 'italic';
-                        break;
-                      case 'ABSENT':
-                        data.cell.styles.fillColor = [238, 255, 238]; // Vert très pâle
-                        data.cell.styles.fontStyle = 'bolditalic';
-                        break;
-                      case 'NON RENDU':
-                        data.cell.styles.fillColor = [255, 242, 230]; // Orange très pâle
-                        data.cell.styles.fontStyle = 'italic';
-                        break;
-                      case 'DÉSACTIVÉ':
-                        data.cell.styles.fillColor = [242, 242, 242]; // Gris très pâle
-                        data.cell.styles.fontStyle = 'italic';
-                        break;
-                    }
+                  const statusValue = data.cell.raw;
+                  switch (statusValue) {
+                    case 'NON NOTÉ':
+                    data.cell.styles.fillColor = [255, 238, 238]; // Rouge très pâle
+                    data.cell.styles.fontStyle = 'italic';
+                    break;
+                    case 'ABSENT':
+                    data.cell.styles.fillColor = [238, 255, 238]; // Vert très pâle
+                    data.cell.styles.fontStyle = 'bolditalic';
+                    break;
+                    case 'NON RENDU':
+                    data.cell.styles.fillColor = [255, 242, 230]; // Orange très pâle
+                    data.cell.styles.fontStyle = 'italic';
+                    break;
+                    case 'DÉSACTIVÉ':
+                    data.cell.styles.fillColor = [252, 252, 252]; // Gris très pâle
+                    data.cell.styles.fontStyle = 'italic';
+                    break;
+                  }
                   }
                   
                   // Style pour les points (colonne 2) et les notes (colonne 3)
                   if (data.column.index === 2 || data.column.index === 3) {
-                    const cellValue = data.cell.raw;
-                    
-                    // Si c'est un statut spécial, appliquer le même style que pour la colonne de statut
-                    if (cellValue === 'NON NOTÉ') {
-                      data.cell.styles.fillColor = [255, 238, 238]; // Rouge très pâle
-                      data.cell.styles.fontStyle = 'italic';
-                    } else if (cellValue === 'ABSENT') {
-                      data.cell.styles.fillColor = [238, 255, 238]; // Vert très pâle
-                      data.cell.styles.fontStyle = 'bolditalic';
-                    } else if (cellValue === 'NON RENDU') {
-                      data.cell.styles.fillColor = [255, 242, 230]; // Orange très pâle
-                      data.cell.styles.fontStyle = 'italic';
-                    } else if (cellValue === 'DÉSACTIVÉ') {
-                      data.cell.styles.fillColor = [242, 242, 242]; // Gris très pâle
-                      data.cell.styles.fontStyle = 'italic';
-                    } else if (cellValue === 'N/A') {
-                      data.cell.styles.fillColor = [238, 238, 238]; // Gris clair
-                      data.cell.styles.fontStyle = 'italic';
-                    } else if (typeof cellValue === 'string' && cellValue.includes('/')) {
-                      // Pour les notes et points, dégradé de couleur basé sur la valeur
-                      const match = cellValue.match(/^(\d+(\.\d+)?)\//);
-                      if (match && data.column.index === 3) {  // Uniquement pour les notes
-                        const grade = parseFloat(match[1]);
-                        if (grade < 5) {
-                          data.cell.styles.fillColor = [255, 204, 204]; // Rouge clair
-                        } else if (grade < 10) {
-                          data.cell.styles.fillColor = [255, 238, 204]; // Orange clair
-                        } else if (grade < 15) {
-                          data.cell.styles.fillColor = [238, 255, 238]; // Vert clair
-                        } else {
-                          data.cell.styles.fillColor = [204, 255, 204]; // Vert plus intense
-                          data.cell.styles.fontStyle = 'bold';
-                        }
-                      }
+                  const cellValue = data.cell.raw;
+                  
+                  // Si c'est un statut spécial, appliquer le même style que pour la colonne de statut
+                  if (cellValue === 'NON NOTÉ') {
+                    data.cell.styles.fillColor = [255, 238, 238]; // Rouge très pâle
+                    data.cell.styles.fontStyle = 'italic';
+                  } else if (cellValue === 'ABSENT') {
+                    data.cell.styles.fillColor = [238, 255, 238]; // Vert très pâle
+                    data.cell.styles.fontStyle = 'bolditalic';
+                  } else if (cellValue === 'NON RENDU') {
+                    data.cell.styles.fillColor = [255, 242, 230]; // Orange très pâle
+                    data.cell.styles.fontStyle = 'italic';
+                  } else if (cellValue === 'DÉSACTIVÉ') {
+                    data.cell.styles.fillColor = [252, 252, 252]; // Gris très pâle
+                    data.cell.styles.fontStyle = 'italic';
+                  } else if (cellValue === 'N/A') {
+                    data.cell.styles.fillColor = [238, 238, 238]; // Gris clair
+                    data.cell.styles.fontStyle = 'italic';
+                  } else if (typeof cellValue === 'string' && cellValue.includes('/')) {
+                    // Pour les notes et points, dégradé de couleur basé sur la valeur
+                    const match = cellValue.match(/^(\d+(\.\d+)?)\//);
+                    if (match && data.column.index === 3) {  // Uniquement pour les notes
+                    const grade = parseFloat(match[1]);
+                    if (grade < 5) {
+                      data.cell.styles.fillColor = [255, 204, 204]; // Rouge clair
+                    } else if (grade < 10) {
+                      data.cell.styles.fillColor = [255, 238, 204]; // Orange clair
+                    } else if (grade < 15) {
+                      data.cell.styles.fillColor = [238, 255, 238]; // Vert clair
+                    } else {
+                      data.cell.styles.fillColor = [204, 255, 204]; // Vert plus intense
+                      data.cell.styles.fontStyle = 'bold';
+                    }
                     }
                   }
+                  }
+                },
+                // Add didDrawCell hook to draw custom content for sub-tables
+                didDrawCell: function(data: any) {
+                  // Check if the cell is in the relevant columns (Points, Note, Statut)
+                  if (data.column.index >= 2 && data.column.index <= 4) { 
+                  const cellValue = data.cell.raw;
+                  if (cellValue === 'DÉSACTIVÉ') {
+                    // Draw a diagonal line (strikethrough)
+                    doc.setDrawColor(200, 200, 200); // Set line color (e.g., gray)
+                    doc.setLineWidth(0.2);
+                    doc.line(
+                    data.cell.x, 
+                    data.cell.y, 
+                    data.cell.x + data.cell.width, 
+                    data.cell.y + data.cell.height
+                    );
+                    doc.line(
+                    data.cell.x + data.cell.width, 
+                    data.cell.y, 
+                    data.cell.x , 
+                    data.cell.y + data.cell.height
+                    );
+                  }
+                  }
                 }
-              });
-              
+                });
               yPosition = (doc as any).lastAutoTable.finalY + 15; // Espace supplémentaire entre les sous-tableaux
             } else {
               // Aucune correction pour ce sous-groupe
@@ -693,13 +788,13 @@ const ExportPDFComponentAllCorrectionsAutres: React.FC<any> = ({
         // Petit texte d'information
         doc.setFontSize(8);
         doc.setTextColor(100, 100, 100);
-        doc.text('Document généré automatiquement - correction.sekrane.fr', doc.internal.pageSize.width - 20, doc.internal.pageSize.height - 7, { align: 'right' });
+        doc.text('Document construit automatiquement — correction.sekrane.fr', 100, doc.internal.pageSize.height - 7, { align: 'right' });
       }
       
       // Sauvegarder le PDF
       const fileName = `Corrections_${new Date().toISOString().slice(0, 10)}.pdf`;
       doc.save(fileName);
-      enqueueSnackbar('PDF généré avec succès', { variant: 'success' });
+      enqueueSnackbar('PDF construit avec succès', { variant: 'success' });
       
     } catch (error) {
       console.error('Erreur lors de la génération du PDF:', error);
@@ -785,12 +880,28 @@ const ExportPDFComponentAllCorrectionsAutres: React.FC<any> = ({
   };
 
   // Fonction pour générer le contenu CSV détaillé
-  const generateDetailedCSV = (corrections: any[]): string => {
+  const generateDetailedCSV = (correctionsInput: any[]): string => {
+    // Create a mutable copy to sort
+    const corrections = [...correctionsInput];
+
+    // --- Ajout du tri par nom d'étudiant ---
+    corrections.sort((a: CorrectionAutreEnriched, b: CorrectionAutreEnriched) => {
+      const studentA = getStudentById(a.student_id) as Student | undefined;
+      const studentB = getStudentById(b.student_id) as Student | undefined;
+      const nameA = studentA ? `${studentA.last_name} ${studentA.first_name}` : '';
+      const nameB = studentB ? `${studentB.last_name} ${studentB.first_name}` : '';
+      if (!nameA && !nameB) return 0;
+      if (!nameA) return 1;
+      if (!nameB) return -1;
+      return nameA.localeCompare(nameB, 'fr', { sensitivity: 'base' });
+    });
+    // --- Fin de l'ajout du tri ---
+
     // En-tête du CSV
     const headers = ['Étudiant', 'Classe', 'Activité', 'Points par partie', 'Note', 'Statut'];
     let content = headers.join(',') + '\n';
     
-    // Ajouter les données
+    // Ajouter les données (maintenant triées)
     corrections.forEach(c => {
       const activity = getActivityById(c.activity_id);
       const student = getStudentById(c.student_id);
@@ -813,14 +924,14 @@ const ExportPDFComponentAllCorrectionsAutres: React.FC<any> = ({
       // Formater les points
       let pointsDisplay = 'N/A';
       if (Array.isArray(c.points_earned) && c.points_earned.length > 0) {
-        pointsDisplay = c.points_earned.join(' / ');
+        pointsDisplay = '[' + c.points_earned.join(' ; ') + ']';
       }
       
       // Formater la note
       let gradeDisplay = 'N/A';
       if (c.grade !== undefined) {
         if (statusDisplay === 'ACTIVE') {
-          gradeDisplay = `${typeof c.grade === 'number' ? c.grade.toFixed(1).replace('.', ',') : c.grade}/20`;
+          gradeDisplay = `${formatGrade(c.grade)} / 20`;
         } else {
           gradeDisplay = statusDisplay;
         }
@@ -868,7 +979,7 @@ const ExportPDFComponentAllCorrectionsAutres: React.FC<any> = ({
       if (c.status) {
         switch (c.status) {
           case 'ACTIVE':
-            displayValue = c.grade !== undefined ? `${typeof c.grade === 'number' ? c.grade.toFixed(1).replace('.', ',') : c.grade}/20` : 'NON NOTÉ';
+            displayValue = c.grade !== undefined ? `${formatGrade(c.grade)}/20` : 'NON NOTÉ';
             break;
           case 'NON_NOTE':
             displayValue = 'NON NOTÉ';
@@ -883,12 +994,12 @@ const ExportPDFComponentAllCorrectionsAutres: React.FC<any> = ({
             displayValue = 'DÉSACTIVÉ';
             break;
           default:
-            displayValue = c.grade !== undefined ? `${typeof c.grade === 'number' ? c.grade.toFixed(1).replace('.', ',') : c.grade}/20` : 'NON NOTÉ';
+            displayValue = c.grade !== undefined ? `${formatGrade(c.grade)}/20` : 'NON NOTÉ';
         }
       } else if (c.active === 0) {
         displayValue = 'DÉSACTIVÉ';
       } else if (c.grade !== undefined) {
-        displayValue = `${typeof c.grade === 'number' ? c.grade.toFixed(1).replace('.', ',') : c.grade}/20`;
+        displayValue = `${formatGrade(c.grade)}/20`;
       }
       
       studentMap[studentKey][activityKey] = displayValue;
@@ -901,8 +1012,14 @@ const ExportPDFComponentAllCorrectionsAutres: React.FC<any> = ({
     const headers = ['Étudiant', ...activityArray];
     let content = headers.map(h => escapeCSV(h)).join(',') + '\n';
     
-    // Ajouter les données
-    Object.entries(studentMap).forEach(([student, grades]) => {
+    // --- Tri des entrées de la map par nom d'étudiant --- 
+    const sortedStudentEntries = Object.entries(studentMap).sort(([studentNameA], [studentNameB]) => {
+      return studentNameA.localeCompare(studentNameB, 'fr', { sensitivity: 'base' });
+    });
+    // --- Fin du tri ---
+
+    // Ajouter les données (maintenant triées par étudiant)
+    sortedStudentEntries.forEach(([student, grades]) => {
       const row = [escapeCSV(student)];
       
       activityArray.forEach(activity => {
@@ -1003,10 +1120,13 @@ const ExportPDFComponentAllCorrectionsAutres: React.FC<any> = ({
   // Fonction pour créer une feuille Excel avec ExcelJS
   const createExcelWorksheet = (
     worksheet: any, 
-    corrections: any[], 
+    correctionsInput: any[], // Rename input to avoid shadowing
     viewType: ViewType, 
     arrangement: ArrangementType
   ) => {
+    // Create a mutable copy to sort
+    const corrections = [...correctionsInput];
+
     if (viewType === 'simplified' && (arrangement === 'class' || arrangement === 'subclass')) {
       // Format simplifié pour l'arrangement par classe
       // Regrouper les étudiants (lignes) et les activités (colonnes)
@@ -1014,6 +1134,19 @@ const ExportPDFComponentAllCorrectionsAutres: React.FC<any> = ({
       const activitySet = new Set<string>();
       const activityStatusMap: Record<string, string> = {}; // Pour stocker les statuts des activités
       
+      // --- Tri des corrections initiales (optionnel mais peut aider à la cohérence si la map est utilisée ailleurs) ---
+      corrections.sort((a: CorrectionAutreEnriched, b: CorrectionAutreEnriched) => {
+        const studentA = getStudentById(a.student_id) as Student | undefined;
+        const studentB = getStudentById(b.student_id) as Student | undefined;
+        const nameA = studentA ? `${studentA.last_name} ${studentA.first_name}` : '';
+        const nameB = studentB ? `${studentB.last_name} ${studentB.first_name}` : '';
+        if (!nameA && !nameB) return 0;
+        if (!nameA) return 1;
+        if (!nameB) return -1;
+        return nameA.localeCompare(nameB, 'fr', { sensitivity: 'base' });
+      });
+      // --- Fin du tri ---
+
       corrections.forEach(c => {
         const student = getStudentById(c.student_id);
         const activity = getActivityById(c.activity_id);
@@ -1045,7 +1178,10 @@ const ExportPDFComponentAllCorrectionsAutres: React.FC<any> = ({
         } else if (c.status) {
           switch (c.status) {
             case 'ACTIVE':
-              displayValue = c.grade !== undefined ? `${c.grade}/20` : 'NON NOTÉ';
+              
+              displayValue = c.grade !== undefined ? 
+              `${formatGrade(c.grade)} / 20`
+               : 'NON NOTÉ';
               break;
             case 'NON_NOTE':
               displayValue = 'NON NOTÉ';
@@ -1060,7 +1196,9 @@ const ExportPDFComponentAllCorrectionsAutres: React.FC<any> = ({
               displayValue = 'DÉSACTIVÉ';
               break;
             default:
-              displayValue = c.grade !== undefined ? `${c.grade}/20` : 'NON NOTÉ';
+              displayValue = c.grade !== undefined ? 
+              `${formatGrade(c.grade)} / 20`
+               : 'NON NOTÉ';
           }
         } else if (c.active === 0) {
           displayValue = 'DÉSACTIVÉ';
@@ -1085,7 +1223,14 @@ const ExportPDFComponentAllCorrectionsAutres: React.FC<any> = ({
       ];
       
       // Ajouter les données
-      Object.entries(studentMap).forEach(([studentName, grades]) => {
+      // --- Tri des entrées de la map par nom d'étudiant --- 
+      const sortedStudentEntries = Object.entries(studentMap).sort(([studentNameA], [studentNameB]) => {
+        return studentNameA.localeCompare(studentNameB, 'fr', { sensitivity: 'base' });
+      });
+      // --- Fin du tri ---
+
+      // Iterate over the sorted entries
+      sortedStudentEntries.forEach(([studentName, grades]) => {
         const rowData: any = { student: studentName };
         
         activityArray.forEach(activity => {
@@ -1141,7 +1286,20 @@ const ExportPDFComponentAllCorrectionsAutres: React.FC<any> = ({
         { header: 'Statut', key: 'status', width: 15 }
       ];
       
-      // Ajouter les données des corrections
+      // --- Ajout du tri par nom d'étudiant pour la vue détaillée ---
+      corrections.sort((a: CorrectionAutreEnriched, b: CorrectionAutreEnriched) => {
+        const studentA = getStudentById(a.student_id) as Student | undefined;
+        const studentB = getStudentById(b.student_id) as Student | undefined;
+        const nameA = studentA ? `${studentA.last_name} ${studentA.first_name}` : '';
+        const nameB = studentB ? `${studentB.last_name} ${studentB.first_name}` : '';
+        if (!nameA && !nameB) return 0;
+        if (!nameA) return 1;
+        if (!nameB) return -1;
+        return nameA.localeCompare(nameB, 'fr', { sensitivity: 'base' });
+      });
+      // --- Fin de l'ajout du tri ---
+
+      // Ajouter les données des corrections (maintenant triées)
       corrections.forEach(c => {
         const activity = getActivityById(c.activity_id);
         const student = getStudentById(c.student_id);
@@ -1167,7 +1325,7 @@ const ExportPDFComponentAllCorrectionsAutres: React.FC<any> = ({
         // Formater les points
         let pointsDisplay = isPlaceholder ? 'N/A' : 'N/A';
         if (!isPlaceholder && Array.isArray(c.points_earned) && c.points_earned.length > 0) {
-          pointsDisplay = c.points_earned.join(' / ');
+          pointsDisplay = '[' + c.points_earned.join(' ; ') + ']';
         }
         
         // Formater la note
@@ -1176,7 +1334,7 @@ const ExportPDFComponentAllCorrectionsAutres: React.FC<any> = ({
           gradeDisplay = 'N/A';
         } else if (c.grade !== undefined) {
           if (statusDisplay === 'ACTIVE') {
-            gradeDisplay = `${c.grade}/20`;
+            gradeDisplay = `${formatGrade(c.grade)} / 20`;
           } else {
             gradeDisplay = statusDisplay;
           }
@@ -1467,10 +1625,6 @@ const ExportPDFComponentAllCorrectionsAutres: React.FC<any> = ({
       )}
       
       <Paper sx={{ p: 2, mb: 3 }} elevation={1}>
-        <Typography variant="h5" gutterBottom>
-          Export des corrections avec barème dynamique
-        </Typography>
-        
         <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 2 }}>
           <Tabs value={activeTab} onChange={handleTabChange}>
             <Tab label="QR Codes" icon={<TableChartIcon />} />
@@ -1507,7 +1661,7 @@ const ExportPDFComponentAllCorrectionsAutres: React.FC<any> = ({
 
           <Grid container spacing={3} sx={{ mt: 2 }}>
             {/* Arrangment Options - Visible pour les deux onglets */}
-            <Grid size={{ xs: 12, md: 6 }}>
+            <Grid size={{ xs: 12, }}>
               <ArrangementOptions
                 arrangement={arrangement}
                 setArrangement={setArrangement}
@@ -1519,7 +1673,7 @@ const ExportPDFComponentAllCorrectionsAutres: React.FC<any> = ({
               />
             </Grid>
             
-            <Grid size={{ xs: 12, md: 6 }}>
+            <Grid size={{ xs: 12, }}>
               {activeTab === 0 ? (
                 <QRCodeExportOptions
                   onExport={handleExport}
@@ -1572,10 +1726,12 @@ const ExportPDFComponentAllCorrectionsAutres: React.FC<any> = ({
                         <TableCell>{student ? `${student.first_name} ${student.last_name}` : 'N/A'}</TableCell>
                         <TableCell>{className}</TableCell>
                         <TableCell>{activity?.name}</TableCell>
-                        <TableCell>{Array.isArray(correction.points_earned) ? correction.points_earned.join(' / ') : 'N/A'}</TableCell>
+                        <TableCell>{Array.isArray(correction.points_earned) ? '[' + correction.points_earned.join(' ; ') + ']' : 'N/A'}</TableCell>
                         <TableCell align="center">
                           <Chip
-                            label={correction.grade ? `${correction.grade}/20` : 'Non noté'}
+                            label={correction.grade ? 
+                               `${formatGrade(correction.grade)} / 20` 
+                               : 'Non noté'}
                             color={correction.grade >= 10 ? 'success' : 'error'}
                             variant="outlined"
                           />

@@ -148,4 +148,5 @@ export interface CorrectionAutreEnriched extends CorrectionAutreWithShareCode {
   status?: string;
   placeholder?: boolean;
   noQRCode?: boolean;
+  sub_class?: string | number | null;
 }

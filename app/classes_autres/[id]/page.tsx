@@ -28,7 +28,7 @@ import PatternBackground from '@/components/ui/PatternBackground';
 import AssociateActivitiesModal, { Activity as ModalActivity } from "@/components/classes/AssociateActivitiesModal";
 import CreateCorrectionsModalAutre from "@/components/corrections_autres/CreateCorrectionsModalAutre";
 import { CorrectionAutreEnriched, Class, Student, ActivityAutre } from '@/lib/types';
-import ExportPDFComponentAutre from '@/components/pdfAutre/ExportPDFComponentAutre';
+import ExportPDFComponentAllCorrectionsAutres from '@/components/pdf/ExportPDFComponentAllCorrectionsAutres';
 import CorrectionCardAutre from '@/components/allCorrections/CorrectionCard';
 import { getBatchShareCodes } from '@/lib/services/shareService';
 import { changeCorrectionAutreStatus } from '@/lib/services/correctionsAutresService';
@@ -1090,31 +1090,32 @@ export default function ClassAutreDetailPage({ params }: { params: Promise<{ id:
           </Typography>
           
           {classData && (
-            <ExportPDFComponentAutre
-              classData={classData}
+            <ExportPDFComponentAllCorrectionsAutres
+              corrections={corrections.map(correction => {
+                const student = students.find(s => s.id === correction.student_id);
+                return {
+                  ...correction,
+                  sub_class: student?.sub_class
+                };
+              })}
               activities={activities}
               students={students}
-              corrections={corrections}
               filterActivity={filterActivity}
               setFilterActivity={setFilterActivity}
-              filterSubClass={filterSubClass}
-              setFilterSubClass={setFilterSubClass}
               uniqueSubClasses={availableSubClasses}
               uniqueActivities={activities.map(a => ({ id: a.id, name: a.name }))}
-              getActivityById={(activityId) => activities.find(a => a.id === activityId)}
-              getStudentById={(studentId) => students.find(s => s.id === studentId)}
-              showQRCodes={true}
-              getBatchShareCodes={async (correctionIds) => {
-                // Convertir Map<string, string> en Record<string, string>
-                const shareCodesMap = await getBatchShareCodes(correctionIds);
-                const shareCodesRecord: Record<string, string> = {};
-                
-                // Convertir la Map en objet Record
-                shareCodesMap.forEach((code, id) => {
-                  shareCodesRecord[id] = code;
-                });
-                
-                return shareCodesRecord;
+              getActivityById={(activityId: number) => activities.find(a => a.id === activityId)}
+              getStudentById={(studentId: number) => students.find(s => s.id === studentId)}
+              getAllClasses={async () => {
+                try {
+                  const response = await fetch('/api/classes');
+                  if (!response.ok) throw new Error('Erreur lors du chargement des classes');
+                  return await response.json();
+                } catch (error) {
+                  console.error('Erreur:', error);
+                  enqueueSnackbar('Erreur lors du chargement des classes', { variant: 'error' });
+                  return [];
+                }
               }}
             />
           )}

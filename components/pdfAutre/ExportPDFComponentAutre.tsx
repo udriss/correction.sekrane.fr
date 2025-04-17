@@ -20,7 +20,7 @@ import QrCodeIcon from '@mui/icons-material/QrCode';
 import TableChartIcon from '@mui/icons-material/TableChart';
 import { Student, CorrectionAutreEnriched, ActivityAutre } from '@/lib/types';
 import NotesTabAutre from './NotesTabAutre';
-import QRCodeTabAutre from './QRCodeTabAutre';
+import ExportPDFComponentAllCorrectionsAutres from '@/components/pdf/ExportPDFComponentAllCorrectionsAutres';
 
 interface ExportPDFComponentAutreProps {
   classData: any;
@@ -141,18 +141,25 @@ const ExportPDFComponentAutre: React.FC<ExportPDFComponentAutreProps> = ({
         </Box>
         
         {activeTab === 0 && showQRCodes && (
-          <QRCodeTabAutre
-            classData={classData}
-            filteredCorrections={filteredCorrections}
+          <ExportPDFComponentAllCorrectionsAutres
+            corrections={filteredCorrections}
+            activities={activities}
+            students={students}
             filterActivity={filterActivity}
             setFilterActivity={setFilterActivity}
-            filterSubClass={filterSubClass}
-            setFilterSubClass={setFilterSubClass}
-            uniqueSubClasses={uniqueSubClasses}
             uniqueActivities={uniqueActivities}
-            students={students}
-            activities={activities}
-            getBatchShareCodes={getBatchShareCodes}
+            getActivityById={getActivityById}
+            getStudentById={getStudentById}
+            getAllClasses={async () => {
+              try {
+                const response = await fetch('/api/classes');
+                if (!response.ok) throw new Error('Erreur lors du chargement des classes');
+                return await response.json();
+              } catch (error) {
+                console.error('Erreur:', error);
+                return [];
+              }
+            }}
           />
         )}
         

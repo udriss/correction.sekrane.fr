@@ -33,11 +33,12 @@ import DragIndicatorIcon from '@mui/icons-material/DragIndicator';
 import GradientBackground from '@/components/ui/GradientBackground';
 import ErrorDisplay from '@/components/ui/ErrorDisplay';
 import ActivityStatsGraphs from '@/components/ActivityStatsGraphs';
-import ExportPDFComponentAutre from '@/components/pdfAutre/ExportPDFComponentAutre';
+import ExportPDFComponentAllCorrectionsAutres from '@/components/pdf/ExportPDFComponentAllCorrectionsAutres';
 // Import FragmentsList et le type Fragment
 import FragmentsList from '@/components/FragmentsList';
 import { Fragment } from '@/lib/types';
-import { getBatchShareCodes } from '@/lib/services/shareService';
+
+
 
 export default function ActivityAutreDetail({ params }: { params: Promise<{ id: string }> }) {
   // Unwrap the params Promise using React.use()
@@ -85,6 +86,26 @@ export default function ActivityAutreDetail({ params }: { params: Promise<{ id: 
     // Remove duplicates
     return Array.from(new Set(subClasses)).sort((a, b) => Number(a) - Number(b));
   }, [students]);
+
+  // Ajout d'un useMemo pour enrichir les corrections avec sub_class
+  const adaptedCorrections = useMemo(() => {
+    if (!corrections.length || !students.length) return [];
+    
+    return corrections.map(correction => {
+      const student = students.find(s => s.id === correction.student_id);
+      return {
+        ...correction,
+        sub_class: student?.sub_class
+      };
+    });
+  }, [corrections, students]);
+  
+  // Mettre à jour filteredCorrections quand adaptedCorrections change
+  useEffect(() => {
+    if (adaptedCorrections.length > 0) {
+      setFilteredCorrections(adaptedCorrections);
+    }
+  }, [adaptedCorrections]);
 
   // Récupérer le tab initial depuis l'URL ou utiliser 0 par défaut
   const initialTabValue = useMemo(() => {
@@ -161,28 +182,24 @@ export default function ActivityAutreDetail({ params }: { params: Promise<{ id: 
   useEffect(() => {
     const fetchStudentsAndClasses = async () => {
       try {
-        // Récupérer les étudiants
-        const studentsResponse = await fetch('/api/students');
-        if (studentsResponse.ok) {
-          const studentsData = await studentsResponse.json();
-          setStudents(studentsData);
-        }
-        
-        // Récupérer les classes associées à cette activité
-        const classesResponse = await fetch(`/api/activities_autres/${activityId}/classes`);
-        if (classesResponse.ok) {
-          const classesData = await classesResponse.json();
-          setFilteredCorrections(corrections);
+        // Vérifier si les étudiants sont déjà chargés
+        if (students.length === 0) {
+          // Récupérer les étudiants seulement si nous n'en avons pas encore
+          const studentsResponse = await fetch('/api/students');
+          if (studentsResponse.ok) {
+            const studentsData = await studentsResponse.json();
+            setStudents(studentsData);
+          }
         }
       } catch (err) {
-        console.error('Erreur lors du chargement des étudiants et des classes:', err);
+        console.error('Erreur lors du chargement des étudiants:', err);
       }
     };
     
     if ((tabValue === 4 || tabValue === 2) && corrections.length > 0) {
       fetchStudentsAndClasses();
     }
-  }, [tabValue, corrections, activityId, error]);
+  }, [tabValue, corrections]);
 
   // Définir une variable activities à partir de l'activité courante
   const activities = useMemo(() => {
@@ -396,12 +413,14 @@ export default function ActivityAutreDetail({ params }: { params: Promise<{ id: 
     }
   }, [tabValue, activityId, fetchFragmentsForActivity]);
 
+  
+
   // Composant pour afficher les parties de l'activité (utilisé en mode lecture)
   const renderParts = () => {
     if (!activity || !activity.parts_names || !activity.points) {
       return <Typography variant="body2">Aucune partie définie</Typography>;
     }
-    
+
     return (
       <Box sx={{ mt: 2 }}>
         <Typography variant="h6" gutterBottom>
@@ -941,22 +960,29 @@ export default function ActivityAutreDetail({ params }: { params: Promise<{ id: 
           {/* Quatrième onglet: Export PDF */}
           {tabValue === 4 && (
             <Box sx={{ py: 2 }}>
-              <ExportPDFComponentAutre
-                classData={{ id: activity?.id || 0, name: activity?.name || 'Activité' }}
-                corrections={filteredCorrections as CorrectionAutreEnriched[]}
-                activities={[{ id: activity?.id || 0, name: activity?.name || 'Activité', parts_names: activity?.parts_names || [], points: activity?.points || [] }]}
+              <ExportPDFComponentAllCorrectionsAutres
+                corrections={filteredCorrections}
+                activities={activities}
                 students={students}
                 filterActivity={activity?.id || 0}
-                setFilterActivity={() => {}} // Non utilisable dans ce contexte
-                filterSubClass={selectedSubGroup === '' ? 'all' : selectedSubGroup}
-                setFilterSubClass={(value) => setSelectedSubGroup(value === 'all' ? '' : value)}
+                setFilterActivity={() => {}} // Non modifiable dans ce contexte
                 uniqueSubClasses={uniqueSubClasses.filter(subClass => subClass !== undefined).map(subClass => ({ id: subClass || "0", name: `Groupe ${subClass}` }))}
                 uniqueActivities={[{ id: activity?.id || 0, name: activity?.name || 'Activité' }]}
-                getActivityById={(activityId) => activities.find((a: ActivityAutre) => a.id === activityId)}
-                getStudentById={(studentId) => {
+                getActivityById={(activityId: number) => activities.find((a: ActivityAutre) => a.id === activityId)}
+                getStudentById={(studentId: number) => {
                   return students.find(s => s.id === studentId);
                 }}
-                getBatchShareCodes={getBatchShareCodes}
+                getAllClasses={async () => {
+                  try {
+                    const response = await fetch('/api/classes');
+                    if (!response.ok) throw new Error('Erreur lors du chargement des classes');
+                    return await response.json();
+                  } catch (error) {
+                    console.error('Erreur:', error);
+                    enqueueSnackbar('Erreur lors du chargement des classes', { variant: 'error' });
+                    return [];
+                  }
+                }}
               />
             </Box>
           )}

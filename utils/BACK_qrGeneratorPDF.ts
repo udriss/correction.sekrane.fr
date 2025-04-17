@@ -222,7 +222,7 @@ export async function generateQRCodePDF({
       throw new Error('No corrections provided');
     }
 
-    console.log('corrections', corrections);
+    
     
     // Trier les corrections par nom d'étudiant
     let sortedCorrections = sortCorrectionsByStudentName(corrections, students);
@@ -236,8 +236,8 @@ export async function generateQRCodePDF({
       activities
     );
 
-    console.log('arrangement', arrangement);
-    console.log('subArrangement', subArrangement);
+    
+    
 
     // Create a new jsPDF instance
     const doc = new jsPDF({

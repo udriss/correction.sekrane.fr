@@ -77,6 +77,7 @@ const organizeAllCorrectionsData = ({
   // Maintenant, construisons le résultat en fonction de l'arrangement souhaité
   switch (arrangement) {
     case 'class':
+
       // Pour chaque classe, ajouter une entrée dans le résultat
       Object.entries(studentsByClass).forEach(([classIdStr, studentsInClass]) => {
         const classId = classIdStr === "null" ? null : Number(classIdStr);
@@ -306,6 +307,7 @@ const organizeAllCorrectionsData = ({
       break;
 
     case 'student':
+
       // Pour l'arrangement par étudiant, on parcourt tous les étudiants
       students.forEach(student => {
         const studentKey = `${student.last_name} ${student.first_name}`;
@@ -478,7 +480,7 @@ const organizeAllCorrectionsData = ({
       // Pour l'arrangement par groupe (subclass)
       // Étape 1: Regrouper les étudiants par sous-classe
       const studentsBySubClass: Record<string, { students: Student[], classIds: Set<number | null> }> = {};
-      
+
       // Parcourir tous les étudiants pour les regrouper par sous-classe
       students.forEach(student => {
         const subClass = student.sub_class !== undefined && student.sub_class !== null 
@@ -801,6 +803,7 @@ const organizeAllCorrectionsData = ({
       break;
 
     case 'activity':
+
       // Pour l'arrangement par activité
       const activities = filterActivity === 'all' 
         ? uniqueActivities 

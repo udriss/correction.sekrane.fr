@@ -523,15 +523,47 @@ export function useCorrectionsAutres(correctionId: string) {
     }
     
     setIsStatusChanging(true);
+    setError(''); // Clear previous errors
     try {
-      // Utiliser la fonction utilitaire du service
-      await fetch(`/api/corrections_autres/${correction.id}/status`, {
-        method: 'PUT',
+      // Determine new grade values based on newStatus
+      let gradeUpdate: number | null = null;
+      let penaltyUpdate: number | null = null;
+      let finalGradeUpdate: number | null = null;
+      let updateGrades = false; // Flag to indicate if grades should be updated in the API call
+
+      if (['ABSENT', 'DEACTIVATED', 'NON_NOTE'].includes(newStatus)) {
+        gradeUpdate = null;
+        penaltyUpdate = null;
+        finalGradeUpdate = null;
+        updateGrades = true;
+      } else if (newStatus === 'ACTIVE') {
+        gradeUpdate = 0;
+        penaltyUpdate = 0;
+        finalGradeUpdate = 0;
+        updateGrades = true;
+      }
+
+      // Prepare payload for the API request
+      const payload: { status: string; grade?: number | null; penalty?: number | null; final_grade?: number | null } = { status: newStatus };
+      if (updateGrades) {
+        payload.grade = gradeUpdate;
+        payload.penalty = penaltyUpdate;
+        payload.final_grade = finalGradeUpdate;
+      }
+
+      // API call to update status and potentially grades
+      const response = await fetch(`/api/corrections_autres/${correction.id}/status`, {
+        method: 'PUT', // Using PUT as per existing code, consider PATCH if applicable
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ status: newStatus }),
+        body: JSON.stringify(payload),
       });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || `Échec de la mise à jour du statut: ${response.statusText}`);
+      }
       
       // Map status to readable name for the toast message
       const statusNames: Record<string, string> = {
@@ -548,27 +580,37 @@ export function useCorrectionsAutres(correctionId: string) {
       
       setCorrectionStatus(newStatus);
       
-      // Also update the active state for backward compatibility
+      // Also update the active state for backward compatibility if needed
       setIsActive(newStatus === 'ACTIVE');
       
-      // Update correction object
+      // Update local correction object state
       setCorrection(prev => {
         if (!prev) return null;
+        
+        // Determine the final grade values for the local state update
+        const finalGrade = updateGrades ? gradeUpdate : prev.grade;
+        const finalPenalty = updateGrades ? penaltyUpdate : prev.penalty;
+        const finalFinalGrade = updateGrades ? finalGradeUpdate : prev.final_grade;
+
         return {
           ...prev,
           status: newStatus,
-          active: newStatus === 'ACTIVE' ? 1 : 0
+          active: newStatus === 'ACTIVE' ? 1 : 0, // Keep active field consistent if used elsewhere
+          grade: finalGrade,
+          penalty: finalPenalty,
+          final_grade: finalFinalGrade
         };
       });
       
     } catch (error) {
       console.error('Error changing correction status:', error);
       setError(`Erreur: ${error instanceof Error ? error.message : 'Échec de la mise à jour'}`);
-      setTimeout(() => setError(''), 5000);
+      // Consider clearing error after timeout
+      // setTimeout(() => setError(''), 5000); 
     } finally {
       setIsStatusChanging(false);
     }
-  }, [correction, correctionStatus]);
+  }, [correction, correctionStatus, correction?.id]); // Added correction.id to dependencies
 
   // Cancel delete confirmation
   const handleCancelDelete = useCallback(() => {
@@ -603,7 +645,7 @@ export function useCorrectionsAutres(correctionId: string) {
     setEditedName,
     setFirstName,
     setLastName,
-    setEmail,
+    // setEmail, // Removed duplicate key
     setIsEditingName,
     setCorrection,
     saveToHistory,
@@ -619,5 +661,7 @@ export function useCorrectionsAutres(correctionId: string) {
     saveDates,
     clearError,
     setSaving,
+    // Add setEmail back here if it was intended to be returned and was accidentally duplicated
+    setEmail, 
   };
 }
