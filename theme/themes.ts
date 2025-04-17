@@ -16,7 +16,7 @@ const themeGradients = {
     success: 'linear-gradient(135deg, #1b5e20, #388e3c)',
     warning: 'linear-gradient(135deg, #e65100, #ef6c00)',
     error: 'linear-gradient(135deg, #b71c1c, #c62828)',
-    info: 'linear-gradient(135deg,rgb(11, 75, 123),rgb(1, 110, 140)89, 164))',
+    info: 'linear-gradient(135deg, rgb(11, 75, 123), rgb(1, 110, 140))',
   },
   intermediate: {
     primary: 'linear-gradient(135deg,rgb(156, 194, 255),rgb(97, 231, 255))',

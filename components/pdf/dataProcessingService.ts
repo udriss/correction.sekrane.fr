@@ -587,18 +587,36 @@ const organizeData = ({
       break;
       
     case 'subclass':
+      // Créer une structure organisée pour les sous-classes
+      const subClassStructure: Record<string, any> = {};
+      
+      // Créer d'abord toutes les entrées de sous-classes pour assurer l'ordre
+      uniqueSubClasses.forEach(subClassObj => {
+        const subClassName = subClassObj.name || `Groupe ${subClassObj.id}`;
+        subClassStructure[subClassName] = {
+          info: { subClass: subClassObj.id },
+          items: {}
+        };
+      });
+      
+      // Ajouter aussi la catégorie "Sans groupe" si nécessaire
+      subClassStructure['Sans groupe'] = {
+        info: { subClass: null },
+        items: {}
+      };
+      
       // Traiter d'abord les corrections existantes
       corrections.forEach(correction => {
         const student = getStudentById(correction.student_id);
         if (!student) return;
         
         const subClass = student.sub_class;
-        const subClassName = subClass 
-          ? uniqueSubClasses.find(sc => sc.id === subClass)?.name || `Groupe ${subClass}`
-          : 'Sans groupe';
+        // Trouver le nom exact du sous-classe par son ID
+        const subClassObj = uniqueSubClasses.find(sc => Number(sc.id) === Number(subClass));
+        const subClassName = subClassObj ? subClassObj.name : (subClass ? `Groupe ${subClass}` : 'Sans groupe');
         
-        if (!result[subClassName]) {
-          result[subClassName] = {
+        if (!subClassStructure[subClassName]) {
+          subClassStructure[subClassName] = {
             info: { subClass },
             items: {}
           };
@@ -608,47 +626,47 @@ const organizeData = ({
         if (subArrangement === 'student') {
           const studentKey = `${student.last_name} ${student.first_name}`;
           
-          if (!result[subClassName].items[studentKey]) {
-            result[subClassName].items[studentKey] = {
+          if (!subClassStructure[subClassName].items[studentKey]) {
+            subClassStructure[subClassName].items[studentKey] = {
               info: { student },
               corrections: []
             };
           }
           
-          result[subClassName].items[studentKey].corrections.push(correction);
+          subClassStructure[subClassName].items[studentKey].corrections.push(correction);
         } 
         else if (subArrangement === 'activity') {
           const activity = getActivityById(correction.activity_id);
           const activityKey = activity?.name || `Activité ${correction.activity_id}`;
           
-          if (!result[subClassName].items[activityKey]) {
-            result[subClassName].items[activityKey] = {
+          if (!subClassStructure[subClassName].items[activityKey]) {
+            subClassStructure[subClassName].items[activityKey] = {
               info: { activity },
               corrections: []
             };
           }
           
-          result[subClassName].items[activityKey].corrections.push(correction);
+          subClassStructure[subClassName].items[activityKey].corrections.push(correction);
         }
         else if (subArrangement === 'class') {
           // Sous-arrangement par classe principale
           const className = classData.name || 'Classe';
           
-          if (!result[subClassName].items[className]) {
-            result[subClassName].items[className] = {
+          if (!subClassStructure[subClassName].items[className]) {
+            subClassStructure[subClassName].items[className] = {
               info: { className: classData.name },
               corrections: []
             };
           }
           
-          result[subClassName].items[className].corrections.push(correction);
+          subClassStructure[subClassName].items[className].corrections.push(correction);
         }
         else {
           // Pas de sous-arrangement
-          if (!result[subClassName].corrections) {
-            result[subClassName].corrections = [];
+          if (!subClassStructure[subClassName].corrections) {
+            subClassStructure[subClassName].corrections = [];
           }
-          result[subClassName].corrections.push(correction);
+          subClassStructure[subClassName].corrections.push(correction);
         }
       });
       
@@ -656,12 +674,12 @@ const organizeData = ({
       if (includeAllStudents) {
         studentsToInclude.forEach(student => {
           const subClass = student.sub_class;
-          const subClassName = subClass 
-            ? uniqueSubClasses.find(sc => sc.id === subClass)?.name || `Groupe ${subClass}`
-            : 'Sans groupe';
+          // Utiliser la même logique pour trouver le nom exact du sous-classe
+          const subClassObj = uniqueSubClasses.find(sc => Number(sc.id) === Number(subClass));
+          const subClassName = subClassObj ? subClassObj.name : (subClass ? `Groupe ${subClass}` : 'Sans groupe');
           
-          if (!result[subClassName]) {
-            result[subClassName] = {
+          if (!subClassStructure[subClassName]) {
+            subClassStructure[subClassName] = {
               info: { subClass },
               items: {}
             };
@@ -670,8 +688,8 @@ const organizeData = ({
           if (subArrangement === 'student') {
             const studentKey = `${student.last_name} ${student.first_name}`;
             
-            if (!result[subClassName].items[studentKey]) {
-              result[subClassName].items[studentKey] = {
+            if (!subClassStructure[subClassName].items[studentKey]) {
+              subClassStructure[subClassName].items[studentKey] = {
                 info: { student },
                 corrections: []
               };
@@ -679,12 +697,12 @@ const organizeData = ({
             
             // Si une activité spécifique est sélectionnée
             if (filterActivity !== 'all') {
-              const hasActivityCorrection = result[subClassName].items[studentKey].corrections.some(
+              const hasActivityCorrection = subClassStructure[subClassName].items[studentKey].corrections.some(
                 (c: any) => c.activity_id === filterActivity
               );
               
               if (!hasActivityCorrection) {
-                result[subClassName].items[studentKey].corrections.push({
+                subClassStructure[subClassName].items[studentKey].corrections.push({
                   id: -1,
                   student_id: student.id,
                   activity_id: filterActivity as number,
@@ -698,12 +716,12 @@ const organizeData = ({
             // Si toutes les activités sont sélectionnées
             else if (uniqueActivities.length > 0) {
               uniqueActivities.forEach(activity => {
-                const hasActivityCorrection = result[subClassName].items[studentKey].corrections.some(
+                const hasActivityCorrection = subClassStructure[subClassName].items[studentKey].corrections.some(
                   (c: any) => c.activity_id === activity.id
                 );
                 
                 if (!hasActivityCorrection) {
-                  result[subClassName].items[studentKey].corrections.push({
+                  subClassStructure[subClassName].items[studentKey].corrections.push({
                     id: -1,
                     student_id: student.id,
                     activity_id: activity.id,
@@ -722,20 +740,20 @@ const organizeData = ({
               const activity = getActivityById(filterActivity as number);
               const activityKey = activity?.name || `Activité ${filterActivity}`;
               
-              if (!result[subClassName].items[activityKey]) {
-                result[subClassName].items[activityKey] = {
+              if (!subClassStructure[subClassName].items[activityKey]) {
+                subClassStructure[subClassName].items[activityKey] = {
                   info: { activity },
                   corrections: []
                 };
               }
               
               // Vérifier si cet étudiant a déjà une correction pour cette activité
-              const hasStudentCorrection = result[subClassName].items[activityKey].corrections.some(
+              const hasStudentCorrection = subClassStructure[subClassName].items[activityKey].corrections.some(
                 (c: any) => c.student_id === student.id
               );
               
               if (!hasStudentCorrection) {
-                result[subClassName].items[activityKey].corrections.push({
+                subClassStructure[subClassName].items[activityKey].corrections.push({
                   id: -1,
                   student_id: student.id,
                   activity_id: filterActivity as number,
@@ -751,20 +769,20 @@ const organizeData = ({
               uniqueActivities.forEach(activity => {
                 const activityKey = activity.name || `Activité ${activity.id}`;
                 
-                if (!result[subClassName].items[activityKey]) {
-                  result[subClassName].items[activityKey] = {
+                if (!subClassStructure[subClassName].items[activityKey]) {
+                  subClassStructure[subClassName].items[activityKey] = {
                     info: { activity },
                     corrections: []
                   };
                 }
                 
                 // Vérifier si cet étudiant a déjà une correction pour cette activité
-                const hasStudentCorrection = result[subClassName].items[activityKey].corrections.some(
+                const hasStudentCorrection = subClassStructure[subClassName].items[activityKey].corrections.some(
                   (c: any) => c.student_id === student.id
                 );
                 
                 if (!hasStudentCorrection) {
-                  result[subClassName].items[activityKey].corrections.push({
+                  subClassStructure[subClassName].items[activityKey].corrections.push({
                     id: -1,
                     student_id: student.id,
                     activity_id: activity.id,
@@ -780,8 +798,8 @@ const organizeData = ({
           else if (subArrangement === 'class') {
             const className = classData.name || 'Classe';
             
-            if (!result[subClassName].items[className]) {
-              result[subClassName].items[className] = {
+            if (!subClassStructure[subClassName].items[className]) {
+              subClassStructure[subClassName].items[className] = {
                 info: { className: classData.name },
                 corrections: []
               };
@@ -790,12 +808,12 @@ const organizeData = ({
             // Si une activité spécifique est sélectionnée
             if (filterActivity !== 'all') {
               // Vérifier si cet étudiant a déjà une correction dans cette classe pour cette activité
-              const hasStudentActivityCorrection = result[subClassName].items[className].corrections.some(
+              const hasStudentActivityCorrection = subClassStructure[subClassName].items[className].corrections.some(
                 (c: any) => c.student_id === student.id && c.activity_id === filterActivity
               );
               
               if (!hasStudentActivityCorrection) {
-                result[subClassName].items[className].corrections.push({
+                subClassStructure[subClassName].items[className].corrections.push({
                   id: -1,
                   student_id: student.id,
                   activity_id: filterActivity as number,
@@ -810,12 +828,12 @@ const organizeData = ({
             else if (uniqueActivities.length > 0) {
               uniqueActivities.forEach(activity => {
                 // Vérifier si cet étudiant a déjà une correction dans cette classe pour cette activité
-                const hasStudentActivityCorrection = result[subClassName].items[className].corrections.some(
+                const hasStudentActivityCorrection = subClassStructure[subClassName].items[className].corrections.some(
                   (c: any) => c.student_id === student.id && c.activity_id === activity.id
                 );
                 
                 if (!hasStudentActivityCorrection) {
-                  result[subClassName].items[className].corrections.push({
+                  subClassStructure[subClassName].items[className].corrections.push({
                     id: -1,
                     student_id: student.id,
                     activity_id: activity.id,
@@ -830,19 +848,19 @@ const organizeData = ({
           }
           else {
             // Pas de sous-arrangement
-            if (!result[subClassName].corrections) {
-              result[subClassName].corrections = [];
+            if (!subClassStructure[subClassName].corrections) {
+              subClassStructure[subClassName].corrections = [];
             }
             
             // Si une activité spécifique est sélectionnée
             if (filterActivity !== 'all') {
               // Vérifier si cet étudiant a déjà une correction pour cette activité
-              const hasStudentActivityCorrection = result[subClassName].corrections.some(
+              const hasStudentActivityCorrection = subClassStructure[subClassName].corrections.some(
                 (c: any) => c.student_id === student.id && c.activity_id === filterActivity
               );
               
               if (!hasStudentActivityCorrection) {
-                result[subClassName].corrections.push({
+                subClassStructure[subClassName].corrections.push({
                   id: -1,
                   student_id: student.id,
                   activity_id: filterActivity as number,
@@ -857,12 +875,12 @@ const organizeData = ({
             else if (uniqueActivities.length > 0) {
               uniqueActivities.forEach(activity => {
                 // Vérifier si cet étudiant a déjà une correction pour cette activité
-                const hasStudentActivityCorrection = result[subClassName].corrections.some(
+                const hasStudentActivityCorrection = subClassStructure[subClassName].corrections.some(
                   (c: any) => c.student_id === student.id && c.activity_id === activity.id
                 );
                 
                 if (!hasStudentActivityCorrection) {
-                  result[subClassName].corrections.push({
+                  subClassStructure[subClassName].corrections.push({
                     id: -1,
                     student_id: student.id,
                     activity_id: activity.id,
@@ -877,6 +895,14 @@ const organizeData = ({
           }
         });
       }
+      
+      // Transférer la structure ordonnée des sous-classes vers le résultat final
+      Object.entries(subClassStructure).forEach(([subClassName, data]) => {
+        // Ne pas inclure les groupes vides
+        if (Object.keys(data.items).length > 0 || (data.corrections && data.corrections.length > 0)) {
+          result[subClassName] = data;
+        }
+      });
       break;
       
     case 'activity':

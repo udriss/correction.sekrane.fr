@@ -35,7 +35,6 @@ export async function POST(request: Request) {
       (shareCodes as any[]).forEach(item => {
         shareCodesMap[item.correction_id] = item.code;
       });
-      
       return NextResponse.json(shareCodesMap);
     } catch (error) {
       console.error('Erreur lors de la récupération des codes de partage en lot:', error);

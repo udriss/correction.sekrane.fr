@@ -637,7 +637,7 @@ export default function ActivitiesAutresPage() {
                                 
                                 {/* Points breakdown */}
                                 <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1, mt: 2 }}>
-                                  {activity.parts_names.map((name, index) => (
+                                  {Array.isArray(activity.parts_names) && activity.parts_names.map((name, index) => (
                                     <Tooltip key={index} title="Voir les détails de cette activité">
                                       <Chip 
                                         label={

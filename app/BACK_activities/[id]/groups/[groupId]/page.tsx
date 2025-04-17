@@ -1,6 +1,6 @@
 'use client';
 
-import { generateQRCodePDF } from '@/utils/qrGeneratorPDF';
+import { generateQRCodePDF } from '@/utils/BACK_qrGeneratorPDF';
 import { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import {

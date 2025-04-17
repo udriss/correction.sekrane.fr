@@ -137,16 +137,35 @@ export async function getBatchShareCodes(correctionIds: (string | number)[]): Pr
     }
     
     const data = await response.json();
+
+    
     const shareCodesMap = new Map<string, string>();
     
-    if (data.shareCodes && Array.isArray(data.shareCodes)) {
+    // Vérifier si les données sont un tableau ou un objet avec des clés numériques
+    if (Array.isArray(data.shareCodes)) {
+      // Format attendu: un tableau d'objets { correction_id, code }
       data.shareCodes.forEach((item: any) => {
         if (item.correction_id && item.code) {
           shareCodesMap.set(item.correction_id.toString(), item.code);
         }
       });
+    } else if (typeof data === 'object' && data !== null) {
+      // Format alternatif: un objet où les clés sont les IDs et les valeurs sont les codes
+      // Parcourir toutes les propriétés de l'objet data qui correspondent à des IDs de correction
+      Object.keys(data).forEach(key => {
+        // Ignorer les propriétés qui ne sont pas censées être des IDs de correction
+        if (key !== 'shareCodes' && !isNaN(Number(key))) {
+          const correctionId = key;
+          const shareCode = data[key];
+          
+          if (typeof shareCode === 'string') {
+            shareCodesMap.set(correctionId, shareCode);
+          }
+        }
+      });
     }
     
+
     return shareCodesMap;
   } catch (error) {
     console.error('Error fetching batch share codes:', error);

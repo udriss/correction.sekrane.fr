@@ -4,18 +4,15 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import {
   Container, Paper, Typography, Box, Chip, Button, 
-  IconButton, Menu, MenuItem, TextField, FormControl,
+  Menu, MenuItem, TextField, FormControl,
   InputLabel, Select, Badge, Divider, ListItemIcon, ListItemText,
   SelectChangeEvent, InputAdornment, Tabs, Tab, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle,
-  Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TablePagination,
   ToggleButton, ToggleButtonGroup
 } from '@mui/material';
 import Grid from '@mui/material/Grid';
 import { useSnackbar } from 'notistack';
-import { Correction, CorrectionWithShareCode } from '@/lib/types';
+
 import { Student as BaseStudent } from '@/lib/types';
-import { Correction as ProviderCorrection } from '@/app/components/CorrectionsDataProvider';
-import ExportPDFComponent from '@/components/pdf/ExportPDFComponent';
 import ExportPDFComponentAllCorrections from '@/components/pdf/ExportPDFComponentAllCorrections';
 
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
@@ -40,11 +37,8 @@ import GradientBackground from '@/components/ui/GradientBackground';
 import PatternBackground from '@/components/ui/PatternBackground';
 import CorrectionsProvider, { useCorrections } from '@/app/components/CorrectionsDataProvider';
 import ChronologyList from '@/components/allCorrections/ChronologyList';
-import { generateQRCodePDF } from '@/utils/qrGeneratorPDF';
 import QrCodeIcon from '@mui/icons-material/QrCode';
-import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf';
 import VisibilityIcon from '@mui/icons-material/Visibility';
-import GroupIcon from '@mui/icons-material/Group';
 import DeleteIcon from '@mui/icons-material/Delete';
 import { BatchDeleteProvider, useBatchDelete } from '@/hooks/useBatchDelete';
 import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
@@ -93,17 +87,12 @@ function CorrectionsContent() {
   // Add state for scroll tracking
   const [stickyButtons, setStickyButtons] = useState(false);
   
-  // États pour la pagination du tableau d'aperçu des corrections
-  const [page, setPage] = useState(0);
-  const [rowsPerPage, setRowsPerPage] = useState(10);
-  
   // États pour ExportPDFComponent
   const [classData, setClassData] = useState<any>(null);
   const [activities, setActivities] = useState<Activity[]>([]);
   const [classStudents, setClassStudents] = useState<any[]>([]);
   const [students, setStudents] = useState<ClassStudent[]>([]);
   const [filterActivity, setFilterActivity] = useState<number | 'all'>('all');
-  const [filterSubClass, setFilterSubClass] = useState<string | 'all'>('all');
   const [errorDetails, setErrorDetails] = useState<any>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
@@ -654,16 +643,7 @@ function CorrectionsContent() {
   };
 
 
-  // Gestion du changement de page
-  const handleChangePage = (event: unknown, newPage: number) => {
-    setPage(newPage);
-  };
 
-  // Gestion du changement du nombre d'éléments par page
-  const handleChangeRowsPerPage = (event: React.ChangeEvent<HTMLInputElement>) => {
-    setRowsPerPage(parseInt(event.target.value, 10));
-    setPage(0);
-  };
 
   if (loading && !filteredCorrections.length) {
     return (

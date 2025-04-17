@@ -109,7 +109,7 @@ export interface ActivityAutre {
   id: number;
   name: string;
   content?: string | null;
-  parts_names: string[];
+  parts_names?: string[];
   points: number[];
   user_id?: number;
   created_at?: string;
@@ -123,7 +123,7 @@ export interface CorrectionAutre {
   grade?: number | null;
   points_earned: number[]; // Array of points earned for each part
   submission_date?: Date | string;
-  content: string | null;
+  content?: string | null;
   content_data?: Date | string; // Could be JSON or string
   created_at?: Date | string;
   updated_at?: Date | string;
@@ -146,4 +146,6 @@ export interface CorrectionAutreEnriched extends CorrectionAutreWithShareCode {
   student_name?: string;
   score_percentage?: number;
   status?: string;
+  placeholder?: boolean;
+  noQRCode?: boolean;
 }

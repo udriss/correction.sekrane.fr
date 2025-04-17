@@ -1,24 +1,33 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import {
   Container, Paper, Typography, Box, Chip, Button, Menu, MenuItem, TextField, FormControl,
-  InputLabel, Select, ListItemIcon, ListItemText,
-   Tabs, Tab, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle,
+  InputLabel, Select, ListItemIcon, ListItemText, Badge, Divider, InputAdornment, SelectChangeEvent,
+  Tabs, Tab, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle,
+  ToggleButton, ToggleButtonGroup
 } from '@mui/material';
 import Grid from '@mui/material/Grid';
 import { useSnackbar } from 'notistack';
 import { ActivityAutre } from '@/lib/types';
 import { Student as BaseStudent } from '@/lib/types';
 
+// Date management
+import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
+import { LocalizationProvider, DatePicker } from '@mui/x-date-pickers';
 
 // Icons
 import FilterAltIcon from '@mui/icons-material/FilterAlt';
+import DeleteIcon from '@mui/icons-material/Delete';
 import SortIcon from '@mui/icons-material/Sort';
 import GradeIcon from '@mui/icons-material/Grade';
 import AssignmentIcon from '@mui/icons-material/Assignment';
 import CalendarIcon from '@mui/icons-material/CalendarToday';
+import SearchIcon from '@mui/icons-material/Search';
+import CheckIcon from '@mui/icons-material/Check';
+import VisibilityIcon from '@mui/icons-material/Visibility';
+import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
 import { alpha, useTheme } from '@mui/material/styles';
 import GradientBackground from '@/components/ui/GradientBackground';
 import PatternBackground from '@/components/ui/PatternBackground';
@@ -45,6 +54,16 @@ export default function CorrectionsAutresPage() {
     classId: searchParams?.get('classId') || '',
     studentId: searchParams?.get('studentId') || '',
     activityId: searchParams?.get('activityId') || '',
+    recent: searchParams?.get('recent') === 'true',
+    highlight: searchParams?.get('highlight') || '',
+    correctionId: searchParams?.get('correctionId') || '',
+    subClassId: searchParams?.get('subClassId') || '',
+    hideInactive: false,
+    showOnlyInactive: false,
+    dateFrom: null as dayjs.Dayjs | null,
+    dateTo: null as dayjs.Dayjs | null,
+    minGrade: '',
+    maxGrade: '',
   };
 
   const initialSort = {
@@ -71,7 +90,11 @@ function CorrectionsContent() {
   const [sortAnchorEl, setSortAnchorEl] = useState<null | HTMLElement>(null);
   const [filterAnchorEl, setFilterAnchorEl] = useState<null | HTMLElement>(null);
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
-  const [tabValue, setTabValue] = useState(0);
+  
+  // Récupérer l'onglet à partir de l'URL lors du chargement initial
+  const initialTabValue = searchParams?.get('tab') ? parseInt(searchParams.get('tab') || '0', 10) : 0;
+  const [tabValue, setTabValue] = useState(initialTabValue);
+  
   const [filterActivity, setFilterActivity] = useState<number | 'all'>('all');
   const [stickyButtons, setStickyButtons] = useState(false);
 
@@ -88,7 +111,8 @@ function CorrectionsContent() {
     removeFilter,
     clearAllFilters,
     refreshCorrections,
-    errorString
+    errorString,
+    isLoading
   } = useCorrectionsAutres();
 
   const { 
@@ -234,6 +258,12 @@ function CorrectionsContent() {
     }
   };
 
+    // Function to cancel batch delete mode
+    const handleCancelBatchDelete = () => {
+      setBatchDeleteMode(false);
+      setSelectedCorrections([]);
+    };
+    
   const getFilterLabel = (filter: string) => {
     switch (filter) {
       case 'search':
@@ -272,7 +302,6 @@ function CorrectionsContent() {
       const activity = metaData.activities.find(a => a.id === correction.activity_id);
       const student = metaData.students.find(s => s.id === correction.student_id);
       const classInfo = metaData.classes.find(c => c.id === correction.class_id);
-      
       // Calculate total points and grade
       const totalPoints = activity ? activity.points.reduce((sum, p) => sum + p, 0) : 20;
       const earnedPoints = correction.points_earned ? correction.points_earned.reduce((sum, p) => sum + p, 0) : 0;
@@ -283,17 +312,31 @@ function CorrectionsContent() {
         activity_name: activity?.name || 'Activité inconnue',
         student_name: student ? `${student.last_name} ${student.first_name}` : 'Étudiant inconnu',
         class_name: classInfo?.name || 'Classe inconnue',
-        experimental_points_earned: earnedPoints,
-        theoretical_points_earned: 0,
+        points_earned: correction.points_earned || [],
         grade: calculatedGrade,
         score_percentage: (calculatedGrade / 20) * 100,
+        sub_class : student?.sub_class
       };
     });
   }, [filteredCorrections, metaData]);
 
-  
 
-  
+
+  // Track scroll position
+  useEffect(() => {
+    const handleScroll = () => {
+      // Determine if buttons should be sticky (when scrolled past 100px)
+      const tabsElement = document.getElementById('correction-tabs-container');
+      if (tabsElement) {
+        const tabsRect = tabsElement.getBoundingClientRect();
+        setStickyButtons(tabsRect.top < 100);
+      }
+    };
+    
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
+
   return (
     <Container maxWidth="lg" sx={{ py: 4 }}>
       {/* Header */}
@@ -321,7 +364,7 @@ function CorrectionsContent() {
                 </Box>
                 
                 <Box>
-                  <Typography variant='h4' fontWeight={700} color='text.primary'>Corrections avec barème dynamique</Typography>
+                  <Typography variant='h4' fontWeight={700} color='text.primary'>Corrections</Typography>
                   <Typography variant='body1' color='text.secondary' sx={{ mt: 0.5 }}>
                     Gérez les corrections avec des points personnalisés par partie
                   </Typography>
@@ -334,7 +377,9 @@ function CorrectionsContent() {
                   variant="outlined"
                   onClick={handleSortClick}
                   startIcon={<SortIcon />}
-                  color="inherit"
+                  sx={{
+                    color: (theme) => theme.palette.secondary.dark,
+                  }}
                 >
                   Trier
                 </Button>
@@ -344,7 +389,9 @@ function CorrectionsContent() {
                   variant="outlined"
                   onClick={handleFilterClick}
                   startIcon={<FilterAltIcon />}
-                  color="inherit"
+                  sx={{
+                    color: (theme) => theme.palette.secondary.dark,
+                  }}
                 >
                   Filtrer
                 </Button>
@@ -357,8 +404,19 @@ function CorrectionsContent() {
                 >
                   Nouvelle correction
                 </Button>
+                <Button
+                variant="contained"
+                color="error"
+                onClick={() => setBatchDeleteMode(true)}
+                startIcon={<DeleteIcon />}
+                size="small"
+                disabled={filteredCorrections.length === 0}
+              >
+                Suppression en lot
+              </Button>
               </Box>
-            </Box>
+              </Box>
+
 
             {/* Active filters display */}
             {activeFilters.length > 0 && (
@@ -396,7 +454,7 @@ function CorrectionsContent() {
               <Paper sx={{ 
                 p: 2, 
                 textAlign: 'center',
-                bgcolor: (theme) => alpha(theme.palette.myBoxes.primary, 0.5),
+                bgcolor: (theme) => alpha(theme.palette.myBoxes?.primary || '#f0f0f0', 0.5),
                 backdropFilter: 'blur(5px)',
                 borderRadius: 2,
               }}>
@@ -414,12 +472,34 @@ function CorrectionsContent() {
       </Paper>
 
       {/* Tabs and content */}
-      <Box sx={{ mb: 3 }}>
+      <Box 
+        id="correction-tabs-container"
+        sx={{ 
+          mb: 3, 
+          display: 'flex', 
+          justifyContent: 'space-between', 
+          alignItems: 'center',
+          borderBottom: 1,
+          borderColor: 'divider',
+          position: 'relative',
+          zIndex: 10
+        }}
+      >
+
         <Tabs 
           value={tabValue} 
           onChange={handleTabChange}
           variant="scrollable"
           scrollButtons="auto"
+          sx={{
+            '& .MuiTab-root': {
+              textTransform: 'none',
+              fontWeight: 600,
+              fontSize: '1rem',
+            },
+            flexGrow: 1, // Permet aux tabs de prendre l'espace disponible
+            maxWidth: { xs: '100%', sm: '70%' } // Limite la largeur sur grand écran
+          }}
         >
           <Tab label="Toutes les corrections" />
           <Tab label="Par classe" />
@@ -427,8 +507,137 @@ function CorrectionsContent() {
           <Tab label="Chronologie" />
           <Tab label="Export PDF" />
         </Tabs>
+        <Divider sx={{ my: 2 }} />
+
       </Box>
 
+
+      {/* Filter toggle group for active/inactive corrections */}
+      <Box sx={{ mb: 2 }}>
+        <FormControl fullWidth>
+          <Typography variant="body2" color="text.secondary" gutterBottom>
+            Statut des corrections
+          </Typography>
+          <ToggleButtonGroup
+            value={activeFilters.includes('hideInactive') 
+              ? 'active' 
+              : activeFilters.includes('showOnlyInactive') 
+                ? 'inactive' 
+                : 'all'}
+            exclusive
+            onChange={(event, newValue) => {
+              // On commence par réinitialiser complètement les filtres d'activité
+              setActiveFilters(prev => prev.filter(f => f !== 'hideInactive' && f !== 'showOnlyInactive'));
+              setFilters(prev => ({
+                ...prev,
+                hideInactive: false,
+                showOnlyInactive: false
+              }));
+
+              // On attend que la réinitialisation soit terminée avant d'appliquer le nouveau filtre
+              setTimeout(() => {
+                if (newValue === 'active') {
+                  setFilters(prev => ({ ...prev, hideInactive: true }));
+                  setActiveFilters(prev => [...prev, 'hideInactive']);
+                } else if (newValue === 'inactive') {
+                  setFilters(prev => ({ ...prev, showOnlyInactive: true }));
+                  setActiveFilters(prev => [...prev, 'showOnlyInactive']);
+                }
+                // Pour 'all', on ne fait rien car on a déjà tout réinitialisé
+              }, 0);
+            }}
+            size="small"
+            color="primary"
+            sx={{
+              boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+              '& .MuiToggleButtonGroup-grouped': {
+                px: 3,
+                py: 1
+              }
+            }}
+          >
+            <ToggleButton 
+              value="active"
+              sx={{
+                fontWeight: activeFilters.includes('hideInactive') ? 'medium' : 'normal',
+                transition: 'all 0.2s'
+              }}
+            >
+              <VisibilityIcon sx={{ mr: 1, fontSize: '1rem' }} />
+              Actives uniquement
+            </ToggleButton>
+            <ToggleButton 
+              value="inactive"
+              sx={{
+                fontWeight: activeFilters.includes('showOnlyInactive') ? 'medium' : 'normal',
+                transition: 'all 0.2s'
+              }}
+            >
+              <VisibilityOffIcon sx={{ mr: 1, fontSize: '1rem' }} />
+              Inactives uniquement
+            </ToggleButton>
+            <ToggleButton 
+              value="all"
+              sx={{
+                fontWeight: !activeFilters.includes('hideInactive') && !activeFilters.includes('showOnlyInactive') ? 'medium' : 'normal',
+                transition: 'all 0.2s'
+              }}
+            >
+              <FilterAltIcon sx={{ mr: 1, fontSize: '1rem' }} />
+              Toutes les corrections
+            </ToggleButton>
+          </ToggleButtonGroup>
+          <Typography variant="overline" sx={{ mt: 1, display: 'block', color: theme => theme.palette.secondary.dark }}>
+            {activeFilters.includes('hideInactive')
+              ? 'Affiche uniquement les corrections actives'
+              : activeFilters.includes('showOnlyInactive')
+                ? 'Affiche uniquement les corrections inactives'
+                : 'Affiche toutes les corrections, y compris celles qui sont inactives'}
+          </Typography>
+        </FormControl>
+      </Box>
+
+
+
+        {/* Sticky Batch Delete Button Container */}
+        {batchDeleteMode && (
+        <Box 
+          sx={{
+            display: 'flex',
+            justifyContent: 'flex-end',
+            gap: 1,
+            position: stickyButtons ? 'fixed' : 'static',
+            top: stickyButtons ? '100px' : 'auto', //
+            right: stickyButtons ? '15px' : 'auto',
+            zIndex: 1100,
+            transition: 'all 0.3s ease',
+            py: 1,
+            px: 2,
+            bgcolor: theme => stickyButtons ? alpha(theme.palette.background.paper, 0.9) : 'transparent',
+            backdropFilter: stickyButtons ? 'blur(8px)' : 'none',
+            borderRadius: stickyButtons ? 2 : 0,
+            boxShadow: stickyButtons ? 3 : 0,
+          }}
+        >
+          <Button
+            variant="contained"
+            color="error"
+            onClick={() => setConfirmDeleteOpen(true)}
+            startIcon={<DeleteIcon />}
+            size="small"
+            disabled={selectedCorrections.length === 0}
+          >
+            Supprimer ({selectedCorrections.length})
+          </Button>
+          <Button
+            variant="outlined"
+            onClick={handleCancelBatchDelete}
+            size="small"
+          >
+            Annuler
+          </Button>
+        </Box>
+      )}
       {/* Content based on selected tab */}
       {tabValue === 0 && (
         <CorrectionsListAutres
@@ -440,6 +649,8 @@ function CorrectionsContent() {
           highlightedIds={searchParams?.get('highlight')?.split(',').filter(Boolean) || []}
           recentFilter={activeFilters.includes('recent')}
           refreshCorrections={refreshCorrections}
+          isLoading={isLoading}
+          getStudentById={getStudentById}
         />
       )}
 
@@ -452,6 +663,8 @@ function CorrectionsContent() {
           highlightedIds={searchParams?.get('highlight')?.split(',').filter(Boolean) || []}
           getGradeColor={getGradeColor}
           refreshCorrections={refreshCorrections}
+          isLoading={isLoading}
+          getStudentById={getStudentById}
         />
       )}
 
@@ -465,6 +678,8 @@ function CorrectionsContent() {
           highlightedIds={searchParams?.get('highlight')?.split(',').filter(Boolean) || []}
           recentFilter={activeFilters.includes('recent')}
           refreshCorrections={refreshCorrections}
+          isLoading={isLoading}
+          getStudentById={getStudentById}
         />
       )}
 
@@ -477,6 +692,8 @@ function CorrectionsContent() {
           getGradeColor={getGradeColor}
           highlightedIds={searchParams?.get('highlight')?.split(',').filter(Boolean) || []}
           recentFilter={activeFilters.includes('recent')}
+          isLoading={isLoading}
+          getStudentById={getStudentById}
         />
       )}
 
@@ -531,37 +748,297 @@ function CorrectionsContent() {
         </MenuItem>
       </Menu>
 
-      {/* Filter menu */}
+      {/* Filter menu - Updated with additional filters */}
       <Menu
         anchorEl={filterAnchorEl}
         open={Boolean(filterAnchorEl)}
         onClose={handleFilterClose}
+        slotProps ={{
+          paper: {
+            sx: {
+              width: 300,
+              maxHeight: '80vh',
+              p: 2
+            }
+          }
+        }}
       >
-        <MenuItem>
-          <FormControl fullWidth>
-            <TextField
-              label="Recherche"
-              value={filters.search}
-              onChange={(e) => setFilters({ ...filters, search: e.target.value })}
-              size="small"
-            />
-          </FormControl>
-        </MenuItem>
-        <MenuItem>
-          <FormControl fullWidth>
+        <Typography variant="subtitle1" fontWeight="bold" gutterBottom>
+          Filtrer les corrections
+        </Typography>
+        
+        <Divider sx={{ mb: 2 }} />
+        
+        <Box sx={{ mb: 2 }}>
+          <TextField
+            name="search"
+            label="Recherche"
+            fullWidth
+            size="small"
+            value={filters.search}
+            onChange={(e) => setFilters({ ...filters, search: e.target.value })}
+            slotProps={{
+              input: {
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <SearchIcon fontSize="small" />
+                  </InputAdornment>
+                ),
+              }
+            }}
+          />
+          <Button 
+            variant="text" 
+            size="small" 
+            onClick={() => applyFilter('search')}
+            disabled={!filters.search}
+            sx={{ mt: 0.5 }}
+          >
+            Appliquer
+          </Button>
+        </Box>
+        
+        <Box sx={{ mb: 2 }}>
+          <FormControl fullWidth size="small">
             <InputLabel>Classe</InputLabel>
             <Select
+              name="classId"
               value={filters.classId}
               onChange={(e) => setFilters({ ...filters, classId: e.target.value })}
               label="Classe"
             >
-              <MenuItem value="">Toutes les classes</MenuItem>
+              <MenuItem value="">
+                <em>Toutes les classes</em>
+              </MenuItem>
               {metaData.classes.map((c: { id: number; name: string }) => (
                 <MenuItem key={c.id} value={c.id.toString()}>{c.name}</MenuItem>
               ))}
             </Select>
           </FormControl>
-        </MenuItem>
+          <Button 
+            variant="text" 
+            size="small" 
+            onClick={() => applyFilter('classId')}
+            disabled={!filters.classId}
+            sx={{ mt: 0.5 }}
+          >
+            Appliquer
+          </Button>
+        </Box>
+        
+        <Box sx={{ mb: 2 }}>
+          <FormControl fullWidth size="small">
+            <InputLabel>Étudiant</InputLabel>
+            <Select
+              name="studentId"
+              value={filters.studentId}
+              onChange={(e) => setFilters({ ...filters, studentId: e.target.value })}
+              label="Étudiant"
+            >
+              <MenuItem value="">
+                <em>Tous les étudiants</em>
+              </MenuItem>
+              {metaData.students.map((s: BaseStudent) => (
+                <MenuItem key={s.id} value={s.id.toString()}>
+                  {s.last_name} {s.first_name}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+          <Button 
+            variant="text" 
+            size="small" 
+            onClick={() => applyFilter('studentId')}
+            disabled={!filters.studentId}
+            sx={{ mt: 0.5 }}
+          >
+            Appliquer
+          </Button>
+        </Box>
+        
+        <Box sx={{ mb: 2 }}>
+          <FormControl fullWidth size="small">
+            <InputLabel>Activité</InputLabel>
+            <Select
+              name="activityId"
+              value={filters.activityId}
+              onChange={(e) => setFilters({ ...filters, activityId: e.target.value })}
+              label="Activité"
+            >
+              <MenuItem value="">
+                <em>Toutes les activités</em>
+              </MenuItem>
+              {metaData.activities.map((a: ActivityAutre) => (
+                <MenuItem key={a.id} value={a.id.toString()}>{a.name}</MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+          <Button 
+            variant="text" 
+            size="small" 
+            onClick={() => applyFilter('activityId')}
+            disabled={!filters.activityId}
+            sx={{ mt: 0.5 }}
+          >
+            Appliquer
+          </Button>
+        </Box>
+        
+        <LocalizationProvider dateAdapter={AdapterDayjs}>
+          <Box sx={{ mb: 2 }}>
+            <Typography variant="body2" color="text.secondary" gutterBottom>
+              Période
+            </Typography>
+            <Box sx={{ display: 'flex', gap: 1, mb: 1 }}>
+              <DatePicker
+                label="Date début"
+                value={filters.dateFrom ? dayjs(filters.dateFrom) : null}
+                onChange={(date) => handleDateChange('dateFrom', date)}
+                slotProps={{
+                  textField: {
+                    size: 'small',
+                    fullWidth: true
+                  }
+                }}
+              />
+              <Button 
+                variant="text" 
+                size="small" 
+                onClick={() => applyFilter('dateFrom')}
+                disabled={!filters.dateFrom}
+              >
+                <CheckIcon fontSize="small" />
+              </Button>
+            </Box>
+            <Box sx={{ display: 'flex', gap: 1 }}>
+              <DatePicker
+                label="Date fin"
+                value={filters.dateTo ? dayjs(filters.dateTo) : null}
+                onChange={(date) => handleDateChange('dateTo', date)}
+                slotProps={{
+                  textField: {
+                    size: 'small',
+                    fullWidth: true
+                  }
+                }}
+              />
+              <Button 
+                variant="text" 
+                size="small" 
+                onClick={() => applyFilter('dateTo')}
+                disabled={!filters.dateTo}
+              >
+                <CheckIcon fontSize="small" />
+              </Button>
+            </Box>
+          </Box>
+        </LocalizationProvider>
+        
+        <Box sx={{ mb: 2 }}>
+          <Typography variant="body2" color="text.secondary" gutterBottom>
+            Plage de notes
+          </Typography>
+          <Box sx={{ display: 'flex', gap: 1, mb: 1 }}>
+            <TextField
+              name="minGrade"
+              label="Note min"
+              type="number"
+              size="small"
+              fullWidth
+              value={filters.minGrade}
+              onChange={(e) => setFilters({ ...filters, minGrade: e.target.value })}
+              slotProps={{
+                input: {
+                  inputProps: { min: 0, step: 0.5 },
+                }
+              }}
+            />
+            <Button 
+              variant="text" 
+              size="small" 
+              onClick={() => applyFilter('minGrade')}
+              disabled={!filters.minGrade}
+            >
+              <CheckIcon fontSize="small" />
+            </Button>
+          </Box>
+          <Box sx={{ display: 'flex', gap: 1 }}>
+            <TextField
+              name="maxGrade"
+              label="Note max"
+              type="number"
+              size="small"
+              fullWidth
+              value={filters.maxGrade}
+              onChange={(e) => setFilters({ ...filters, maxGrade: e.target.value })}
+              slotProps={{
+                input: {
+                  inputProps: { min: 0, step: 0.5 },
+                }
+              }}
+            />
+            <Button 
+              variant="text" 
+              size="small" 
+              onClick={() => applyFilter('maxGrade')}
+              disabled={!filters.maxGrade}
+            >
+              <CheckIcon fontSize="small" />
+            </Button>
+          </Box>
+        </Box>
+        
+        <Box sx={{ mb: 2 }}>
+          <TextField
+            name="correctionId"
+            label="ID de correction"
+            fullWidth
+            size="small"
+            value={filters.correctionId}
+            onChange={(e) => setFilters({ ...filters, correctionId: e.target.value })}
+            slotProps={{
+              input: {
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <SearchIcon fontSize="small" />
+                  </InputAdornment>
+                ),
+              }
+            }}
+          />
+          <Button 
+            variant="text" 
+            size="small" 
+            onClick={() => applyFilter('correctionId')}
+            disabled={!filters.correctionId}
+            sx={{ mt: 0.5 }}
+          >
+            Appliquer
+          </Button>
+        </Box>
+        
+        <Box sx={{ mb: 2 }}>
+          <Button
+            fullWidth
+            variant="outlined"
+            sx={{ color: theme => theme.palette.text.primary, 
+              bgcolor: theme => alpha(theme.palette.secondary.main, 0.1),
+              borderColor: theme => theme.palette.secondary.dark }}
+            onClick={() => applyFilter('recent')}
+            startIcon={<CalendarIcon />}
+          >
+            Corrections des dernières 24h
+          </Button>
+        </Box>
+        
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 2 }}>
+          <Button variant="text" onClick={clearAllFilters}>
+            Tout effacer
+          </Button>
+          <Button variant="contained" onClick={handleFilterClose}>
+            Fermer
+          </Button>
+        </Box>
       </Menu>
 
       {/* Confirm delete dialog - fixed syntax */}

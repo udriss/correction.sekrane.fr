@@ -10,6 +10,8 @@ import { useSnackbar } from 'notistack';
 import ErrorDisplay from '@/components/ui/ErrorDisplay';
 import { changeCorrectionAutreStatus } from '@/lib/services/correctionsAutresService';
 import { CorrectionAutreEnriched } from '@/lib/types';
+import { getBatchShareCodes } from '@/lib/services/shareService';
+
 
 interface ClassesListAutresProps {
   filteredCorrections: CorrectionAutreEnriched[];
@@ -22,6 +24,7 @@ interface ClassesListAutresProps {
   subClassFilter?: string; // Make sure this is optional and of type string
   refreshCorrections?: () => Promise<void>;
   isLoading?: boolean; // Ajout d'une propriété pour indiquer l'état de chargement
+  getStudentById?: (studentId: number | null) => any; // Fonction pour récupérer un étudiant par son ID
 }
 
 interface ClassGroup {
@@ -39,9 +42,26 @@ export default function ClassesListAutres({
   getGradeColor,
   highlightedIds = [],
   refreshCorrections,
-  isLoading = false
+  isLoading = false,
+  getStudentById
 }: ClassesListAutresProps) {
   const { enqueueSnackbar } = useSnackbar();
+  const [shareCodesMap, setShareCodesMap] = useState<Map<string, string>>(new Map());
+
+  // Chargement en masse des codes de partage quand les corrections changent
+  useEffect(() => {
+    const loadShareCodes = async () => {
+      if (filteredCorrections && filteredCorrections.length > 0) {
+        const correctionIds = filteredCorrections.map(c => c.id.toString());
+        const shareCodes = await getBatchShareCodes(correctionIds);
+        setShareCodesMap(shareCodes);
+      } else {
+        setShareCodesMap(new Map());
+      }
+    };
+    
+    loadShareCodes();
+  }, [filteredCorrections]);
 
   // Handle changing the status of a correction to a specific value
   const handleChangeStatus = async (correctionId: number, newStatus: string): Promise<void> => {
@@ -158,6 +178,8 @@ export default function ClassesListAutres({
                       showStudent={true}
                       showActivity={true}
                       onChangeStatus={handleChangeStatus}
+                      preloadedShareCode={shareCodesMap.get(correction.id.toString())}
+                      studentSubClass={getStudentById && correction.student_id ? getStudentById(correction.student_id)?.sub_class : null}
                     />
                   </Grid>
                 );

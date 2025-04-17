@@ -39,7 +39,7 @@ import ErrorDisplay from '@/components/ui/ErrorDisplay';
 // Import the Fragment type from FragmentEditModal
 import { Fragment } from '@/lib/types';
 // Import QR Code Generator utility
-import { generateQRCodePDF } from '@/utils/qrGeneratorPDF';
+import { generateQRCodePDF } from '@/utils/BACK_qrGeneratorPDF';
 import FirstPageIcon from '@mui/icons-material/FirstPage';
 import KeyboardArrowLeft from '@mui/icons-material/KeyboardArrowLeft';
 import KeyboardArrowRight from '@mui/icons-material/KeyboardArrowRight';

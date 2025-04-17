@@ -314,8 +314,10 @@ const NotesTabAutre: React.FC<NotesTabAutreProps> = ({
       const student = getStudentById(c.student_id);
       
       // Déterminer les valeurs à afficher
-      const totalGradeDisplay = c.grade !== undefined ? 
-        `${formatGrade(c.grade)} / 20` : 'Non noté';
+      const isPlaceholder = (c.placeholder && c.status === 'NON_NOTE');
+      const totalGradeDisplay = isPlaceholder ? 
+        'N/A' : 
+        (c.grade !== undefined ? `${formatGrade(c.grade)} / 20` : 'Non noté');
       
       // Construire la ligne du tableau avec les colonnes de base
       const row = [
@@ -327,12 +329,13 @@ const NotesTabAutre: React.FC<NotesTabAutreProps> = ({
       // Ajouter des colonnes pour chaque partie de l'activité (si détaillé)
       if (viewType === 'detailed' && activity?.parts_names) {
         for (let i = 0; i < activity.parts_names.length; i++) {
-          const pointsEarned = c.points_earned && c.points_earned[i] !== undefined ? 
-            c.points_earned[i] : 'N/A';
+          const pointsEarned = isPlaceholder ? 
+            'N/A' : 
+            (c.points_earned && c.points_earned[i] !== undefined ? c.points_earned[i] : 'N/A');
           const maxPoints = activity.points && activity.points[i] !== undefined ? 
             activity.points[i] : 0;
           
-          row.push(`${pointsEarned} / ${maxPoints}`);
+          row.push(isPlaceholder ? 'N/A' : `${pointsEarned} / ${maxPoints}`);
         }
       }
       

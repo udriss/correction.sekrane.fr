@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Box,
   Grid,
@@ -13,6 +13,8 @@ import { CorrectionAutreEnriched } from '@/lib/types';
 import { useBatchDelete } from '@/hooks/useBatchDelete';
 import { changeCorrectionAutreStatus } from '@/lib/services/correctionsAutresService';
 import { useSnackbar } from 'notistack';
+import { getBatchShareCodes } from '@/lib/services/shareService';
+
 
 interface CorrectionsListAutresProps {
   filteredCorrections: CorrectionAutreEnriched[];
@@ -24,6 +26,7 @@ interface CorrectionsListAutresProps {
   recentFilter?: boolean;
   refreshCorrections?: () => Promise<void>;
   isLoading?: boolean; // Ajout d'une propriété pour indiquer l'état de chargement
+  getStudentById?: (studentId: number | null) => any; // Fonction pour récupérer un étudiant par son ID
 }
 
 export default function CorrectionsListAutres({
@@ -35,12 +38,29 @@ export default function CorrectionsListAutres({
   highlightedIds = [],
   recentFilter = false,
   refreshCorrections,
-  isLoading = false
+  isLoading = false,
+  getStudentById
 }: CorrectionsListAutresProps) {
   const { batchDeleteMode, selectedCorrections, setSelectedCorrections, deletingCorrections } = useBatchDelete();
   const { enqueueSnackbar } = useSnackbar();
 
   const [localSelected, setLocalSelected] = useState<string[]>([]);
+  const [shareCodesMap, setShareCodesMap] = useState<Map<string, string>>(new Map());
+
+  // Chargement en masse des codes de partage quand les corrections changent
+  useEffect(() => {
+    const loadShareCodes = async () => {
+      if (filteredCorrections && filteredCorrections.length > 0) {
+        const correctionIds = filteredCorrections.map(c => c.id.toString());
+        const shareCodes = await getBatchShareCodes(correctionIds);
+        setShareCodesMap(shareCodes);
+      } else {
+        setShareCodesMap(new Map());
+      }
+    };
+    
+    loadShareCodes();
+  }, [filteredCorrections]);
 
   // Gestion de la sélection des corrections pour la suppression par lot
   const handleCorrectionSelect = (correctionId: string) => {
@@ -128,6 +148,8 @@ export default function CorrectionsListAutres({
               showStudent={true}
               showActivity={true}
               onChangeStatus={handleChangeStatus}
+              preloadedShareCode={shareCodesMap.get(correction.id.toString())}
+              studentSubClass={getStudentById && correction.student_id ? getStudentById(correction.student_id)?.sub_class : null}
             />
           </Grid>
         );

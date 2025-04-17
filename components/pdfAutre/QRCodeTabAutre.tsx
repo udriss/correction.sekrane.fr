@@ -16,7 +16,7 @@ import {
 import FileDownloadIcon from '@mui/icons-material/FileDownload';
 import { Student, CorrectionAutreEnriched, ActivityAutre } from '@/lib/types';
 import { useSnackbar } from 'notistack';
-import {generateQRCodePDF} from '@/utils/qrGeneratorPDF'
+import {generateQRCodePDF} from '@/utils/BACK_qrGeneratorPDF'
 
 
 interface QRCodeTabAutreProps {

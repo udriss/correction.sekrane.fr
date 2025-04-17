@@ -241,11 +241,13 @@ export default function ActivityAutreDetail({ params }: { params: Promise<{ id: 
       setContent(activity.content || '');
       
       // Réinitialiser les parties
-      const partsData = activity.parts_names.map((name, index) => ({
-        name,
-        points: activity.points[index] || 0
-      }));
-      setParts(partsData);
+      if (activity.parts_names && activity.points) {
+        const partsData = activity.parts_names.map((name, index) => ({
+          name,
+          points: activity.points[index] || 0
+        }));
+        setParts(partsData);
+      }
     }
     
     setErrors({});
@@ -810,10 +812,10 @@ export default function ActivityAutreDetail({ params }: { params: Promise<{ id: 
                       </Box>
                       
                       <Box sx={{ mt: 1, display: 'flex', flexDirection: 'column', gap: 1 }}>
-                        {Array.isArray(correction.points_earned) && activity.parts_names.map((name, idx) => (
+                        {correction.points_earned && Array.isArray(activity.parts_names) && activity.parts_names.map((name, idx) => (
                           <Box key={idx} sx={{ display: 'flex', justifyContent: 'end' }}>
                             <Typography variant="body2">
-                              {name} : {correction.points_earned[idx]} / {activity.points[idx]} pts
+                              {name} : {correction.points_earned[idx]} / {activity.points?.[idx]} pts
                             </Typography>
                           </Box>
                         ))}
@@ -887,8 +889,8 @@ export default function ActivityAutreDetail({ params }: { params: Promise<{ id: 
                 Points moyens par partie:
               </Typography>
               
-              {activity.parts_names.map((name, idx) => {
-                const maxPoints = activity.points[idx];
+              {Array.isArray(activity.parts_names) && activity.parts_names.map((name, idx) => {
+                const maxPoints = activity.points?.[idx];
                 const avgPoints = corrections.length > 0
                   ? corrections.reduce((sum, c) => {
                       const pts = Array.isArray(c.points_earned) && c.points_earned[idx] !== undefined

@@ -196,10 +196,15 @@ const ExportPDFComponentAutre: React.FC<ExportPDFComponentAutreProps> = ({
                   const activity = getActivityById(correction.activity_id);
                   const student = getStudentById(correction.student_id);
                   
+                  // Vérifier si c'est une correction fictive avec status NON_NOTE
+                  const isPlaceholder = (correction.placeholder && correction.status === 'NON_NOTE');
+                  
                   // Calculer le total des points gagnés et disponibles
-                  const totalPointsEarned = correction.points_earned 
-                    ? correction.points_earned.reduce((sum, p) => sum + p, 0) 
-                    : 0;
+                  const totalPointsEarned = isPlaceholder ? 
+                    'N/A' : 
+                    (correction.points_earned 
+                      ? correction.points_earned.reduce((sum, p) => sum + p, 0) 
+                      : 0);
                   
                   const totalPointsAvailable = activity?.points 
                     ? activity.points.reduce((sum, p) => sum + p, 0) 
@@ -210,13 +215,16 @@ const ExportPDFComponentAutre: React.FC<ExportPDFComponentAutreProps> = ({
                       <TableCell>{student?.first_name} {student?.last_name}</TableCell>
                       <TableCell>{activity?.name}</TableCell>
                       <TableCell align="right">
-                        {totalPointsEarned} / {totalPointsAvailable}
+                        {isPlaceholder ? 
+                          'N/A' : 
+                          `${totalPointsEarned} / ${totalPointsAvailable}`}
                       </TableCell>
                       <TableCell align="center">
                         <Chip 
                           label={correction.status !== 'ACTIVE' ?
                             <Typography variant="overline" color="text.secondary">
                               {(() => {
+                                if (isPlaceholder) return 'N/A';
                                 if (!correction.status) return 'Non rendu / ABS';
                                 switch (correction.status) {
                                   case 'NON_NOTE': return 'NON NOTÉ';
@@ -228,9 +236,11 @@ const ExportPDFComponentAutre: React.FC<ExportPDFComponentAutreProps> = ({
                               })()}
                             </Typography> 
                             : 
-                            `${correction.grade !== null && correction.grade !== undefined ? 
-                              (typeof correction.grade === 'string' ? parseFloat(correction.grade).toFixed(1) : correction.grade.toFixed(1)) 
-                              : 'NaN'} / 20`}
+                            (isPlaceholder ? 
+                              'N/A' : 
+                              `${correction.grade !== null && correction.grade !== undefined ? 
+                                (typeof correction.grade === 'string' ? parseFloat(correction.grade).toFixed(1) : correction.grade.toFixed(1)) 
+                                : 'NaN'} / 20`)}
                           size="small"
                           variant={correction.status !== 'ACTIVE' ? "outlined" : "filled"}
                           sx={correction.status !== 'ACTIVE' ? { 

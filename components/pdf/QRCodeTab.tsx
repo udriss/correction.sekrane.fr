@@ -70,7 +70,7 @@ const QRCodeTab: React.FC<QRCodeTabProps> = ({
         ? uniqueActivities.find(a => a.id === filterActivity)?.name
         : 'Toutes les activités';
       
-      const { generateQRCodePDF } = await import('@/utils/qrGeneratorPDF');
+      const { generateQRCodePDF } = await import('@/utils/BACK_qrGeneratorPDF');
       
       await generateQRCodePDF({
         corrections: filteredCorrections,

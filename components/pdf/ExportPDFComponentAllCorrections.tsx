@@ -1126,7 +1126,7 @@ const ExportPDFComponentAllCorrections: React.FC<ExportPDFComponentAllCorrection
         : 'Toutes les activités';
       
       // Importer la fonction de génération de QR codes
-      const { generateQRCodePDF } = await import('@/utils/qrGeneratorPDF');
+      const { generateQRCodePDF } = await import('@/utils/BACK_qrGeneratorPDF');
       
       // Générer le PDF
       await generateQRCodePDF({

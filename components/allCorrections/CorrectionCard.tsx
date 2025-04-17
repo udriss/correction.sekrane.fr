@@ -43,6 +43,7 @@ interface CorrectionCardProps {
   showClass?: boolean;
   showStudent?: boolean;
   showActivity?: boolean;
+  studentSubClass?: number | null;
   onToggleActive?: (correctionId: number, newActiveState: boolean) => Promise<void>;
   onChangeStatus?: (correctionId: number, newStatus: string) => Promise<void>;
   standalone?: boolean; // Nouveau prop pour indiquer si le composant est utilisé de manière autonome
@@ -58,6 +59,7 @@ const CorrectionCardAutre: React.FC<CorrectionCardProps> = ({
   showClass = true,
   showStudent = true,
   showActivity = true,
+  studentSubClass = null,
   onToggleActive,
   onChangeStatus,
   standalone = false
@@ -263,8 +265,34 @@ const CorrectionCardAutre: React.FC<CorrectionCardProps> = ({
         borderRadius: 2,
         overflow: 'hidden',
         transition: 'all 0.2s ease-in-out',
-        border: '1px solid',
-        borderColor: theme => isHighlighted 
+        border: '1px solid rgba(0, 0, 0, 0.1)',
+      }}
+    >
+      
+      {/* Batch Delete Checkbox - seulement si le mode batchDeleteMode est activé */}  
+      {batchDeleteMode && !standalone && (
+        <Box sx={{ 
+          position: 'relative', 
+          top: 0, 
+          left: 0, 
+          zIndex: 2,
+          p:0
+        }}>
+          <Checkbox 
+            checked={isSelected}
+            onChange={() => toggleCorrectionSelection(correction.id?.toString() || '')}
+            sx={{
+              color: 'error.light',
+              '&.Mui-checked': {
+                color: 'error.main',
+              },
+            }}
+          />
+        </Box>
+      )}
+      <Box 
+        sx={{
+          borderColor: theme => isHighlighted 
           ? alpha(theme.palette.warning.main, 0.5) 
           : (isSelected && batchDeleteMode)
             ? alpha(theme.palette.error.main, 0.7)
@@ -272,46 +300,28 @@ const CorrectionCardAutre: React.FC<CorrectionCardProps> = ({
               ? alpha(theme.palette.error.main, 0.7) // Bordure rouge pour les corrections inactives
               : alpha(theme.palette.divider, 0.5),
         boxShadow: theme => isHighlighted 
-          ? `0 0 15px ${alpha(theme.palette.warning.main, 0.4)}` 
+          ? `0 0 5px ${alpha(theme.palette.warning.main, 0.4)}` 
           : (isSelected && batchDeleteMode)
-            ? `0 0 15px ${alpha(theme.palette.error.main, 0.3)}`
+            ? `rgba(179, 29, 29, 0.56) 0px 22px 70px 4px;`
             : correctionStatus !== 'ACTIVE'
-              ? `0 0 8px ${alpha(theme.palette.error.light, 0.3)}` // Ajout d'une ombre rouge pour les inactives
+              ? `0 0 10px rgba(0,0,0,0.08)` // Ajout d'une ombre rouge pour les inactives
               : 'none',
         '&:hover': {
-          transform: 'translateY(-2px)',
+          transform: 'translateY(0px)',
           boxShadow: theme => isHighlighted 
-            ? `0 5px 20px ${alpha(theme.palette.warning.main, 0.4)}` 
-            : (isSelected && batchDeleteMode)
-              ? `0 5px 20px ${alpha(theme.palette.error.main, 0.3)}`
+            ? `0 0px 5px ${alpha(theme.palette.warning.main, 0.4)}` 
+            : (batchDeleteMode)
+              ? `rgba(60, 64, 67, 0.3) 0px 1px 2px 0px, rgba(60, 64, 67, 0.15) 0px 2px 6px 2px;`
               : correctionStatus !== 'ACTIVE'
-                ? `0 5px 15px ${alpha(theme.palette.error.light, 0.4)}` // Ombre au survol pour les inactives
-                : '0 5px 15px rgba(0,0,0,0.08)',
+                ? `rgba(60, 64, 67, 0.3) 0px 1px 2px 0px, rgba(60, 64, 67, 0.15) 0px 2px 6px 2px;` // Ombre au survol pour les inactives
+                : 'rgba(60, 64, 67, 0.3) 0px 1px 2px 0px, rgba(60, 64, 67, 0.15) 0px 2px 6px 2px;',
         },
         opacity: isDeleting ? 0.7 : correctionStatus !== 'ACTIVE' ? 0.9 : 1, // Augmentation légère de l'opacité pour les inactives
         pointerEvents: isDeleting ? 'none' : 'auto',
         bgcolor: theme => correctionStatus !== 'ACTIVE' ? alpha(theme.palette.grey[300], 0.8) : undefined, // Fond légèrement plus visible
-      }}
-    >
-      {/* Deletion spinner overlay */}
-      {isDeleting && (
-        <Box sx={{
-          position: 'absolute',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          backgroundColor: 'rgba(0, 0, 0, 0.2)',
-          zIndex: 10,
-          borderRadius: 2
+        position: 'relative',
         }}>
-          <CircularProgress color="error" size={40} />
-        </Box>
-      )}
-
+        
       {/* Status label */}
       {correctionStatus !== 'ACTIVE' && (
         <Box sx={{ 
@@ -322,51 +332,29 @@ const CorrectionCardAutre: React.FC<CorrectionCardProps> = ({
           fontSize: '1.25rem',
           fontWeight: 'bold',
           position: 'absolute',
-          bottom: 0,
+          top: 0,
           right: 0,
           borderTopRightRadius: 8,
+          borderBottomLeftRadius: 8,
           zIndex: 1
         }}>
           {getStatusLabel()}
         </Box>
       )}
 
-      {/* Batch Delete Checkbox - seulement si le mode batchDeleteMode est activé */}
-      {batchDeleteMode && !standalone && (
-        <Box sx={{ 
-          position: 'absolute', 
-          top: 0, 
-          right: 0, 
-          zIndex: 2,
-          mb:0.5,
-          p:0
-        }}>
-          <Checkbox 
-            checked={isSelected}
-            onChange={() => toggleCorrectionSelection(correction.id?.toString() || '')}
-            sx={{
-              mb:0.5,
-              color: 'error.light',
-              '&.Mui-checked': {
-                color: 'error.main',
-              },
-            }}
-          />
-        </Box>
-      )}
-
-      {/* Card Header */}
-      <Box sx={{ 
+            {/* Card Header */}
+            <Box sx={{ 
         display: 'flex', 
         justifyContent: 'space-between', 
         alignItems: 'center',
         p: 2,
         pb:0,
-        pt: batchDeleteMode ? 3 : 2,
+        pt: batchDeleteMode ? 2 : 2,
         bgcolor: theme => isSelected && batchDeleteMode 
           ? alpha(theme.palette.error.light, 0.1) 
           : undefined
       }}>
+        
         <Box sx={{ 
           maxWidth: '65%',
           overflow: 'hidden'
@@ -421,8 +409,8 @@ const CorrectionCardAutre: React.FC<CorrectionCardProps> = ({
               title={correction.class_name} // Ajoute un tooltip natif sur hover
               sx={{ textOverflow: 'ellipsis' }}
             >
-              {correction.student_id ? 
-              <><RecentActorsIcon color="info" fontSize="small" sx={{ mr: .25 }} /> Groupe {correction.student_id}</>
+              {studentSubClass ? 
+              <><RecentActorsIcon color="info" fontSize="small" sx={{ mr: .25 }} /> Groupe {studentSubClass}</>
                : ''}
             </Typography>
             </Box>
@@ -453,6 +441,7 @@ const CorrectionCardAutre: React.FC<CorrectionCardProps> = ({
           ? alpha(theme.palette.error.light, 0.1) 
           : undefined 
       }}>
+        
         <Box sx={{ display: 'flex', 
           justifyContent: 'space-between', 
           alignItems: 'start', 
@@ -480,13 +469,13 @@ const CorrectionCardAutre: React.FC<CorrectionCardProps> = ({
         {Array.isArray(correction.points_earned) && correction.points_earned.length > 0 && (
           <Box sx={{ mt: 2 }}>
             <Typography variant="caption" color="text.secondary">
-              Points par partie:
+              Points par partie :
             </Typography>
             <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mt: 1 }}>
               {correction.points_earned.map((points, index) => (
                 <Chip
                   key={index}
-                  label={`P${index + 1}: ${points}`}
+                  label={`P${index + 1} : ${points}`}
                   size="small"
                   variant="outlined"
                 />
@@ -496,13 +485,19 @@ const CorrectionCardAutre: React.FC<CorrectionCardProps> = ({
         )}
           
           
-          {!batchDeleteMode && (
+          
+        </Box>
+      </Box>
+      </Box>
+
+      <Box>
+            {!batchDeleteMode && (
             <Box sx={{ display: 'flex', 
             gap: 1,
             width: '100%',
             alignItems: 'center',
             justifyContent: 'center',
-            pt: 1,
+            py: 1,
             }}>
               {/* Bouton de partage ou de visualisation selon l'existence d'un code de partage */}
               {shareCode ? (
@@ -650,10 +645,62 @@ const CorrectionCardAutre: React.FC<CorrectionCardProps> = ({
               </Link>
               </Tooltip>
             </Box>
-          )}
-        </Box>
+          )}  
+
       </Box>
+      {/* Deletion spinner overlay */}
+      {isDeleting && (
+        <Box sx={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          backgroundColor: 'rgba(0, 0, 0, 0.2)',
+          zIndex: 10,
+          borderRadius: 2
+        }}>
+          <CircularProgress color="error" size={40} />
+        </Box>
+      )}
+
+
       
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
       {/* Modal de partage */}
       <ShareModal 
         open={shareModalOpen}

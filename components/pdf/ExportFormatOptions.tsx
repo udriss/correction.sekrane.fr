@@ -2,15 +2,19 @@ import React from 'react';
 import { 
   Typography, 
   Box, 
-  Paper, 
-  FormControl, 
-  RadioGroup, 
-  FormControlLabel, 
-  Radio, 
-  Button
+  Paper,
+  Button,
+  Card,
+  CardContent,
+  CardMedia,
+  CardActionArea,
+  Grid
 } from '@mui/material';
 import SaveIcon from '@mui/icons-material/Save';
 import FileDownloadIcon from '@mui/icons-material/FileDownload';
+import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf';
+import TableChartIcon from '@mui/icons-material/TableChart';
+import InsertDriveFileIcon from '@mui/icons-material/InsertDriveFile';
 import { ExportFormat } from './types';
 
 interface ExportFormatOptionsProps {
@@ -26,70 +30,122 @@ const ExportFormatOptions: React.FC<ExportFormatOptionsProps> = ({
   onExport,
   disabled
 }) => {
+  // Options pour les différents formats d'export
+  const exportOptions = [
+    {
+      value: 'pdf',
+      title: 'PDF Document',
+      description: 'Document portable lisible sur tous les appareils',
+      icon: <PictureAsPdfIcon sx={{ fontSize: 50, color: '#f44336' }} />,
+      buttonIcon: <SaveIcon />,
+      buttonText: 'Générer PDF',
+      color: '#f44336',
+      bgColor: '#ffebee'
+    },
+    {
+      value: 'xlsx',
+      title: 'Excel (XLSX)',
+      description: 'Fichier tableur Microsoft Excel pour l\'analyse des données',
+      icon: <TableChartIcon sx={{ fontSize: 50, color: '#4caf50' }} />,
+      buttonIcon: <FileDownloadIcon />,
+      buttonText: 'Exporter en Excel',
+      color: '#4caf50',
+      bgColor: '#e8f5e9'
+    },
+    {
+      value: 'csv',
+      title: 'CSV Format',
+      description: 'Format texte compatible avec tous les tableurs',
+      icon: <InsertDriveFileIcon sx={{ fontSize: 50, color: '#ff9800' }} />,
+      buttonIcon: <FileDownloadIcon />,
+      buttonText: 'Exporter en CSV',
+      color: '#ff9800',
+      bgColor: '#fff3e0'
+    }
+  ];
+
+  // Trouver l'option actuellement sélectionnée
+  const selectedOption = exportOptions.find(option => option.value === exportFormat) || exportOptions[0];
+
   return (
     <Paper variant="outlined" sx={{ p: 2 }}>
       <Typography variant="subtitle1" fontWeight="bold" gutterBottom>
         Format d'export
       </Typography>
       
-      <FormControl component="fieldset" sx={{ mb: 3 }}>
-        <RadioGroup
-          value={exportFormat}
-          onChange={(e) => setExportFormat(e.target.value as ExportFormat)}
-        >
-          <FormControlLabel 
-            value="pdf" 
-            control={<Radio />} 
-            label={
-              <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                <SaveIcon sx={{ mr: 1, fontSize: '1.2rem' }} />
-                PDF (document portable)
-              </Box>
-            } 
-          />
-          <FormControlLabel 
-            value="xlsx" 
-            control={<Radio />} 
-            label={
-              <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                <FileDownloadIcon sx={{ mr: 1, fontSize: '1.2rem' }} />
-                Excel (XLSX)
-              </Box>
-            } 
-          />
-          <FormControlLabel 
-            value="csv" 
-            control={<Radio />} 
-            label={
-              <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                <FileDownloadIcon sx={{ mr: 1, fontSize: '1.2rem' }} />
-                CSV (compatible Excel)
-              </Box>
-            } 
-          />
-        </RadioGroup>
-      </FormControl>
+      <Grid container spacing={2} sx={{ mb: 3 }}>
+        {exportOptions.map((option) => (
+          <Grid size={{ xs: 12, sm: 4 }} key={option.value}>
+            <Card 
+              variant="outlined" 
+              sx={{ 
+                height: '100%',
+                border: exportFormat === option.value ? `2px solid ${option.color}` : '1px solid #e0e0e0',
+                borderRadius: 2,
+                boxShadow: exportFormat === option.value ? `0 4px 8px rgba(0,0,0,0.15)` : 'none',
+                transition: 'all 0.3s ease',
+                '&:hover': {
+                  boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+                  borderColor: option.color
+                }
+              }}
+            >
+              <CardActionArea 
+                onClick={() => setExportFormat(option.value as ExportFormat)}
+                sx={{ height: '100%' }}
+              >
+                <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%', p: 2 }}>
+                  <CardMedia
+                    sx={{ 
+                      width: 80, 
+                      height: 80, 
+                      display: 'flex', 
+                      justifyContent: 'center', 
+                      alignItems: 'center',
+                      backgroundColor: option.bgColor,
+                      borderRadius: 2,
+                      mx: 'auto',
+                      mb: 2
+                    }}
+                  >
+                    {option.icon}
+                  </CardMedia>
+                  <CardContent sx={{ flex: '1 0 auto', p: 1, textAlign: 'center' }}>
+                    <Typography component="div" variant="h6">
+                      {option.title}
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      {option.description}
+                    </Typography>
+                  </CardContent>
+                </Box>
+              </CardActionArea>
+            </Card>
+          </Grid>
+        ))}
+      </Grid>
       
-      <Box sx={{ display: 'flex', justifyContent: 'center', mt: 2 }}>
+      <Box sx={{ display: 'flex', justifyContent: 'center', mt: 3 }}>
         <Button
           variant="contained"
-          startIcon={exportFormat === 'pdf' ? <SaveIcon /> : <FileDownloadIcon />}
+          startIcon={selectedOption.buttonIcon}
           disabled={disabled}
           onClick={onExport}
           size="large"
-          color="primary"
-          sx={{ px: 4 }}
+          sx={{ 
+            px: 4,
+            backgroundColor: selectedOption.color,
+            '&:hover': {
+              backgroundColor: selectedOption.color,
+              filter: 'brightness(0.9)'
+            },
+          }}
         >
-          {exportFormat === 'pdf' 
-            ? 'Générer PDF' 
-            : exportFormat === 'xlsx'
-              ? 'Exporter en Excel'
-              : 'Exporter en CSV'
-          }
+          {selectedOption.buttonText}
         </Button>
       </Box>
-      <Typography variant="caption" align="center" color="text.secondary" display="block">
-        Export d&apos;un tableau Excel
+      <Typography variant="caption" align="center" color="text.secondary" display="block" sx={{ mt: 1 }}>
+        Export des données au format sélectionné
       </Typography>
     </Paper>
   );
