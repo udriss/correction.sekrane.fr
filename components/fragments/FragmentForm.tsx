@@ -3,6 +3,8 @@
 import React, { useState } from 'react';
 import { Box, TextField, Button, Alert, Chip, CircularProgress, Typography } from '@mui/material';
 import { CategorySelect } from './'; // Import depuis index.ts
+import IconButton from '@mui/material/IconButton';
+import CloseIcon from '@mui/icons-material/Close';
 
 interface FragmentFormProps {
   activityId?: number;
@@ -194,22 +196,23 @@ const FragmentForm: React.FC<FragmentFormProps> = ({
       />
       
       <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 2, mt: 3 }}>
-        <Button 
-          variant="outlined" 
-          color="secondary"
+        <IconButton
+          color="error"
+          size='large'
           onClick={onCancel}
           disabled={loading}
         >
-          Annuler
-        </Button>
+          <CloseIcon fontSize="large" />
+        </IconButton>
         <Button 
           type="submit" 
-          variant="contained" 
-          color="primary"
+          variant="outlined" 
+          color="success"
           disabled={loading || !content.trim()}
           startIcon={loading ? <CircularProgress size={20} /> : null}
+          sx={{ height: 'fit-content', alignSelf: 'center' }}
         >
-          {loading ? 'Création...' : 'Créer fragment'}
+          {loading ? 'Création...' : 'Ajouter fragment'}
         </Button>
       </Box>
     </Box>

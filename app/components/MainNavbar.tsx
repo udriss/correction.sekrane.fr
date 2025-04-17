@@ -102,7 +102,10 @@ export default function MainNavbar() {
         method: 'POST',
       });
       
-      window.location.href = '/login';
+      // Capturer l'URL actuelle avant la déconnexion
+      const currentPath = window.location.pathname;
+      // Rediriger vers la page de login avec le paramètre callbackUrl
+      window.location.href = `/login?callbackUrl=${encodeURIComponent(currentPath)}`;
     } catch (error) {
       console.error('Error logging out:', error);
     }
@@ -398,8 +401,14 @@ export default function MainNavbar() {
               ) : (
                 <Button 
                   color="primary" 
-                  component={Link} 
-                  href="/login"
+                  onClick={() => {
+                    // Capturer l'URL actuelle
+                    const currentPath = window.location.pathname;
+                    // Construire l'URL de login avec le paramètre callbackUrl
+                    const loginUrl = `/login?callbackUrl=${encodeURIComponent(currentPath)}`;
+                    // Rediriger vers la page de login
+                    window.location.href = loginUrl;
+                  }}
                   variant="contained"
                   sx={{ borderRadius: '24px' }}
                 >

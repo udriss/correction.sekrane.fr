@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { 
   Paper, Typography, FormControl, InputLabel, Select, MenuItem, 
-  Box, Button, Divider, CircularProgress, Alert, Chip
+  Box, Button, Divider, CircularProgress, Alert, Chip,
+  Dialog, DialogTitle, DialogContent, DialogActions
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import CloseIcon from '@mui/icons-material/Close';
@@ -34,6 +35,7 @@ const FragmentsSidebar: React.FC<FragmentsSidebarProps> = ({
   
   // État d'affichage
   const [showAddForm, setShowAddForm] = useState(false);
+  const [addFragmentDialogOpen, setAddFragmentDialogOpen] = useState(false); // Nouvel état pour le dialogue modal
   const [selectedActivityId, setSelectedActivityId] = useState<number | null>(null);
   const [editingFragmentId, setEditingFragmentId] = useState<number | null>(null);
   
@@ -322,13 +324,13 @@ const FragmentsSidebar: React.FC<FragmentsSidebarProps> = ({
           <Box sx={{ mt: 3, display: 'flex', justifyContent: 'space-between' }}>
             {canAddNewFragments && (
               <Button
-                onClick={() => setShowAddForm(!showAddForm)}
+                onClick={() => setAddFragmentDialogOpen(true)}
                 color="primary"
-                variant={showAddForm ? "text" : "contained"}
+                variant="contained"
                 size="small"
-                startIcon={showAddForm ? <CloseIcon /> : <AddIcon />}
+                startIcon={<AddIcon />}
               >
-                {showAddForm ? 'Annuler' : 'Nouveau fragment'}
+                Nouveau fragment
               </Button>
             )}
             
@@ -345,10 +347,33 @@ const FragmentsSidebar: React.FC<FragmentsSidebarProps> = ({
         </>
       )}
 
-      {/* Formulaire d'ajout de fragment */}
-      {showAddForm && canAddNewFragments && (
+      {/* Dialogue modal pour l'ajout de fragment */}
+      <Dialog 
+        open={addFragmentDialogOpen} 
+        onClose={() => setAddFragmentDialogOpen(false)}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle>Ajouter un nouveau fragment</DialogTitle>
+        <DialogContent>
+          {canAddNewFragments && (
+            <FragmentForm
+              activityId={selectedActivityId || undefined}
+              categories={categories}
+              onSuccess={(newFragment) => {
+                addFragmentToList(newFragment);
+                setAddFragmentDialogOpen(false);
+              }}
+              onCancel={() => setAddFragmentDialogOpen(false)}
+              refreshCategories={refreshCategories}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Désactivé: ancien formulaire d'ajout de fragment (remplacé par le modal) */}
+      {false && showAddForm && canAddNewFragments && (
         <FragmentForm
-        
           activityId={selectedActivityId || undefined}
           categories={categories}
           onSuccess={(newFragment) => {

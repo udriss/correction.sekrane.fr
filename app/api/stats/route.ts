@@ -39,21 +39,15 @@ export async function GET(request: NextRequest) {
     };
 
     // 1. Récupération des statistiques globales des corrections
-    // For global stats, we need to join with other tables to apply class filter
+    // Pour les stats globales, nous devons rejoindre avec activities_autres pour normaliser les points
     let globalStatsQuery = `
       SELECT 
         COUNT(c.id) as total_corrections,
-        IFNULL(AVG(c.grade), 0) as average_grade,
-        IFNULL(MAX(c.grade), 0) as highest_grade,
-        IFNULL(MIN(c.grade), 0) as lowest_grade,
-        IFNULL(AVG(c.experimental_points_earned), 0) as avg_experimental_points,
-        IFNULL(AVG(c.theoretical_points_earned), 0) as avg_theoretical_points,
         COUNT(DISTINCT c.student_id) as total_students,
         COUNT(DISTINCT c.activity_id) as total_activities
       FROM 
-        corrections c
+        corrections_autres c
     `;
-
 
     let globalWhereConditions = [];
     let globalParams: any[] = [];
@@ -93,93 +87,232 @@ export async function GET(request: NextRequest) {
       globalStatsQuery += ` WHERE ${globalWhereConditions.join(' AND ')}`;
     }
 
-    const globalStats = await query<any[]>(globalStatsQuery, globalParams);
+    const basicGlobalStats = await query<any[]>(globalStatsQuery, globalParams);
 
-    // 2. Distribution des notes par tranches
-    let gradeDistQuery = `
+    // Maintenant, nous allons calculer les statistiques normalisées pour les notes
+    let normalizedGradesQuery = `
       SELECT 
-        CASE 
-          WHEN c.grade < 5 THEN '0-5'
-          WHEN c.grade < 10 THEN '5-10'
-          WHEN c.grade < 12 THEN '10-12'
-          WHEN c.grade < 14 THEN '12-14'
-          WHEN c.grade < 16 THEN '14-16'
-          WHEN c.grade < 18 THEN '16-18'
-          ELSE '18-20'
-        END as grade_range,
-        COUNT(*) as count
+        c.id, 
+        c.grade,
+        c.activity_id,
+        a.points
       FROM 
-        corrections c
+        corrections_autres c
+      JOIN
+        activities_autres a ON c.activity_id = a.id
     `;
 
-    let gradeDistWhereConditions = [];
-    let gradeDistParams: any[] = [];
+    let normalizedGradesConditions = [...globalWhereConditions];
+    let normalizedGradesParams = [...globalParams];
 
-    // Ajout du filtre d'activité
-    if (!showInactive) {
-      gradeDistWhereConditions.push("c.status = 'ACTIVE'");
+    if (normalizedGradesConditions.length > 0) {
+      normalizedGradesQuery += ` WHERE ${normalizedGradesConditions.join(' AND ')}`;
     }
 
-    // Add joins if filtering by class
+    const gradesData = await query<any[]>(normalizedGradesQuery, normalizedGradesParams);
+
+    // Calculer les statistiques de notes normalisées
+    let totalNormalizedGrade = 0;
+    let maxNormalizedGrade = 0;
+    let minNormalizedGrade = 20;
+    let validGradeCount = 0;
+
+    gradesData.forEach(item => {
+      if (item.grade !== null && item.grade !== undefined) {
+        // Convertir le tableau de points maximums
+        let maxPoints: number[] = [];
+        try {
+          maxPoints = Array.isArray(item.points) 
+            ? item.points 
+            : JSON.parse(item.points || '[]');
+        } catch (e) {
+          console.error('Erreur lors du parsing des points:', e);
+          return;
+        }
+
+        // Calculer le total des points maximum pour cette activité
+        const totalMaxPoints = maxPoints.reduce((sum, points) => sum + points, 0);
+        
+        // Normaliser la note sur 20
+        if (totalMaxPoints > 0) {
+          const normalizedGrade = (item.grade / totalMaxPoints) * 20;
+          totalNormalizedGrade += normalizedGrade;
+          
+          if (normalizedGrade > maxNormalizedGrade) maxNormalizedGrade = normalizedGrade;
+          if (normalizedGrade < minNormalizedGrade) minNormalizedGrade = normalizedGrade;
+          
+          validGradeCount++;
+        }
+      }
+    });
+
+    // Calculer la moyenne normalisée
+    const averageNormalizedGrade = validGradeCount > 0 ? totalNormalizedGrade / validGradeCount : 0;
+
+    // Combiner les statistiques de base avec les statistiques de notes normalisées
+    const globalStats = {
+      ...basicGlobalStats[0],
+      average_grade: averageNormalizedGrade,
+      highest_grade: maxNormalizedGrade,
+      lowest_grade: minNormalizedGrade
+    };
+
+    // 2. Récupérer toutes les corrections avec leurs activités pour calculer les pourcentages normalisés
+    let normalizedStatsQuery = `
+      SELECT 
+        c.id,
+        c.activity_id,
+        c.points_earned,
+        a.points,
+        a.parts_names
+      FROM 
+        corrections_autres c
+      JOIN
+        activities_autres a ON c.activity_id = a.id
+    `;
+
+    let normalizedWhereConditions = [];
+    let normalizedParams: any[] = [];
+
+    if (!showInactive) {
+      normalizedWhereConditions.push("c.status = 'ACTIVE'");
+    }
+
     if (classId) {
-      gradeDistQuery += `
+      normalizedStatsQuery += `
         JOIN students s ON c.student_id = s.id
         JOIN class_students cs ON s.id = cs.student_id
       `;
-      gradeDistWhereConditions.push('cs.class_id = ?');
-      gradeDistParams.push(classId);
+      normalizedWhereConditions.push('cs.class_id = ?');
+      normalizedParams.push(classId);
       
-      // Add sub-class filter if provided
       if (subClassId) {
-        gradeDistWhereConditions.push('cs.sub_class = ?');
-        gradeDistParams.push(subClassId);
+        normalizedWhereConditions.push('cs.sub_class = ?');
+        normalizedParams.push(subClassId);
       }
     }
 
     if (activityId) {
-      gradeDistWhereConditions.push('c.activity_id = ?');
-      gradeDistParams.push(activityId);
+      normalizedWhereConditions.push('c.activity_id = ?');
+      normalizedParams.push(activityId);
     }
 
     if (studentId) {
-      gradeDistWhereConditions.push('c.student_id = ?');
-      gradeDistParams.push(studentId);
+      normalizedWhereConditions.push('c.student_id = ?');
+      normalizedParams.push(studentId);
     }
 
-    if (gradeDistWhereConditions.length > 0) {
-      gradeDistQuery += ` WHERE ${gradeDistWhereConditions.join(' AND ')}`;
+    if (normalizedWhereConditions.length > 0) {
+      normalizedStatsQuery += ` WHERE ${normalizedWhereConditions.join(' AND ')}`;
     }
 
-    gradeDistQuery += `
-      GROUP BY 
-        grade_range
-      ORDER BY 
-        CASE grade_range
-          WHEN '0-5' THEN 1
-          WHEN '5-10' THEN 2
-          WHEN '10-12' THEN 3
-          WHEN '12-14' THEN 4
-          WHEN '14-16' THEN 5
-          WHEN '16-18' THEN 6
-          WHEN '18-20' THEN 7
-        END
-    `;
+    const normalizedCorrections = await query<any[]>(normalizedStatsQuery, normalizedParams);
 
-    const gradeDistribution = await query<any[]>(gradeDistQuery, gradeDistParams);
+    // Calculer les pourcentages normalisés pour chaque correction
+    const correctionPercentages = normalizedCorrections.map(correction => {
+      let pointsEarned: number[] = [];
+      let maxPoints: number[] = [];
+      
+      try {
+        // Convertir les strings JSON en tableaux
+        pointsEarned = Array.isArray(correction.points_earned) 
+          ? correction.points_earned 
+          : JSON.parse(correction.points_earned || '[]');
+        
+        maxPoints = Array.isArray(correction.points) 
+          ? correction.points 
+          : JSON.parse(correction.points || '[]');
+      } catch (e) {
+        console.error('Erreur lors du parsing des points:', e);
+        return { 
+          id: correction.id, 
+          activity_id: correction.activity_id,
+          percentage: 0 
+        };
+      }
+      
+      // Calculer le pourcentage global pour cette correction
+      const totalEarned = pointsEarned.reduce((sum, points) => sum + points, 0);
+      const totalMax = maxPoints.reduce((sum, points) => sum + points, 0);
+      
+      const percentage = totalMax > 0 ? (totalEarned / totalMax) * 100 : 0;
+      
+      return {
+        id: correction.id,
+        activity_id: correction.activity_id,
+        percentage
+      };
+    });
 
-    // 3. Statistiques par activité
+    // Calcul du pourcentage moyen global
+    const averagePercentage = correctionPercentages.length > 0
+      ? correctionPercentages.reduce((sum, item) => sum + item.percentage, 0) / correctionPercentages.length
+      : 0;
+
+    // 3. Regrouper les résultats par partie (si les noms de parties sont identiques)
+    const partResults: Record<string, { earned: number, max: number, count: number }> = {};
+    
+    normalizedCorrections.forEach(correction => {
+      let pointsEarned: number[] = [];
+      let maxPoints: number[] = [];
+      let partsNames: string[] = [];
+      
+      try {
+        pointsEarned = Array.isArray(correction.points_earned) 
+          ? correction.points_earned 
+          : JSON.parse(correction.points_earned || '[]');
+        
+        maxPoints = Array.isArray(correction.points) 
+          ? correction.points 
+          : JSON.parse(correction.points || '[]');
+          
+        partsNames = Array.isArray(correction.parts_names) 
+          ? correction.parts_names 
+          : JSON.parse(correction.parts_names || '[]');
+      } catch (e) {
+        console.error('Erreur lors du parsing des données:', e);
+        return;
+      }
+      
+      // Traiter chaque partie si elle a un nom
+      partsNames.forEach((name, index) => {
+        if (!name) return; // Ignorer les parties sans nom
+        
+        if (!partResults[name]) {
+          partResults[name] = { earned: 0, max: 0, count: 0 };
+        }
+        
+        // Ajouter les points de cette partie
+        if (pointsEarned[index] !== undefined && maxPoints[index] !== undefined) {
+          partResults[name].earned += pointsEarned[index];
+          partResults[name].max += maxPoints[index];
+          partResults[name].count += 1;
+        }
+      });
+    });
+    
+    // Calculer les pourcentages par partie
+    const partPercentages = Object.entries(partResults).map(([name, data]) => {
+      const percentage = data.max > 0 ? (data.earned / data.max) * 100 : 0;
+      return {
+        name,
+        percentage,
+        count: data.count
+      };
+    }).sort((a, b) => b.count - a.count); // Trier par nombre d'occurrences
+
+    // 4. Statistiques par activité avec pourcentages normalisés
     let activityStatsQuery = `
       SELECT 
         a.id as activity_id,
         a.name as activity_name,
-        COUNT(c.id) as correction_count,
-        IFNULL(AVG(c.grade), 0) as average_grade,
-        IFNULL(MAX(c.grade), 0) as highest_grade,
-        IFNULL(MIN(c.grade), 0) as lowest_grade
+        a.points,
+        a.parts_names,
+        COUNT(c.id) as correction_count
       FROM 
-        activities a
+        activities_autres a
       LEFT JOIN 
-        corrections c ON a.id = c.activity_id
+        corrections_autres c ON a.id = c.activity_id
     `;
 
     let activityWhereConditions = [];
@@ -227,16 +360,35 @@ export async function GET(request: NextRequest) {
         correction_count DESC
     `;
 
-    const activityStats = await query<any[]>(activityStatsQuery, activityParams);
+    const rawActivityStats = await query<any[]>(activityStatsQuery, activityParams);
 
-    // 4. Statistiques par classe
+    // Calculer les pourcentages de réussite pour chaque activité
+    const activityStats = rawActivityStats.map(activity => {
+      const activityCorrections = correctionPercentages.filter(
+        c => c.activity_id === activity.activity_id
+      );
+      
+      const averagePercentage = activityCorrections.length > 0
+        ? activityCorrections.reduce((sum, item) => sum + item.percentage, 0) / activityCorrections.length
+        : 0;
+      
+      return {
+        ...activity,
+        average_percentage: averagePercentage
+      };
+    });
+
+    // 5. Statistiques par classe
     let classStatsQuery = `
       SELECT 
         cl.id as class_id,
         cl.name as class_name,
         COUNT(DISTINCT c.id) as correction_count,
-        COUNT(DISTINCT s.id) as student_count,
-        IFNULL(AVG(c.grade), 0) as average_grade
+        (
+          SELECT COUNT(DISTINCT cs_inner.student_id) 
+          FROM class_students cs_inner 
+          WHERE cs_inner.class_id = cl.id
+        ) as student_count
       FROM 
         classes cl
       LEFT JOIN 
@@ -244,7 +396,7 @@ export async function GET(request: NextRequest) {
       LEFT JOIN 
         students s ON cs.student_id = s.id
       LEFT JOIN 
-        corrections c ON s.id = c.student_id
+        corrections_autres c ON s.id = c.student_id
     `;
 
     let classWhereConditions = [];
@@ -287,132 +439,236 @@ export async function GET(request: NextRequest) {
         correction_count DESC
     `;
 
-    const classStats = await query<any[]>(classStatsQuery, classParams);
+    const rawClassStats = await query<any[]>(classStatsQuery, classParams);
+    
+    // Récupérer les pourcentages moyens pour chaque classe
+    const classPercentages: Record<number, { total: number, count: number, totalGrade: number, gradeCount: number }> = {};
+    
+    // Préparation de la requête pour récupérer les données des pourcentages par classe
+    let classPercentagesQuery = `
+      SELECT 
+        cs.class_id,
+        c.id as correction_id,
+        c.points_earned,
+        c.grade,
+        a.points
+      FROM 
+        corrections_autres c
+      JOIN 
+        activities_autres a ON c.activity_id = a.id
+      JOIN 
+        students s ON c.student_id = s.id
+      JOIN 
+        class_students cs ON s.id = cs.student_id
+    `;
+    
+    let classPercentagesConditions = [];
+    let classPercentagesParams: any[] = [];
+    
+    if (!showInactive) {
+      classPercentagesConditions.push("c.status = 'ACTIVE'");
+    }
+    
+    if (classId) {
+      classPercentagesConditions.push('cs.class_id = ?');
+      classPercentagesParams.push(classId);
+      
+      if (subClassId) {
+        classPercentagesConditions.push('cs.sub_class = ?');
+        classPercentagesParams.push(subClassId);
+      }
+    }
+    
+    if (activityId) {
+      classPercentagesConditions.push('c.activity_id = ?');
+      classPercentagesParams.push(activityId);
+    }
+    
+    if (studentId) {
+      classPercentagesConditions.push('c.student_id = ?');
+      classPercentagesParams.push(studentId);
+    }
+    
+    if (classPercentagesConditions.length > 0) {
+      classPercentagesQuery += ` WHERE ${classPercentagesConditions.join(' AND ')}`;
+    }
+    
+    const classPercentagesData = await query<any[]>(classPercentagesQuery, classPercentagesParams);
+    
+    // Calculer le pourcentage moyen et la note moyenne pour chaque classe
+    classPercentagesData.forEach(item => {
+      let pointsEarned: number[] = [];
+      let maxPoints: number[] = [];
+      
+      try {
+        pointsEarned = Array.isArray(item.points_earned) 
+          ? item.points_earned 
+          : JSON.parse(item.points_earned || '[]');
+        
+        maxPoints = Array.isArray(item.points) 
+          ? item.points 
+          : JSON.parse(item.points || '[]');
+      } catch (e) {
+        console.error('Erreur lors du parsing des points pour les classes:', e);
+        return;
+      }
+      
+      const totalEarned = pointsEarned.reduce((sum, points) => sum + points, 0);
+      const totalMax = maxPoints.reduce((sum, points) => sum + points, 0);
+      
+      const percentage = totalMax > 0 ? (totalEarned / totalMax) * 100 : 0;
+      
+      if (!classPercentages[item.class_id]) {
+        classPercentages[item.class_id] = { total: 0, count: 0, totalGrade: 0, gradeCount: 0 };
+      }
+      
+      classPercentages[item.class_id].total += percentage;
+      classPercentages[item.class_id].count += 1;
+      
+      // Calcul de la note normalisée
+      if (item.grade !== null && item.grade !== undefined && totalMax > 0) {
+        const normalizedGrade = (item.grade / totalMax) * 20;
+        classPercentages[item.class_id].totalGrade += normalizedGrade;
+        classPercentages[item.class_id].gradeCount += 1;
+      }
+    });
+    
+    // Fusionner les stats avec les pourcentages calculés
+    const classStats = rawClassStats.map(cls => {
+      const classData = classPercentages[cls.class_id] || { total: 0, count: 0, totalGrade: 0, gradeCount: 0 };
+      const averagePercentage = classData.count > 0 ? classData.total / classData.count : 0;
+      const averageGrade = classData.gradeCount > 0 ? classData.totalGrade / classData.gradeCount : 0;
+      
+      return {
+        ...cls,
+        average_percentage: averagePercentage,
+        average_grade: averageGrade
+      };
+    });
 
-    // 5. Évolution des notes au fil du temps (par mois)
-    let gradeEvolQuery = `
+    // 6. Évolution des pourcentages de réussite au fil du temps (par mois)
+    let evolQuery = `
       SELECT 
         DATE_FORMAT(c.submission_date, '%Y-%m') as month,
-        COUNT(*) as correction_count,
-        IFNULL(AVG(c.grade), 0) as average_grade
+        c.id,
+        c.activity_id,
+        c.points_earned,
+        a.points
       FROM 
-        corrections c
+        corrections_autres c
+      JOIN
+        activities_autres a ON c.activity_id = a.id
+      WHERE
+        c.submission_date IS NOT NULL
     `;
 
-    let gradeEvolWhereConditions = ['c.submission_date IS NOT NULL'];
-    let gradeEvolParams: any[] = [];
+    let evolWhereConditions = [];
+    let evolParams: any[] = [];
 
     // Filtre pour les corrections actives
     if (!showInactive) {
-      gradeEvolWhereConditions.push("c.status = 'ACTIVE'");
+      evolWhereConditions.push("c.status = 'ACTIVE'");
     }
 
     // Add joins if filtering by class
     if (classId) {
-      gradeEvolQuery += `
+      evolQuery += `
         JOIN students s ON c.student_id = s.id
         JOIN class_students cs ON s.id = cs.student_id
       `;
-      gradeEvolWhereConditions.push('cs.class_id = ?');
-      gradeEvolParams.push(classId);
+      evolWhereConditions.push('cs.class_id = ?');
+      evolParams.push(classId);
       
       // Add sub-class filter if provided
       if (subClassId) {
-        gradeEvolWhereConditions.push('cs.sub_class = ?');
-        gradeEvolParams.push(subClassId);
+        evolWhereConditions.push('cs.sub_class = ?');
+        evolParams.push(subClassId);
       }
     }
 
     if (activityId) {
-      gradeEvolWhereConditions.push('c.activity_id = ?');
-      gradeEvolParams.push(activityId);
+      evolWhereConditions.push('c.activity_id = ?');
+      evolParams.push(activityId);
     }
 
     if (studentId) {
-      gradeEvolWhereConditions.push('c.student_id = ?');
-      gradeEvolParams.push(studentId);
+      evolWhereConditions.push('c.student_id = ?');
+      evolParams.push(studentId);
     }
 
-    gradeEvolQuery += ` WHERE ${gradeEvolWhereConditions.join(' AND ')}`;
-    gradeEvolQuery += `
-      GROUP BY 
-        month
-      ORDER BY 
-        month ASC
-    `;
-
-    const gradeEvolution = await query<any[]>(gradeEvolQuery, gradeEvolParams);
-
-    // 6. Top des activités par note moyenne
-    let topActivitiesQuery = `
-      SELECT 
-        a.id as activity_id,
-        a.name as activity_name,
-        COUNT(c.id) as correction_count,
-        IFNULL(AVG(c.grade), 0) as average_grade
-      FROM 
-        activities a
-      JOIN 
-        corrections c ON a.id = c.activity_id
-    `;
-
-    let topActWhereConditions = [];
-    let topActParams: any[] = [];
-
-    // Filtre pour les corrections actives
-    if (!showInactive) {
-      topActWhereConditions.push("c.status = 'ACTIVE'");
+    if (evolWhereConditions.length > 0) {
+      evolQuery += ` AND ${evolWhereConditions.join(' AND ')}`;
     }
 
-    // Add joins if filtering by class
-    if (classId) {
-      topActivitiesQuery += `
-        JOIN students s ON c.student_id = s.id
-        JOIN class_students cs ON s.id = cs.student_id
-      `;
-      topActWhereConditions.push('cs.class_id = ?');
-      topActParams.push(classId);
+    evolQuery += ` ORDER BY c.submission_date ASC`;
+
+    const monthlyCorrections = await query<any[]>(evolQuery, evolParams);
+
+    // Regrouper par mois et calculer les pourcentages
+    const monthlyResults: Record<string, { earned: number, max: number, count: number }> = {};
+    
+    monthlyCorrections.forEach(correction => {
+      const month = correction.month;
+      let pointsEarned: number[] = [];
+      let maxPoints: number[] = [];
       
-      // Add sub-class filter if provided
-      if (subClassId) {
-        topActWhereConditions.push('cs.sub_class = ?');
-        topActParams.push(subClassId);
+      try {
+        pointsEarned = Array.isArray(correction.points_earned) 
+          ? correction.points_earned 
+          : JSON.parse(correction.points_earned || '[]');
+        
+        maxPoints = Array.isArray(correction.points) 
+          ? correction.points 
+          : JSON.parse(correction.points || '[]');
+      } catch (e) {
+        console.error('Erreur lors du parsing des points:', e);
+        return;
       }
-    }
+      
+      if (!monthlyResults[month]) {
+        monthlyResults[month] = { earned: 0, max: 0, count: 0 };
+      }
+      
+      const totalEarned = pointsEarned.reduce((sum, points) => sum + points, 0);
+      const totalMax = maxPoints.reduce((sum, points) => sum + points, 0);
+      
+      monthlyResults[month].earned += totalEarned;
+      monthlyResults[month].max += totalMax;
+      monthlyResults[month].count += 1;
+    });
+    
+    // Calculer les pourcentages mensuels
+    const gradeEvolution = Object.entries(monthlyResults).map(([month, data]) => {
+      const percentage = data.max > 0 ? (data.earned / data.max) * 100 : 0;
+      // Calculer également une note normalisée sur 20 pour la compatibilité avec GradeEvolutionChart
+      const normalizedGrade = data.max > 0 ? (data.earned / data.max) * 20 : 0;
+      
+      return {
+        month,
+        percentage,
+        correction_count: data.count,
+        average_grade: normalizedGrade // Ajouter ce champ pour la compatibilité
+      };
+    }).sort((a, b) => a.month.localeCompare(b.month));
 
-    if (activityId) {
-      topActWhereConditions.push('a.id = ?');
-      topActParams.push(activityId);
-    }
+    // 7. Top des activités par pourcentage de réussite
+    const topActivities = [...activityStats]
+      .filter(activity => activity.correction_count > 2)
+      .sort((a, b) => b.average_percentage - a.average_percentage)
+      .slice(0, 10)
+      .map(activity => ({
+        ...activity,
+        // Ajouter le champ average_grade pour assurer la compatibilité avec TopActivitiesChart
+        average_grade: activity.average_percentage / 5 // Convertir le pourcentage en note sur 20
+      }));
 
-    if (studentId) {
-      topActWhereConditions.push('c.student_id = ?');
-      topActParams.push(studentId);
-    }
-
-    if (topActWhereConditions.length > 0) {
-      topActivitiesQuery += ` WHERE ${topActWhereConditions.join(' AND ')}`;
-    }
-
-    topActivitiesQuery += `
-      GROUP BY 
-        a.id
-      HAVING 
-        correction_count > 2
-      ORDER BY 
-        average_grade DESC
-      LIMIT 10
-    `;
-
-    const topActivities = await query<any[]>(topActivitiesQuery, topActParams);
-
-    // 7. Métadonnées pour les filtres
+    // 8. Métadonnées pour les filtres
     const classes = await query<any[]>(`
       SELECT id, name FROM classes ORDER BY name
     `);
     
     const activities = await query<any[]>(`
-      SELECT id, name FROM activities ORDER BY name
+      SELECT id, name FROM activities_autres ORDER BY name
     `);
     
     // Récupérer les sous-classes pour la classe sélectionnée
@@ -455,10 +711,10 @@ export async function GET(request: NextRequest) {
       students = await query<any[]>(studentsQuery, studentsParams);
     }
 
-    // 8. Récupérer le nombre total d'activités inactives
+    // 9. Récupérer le nombre total d'activités inactives
     let inactiveCountQuery = `
       SELECT COUNT(*) as count
-      FROM corrections
+      FROM corrections_autres
       WHERE status = 'DEACTIVATED'
     `;
     
@@ -493,9 +749,17 @@ export async function GET(request: NextRequest) {
     
     const inactiveCount = await query<any[]>(inactiveCountQuery, inactiveCountParams);
 
+    // 10. Calculer la distribution des notes
+    // Utiliser les données de gradesData pour créer une distribution des notes
+    const gradeDistribution = calculateGradeDistribution(gradesData);
+
     return NextResponse.json({
-      globalStats: globalStats[0] || {},
-      gradeDistribution,
+      globalStats: {
+        ...globalStats,
+        average_percentage: averagePercentage
+      },
+      gradeDistribution, // Ajout de la distribution des notes
+      partPercentages,
       activityStats,
       classStats,
       gradeEvolution,
@@ -506,7 +770,7 @@ export async function GET(request: NextRequest) {
         activities,
         subClasses,
         students,
-        showInactive // Ajouter l'état actuel du filtre
+        showInactive
       }
     });
   } catch (error) {
@@ -516,4 +780,62 @@ export async function GET(request: NextRequest) {
       { status: 500 }
     );
   }
+}
+
+// Fonction pour calculer la distribution des notes
+function calculateGradeDistribution(gradesData: any[]): Array<{ grade_range: string, count: number }> {
+  // Créer des tranches de notes (0-2, 2-4, etc.)
+  const distribution: { [key: string]: number } = {
+    '0-2': 0,
+    '2-4': 0,
+    '4-6': 0,
+    '6-8': 0,
+    '8-10': 0,
+    '10-12': 0,
+    '12-14': 0,
+    '14-16': 0,
+    '16-18': 0,
+    '18-20': 0
+  };
+
+  gradesData.forEach(item => {
+    if (item.grade !== null && item.grade !== undefined) {
+      // Convertir le tableau de points maximums
+      let maxPoints: number[] = [];
+      try {
+        maxPoints = Array.isArray(item.points) 
+          ? item.points 
+          : JSON.parse(item.points || '[]');
+      } catch (e) {
+        console.error('Erreur lors du parsing des points pour la distribution:', e);
+        return;
+      }
+
+      // Calculer le total des points maximum pour cette activité
+      const totalMaxPoints = maxPoints.reduce((sum, points) => sum + points, 0);
+      
+      // Normaliser la note sur 20
+      if (totalMaxPoints > 0) {
+        const normalizedGrade = (item.grade / totalMaxPoints) * 20;
+        
+        // Déterminer la plage pour cette note
+        const range = Math.floor(normalizedGrade / 2) * 2;
+        const rangeKey = `${range}-${range + 2}`;
+        
+        // Incrémenter le compteur pour cette plage
+        if (distribution[rangeKey] !== undefined) {
+          distribution[rangeKey]++;
+        } else if (normalizedGrade === 20) {
+          // Cas spécial pour la note de 20, qui va dans la plage 18-20
+          distribution['18-20']++;
+        }
+      }
+    }
+  });
+
+  // Convertir l'objet en tableau pour le retour
+  return Object.entries(distribution).map(([grade_range, count]) => ({
+    grade_range,
+    count
+  }));
 }

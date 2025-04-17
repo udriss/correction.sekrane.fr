@@ -7,7 +7,10 @@ interface TopActivityData {
   activity_id: number;
   activity_name: string;
   correction_count: number;
-  average_grade: number;
+  average_grade?: number;
+  average_percentage?: number;
+  points?: number[];
+  parts_names?: string[];
 }
 
 interface TopActivitiesChartProps {
@@ -17,8 +20,26 @@ interface TopActivitiesChartProps {
 const COLORS = ['#8884d8', '#83a6ed', '#8dd1e1', '#82ca9d', '#a4de6c', '#d0ed57', '#ffc658'];
 
 export default function TopActivitiesChart({ data }: TopActivitiesChartProps) {
+  // Adapter les données pour compatibilité avec le nouveau format d'API
+  const adaptedData = data.map(item => {
+    // Si average_grade est déjà présent, l'utiliser
+    if (item.average_grade !== undefined && item.average_grade !== null) {
+      return item;
+    }
+    
+    // Sinon, calculer average_grade à partir de average_percentage
+    const avgGrade = item.average_percentage !== undefined 
+      ? (item.average_percentage / 100) * 20 
+      : 0;
+      
+    return {
+      ...item,
+      average_grade: avgGrade
+    };
+  });
+
   // Limiter aux 10 premières activités pour la lisibilité et formatter les données
-  const displayData = data.slice(0, 10).map(item => ({
+  const displayData = adaptedData.slice(0, 10).map(item => ({
     ...item,
     name: item.activity_name.length > 20 ? item.activity_name.substring(0, 20) + '...' : item.activity_name,
     // S'assurer que average_grade est traité correctement

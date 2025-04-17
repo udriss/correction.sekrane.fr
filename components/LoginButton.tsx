@@ -19,12 +19,14 @@ interface LoginButtonProps {
   variant?: 'text' | 'outlined' | 'contained';
   color?: 'inherit' | 'primary' | 'secondary';
   size?: 'small' | 'medium' | 'large';
+  modal?: boolean; // Option pour choisir entre modal et redirection
 }
 
 const LoginButton: React.FC<LoginButtonProps> = ({ 
   variant = 'contained', 
   color = 'primary',
-  size = 'medium'
+  size = 'medium',
+  modal = true // Par défaut, utilise le modal comme avant
 }) => {
   const { user, status } = useAuth();
   const router = useRouter();
@@ -86,62 +88,97 @@ const LoginButton: React.FC<LoginButtonProps> = ({
     }
   };
   
+  const handleRedirectToLogin = () => {
+    // Utiliser window.location.pathname au lieu de usePathname()
+    const currentPath = typeof window !== 'undefined' ? window.location.pathname : '/';
+    console.log('Current window.location.pathname in LoginButton:', currentPath);
+    
+    // S'assurer que le pathname est bien formaté (commence par /)
+    const formattedPath = currentPath && currentPath.startsWith('/') 
+      ? currentPath 
+      : `/${currentPath || ''}`;
+    
+    // Construire l'URL avec le paramètre callbackUrl explicitement
+    const loginUrl = `/login?callbackUrl=${encodeURIComponent(formattedPath)}`;
+    
+    // Pour déboguer
+    console.log('Redirection LoginButton vers:', loginUrl, 'Callback path:', formattedPath);
+    
+    // Utiliser une redirection directe au lieu du router Next.js
+    window.location.href = loginUrl;
+  };
+  
   // Show login button if not authenticated
   if (status === 'unauthenticated') {
+    // Si on veut utiliser le modal
+    if (modal) {
+      return (
+        <>
+          <Button
+            variant={variant}
+            color={color}
+            size={size}
+            onClick={() => setOpen(true)}
+          >
+            Se connecter
+          </Button>
+          
+          <Dialog open={open} onClose={() => setOpen(false)}>
+            <DialogTitle>Connexion</DialogTitle>
+            <DialogContent>
+              {error && (
+                <Alert severity="error" sx={{ mb: 2 }}>
+                  {error}
+                </Alert>
+              )}
+              <Box component="form" sx={{ mt: 1 }}>
+                <TextField
+                  margin="normal"
+                  required
+                  fullWidth
+                  label="Nom d'utilisateur"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  autoFocus
+                />
+                <TextField
+                  margin="normal"
+                  required
+                  fullWidth
+                  label="Mot de passe"
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                />
+              </Box>
+            </DialogContent>
+            <DialogActions>
+              <Button onClick={() => setOpen(false)}>
+                Annuler
+              </Button>
+              <Button 
+                onClick={handleLogin}
+                disabled={loading}
+                variant="contained"
+              >
+                {loading ? <CircularProgress size={24} /> : 'Se connecter'}
+              </Button>
+            </DialogActions>
+          </Dialog>
+        </>
+      );
+    }
+    
+    // Version avec redirection et callback
     return (
-      <>
-        <Button
-          variant={variant}
-          color={color}
-          size={size}
-          onClick={() => setOpen(true)}
-        >
-          Se connecter
-        </Button>
-        
-        <Dialog open={open} onClose={() => setOpen(false)}>
-          <DialogTitle>Connexion</DialogTitle>
-          <DialogContent>
-            {error && (
-              <Alert severity="error" sx={{ mb: 2 }}>
-                {error}
-              </Alert>
-            )}
-            <Box component="form" sx={{ mt: 1 }}>
-              <TextField
-                margin="normal"
-                required
-                fullWidth
-                label="Nom d'utilisateur"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                autoFocus
-              />
-              <TextField
-                margin="normal"
-                required
-                fullWidth
-                label="Mot de passe"
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-              />
-            </Box>
-          </DialogContent>
-          <DialogActions>
-            <Button onClick={() => setOpen(false)}>
-              Annuler
-            </Button>
-            <Button 
-              onClick={handleLogin}
-              disabled={loading}
-              variant="contained"
-            >
-              {loading ? <CircularProgress size={24} /> : 'Se connecter'}
-            </Button>
-          </DialogActions>
-        </Dialog>
-      </>
+      <Button
+        variant={variant}
+        color={color}
+        size={size}
+        onClick={handleRedirectToLogin}
+      >
+        Se connecter
+      </Button>
     );
   }
   

@@ -25,7 +25,7 @@ import ChildCareIcon from '@mui/icons-material/ChildCare';
 
 export default function PrivacyPolicyPage() {
   // Get current date for the last update
-  const lastUpdated = new Date('2025-03-21').toLocaleDateString('fr-FR', {
+  const lastUpdated = new Date('2025-04-17').toLocaleDateString('fr-FR', {
     year: 'numeric',
     month: 'long',
     day: 'numeric'
@@ -308,7 +308,11 @@ export default function PrivacyPolicyPage() {
           <Typography variant="body1">
             Si vous avez des questions concernant cette politique de confidentialité ou nos pratiques en matière de protection des données, veuillez nous contacter à l'adresse suivante :
           </Typography>
-          <Typography variant="body1" fontWeight="bold" sx={{ mt: 1 }}>
+          <Typography variant="body1" fontWeight="bold" sx={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            mt: 1 }}>
             admin@sekrane.fr
           </Typography>
         </Box>

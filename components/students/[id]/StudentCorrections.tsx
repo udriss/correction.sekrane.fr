@@ -241,12 +241,14 @@ export default function StudentCorrections({ student, corrections: initialCorrec
             size="small"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            InputProps={{
-              startAdornment: (
-                <InputAdornment position="start">
-                  <SearchIcon color="action" fontSize="small" />
-                </InputAdornment>
-              ),
+            slotProps ={{
+              input: {
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <SearchIcon color="action" fontSize="small" />
+                  </InputAdornment>
+                ),
+              }
             }}
             variant="outlined"
           />
@@ -367,10 +369,10 @@ export default function StudentCorrections({ student, corrections: initialCorrec
                             correction.grade !== null && correction.grade !== undefined
                               ?
                               <Box sx={{ display: 'flex', alignItems: 'center', gap: 0 }}>
-                              <Typography variant="body2" fontWeight='700' noWrap>
+                              <Typography variant="overline" fontWeight='700' noWrap>
                                 {correction.grade}&nbsp;
                               </Typography>
-                              <Typography variant="body2" noWrap>
+                              <Typography variant="overline" noWrap>
                               / {activity?.points?.reduce((a, b) => a + b, 0)}
                               </Typography>
                               </Box>
@@ -389,9 +391,9 @@ export default function StudentCorrections({ student, corrections: initialCorrec
                     
                     <Box sx={{ mb: 2 }}>
                       <Typography 
-                        variant="body2" 
+                        variant="overline" 
                         color="text.secondary"
-                        sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}
+                        sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: .2 }}
                       >
                         <CalendarTodayIcon fontSize="small" color="primary" />
                         Envoyé le : {correction.submission_date 
@@ -402,33 +404,24 @@ export default function StudentCorrections({ student, corrections: initialCorrec
                       
                       {correction.deadline && (
                         <Typography 
-                          variant="body2" 
+                          variant="overline" 
                           color="text.secondary"
-                          sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}
+                          sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: .2 }}
                         >
                           <CalendarTodayIcon fontSize="small" color="error" />
                           Date limite : {formatDate(correction.deadline)}
                         </Typography>
                       )}
-                      
-                      <Typography 
-                        variant="body2" 
-                        color="text.secondary"
-                        sx={{ display: 'flex', alignItems: 'center', gap: 1 }}
-                      >
-                        <SchoolIcon fontSize="small" />
-                        {correction.class_name || 'Aucune classe'}
-                      </Typography>
                     </Box>
                     
                     {/* Affichage des points par partie */}
                     {correction.points_earned && correction.points_earned.length > 0 && (
                       <>
-                        <Typography variant="subtitle2" gutterBottom>
-                          Répartition des points :
+                        <Typography variant="overline" fontWeight={'bold'} gutterBottom>
+                          Répartition des points
                         </Typography>
                         
-                        <Grid container spacing={1} sx={{ mb: 1 }}>
+                        <Grid container spacing={1} sx={{ mb: .2 }}>
                           {correction.points_earned.map((points, index) => {
                             // Obtenir le nom de la partie de l'activité
                             const partName = activity?.parts_names?.[index] || `Partie ${index + 1}`;
@@ -444,8 +437,8 @@ export default function StudentCorrections({ student, corrections: initialCorrec
                                   ) : (
                                     <MenuBookIcon color="secondary" fontSize="small" />
                                   )}
-                                  <Typography variant="body2" fontWeight="medium">
-                                    {partName}: {points || 0} / {maxPoints} pts
+                                  <Typography variant="overline" fontWeight="medium">
+                                  {partName} : {(points || 0).toString().replace('.', ',')} / {maxPoints} pts
                                   </Typography>
                                 </Box>
                               </Grid>
@@ -473,8 +466,8 @@ export default function StudentCorrections({ student, corrections: initialCorrec
                               variant="determinate" 
                               value={correction.score_percentage || 0} 
                               sx={{ 
-                                height: 10, 
-                                borderRadius: 5,
+                              height: 10, 
+                              borderRadius: 5,
                                 // Styliser le fond (partie non remplie)
                                 backgroundColor: theme => {
                                   const grade = correction.grade || 0;
@@ -519,8 +512,9 @@ export default function StudentCorrections({ student, corrections: initialCorrec
                       variant="outlined"
                       target="_blank"
                       rel="noopener noreferrer"
+                      size="small"
                     >
-                      Voir/Modifier
+                      Voir / Modifier
                     </Button>
                     
                     <Stack direction="row" spacing={1} sx={{ display:'flex', justifyItems:'center',

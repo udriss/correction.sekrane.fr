@@ -81,11 +81,12 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({ activityId, correctionId,
         size="medium"
         disabled={uploading}
         title="Ajouter une image"
+        sx={{ height: 'fit-content', alignSelf: 'center' }}
       >
         {uploading ? (
           <CircularProgress size={20} />
         ) : (
-          <ImageIcon />
+          <ImageIcon fontSize='medium' />
         )}
       </IconButton>
       {error && (

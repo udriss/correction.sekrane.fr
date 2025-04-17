@@ -15,7 +15,8 @@ import {
   Chip,
   Alert,
   Button,
-  Badge
+  Badge,
+  alpha
 } from '@mui/material';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import SearchIcon from '@mui/icons-material/Search';
@@ -674,14 +675,23 @@ export default function FAQPage() {
                           alignItems: 'center', 
                           mt: 2, 
                           p: 1.5, 
-                          bgcolor: theme => theme.palette.warning.light, 
-                          borderRadius: 1,
                           border: '1px dashed',
-                          borderColor: 'warning.main'
+                          bgcolor: theme => alpha(theme.palette.warning.main, 0.05),
+                          borderRadius:2,
+                          '&:hover': {
+                            bgcolor: theme => alpha(theme.palette.warning.main, 0.1),
+                            borderColor: 'warning.main',
+                            borderRadius: 4,
+                          }
                         }}
                       >
                         <ConstructionIcon sx={{ color: 'warning.main', mr: 1 }} />
-                        <Typography variant="body2" color="warning.dark">
+                        <Typography variant="body2"
+                        sx={{
+                          color: 'text.primary',
+                          fontWeight: 'medium',
+                        }}
+                        >
                           Cette fonctionnalité est actuellement en développement et sera disponible prochainement.
                         </Typography>
                       </Box>

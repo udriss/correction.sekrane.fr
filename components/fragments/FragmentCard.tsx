@@ -21,6 +21,7 @@ import {
   Theme,
   CircularProgress
 } from '@mui/material';
+import AddCircleIcon from '@mui/icons-material/AddCircle';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
@@ -162,7 +163,15 @@ export default function FragmentCard({
         )}
       </CardContent>
 
-      <CardActions>
+      <CardActions
+      sx={{
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        padding: 1,
+      }}  
+      >
+        <Box>
         <Tooltip title="Modifier">
           <IconButton 
             size="medium"
@@ -190,18 +199,22 @@ export default function FragmentCard({
             <DeleteIcon fontSize="medium" />
           </IconButton>
         </Tooltip>
+        </Box>
 
+        <Box>
         {onAddToCorrection && (
           <Tooltip title="Ajouter à la correction">
             <IconButton 
-              size="medium"
+              size="large"
+              color='success'
               onClick={handleAddToCorrection}
               sx={{ ml: 'auto' }}
             >
-              <CheckIcon fontSize="medium" />
+              <AddCircleIcon fontSize="large" />
             </IconButton>
           </Tooltip>
         )}
+        </Box>
       </CardActions>
 
       <Dialog

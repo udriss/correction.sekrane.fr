@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   Container, 
   Typography, 
@@ -62,13 +62,17 @@ interface StatsData {
     average_grade: number;
     highest_grade: number;
     lowest_grade: number;
-    avg_experimental_points: number;
-    avg_theoretical_points: number;
     total_students: number;
     total_activities: number;
+    average_percentage: number; // Pourcentage moyen de réussite normalisé
   };
   gradeDistribution: Array<{
     grade_range: string;
+    count: number;
+  }>;
+  partPercentages: Array<{
+    name: string;
+    percentage: number;
     count: number;
   }>;
   activityStats: Array<{
@@ -78,6 +82,9 @@ interface StatsData {
     average_grade: number;
     highest_grade: number;
     lowest_grade: number;
+    average_percentage: number; // Pourcentage moyen de réussite
+    points: number[]; // Maximum possible points per part
+    parts_names: string[]; // Names of the parts
   }>;
   classStats: Array<{
     class_id: number;
@@ -88,14 +95,18 @@ interface StatsData {
   }>;
   gradeEvolution: Array<{
     month: string;
+    percentage: number; // Pourcentage de réussite au lieu de average_grade
     correction_count: number;
-    average_grade: number;
+    average_grade: number; // Ajout pour compatibilité avec GradeEvolutionChart
   }>;
   topActivities: Array<{
     activity_id: number;
     activity_name: string;
     correction_count: number;
-    average_grade: number;
+    average_percentage: number; // Pourcentage de réussite au lieu de average_grade
+    average_grade: number; // Ajout pour compatibilité avec TopActivitiesChart
+    points?: number[]; // Maximum possible points per part
+    parts_names?: string[]; // Names of the parts
   }>;
   inactiveCount: number; // Nombre de corrections inactives
   metaData?: {
@@ -127,10 +138,17 @@ interface FiltersState {
 export default function StatsPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [tabValue, setTabValue] = useState<TabValue>(TabValue.Overview);
+  // Récupération du tab actif depuis l'URL et conversion en valeur numérique
+  const tabFromUrl = searchParams?.get('tab');
+  const initialTab = tabFromUrl ? parseInt(tabFromUrl, 10) : TabValue.Overview;
+  const [tabValue, setTabValue] = useState<TabValue>(initialTab);
   const [stats, setStats] = useState<StatsData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  
+  // Références pour stocker l'état des filtres et les paramètres de requête API
+  const currentApiParams = useRef<string>('');
+  const dataFetched = useRef<boolean>(false);
   
   // États pour les filtres
   const [filters, setFilters] = useState<FiltersState>({
@@ -306,33 +324,44 @@ export default function StatsPage() {
   // Chargement des données avec gestion des filtres
   const fetchData = async () => {
     try {
-      setLoading(true);
-      
       // Construire l'URL avec les filtres actifs
       let url = '/api/stats';
       const queryParams = new URLSearchParams();
       
       if (filters.classId) queryParams.append('classId', filters.classId);
-      if (filters.subClassId) queryParams.append('subClassId', filters.subClassId); // Ajout du filtre de sous-classe
+      if (filters.subClassId) queryParams.append('subClassId', filters.subClassId);
       if (filters.activityId) queryParams.append('activityId', filters.activityId);
       if (filters.studentId) queryParams.append('studentId', filters.studentId);
-      if (filters.showInactive) queryParams.append('showInactive', 'true'); // Ajouter showInactive aux paramètres de requête
+      if (filters.showInactive) queryParams.append('showInactive', 'true');
       
       const queryString = queryParams.toString();
       if (queryString) {
         url += `?${queryString}`;
       }
       
+      // Vérifier si les paramètres de requête ont changé depuis le dernier appel
+      // Si ce sont les mêmes paramètres et que nous avons déjà des données, pas besoin de recharger
+      if (url === currentApiParams.current && stats !== null && dataFetched.current) {
+        console.log("Les données sont déjà chargées avec ces filtres, pas besoin de recharger");
+        return;
+      }
+      
+      // Mettre à jour les paramètres actuels et indiquer qu'un chargement est en cours
+      currentApiParams.current = url;
+      setLoading(true);
+      
       const response = await fetch(url);
       
       if (!response.ok) {
         const data = await response.json();
-        
         throw new Error('Erreur lors du chargement des statistiques : '+data.error);
       }
       
       const data = await response.json();
       setStats(data);
+      
+      // Marquer que les données ont été chargées avec succès
+      dataFetched.current = true;
       
       // Mettre à jour la liste des étudiants si disponible
       if (data.metaData?.students) {
@@ -342,18 +371,27 @@ export default function StatsPage() {
     } catch (err) {
       console.error('Erreur:', err);
       setError(err instanceof Error ? err.message : 'Une erreur est survenue');
+      // En cas d'erreur, réinitialiser pour permettre une nouvelle tentative
+      dataFetched.current = false;
     } finally {
       setLoading(false);
     }
   };
   
-  // Chargement initial des données
+  // Chargement initial des données - une seule fois au montage du composant
   useEffect(() => {
     fetchData();
-  }, []);
+  }, []); // Dépendances vides pour n'exécuter qu'une seule fois
 
   const handleTabChange = (event: React.SyntheticEvent, newValue: TabValue) => {
     setTabValue(newValue);
+    
+    // Mise à jour de l'URL sans déclencher de navigation
+    const newParams = new URLSearchParams(searchParams?.toString());
+    newParams.set('tab', newValue.toString());
+    
+    // Mettre à jour l'URL sans déclencher de rechargement
+    window.history.pushState({}, '', `/stats?${newParams.toString()}`);
   };
 
   if (loading && !stats) {
@@ -379,6 +417,7 @@ export default function StatsPage() {
     );
   }
 
+  
   return (
     <Container maxWidth="lg" className="py-8">
 
@@ -834,16 +873,19 @@ export default function StatsPage() {
                 </Card>
               </Grid>
               
-              <Grid size={{ xs: 12, sm: 6, md: 2.5 }}>
+              <Grid size={{ xs: 12, sm: 6, md: 3.5 }}>
                 <Card className="h-full">
                   <CardContent>
                   <Typography variant="overline" color="text.secondary">
-                      Moyenne générale
+                      Pourcentage moyen de réussite
                     </Typography>
                     <Typography variant="h4" component="div" fontWeight="bold">
-                      {stats?.globalStats.average_grade !== undefined && stats?.globalStats.average_grade !== null 
-                        ? formatNumber(stats.globalStats.average_grade) 
-                        : "N/A"}/20
+                      {stats?.globalStats.average_percentage !== undefined && stats?.globalStats.average_percentage !== null 
+                        ? formatNumber(stats.globalStats.average_percentage) 
+                        : "N/A"}%
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      (Normalisé selon le barème de chaque activité)
                     </Typography>
                   </CardContent>
                 </Card>
@@ -882,17 +924,25 @@ export default function StatsPage() {
                 Distribution des notes
               </Typography>
               <Box sx={{ height: 300 }}>
-                {stats && <GradeDistributionChart data={stats.gradeDistribution} />}
+                {stats && stats.gradeDistribution && stats.gradeDistribution.length > 0 ? (
+                  <GradeDistributionChart data={stats.gradeDistribution} />
+                ) : (
+                  <Alert severity="info">Aucune donnée de distribution de notes disponible.</Alert>
+                )}
               </Box>
             </Paper>
 
             {/* Top des activités */}
             <Paper className="p-4 mb-6">
               <Typography variant="h6" fontWeight="bold" className="mb-4">
-                Top 10 des activités par note moyenne
+                Top 10 des activités par pourcentage de réussite
               </Typography>
               <Box sx={{ height: 300 }}>
-                {stats && <TopActivitiesChart data={stats.topActivities} />}
+                {stats && stats.topActivities && stats.topActivities.length > 0 ? (
+                  <TopActivitiesChart data={stats.topActivities} />
+                ) : (
+                  <Alert severity="info">Aucune donnée sur les activités disponible.</Alert>
+                )}
               </Box>
             </Paper>
           </>
@@ -904,10 +954,14 @@ export default function StatsPage() {
           <>
             <Paper className="p-4 mb-6">
               <Typography variant="h6" fontWeight="bold" className="mb-4">
-                Comparaison des activités
+                Comparaison des activités par pourcentage de réussite
               </Typography>
               <Box sx={{ height: 400 }}>
-                {stats && <ActivityComparisonChart activityStats={stats.activityStats} />}
+                {stats && stats.activityStats && stats.activityStats.length > 0 ? (
+                  <ActivityComparisonChart activityStats={stats.activityStats} />
+                ) : (
+                  <Alert severity="info">Aucune donnée sur les activités disponible pour la comparaison.</Alert>
+                )}
               </Box>
             </Paper>
 
@@ -923,9 +977,10 @@ export default function StatsPage() {
                       <TableRow>
                         <TableCell>Activité</TableCell>
                         <TableCell>Corrections</TableCell>
+                        <TableCell>% Réussite</TableCell>
                         <TableCell>Note moyenne</TableCell>
-                        <TableCell>Note max</TableCell>
-                        <TableCell>Note min</TableCell>
+                        <TableCell>Points max</TableCell>
+                        <TableCell>Parties</TableCell>
                       </TableRow>
                     </TableHead>
                     <TableBody>
@@ -934,13 +989,25 @@ export default function StatsPage() {
                           <TableCell>{activity.activity_name}</TableCell>
                           <TableCell>{activity.correction_count}</TableCell>
                           <TableCell>
-                            {formatNumber(activity.average_grade)}
+                            {activity.average_percentage !== undefined ? 
+                              `${formatNumber(activity.average_percentage)}%` : 'N/A'}
                           </TableCell>
                           <TableCell>
-                            {formatNumber(activity.highest_grade)}
+                            {activity.average_grade !== undefined ? 
+                              formatNumber(activity.average_grade) : 
+                              activity.average_percentage !== undefined ? 
+                                formatNumber((activity.average_percentage / 100) * 20) : 
+                                'N/A'}
                           </TableCell>
                           <TableCell>
-                            {formatNumber(activity.lowest_grade)}
+                            {activity.points ? 
+                              activity.points.reduce((sum, val) => sum + val, 0) : 
+                              'N/A'}
+                          </TableCell>
+                          <TableCell>
+                            {activity.parts_names ? 
+                              activity.parts_names.join(', ') : 
+                              'N/A'}
                           </TableCell>
                         </TableRow>
                       ))}
@@ -961,7 +1028,11 @@ export default function StatsPage() {
                 Comparaison des classes
               </Typography>
               <Box sx={{ height: 400 }}>
-                {stats && <ClassComparisonChart data={stats.classStats} />}
+                {stats && stats.classStats && stats.classStats.length > 0 ? (
+                  <ClassComparisonChart data={stats.classStats} />
+                ) : (
+                  <Alert severity="info">Aucune donnée de classes disponible pour la comparaison.</Alert>
+                )}
               </Box>
             </Paper>
 
@@ -1006,48 +1077,53 @@ export default function StatsPage() {
           <>
             <Paper className="p-4 mb-6">
               <Typography variant="h6" fontWeight="bold" className="mb-4">
-                Évolution des notes au fil du temps
+                Évolution des pourcentages de réussite au fil du temps
               </Typography>
               <Box sx={{ height: 400 }}>
-                {stats && <GradeEvolutionChart data={stats.gradeEvolution} />}
+                {stats && stats.gradeEvolution && stats.gradeEvolution.length > 0 ? (
+                  <GradeEvolutionChart data={stats.gradeEvolution} />
+                ) : (
+                  <Alert severity="info">Aucune donnée d'évolution des notes disponible.</Alert>
+                )}
               </Box>
             </Paper>
 
-            {/* Répartition expérimental vs théorique */}
+            {/* Statistiques par partie d'activité */}
             <Paper className="p-4">
               <Typography variant="h6" fontWeight="bold" className="mb-4">
-                Répartition moyenne des points
+                Pourcentages de réussite par partie d'activité
               </Typography>
-              <Grid container spacing={3}>
-                <Grid size={{ xs: 12, sm: 6 }}>
-                  <Card>
-                    <CardContent>
-                      <Typography variant="h5" component="div" color="primary" fontWeight="bold" align="center">
-                        {stats?.globalStats.avg_experimental_points !== undefined && stats?.globalStats.avg_experimental_points !== null 
-                          ? formatNumber(stats.globalStats.avg_experimental_points) 
-                          : "N/A"}
-                      </Typography>
-                      <Typography variant="body1" align="center">
-                        Points expérimentaux (moyenne)
-                      </Typography>
-                    </CardContent>
-                  </Card>
-                </Grid>
-                <Grid size={{ xs: 12, sm: 6 }}>
-                  <Card>
-                    <CardContent>
-                      <Typography variant="h5" component="div" color="secondary" fontWeight="bold" align="center">
-                        {stats?.globalStats.avg_theoretical_points !== undefined && stats?.globalStats.avg_theoretical_points !== null 
-                          ? formatNumber(stats.globalStats.avg_theoretical_points) 
-                          : "N/A"}
-                      </Typography>
-                      <Typography variant="body1" align="center">
-                        Points théoriques (moyenne)
-                      </Typography>
-                    </CardContent>
-                  </Card>
-                </Grid>
-              </Grid>
+              
+              {stats?.partPercentages && stats.partPercentages.length > 0 ? (
+                <Box sx={{ overflowX: 'auto' }}>
+                  <TableContainer>
+                    <Table size="small">
+                      <TableHead>
+                        <TableRow>
+                          <TableCell>Partie</TableCell>
+                          <TableCell>Nombre d'occurrences</TableCell>
+                          <TableCell>Pourcentage de réussite</TableCell>
+                        </TableRow>
+                      </TableHead>
+                      <TableBody>
+                        {stats.partPercentages.map((part, index) => (
+                          <TableRow key={index}>
+                            <TableCell>{part.name}</TableCell>
+                            <TableCell>{part.count}</TableCell>
+                            <TableCell>
+                              {formatNumber(part.percentage)}%
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </TableContainer>
+                </Box>
+              ) : (
+                <Alert severity="info">
+                  Aucune donnée disponible sur les parties d'activité. Cela peut être dû au fait que les activités n'ont pas de parties nommées.
+                </Alert>
+              )}
             </Paper>
           </>
         )}

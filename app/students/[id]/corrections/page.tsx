@@ -335,7 +335,7 @@ export default function StudentCorrectionsPage() {
   }, [studentId]);
   
   // Fonction pour formater la date
-  const formatDate = (dateString: string) => {
+  const formatDate2 = (dateString: string) => {
     const options: Intl.DateTimeFormatOptions = { 
       year: 'numeric', 
       month: 'short', 
@@ -345,6 +345,22 @@ export default function StudentCorrectionsPage() {
     };
     return new Date(dateString).toLocaleDateString('fr-FR', options);
   };
+
+    // Fonction pour formater la date
+    const formatDate = (dateString?: string | Date) => {
+      if (!dateString) return 'Non spécifiée';
+      
+      const date = typeof dateString === 'string' 
+        ? new Date(dateString) 
+        : dateString;
+      
+      const options: Intl.DateTimeFormatOptions = { 
+        year: 'numeric', 
+        month: 'short', 
+        day: 'numeric',
+      };
+      return date.toLocaleDateString('fr-FR', options);
+    };
   
   // Fonction pour obtenir la couleur selon la note
   const getGradeColor = (percentage: number) => {
@@ -604,30 +620,49 @@ export default function StudentCorrectionsPage() {
               >
                 <CardContent sx={{ flexGrow: 1 }}>
                   <Box sx={{ mb: 2 }}>
+                    <Typography variant="h6" fontWeight="bold" noWrap>
+                      {correction.activity_name}
+                    </Typography>
                     <Typography 
-                      variant="body2" 
+                      variant="overline" 
                       color="text.secondary"
-                      sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}
+                      sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: .2 }}
                     >
-                      <CalendarTodayIcon fontSize="small" />
-                        {new Date(correction.submission_date).toLocaleDateString('fr-FR', { year: 'numeric', month: 'short', day: 'numeric' })}
+                      <CalendarTodayIcon fontSize="small" color="primary" />
+                      Envoyé le : {correction.submission_date 
+                        ? formatDate(correction.submission_date)
+                        : formatDate(correction.created_at)
+                      }
                     </Typography>
                     
-                    <Typography 
-                      variant="body2" 
-                      color="text.secondary"
-                      sx={{ display: 'flex', alignItems: 'center', gap: 1 }}
-                    >
-                      <SchoolIcon fontSize="small" />
-                      {correction.class_name}
-                    </Typography>
+                    {correction.deadline && (
+                      <Typography 
+                        variant="overline" 
+                        color="text.secondary"
+                        sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: .2 }}
+                      >
+                        <CalendarTodayIcon fontSize="small" color="error" />
+                        Date limite : {formatDate(correction.deadline)}
+                      </Typography>
+                    )}
+                    {correction.updated_at && (
+                      <Typography 
+                        variant="overline" 
+                        color="text.secondary"
+                        sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: .2 }}
+                      >
+                        <CalendarTodayIcon fontSize="small" color="success" />
+                        Mise à jour : {formatDate2(correction.updated_at)}
+                      </Typography>
+                    )}
                   </Box>
+
                   
-                  <Typography variant="subtitle2" gutterBottom>
-                    Répartition des points :
+                  <Typography variant="overline" fontWeight={'bold'} gutterBottom>
+                    Répartition des points
                   </Typography>
                   
-                  <Grid container spacing={1} sx={{ mb: 1 }}>
+                  <Grid container spacing={1} sx={{ mb: .2 }}>
                     {correction.parts_names?.map((partName, index) => (
                         <Grid size={{ xs: 6 }} key={index}>
                           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
@@ -636,8 +671,8 @@ export default function StudentCorrectionsPage() {
                             ) : (
                               <MenuBookIcon color="secondary" fontSize="small" />
                             )}
-                            <Typography variant="body2" fontWeight="medium">
-                              {partName}: {correction.points_earned?.[index] || 0} / {correction.points?.[index] || 0} pts
+                            <Typography variant="overline" fontWeight="medium">
+                            {partName} : {String(correction.points_earned?.[index] || 0).replace('.', ',')} / {correction.points?.[index] || 0} pts
                             </Typography>
                           </Box>
                         </Grid>

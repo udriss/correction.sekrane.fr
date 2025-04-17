@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Paper, IconButton, CircularProgress, Chip, Switch, FormControlLabel, Tooltip } from '@mui/material';
+import { Paper, Box, IconButton, CircularProgress, Chip, Switch, Tooltip } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import UndoIcon from '@mui/icons-material/Undo';
 import SaveIcon from '@mui/icons-material/Save';
@@ -97,8 +97,9 @@ const ActionButtons: React.FC<ActionButtonsProps> = ({
           color="primary"
           size="medium"
           title="Ajouter un paragraphe"
+          sx={{ height: 'fit-content', alignSelf: 'center' }}
         >
-          <AddIcon />
+          <AddIcon fontSize='medium' />
         </IconButton>
         
         <ImageUploader 
@@ -111,9 +112,10 @@ const ActionButtons: React.FC<ActionButtonsProps> = ({
           color="inherit"
           disabled={historyLength === 0}
           size="medium"
+          sx={{ height: 'fit-content', alignSelf: 'center' }}
           title="Annuler la dernière modification"
         >
-          <UndoIcon />
+          <UndoIcon fontSize='medium' />
         </IconButton>
         <IconButton
           onClick={() => {
@@ -122,9 +124,10 @@ const ActionButtons: React.FC<ActionButtonsProps> = ({
           }}
           color="success"
           size="medium"
+          sx={{ height: 'fit-content', alignSelf: 'center' }}
           title="Copier dans le presse-papier"
         >
-          <ContentCopyIcon />
+          <ContentCopyIcon fontSize='medium' />
         </IconButton>
         <IconButton
           onClick={() => {
@@ -133,33 +136,47 @@ const ActionButtons: React.FC<ActionButtonsProps> = ({
           }}
           color="primary"
           size="medium"
+          sx={{ height: 'fit-content', alignSelf: 'center' }}
           disabled={saving}
           title="Sauvegarder la correction"
         >
           {saving ? <CircularProgress size={20} /> : <SaveIcon />}
         </IconButton>
-      </div>
-      
       {/* Indicateur de sauvegarde automatique */}
-      <div className="flex items-center">
-        <FormControlLabel
-          control={
+      <Box 
+      sx={{
+        display: 'flex',
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginLeft: 2,
+      }}
+      >
+      <Box 
+      sx={{
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        mr: 2,
+      }}
+      >
         <Switch
           checked={autoSaveActive}
           onChange={(e) => setAutoSaveActive(e.target.checked)}
           size="small"
         />
-          }
-          label={
-        <Typography 
-          variant="overline" 
+        <Typography
+          variant="overline"
           color="text.secondary"
+          sx={{ 
+            mt: 0,
+            fontSize: '0.55rem',}}
         >
           Auto-save
         </Typography>
-          }
-        />
-        {autoSaveActive && lastAutoSave && (
+      </Box>
+      {autoSaveActive && lastAutoSave && (
           <Tooltip title={`Enregistrement automatique toutes les 70 secondes. Dernière sauvegarde: ${lastAutoSave.toLocaleTimeString()}`}>
         <Chip
           icon={<AutorenewIcon fontSize="small" />}
@@ -167,11 +184,14 @@ const ActionButtons: React.FC<ActionButtonsProps> = ({
           size="small"
           variant="outlined"
           color="info"
-          sx={{ ml: 1, fontSize: '0.7rem' }}
+          sx={{ mt: 1, fontSize: '0.7rem' }}
         />
           </Tooltip>
         )}
+      </Box>
       </div>
+      
+
       
       <div className="space-x-2 flex justify-end items-center">
         <Tooltip title={shareCode ? "Cette correction est déjà partagée" : "Partager la correction"}>
@@ -179,6 +199,7 @@ const ActionButtons: React.FC<ActionButtonsProps> = ({
             color={shareCode ? "success" : "primary"}
             onClick={() => setShareModalOpen(true)}
             size="medium"
+            sx={{ height: 'fit-content', alignSelf: 'center' }}
           >
             {shareCode ? <VisibilityIcon /> : <ShareIcon />}
           </IconButton>
@@ -189,6 +210,7 @@ const ActionButtons: React.FC<ActionButtonsProps> = ({
               onClick={() => window.open(getShareUrl(), '_blank')}
               color="info"
               size="medium"
+              sx={{ height: 'fit-content', alignSelf: 'center' }}
             >
               <OpenInNewIcon />
             </IconButton>
