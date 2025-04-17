@@ -109,7 +109,7 @@ export default function StudentCorrectionsPage() {
   
   // États pour la gestion de l'édition d'étudiant
   const [editError, setEditError] = useState<string | null>(null);
-  const [classes, setClasses] = useState<any[]>([]);
+
   const [errorDetails, setErrorDetails] = useState<any>(null);
 
   // Gérer la récupération du share code et rediriger vers la page de feedback
@@ -186,7 +186,7 @@ export default function StudentCorrectionsPage() {
       
       try {
         // Récupérer les informations de l'étudiant
-        const studentResponse = await fetch(`/api/students/${studentId}`);
+        const studentResponse = await fetch(`/api/studentsPublic/${studentId}`);
         if (!studentResponse.ok) {
           const errorData = await studentResponse.json().catch(() => ({ error: 'Étudiant non trouvé' }));
           // Créer une instance d'Error et y attacher les détails
@@ -202,10 +202,11 @@ export default function StudentCorrectionsPage() {
           setLoading(false);
           return;
         }
+        
         const studentData = await studentResponse.json();
         
         // Récupérer toutes les classes de l'étudiant
-        const studentClassesResponse = await fetch(`/api/students/${studentId}/classes`);
+        const studentClassesResponse = await fetch(`/api/studentsPublic/${studentId}/classes`);
         if (studentClassesResponse.ok) {
           const studentClassesData = await studentClassesResponse.json();
           
@@ -235,15 +236,9 @@ export default function StudentCorrectionsPage() {
         
         setStudent(studentData);
         
-        // Récupérer toutes les classes pour le dialog d'édition
-        const classesResponse = await fetch('/api/classes');
-        if (classesResponse.ok) {
-          const classesData = await classesResponse.json();
-          setClasses(classesData);
-        }
-        
+
         // Récupérer les corrections de l'étudiant
-        const correctionsResponse = await fetch(`/api/students/${studentId}/corrections`);
+        const correctionsResponse = await fetch(`/api/studentsPublic/${studentId}/corrections`);
         if (!correctionsResponse.ok) {
           const errorData = await correctionsResponse.json().catch(() => ({ error: 'Erreur lors du chargement des corrections' }));
           // Créer une instance d'Error et y attacher les détails
@@ -288,7 +283,7 @@ export default function StudentCorrectionsPage() {
 
 
         // Récupérer les statistiques de l'étudiant
-        const statsResponse = await fetch(`/api/students/${studentId}/stats`);
+        const statsResponse = await fetch(`/api/studentsPublic/${studentId}/stats`);
         if (!statsResponse.ok) {
           // On ne bloque pas le chargement pour les stats, on continue
           console.warn('Impossible de charger les statistiques de l\'étudiant');

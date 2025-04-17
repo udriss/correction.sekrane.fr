@@ -31,7 +31,9 @@ function isValidRedirectUrl(path: string): boolean {
   const allowedPaths = [
     '/', 
     '/activities', 
+    '/activities_autres', 
     '/corrections', 
+    '/corrections_autres', 
     '/feedback', 
     '/dashboard',
     '/stats',
@@ -52,21 +54,29 @@ export async function middleware(request: NextRequest) {
     path === '/login' || 
     path === '/api/auth/login' || 
     path === '/demo' || 
+    /^\/students\/\d+\/corrections$/.test(path) ||
     path === '/api/auth/logout';
     
   // Check if path matches students/[id] pattern which should be public
   const isStudentProfilePath = /^\/students\/\d+$/.test(path);
   
+  // ONLY allow corrections API endpoint for students to be public
+  const isStudentCorrectionsApiPath = /^\/api\/students\/\d+\/corrections$/.test(path);
+  
   // Check if the path should be protected
   const isPathProtected = 
     path.startsWith('/activities') || 
     path.startsWith('/corrections') ||
+    path.startsWith('/corrections_autres') ||
     path.startsWith('/admin') ||
     (path.startsWith('/students') && !isStudentProfilePath) || // Protect /students but not individual profiles
+    (path.startsWith('/api/students') && !isStudentCorrectionsApiPath) || // Only free /api/students/[id]/corrections
+    path.startsWith('/api/classes') || 
+    path.startsWith('/api/activities_autres') || 
     path.startsWith('/stats');
   
   // Si le chemin n'est pas protégé ou est public, continuer
-  if (!isPathProtected || isPublicPath || isStudentProfilePath) {
+  if (!isPathProtected || isPublicPath || isStudentProfilePath || isStudentCorrectionsApiPath) {
     return NextResponse.next();
   }
   

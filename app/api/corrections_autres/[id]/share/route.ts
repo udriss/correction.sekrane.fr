@@ -4,6 +4,7 @@ import { nanoid } from 'nanoid';
 import { getServerSession } from "next-auth/next";
 import authOptions from "@/lib/auth";
 import { getUser } from '@/lib/auth';
+import { createLogEntry } from '@/lib/services/logsService';
 
 // Fonction pour générer un code unique
 function generateUniqueCode(): string {
@@ -91,7 +92,6 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-
     // Get the user from both auth systems
     const session = await getServerSession(authOptions);
     const customUser = await getUser();
@@ -100,18 +100,21 @@ export async function GET(
     const userId = customUser?.id || session?.user?.id;
     
     if (!userId) {
-      return NextResponse.json({ error: 'utilisateur non authentifié' }, { status: 401 });
+      // Log access only for unauthenticated users
+      await createLogEntry({
+        action_type: 'GET_CORRECTION_SHARE_CODE',
+        description: `Accès non authentifié au code de partage de la correction ID: ${await params.then(p => p.id)}`,
+        entity_type: 'correction_autre',
+        entity_id: parseInt(await params.then(p => p.id)),
+        ip_address: request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || 'unknown',
+        metadata: {
+          path: request.nextUrl.pathname,
+          method: request.method
+        }
+      });
     }
 
-    // Vérifier l'authentification
-    const user = await getUser(request);
-    if (!user) {
-      return NextResponse.json(
-        { error: 'Authentification requise' },
-        { status: 401 }
-      );
-    }
-
+    
     // Await the params
     const { id } = await params;
     const correctionId = parseInt(id);
