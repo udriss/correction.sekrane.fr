@@ -446,11 +446,11 @@ export default function DuplicateCorrectionMock({ studentName = "Jean Dupont" }:
                           {/* Link to the duplicated correction */}
                           {status.status === 'success' && status.newCorrectionId && (
                             <IconButton
-                              size="small"
+                              size="medium"
                               color="primary"
                               title="Voir la correction dupliquée"
                             >
-                              <LaunchIcon fontSize="small" />
+                              <LaunchIcon fontSize="medium" />
                             </IconButton>
                           )}
                         </Box>

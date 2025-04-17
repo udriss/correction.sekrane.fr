@@ -175,6 +175,8 @@ export function useCorrectionsAutres(correctionId: string) {
         }),
       });
       
+      
+
       if (!response.ok) {
         throw new Error('Échec de sauvegarde de la correction');
       }

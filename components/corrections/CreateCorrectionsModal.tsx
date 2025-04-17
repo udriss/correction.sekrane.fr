@@ -199,7 +199,7 @@ export default function CreateCorrectionsModal({
   // Fetch activity details when opening the modal
   useEffect(() => {
     if (open && activityId) {
-      fetch(`/api//api/activities/${activityId}`)
+      fetch(`/api/activities_autres/${activityId}`)
         .then(res => res.ok ? res.json() : null)
         .then(data => {
           if (data) setSelectedActivity(data);

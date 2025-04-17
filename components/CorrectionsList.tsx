@@ -85,17 +85,19 @@ const CorrectionsList: React.FC<CorrectionsListProps> = ({
             >
               Corrections en lot
             </Button>
-            {activityId && (
+            {/* {activityId && (
               <Button
                 variant="outlined"
                 color="primary"
                 startIcon={<GroupsIcon />}
                 component={Link}
-                href={`/activities/${activityId}/groups`}
+                href={`/activities_autres/${activityId}/groups`}
               >
                 Groupes
-              </Button>
-            )}
+              </Button> )}
+              
+              */}
+            
           </div>
       </div>
       

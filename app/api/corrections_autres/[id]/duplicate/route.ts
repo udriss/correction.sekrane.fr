@@ -106,6 +106,9 @@ export async function POST(
         }
       }
       
+      
+
+
       // 2. Vérifier si l'utilisateur souhaite écraser une correction existante
       if (overwriteExisting && existingCorrectionId) {
         // Mettre à jour la correction existante avec les nouvelles données
@@ -113,6 +116,7 @@ export async function POST(
           `UPDATE corrections_autres SET 
             content = ?, 
             content_data = ?,
+            points_earned = ?,
             grade = ?, 
             penalty = ?, 
             deadline = ?, 
@@ -123,7 +127,11 @@ export async function POST(
           WHERE id = ?`,
           [
             originalCorrection.content,
-            JSON.stringify(originalCorrection.content_data), // Convertir en JSON string comme pour l'INSERT
+            // S'assurer que content_data est une chaîne JSON valide
+            typeof originalCorrection.content_data === 'string' 
+              ? originalCorrection.content_data 
+              : JSON.stringify(originalCorrection.content_data),
+            JSON.stringify(originalCorrection.points_earned),
             originalCorrection.grade,
             originalCorrection.penalty,
             originalCorrection.deadline,
@@ -139,16 +147,19 @@ export async function POST(
         // Créer une nouvelle correction avec les données de l'étudiant spécifié
         const [insertResult] = await connection.query(
           `INSERT INTO corrections_autres (
-            activity_id, student_id, content, content_data, grade, penalty, 
+            activity_id, student_id, content, content_data, points_earned, grade, penalty, 
             created_at, updated_at, deadline, submission_date,
             class_id, group_id
           ) 
-          VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, ?, ?, ?, ?)`,
+          VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, ?, ?, ?, ?)`,
           [
             originalCorrection.activity_id,
             studentId,
             originalCorrection.content,
-            JSON.stringify(originalCorrection.content_data), // Convertir en JSON string
+            typeof originalCorrection.content_data === 'string' 
+              ? originalCorrection.content_data 
+              : JSON.stringify(originalCorrection.content_data),
+            JSON.stringify(originalCorrection.points_earned),
             originalCorrection.grade,
             originalCorrection.penalty,
             originalCorrection.deadline,

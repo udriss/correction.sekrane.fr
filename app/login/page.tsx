@@ -24,7 +24,7 @@ export default function LoginPage() {
   // Debug
   useEffect(() => {
     // Afficher dans la console la valeur du callbackUrl pour débogage
-    console.log('CallbackUrl récupéré des paramètres:', callbackUrl);
+    
     
     // Pour s'assurer que le paramètre est disponible même après un rechargement de page
     if (callbackUrl && callbackUrl !== '/') {
@@ -71,7 +71,7 @@ export default function LoginPage() {
       }
       
       // Log pour déboguer
-      console.log('Redirection après authentification vers:', finalCallbackUrl);
+      
       
       // Utilisez un timeout court pour s'assurer que le cookie est bien défini
       setTimeout(() => {

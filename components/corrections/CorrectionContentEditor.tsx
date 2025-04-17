@@ -1,9 +1,6 @@
 import React from 'react';
-import { Paper, Typography, IconButton, TextField } from '@mui/material';
 import { ContentItem } from '@/types/correction';
 import DraggableItem from '@/app/components/DraggableItem';
-import AddIcon from '@mui/icons-material/Add';
-import ImageUploader from '@/app/components/ImageUploader';
 
 interface CorrectionContentEditorProps {
   contentItems: ContentItem[];

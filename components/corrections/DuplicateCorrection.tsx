@@ -3,7 +3,7 @@ import {
   Button, Dialog, DialogTitle, DialogContent, DialogActions, 
   FormControl, InputLabel, Select, MenuItem, TextField, 
   Typography, Box, Chip, Alert, CircularProgress,
-  List, ListItem, ListItemText, IconButton, SelectChangeEvent, OutlinedInput, Switch,
+  List, ListItem, IconButton, SelectChangeEvent, OutlinedInput, Switch,
   alpha, InputAdornment
 } from '@mui/material';
 import { Timeline, TimelineItem, TimelineSeparator, TimelineConnector, TimelineContent, TimelineDot } from '@mui/lab';
@@ -13,9 +13,10 @@ import PersonIcon from '@mui/icons-material/Person';
 import LaunchIcon from '@mui/icons-material/Launch';
 import ClearIcon from '@mui/icons-material/Clear';
 import SearchIcon from '@mui/icons-material/Search';
+import SwapHorizIcon from '@mui/icons-material/SwapHoriz';
 import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline'; // Import de l'icône d'alerte
 import Link from 'next/link';
-import { constructFromSymbol } from 'date-fns/constants';
+import AddCircleIcon from '@mui/icons-material/AddCircle';
 
 interface DuplicateCorrectionProps {
   correctionId: string;
@@ -104,7 +105,7 @@ export default function DuplicateCorrection({ correctionId }: DuplicateCorrectio
     loadData();
     
     // Récupérer l'ID de l'activité associée à cette correction
-    fetch(`/api/corrections/${correctionId}`)
+    fetch(`/api/corrections_autres/${correctionId}`)
       .then(response => response.json())
       .then(data => {
         if (data && data.activity_id) {
@@ -277,7 +278,7 @@ export default function DuplicateCorrection({ correctionId }: DuplicateCorrectio
         additionalData.groupName = customGroupName.trim();
       }
       
-      const response = await fetch(`/api/corrections/${correctionId}/duplicate`, {
+      const response = await fetch(`/api/corrections_autres/${correctionId}/duplicate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(additionalData)
@@ -373,7 +374,7 @@ export default function DuplicateCorrection({ correctionId }: DuplicateCorrectio
       
       
       // Récupérer les corrections existantes pour ces étudiants et cette activité
-      fetch(`/api/corrections/check-existing?activityId=${activityId}&studentIds=${studentIds.join(',')}`)
+      fetch(`/api/corrections_autres/check-existing?activityId=${activityId}&studentIds=${studentIds.join(',')}`)
         .then(response => response.json())
         .then(data => {
           
@@ -399,13 +400,6 @@ export default function DuplicateCorrection({ correctionId }: DuplicateCorrectio
     }
   }, [activityId, studentsToProcess]);
 
-
-  // Fonction pour vérifier si un étudiant a déjà une correction pour cette activité
-  const hasExistingCorrection = (studentId: number) => {
-    return existingCorrections.some(
-      correction => correction.studentId === studentId && correction.activityId === activityId
-    );
-  };
 
   // Fonction pour obtenir l'ID de la correction existante
   const getExistingCorrectionId = (studentId: number) => {
@@ -460,7 +454,7 @@ export default function DuplicateCorrection({ correctionId }: DuplicateCorrectio
       }
       
       // Faire la requête de duplication
-      const response = await fetch(`/api/corrections/${correctionId}/duplicate`, {
+      const response = await fetch(`/api/corrections_autres/${correctionId}/duplicate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(additionalData)
@@ -553,7 +547,7 @@ export default function DuplicateCorrection({ correctionId }: DuplicateCorrectio
       }
       
       // Faire la requête de duplication
-      const response = await fetch(`/api/corrections/${correctionId}/duplicate`, {
+      const response = await fetch(`/api/corrections_autres/${correctionId}/duplicate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(additionalData)
@@ -636,18 +630,18 @@ export default function DuplicateCorrection({ correctionId }: DuplicateCorrectio
                   sx={{ 
                     p: 2.5, 
                     border: '1px solid', 
-                    borderColor: 'warning.light',
-                    bgcolor: 'warning.50',
+                    borderColor: theme => theme.palette.error[700],
+                    bgcolor: theme => alpha(theme.palette.error.light, 0.05),
                     borderRadius: 2,
                     transition: 'all 0.2s ease',
                     '&:hover': {
                       boxShadow: '0 4px 12px rgba(0, 0, 0, 0.08)',
-                      borderColor: 'warning.main'
+                      borderColor: theme => theme.palette.error[400]
                     }
                   }}
                 >
-                  <Typography variant="subtitle1" fontWeight="bold" color="warning.dark" gutterBottom>
-                    Écraser la correction existante
+                  <Typography variant="subtitle1" fontWeight="bold" color="error.dark" gutterBottom>
+                    Écraser la correction existante <SwapHorizIcon fontSize='medium' />
                   </Typography>
                   <Typography variant="body2" color="text.secondary">
                     Les données de la correction existante seront remplacées par les données de la correction que vous dupliquez.
@@ -658,18 +652,18 @@ export default function DuplicateCorrection({ correctionId }: DuplicateCorrectio
                   sx={{ 
                     p: 2.5, 
                     border: '1px solid', 
-                    borderColor: 'primary.light',
-                    bgcolor: 'primary.50',
+                    borderColor: theme => theme.palette.success[700],
+                    bgcolor: theme => alpha(theme.palette.success.light, 0.05),
                     borderRadius: 2,
                     transition: 'all 0.2s ease',
                     '&:hover': {
                       boxShadow: '0 4px 12px rgba(0, 0, 0, 0.08)',
-                      borderColor: 'primary.main'
+                      borderColor: theme => theme.palette.success[400]
                     }
                   }}
                 >
-                  <Typography variant="subtitle1" fontWeight="bold" color="primary.dark" gutterBottom>
-                  Ajouter une nouvelle correction
+                  <Typography variant="subtitle1" fontWeight="bold" color="success.dark" gutterBottom>
+                  Ajouter une nouvelle correction <AddCircleIcon fontSize='medium' />
                   </Typography>
                   <Typography variant="body2" color="text.secondary">
                     Une nouvelle correction sera ajoutée pour cet étudiant, en plus de la correction existante.
@@ -679,36 +673,25 @@ export default function DuplicateCorrection({ correctionId }: DuplicateCorrectio
             </Box>
           )}
         </DialogContent>
-        <DialogActions sx={{ px: 3, py: 2, bgcolor: 'grey.50' }}>
-          <Button 
+        <DialogActions sx={{ px: 3, py: 2, bgcolor: 'grey.200' }}>
+          <IconButton 
             onClick={() => handleOverwriteChoice('create')} 
-            color="primary"
-            variant="outlined"
-            sx={{ 
-              borderRadius: 2, 
-              px: 3,
-              fontWeight: 'medium' 
-            }}
+            color="success"
+            aria-label="Ajouter une nouvelle"
+            title="Ajouter une nouvelle"
+            size='large'
           >
-            Ajouter une nouvelle
-          </Button>
-            <Button 
-            onClick={() => handleOverwriteChoice('overwrite')} 
-            
-            variant="outlined"
-            sx={{ 
-              color:'warning.dark',
-              borderColor: 'warning.dark',
-              borderRadius: 2, 
-              px: 3,
-              fontWeight: 'medium',
-              '&:hover': {
-              bgcolor: theme => alpha(theme.palette.warning.main, 0.15),
-              }
-            }}
-            >
-            Écraser l'existante
-            </Button>
+            <AddCircleIcon fontSize='large' />
+          </IconButton>
+          <IconButton 
+            onClick={() => handleOverwriteChoice('overwrite')}
+            color="error"
+            aria-label="Écraser l'existante"
+            title="Écraser l'existante"
+            size='large'
+          >
+            <SwapHorizIcon fontSize='large' />
+          </IconButton>
         </DialogActions>
       </Dialog>
       
@@ -995,14 +978,14 @@ export default function DuplicateCorrection({ correctionId }: DuplicateCorrectio
                               {status.status === 'success' && status.newCorrectionId && (
                                 <IconButton
                                   component={Link}
-                                  href={`/corrections/${status.newCorrectionId}`}
+                                  href={`/corrections_autres/${status.newCorrectionId}`}
                                   target="_blank"
                                   rel="noopener noreferrer"
-                                  size="small"
+                                  size="medium"
                                   color="primary"
                                   title="Voir la correction dupliquée"
                                 >
-                                  <LaunchIcon fontSize="small" />
+                                  <LaunchIcon fontSize="medium" />
                                 </IconButton>
                               )}
                             </Box>

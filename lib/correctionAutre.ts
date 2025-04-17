@@ -128,69 +128,75 @@ export async function createCorrectionAutre(data: {
 export async function updateCorrectionAutre(id: number, data: {
   points_earned?: number[];
   content?: string | null;
-  submission_date?: Date | string | null; // Ajout de null pour correspondre à l'utilisation réelle
+  content_data?: string | Record<string, any> | null; // Corrigé pour accepter null
+  submission_date?: Date | string | null;
   penalty?: number | null;
   deadline?: Date | string | null;
-  grade?: number | null; // Ajout de null pour correspondre à l'utilisation réelle
-  final_grade?: number | null; // Ajout de null pour correspondre à l'utilisation réelle
-  status?: string; // Changé de active (number) à status (string)
+  grade?: number | null;
+  final_grade?: number | null;
+  status?: string;
 }): Promise<boolean> {
   const updates = [];
   const values = [];
-  
+
   if (data.points_earned !== undefined) {
     updates.push('points_earned = ?');
     values.push(JSON.stringify(data.points_earned));
   }
-  
+
   if (data.content !== undefined) {
     updates.push('content = ?');
     values.push(data.content);
   }
-  
+
+  if (data.content_data !== undefined) {
+    updates.push('content_data = ?');
+    values.push(data.content_data !== null ? JSON.stringify(data.content_data) : null);
+  }
+
   if (data.submission_date !== undefined) {
     updates.push('submission_date = ?');
     values.push(data.submission_date);
   }
-  
+
   if (data.penalty !== undefined) {
     updates.push('penalty = ?');
     values.push(data.penalty);
   }
-  
+
   if (data.deadline !== undefined) {
     updates.push('deadline = ?');
     values.push(data.deadline);
   }
-  
+
   if (data.grade !== undefined) {
     updates.push('grade = ?');
     values.push(data.grade);
   }
-  
+
   if (data.final_grade !== undefined) {
     updates.push('final_grade = ?');
     values.push(data.final_grade);
   }
-  
+
   if (data.status !== undefined) {
     updates.push('status = ?');
     values.push(data.status);
   }
-  
+
   updates.push('updated_at = NOW()');
-  
+
   if (updates.length === 0) {
     return false;
   }
-  
+
   values.push(id);
-  
+
   const result = await query<{ affectedRows: number }>(
     `UPDATE corrections_autres SET ${updates.join(', ')} WHERE id = ?`,
     values
   );
-  
+
   return result.affectedRows > 0;
 }
 

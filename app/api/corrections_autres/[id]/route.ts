@@ -24,25 +24,7 @@ export async function GET(
       return NextResponse.json({ error: 'utilisateur non authentifié' }, { status: 401 });
     }
 
-    const { id } = await params;
-    
-    // Vérifier l'authentification avec capture des erreurs
-    let user;
-    try {
-      user = await getUser(request);
-    } catch (authError) {
-      console.error('Authentication error in GET correction_autre:', authError);
-      const errorMessage = authError instanceof Error ? authError.message : String(authError);
-      return NextResponse.json({ 
-        error: `Erreur d'authentification - ${errorMessage}`,
-        errorType: authError instanceof Error ? authError.name : 'UnknownError'
-      }, { status: 401 });
-    }
-    
-    if (!user) {
-      return NextResponse.json({ error: 'Non autorisé' }, { status: 401 });
-    }
-    
+    const { id } = await params;    
     const idNumber = parseInt(id);
     
     if (isNaN(idNumber)) {
@@ -54,6 +36,7 @@ export async function GET(
     if (!correction) {
       return NextResponse.json({ error: 'CorrectionNotFound: Correction autre non trouvée' }, { status: 404 });
     }
+
 
     return await withConnection(async (connection) => {
       // Récupérer les informations de classe si class_id existe
@@ -231,7 +214,20 @@ export async function PUT(
           contentData = { ...contentData, items: body.items };
         }
 
-        updateData.content_data = JSON.stringify(contentData);
+        // S'assurer que contentData est bien un objet et non une chaîne
+        if (typeof contentData === 'string') {
+          try {
+            contentData = JSON.parse(contentData);
+          } catch (e) {
+            console.error('Erreur de parsing contentData:', e);
+            contentData = {};
+          }
+        }
+
+        // S'assurer que content_data est bien un Record<string, any>
+        updateData.content_data = typeof contentData === 'object' && contentData !== null 
+          ? contentData as Record<string, any> 
+          : {};
       }
       
       if (Object.keys(updateData).length === 0) {
@@ -402,35 +398,7 @@ export async function PATCH(
       return NextResponse.json({ error: 'utilisateur non authentifié' }, { status: 401 });
     }
     
-    // Amélioration de la gestion des erreurs d'authentification
-    let user;
-    try {
-      user = await getUser(request);
-    } catch (authError) {
-      console.error('Authentication error in PATCH correction_autre:', authError);
-      const errorMessage = authError instanceof Error ? authError.message : String(authError);
-      const errorType = authError instanceof Error ? authError.name : 'UnknownError';
-      
-      // Capture et transmission des erreurs de base de données
-      const dbError = authError as any;
-      if (dbError.code && dbError.sqlMessage) {
-        return NextResponse.json({ 
-          error: `Erreur d'authentification - ${dbError.sqlMessage}`,
-          errorType: errorType,
-          errorCode: dbError.code,
-          errorDetails: process.env.NODE_ENV === 'development' ? String(authError) : undefined
-        }, { status: 500 }); // 500 pour les erreurs DB au lieu de 401
-      }
-      
-      return NextResponse.json({ 
-        error: `Erreur d'authentification - ${errorMessage}`,
-        errorType: errorType
-      }, { status: 401 });
-    }
-    
-    if (!user) {
-      return NextResponse.json({ error: 'Non autorisé' }, { status: 401 });
-    }
+
 
     const { id } = await params;
     const correctionId = parseInt(id);
@@ -439,7 +407,7 @@ export async function PATCH(
     }
 
     const data = await request.json();
-
+    
     // Récupérer la correction existante pour comparaison
     const oldCorrection = await getCorrectionAutreById(correctionId);
     if (!oldCorrection) {
@@ -467,6 +435,23 @@ export async function PATCH(
     
     if (data.content !== undefined) {
       updateData.content = data.content;
+    }
+
+    if (data.content_data !== undefined) {
+      // S'assurer que content_data est bien un objet et non une chaîne
+      if (typeof data.content_data === 'string') {
+        try {
+          updateData.content_data = JSON.parse(data.content_data) as Record<string, any>;
+        } catch (e) {
+          console.error('Erreur de parsing content_data:', e);
+          updateData.content_data = {};
+        }
+      } else {
+        // S'assurer que l'objet est bien un Record<string, any>
+        updateData.content_data = typeof data.content_data === 'object' && data.content_data !== null
+          ? data.content_data as Record<string, any>
+          : {};
+      }
     }
     
     if (data.grade !== undefined) {
@@ -533,8 +518,8 @@ export async function PATCH(
         description: `Modification des notes pour la correction autre #${correctionId}`,
         entity_type: 'correction_autre',
         entity_id: correctionId,
-        user_id: user.id,
-        username: user.username,
+        user_id: customUser?.id,
+        username: customUser?.username,
         metadata: {
           changes,
           old_grade: oldCorrection.grade,
@@ -571,8 +556,8 @@ export async function PATCH(
         description: `Modification des dates pour la correction autre #${correctionId}`,
         entity_type: 'correction_autre',
         entity_id: correctionId,
-        user_id: user.id,
-        username: user.username,
+        user_id: customUser?.id,
+        username: customUser?.username,
         metadata: {
           changes: dateChanges,
           activity_id: oldCorrection.activity_id,

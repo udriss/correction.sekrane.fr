@@ -26,7 +26,7 @@ const NavLoginButton: React.FC<NavLoginButtonProps> = ({
   const handleClick = () => {
     // Utiliser window.location.pathname au lieu de usePathname()
     const currentPath = typeof window !== 'undefined' ? window.location.pathname : '/';
-    console.log('Current window.location.pathname:', currentPath);
+    
     
     // S'assurer que le pathname est bien formaté (commence par /)
     const formattedPath = currentPath && currentPath.startsWith('/') 
@@ -37,7 +37,7 @@ const NavLoginButton: React.FC<NavLoginButtonProps> = ({
     const loginUrl = `/login?callbackUrl=${encodeURIComponent(formattedPath)}`;
     
     // Pour déboguer
-    console.log('Redirection vers:', loginUrl, 'Callback path:', formattedPath);
+    
     
     // Utiliser une redirection directe au lieu du router Next.js
     window.location.href = loginUrl;

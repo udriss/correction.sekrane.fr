@@ -49,7 +49,7 @@ export default function AddCorrectionToGroupModal({
       setLoading(true);
       setError('');
       
-      const response = await fetch(`/api/activities/${activityId}`);
+      const response = await fetch(`/api/activities_autres/${activityId}`);
       if (!response.ok) {
         throw new Error("Erreur lors du chargement de l'activité");
       }

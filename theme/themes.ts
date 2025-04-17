@@ -304,9 +304,9 @@ export const darkTheme = createTheme({
   palette: {
     mode: 'dark',
     primary: {
-      main: 'rgb(31, 53, 178)', // Deep blue
-      light: 'rgb(92, 125, 230)',
-      dark: 'rgb(21, 36, 128)',
+      main: 'rgb(44, 150, 255)', // Deep blue
+      light: 'rgb(169, 212, 255)',
+      dark: 'rgb(19, 120, 221)',
       50: 'rgb(235, 240, 255)',
       100: 'rgb(205, 220, 255)',
       200: 'rgb(175, 200, 255)',
@@ -319,21 +319,21 @@ export const darkTheme = createTheme({
       900: 'rgb(31, 53, 178)',
     },
     secondary: {
-      main: 'rgb(94, 57, 135)', // Purple - complements deep blue in dark theme
-      light: 'rgb(168, 85, 247)',
-      dark: 'rgb(83, 37, 135)',
-      50: 'rgb(250, 245, 255)',
-      100: 'rgb(243, 232, 255)',
-      200: 'rgb(233, 213, 255)',
-      300: 'rgb(216, 180, 254)',
-      400: 'rgb(192, 132, 252)',
-      500: 'rgb(168, 85, 247)',
-      600: 'rgb(147, 51, 234)',
-      700: 'rgb(126, 34, 206)',
-      800: 'rgb(107, 33, 168)',
-      900: 'rgb(88, 28, 135)',
-    },
-    success: {
+      main: 'rgb(2, 195, 201)', // Purple - complements deep blue in dark theme
+      light: 'rgb(134, 232, 235)',
+      dark: 'rgb(4, 152, 157)',
+      50: 'rgb(232, 250, 251)',
+      100: 'rgb(204, 242, 244)',
+      200: 'rgb(166, 233, 236)',
+      300: 'rgb(134, 232, 235)',
+      400: 'rgb(70, 210, 215)',
+      500: 'rgb(2, 195, 201)',
+      600: 'rgb(4, 172, 177)',
+      700: 'rgb(4, 152, 157)',
+      800: 'rgb(6, 122, 126)',
+      900: 'rgb(8, 92, 95)',
+        },
+        success: {
       lighter: '#B7DFCA', // Vert très clair pour le thème sombre
       main: 'rgb(16, 185, 129)', // Brighter green for dark theme for better contrast
       light: 'rgb(52, 211, 153)',

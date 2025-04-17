@@ -342,7 +342,7 @@ export default function StatsPage() {
       // Vérifier si les paramètres de requête ont changé depuis le dernier appel
       // Si ce sont les mêmes paramètres et que nous avons déjà des données, pas besoin de recharger
       if (url === currentApiParams.current && stats !== null && dataFetched.current) {
-        console.log("Les données sont déjà chargées avec ces filtres, pas besoin de recharger");
+        
         return;
       }
       

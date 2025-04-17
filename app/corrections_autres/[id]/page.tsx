@@ -1,17 +1,15 @@
 'use client';
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { useIsomorphicLayoutEffect } from '@/utils/client-hooks';
 import { DndProvider } from 'react-dnd';
 import { HTML5Backend } from 'react-dnd-html5-backend';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { CorrectionAutre, ActivityAutre, Student } from '@/lib/types';
+import { Student } from '@/lib/types';
 import dayjs from 'dayjs';
 
-import { ContentItem } from '@/types/correction';
 import { generateHtmlFromItems, extractFormattedText } from '@/utils/htmlUtils';
 import { copyToClipboard } from '@/utils/clipboardUtils';
 import EmailFeedbackAutre from '@/components/corrections/EmailFeedbackAutre';
@@ -20,22 +18,16 @@ import {
   Container,
   Paper,
   Typography,
-  TextField,
   Button,
   Box,
-  Chip,
   IconButton,
-  Divider,
   CircularProgress,
-  Alert,
-  AlertTitle,
   Card,
   alpha,
   useTheme,
   Drawer,
   Zoom,
   Tooltip,
-  Grid
 } from '@mui/material';
 
 import AssignmentIcon from '@mui/icons-material/Assignment';

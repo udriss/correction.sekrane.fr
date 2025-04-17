@@ -124,7 +124,7 @@ export interface CorrectionAutre {
   points_earned: number[]; // Array of points earned for each part
   submission_date?: Date | string;
   content?: string | null;
-  content_data?: Date | string; // Could be JSON or string
+  content_data?: string | Record<string, any> | null; // Peut être un objet structuré ou null, plus de string
   created_at?: Date | string;
   updated_at?: Date | string;
   penalty?: number | null;
@@ -133,6 +133,7 @@ export interface CorrectionAutre {
   group_id: number | null;
   class_id: number | null;
   active?: number; // 0 = inactive, 1 = active
+  status?: string; // Ajout du statut pour compléter les propriétés attendues
 }
 
 export interface CorrectionAutreWithShareCode extends CorrectionAutre {

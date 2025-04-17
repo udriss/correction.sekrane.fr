@@ -1,7 +1,6 @@
 import React, { useRef, useState, useEffect } from 'react';
 import { useDrag, useDrop } from 'react-dnd';
 import { ContentItem, DragItem } from '@/types/correction';
-import { useIsomorphicLayoutEffect } from '@/utils/client-hooks';
 // Import Material UI components
 import { IconButton, TextField, Paper, Typography } from '@mui/material';
 import EditIcon from '@mui/icons-material/Edit';
@@ -10,7 +9,7 @@ import SaveIcon from '@mui/icons-material/Save';
 import CancelIcon from '@mui/icons-material/Cancel';
 import DragIndicatorIcon from '@mui/icons-material/DragIndicator';
 import ArticleIcon from '@mui/icons-material/Article';
-import Image from 'next/image';
+
 
 interface DraggableItemProps {
   item: ContentItem;
