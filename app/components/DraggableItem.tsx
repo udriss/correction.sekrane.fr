@@ -1,15 +1,14 @@
-import React, { useRef, useState, useEffect } from 'react';
-import { useDrag, useDrop } from 'react-dnd';
-import { ContentItem, DragItem } from '@/types/correction';
+import React, { useState, useEffect, useRef } from 'react';
+import { Draggable } from '@hello-pangea/dnd';
+import { ContentItem } from '@/types/correction';
 // Import Material UI components
-import { IconButton, TextField, Paper, Typography } from '@mui/material';
+import { IconButton, TextField, Paper, Typography, Box, Stack } from '@mui/material';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import SaveIcon from '@mui/icons-material/Save';
 import CancelIcon from '@mui/icons-material/Cancel';
 import DragIndicatorIcon from '@mui/icons-material/DragIndicator';
 import ArticleIcon from '@mui/icons-material/Article';
-
 
 interface DraggableItemProps {
   item: ContentItem;
@@ -26,7 +25,6 @@ const DraggableItem: React.FC<DraggableItemProps> = ({
   removeItem,
   updateItem 
 }) => {
-  const ref = useRef<HTMLDivElement>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [editedContent, setEditedContent] = useState(item.content || '');
   
@@ -123,178 +121,195 @@ const DraggableItem: React.FC<DraggableItemProps> = ({
     }
   };
 
-  const [{ isDragging }, drag] = useDrag({
-    type: 'contentItem',
-    item: () => ({ index, id: item.id }),
-    collect: (monitor) => ({
-      isDragging: monitor.isDragging()
-    })
-  });
-
-  const [, drop] = useDrop({
-    accept: 'contentItem',
-    hover: (draggedItem: DragItem, monitor) => {
-      if (!ref.current) return;
-      
-      const dragIndex = draggedItem.index;
-      const hoverIndex = index;
-      
-      if (dragIndex === hoverIndex) return;
-      
-      const hoverBoundingRect = ref.current.getBoundingClientRect();
-      const hoverMiddleY = (hoverBoundingRect.bottom - hoverBoundingRect.top) / 2;
-      const clientOffset = monitor.getClientOffset();
-      
-      if (!clientOffset) return;
-      
-      const hoverClientY = clientOffset.y - hoverBoundingRect.top;
-      
-      if (dragIndex < hoverIndex && hoverClientY < hoverMiddleY) return;
-      if (dragIndex > hoverIndex && hoverClientY > hoverMiddleY) return;
-      
-      moveItem(dragIndex, hoverIndex);
-      draggedItem.index = hoverIndex;
-    }
-  });
-
-  // Important: appliquer drag et drop au même conteneur racine pour tous les types d'éléments
-  drag(ref);
-  drop(ref);
-  
-  const opacity = isDragging ? 0.4 : 1;
-
   return (
-    <div 
-      ref={ref}
-      className="mb-2" 
-      id={item.id} 
-      data-item-id={item.id}
-      data-parent-id={item.parentId}
-      data-from-fragment={item.isFromFragment ? 'true' : 'false'}
-      style={{ opacity }}
-    >
-      <Paper 
-        elevation={1} 
-        className={`
-          ${isDragging ? 'opacity-50' : ''} 
-          ${item.isFromFragment ? 'border-l-4 border-blue-500' : ''}
-          transition-all duration-200
-        `}
-        variant="outlined"
-      >
-        {isEditing ? (
-          /* Mode édition - design plus compact */
-          <div className="p-2">
-            <div className="flex items-center mb-1">
-              <div className="cursor-move flex items-center mr-1">
-                <DragIndicatorIcon fontSize="small" />
-              </div>
-              
-              {item.isFromFragment && (
-                <Typography variant="caption" className="text-blue-600 flex items-center text-xs mr-auto">
-                  <ArticleIcon fontSize="small" className="mr-1" />
-                  Fragment importé
-                </Typography>
-              )}
-              
-              <div className="flex space-x-1 ml-auto">
-                <IconButton 
-                  onClick={handleSave}
-                  color="success"
-                  title="Sauvegarder"
-                  size="small"
-                >
-                  <SaveIcon fontSize="small" />
-                </IconButton>
-                <IconButton 
-                  onClick={handleCancel}
-                  color="default"
-                  title="Annuler"
-                  size="small"
-                >
-                  <CancelIcon fontSize="small" />
-                </IconButton>
-              </div>
-            </div>
-            
-            <TextField
-              value={editedContent}
-              onChange={handleContentChange}
-              onKeyDown={handleKeyDown}
-              className="w-full mt-1"
-              multiline
-              rows={item.type === 'image' ? 1 : 2}
-              autoFocus
-              variant="outlined"
-              size="small"
-              onBlur={() => {
-                if (editedContent !== item.content) {
-                  handleSave();
-                }
+    <Draggable draggableId={item.id} index={index}>
+      {(provided, snapshot) => (
+        <Box 
+          ref={provided.innerRef}
+          {...provided.draggableProps}
+          sx={{ mb: 2 }}
+          id={item.id} 
+          data-item-id={item.id}
+          data-parent-id={item.parentId}
+          data-from-fragment={item.isFromFragment ? 'true' : 'false'}
+        >
+          <Paper 
+            elevation={snapshot.isDragging ? 3 : 1} 
+            sx={{
+              borderLeft: item.isFromFragment ? '4px solid' : 'none',
+              borderColor: item.isFromFragment ? 'primary.main' : 'transparent',
+              transition: 'all 0.2s ease',
+              opacity: snapshot.isDragging ? 0.6 : 1,
+              display: 'flex',
+              flexDirection: 'row',
+            }}
+            variant="outlined"
+          >
+            {/* Barre de drag verticale */}
+            <Box 
+              {...provided.dragHandleProps}
+              sx={{ 
+                height: 'auto',
+                cursor: 'move',
+                display: 'flex',
+                alignItems: 'stretch',
+                justifyContent: 'center',
+                borderRight: '1px solid',
+                borderColor: 'divider',
+                bgcolor: theme => theme.palette.action.hover,
+                px: 0.5,
+                width: '28px',
               }}
-            />
-          </div>
-        ) : (
-          /* Mode affichage normal */
-          <div className="p-3 flex items-start">
-            <div className="cursor-move flex items-center mr-2">
-              <DragIndicatorIcon fontSize="small" />
-            </div>
+            >
+              <Box sx={{ 
+                display: 'flex', 
+                flexDirection: 'column',
+                justifyContent: 'center ',
+                alignItems: 'center',
+                py: 1,
+                height: 'auto'
+              }}>
+                <DragIndicatorIcon fontSize="small" />
+              </Box>
+            </Box>
             
-            <div className="flex-grow">
-              {/* Indicateur de fragment */}
-              {item.isFromFragment && (
-                <Typography variant="caption" className="text-blue-600 flex items-center mb-1">
-                  <ArticleIcon fontSize="small" className="mr-1" />
-                  Fragment importé
-                </Typography>
+            <Box sx={{ flexGrow: 1 }}>
+              {isEditing ? (
+                /* Mode édition - design plus compact */
+                <Box sx={{ p: 1.5 }}>
+                  <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 1 }}>
+                    {item.isFromFragment && (
+                      <Typography 
+                        variant="caption" 
+                        sx={{ 
+                          color: 'primary.main', 
+                          display: 'flex', 
+                          alignItems: 'center',
+                          fontSize: '0.75rem',
+                          mr: 'auto'
+                        }}
+                      >
+                        <ArticleIcon fontSize="small" sx={{ mr: 0.5 }} />
+                        Fragment importé
+                      </Typography>
+                    )}
+                    
+                    <Stack direction="row" spacing={1} sx={{ ml: 'auto' }}>
+                      <IconButton 
+                        onClick={handleSave}
+                        color="success"
+                        title="Sauvegarder"
+                        size="small"
+                      >
+                        <SaveIcon fontSize="small" />
+                      </IconButton>
+                      <IconButton 
+                        onClick={handleCancel}
+                        color="default"
+                        title="Annuler"
+                        size="small"
+                      >
+                        <CancelIcon fontSize="small" />
+                      </IconButton>
+                    </Stack>
+                  </Stack>
+                  
+                  <TextField
+                    value={editedContent}
+                    onChange={handleContentChange}
+                    onKeyDown={handleKeyDown}
+                    sx={{ width: '100%', mt: 1, }}
+                    multiline
+                    rows={item.type === 'image' ? 1 : 3}
+                    autoFocus
+                    variant="outlined"
+                    size="small"
+                    onBlur={() => {
+                      if (editedContent !== item.content) {
+                        handleSave();
+                      }
+                    }}
+                  />
+                </Box>
+              ) : (
+                /* Mode affichage normal */
+                <Box sx={{ p: 1.5 }}>
+                  <Box sx={{ display: 'flex', alignItems: 'flex-start' }}>
+                    <Box sx={{ flexGrow: 1 }}>
+                      {/* Indicateur de fragment */}
+                      {item.isFromFragment && (
+                        <Typography 
+                          variant="caption" 
+                          sx={{ 
+                            color: 'primary.main', 
+                            display: 'flex', 
+                            alignItems: 'center',
+                            mb: 1
+                          }}
+                        >
+                          <ArticleIcon fontSize="small" sx={{ mr: 0.5 }} />
+                          Fragment importé
+                        </Typography>
+                      )}
+                      
+                      <Box 
+                        onClick={() => setIsEditing(true)} 
+                        sx={{ cursor: 'text' }}
+                      >
+                        {item.type === 'image' && item.src ? (
+                          <Box sx={{ position: 'relative' }}>
+                            <img 
+                              src={item.src}
+                              alt={item.alt || 'Image uploadée'}
+                              style={{ 
+                                maxWidth: '100%', 
+                                height: 'auto', 
+                                borderRadius: '4px',
+                                maxHeight: '200px'
+                              }}
+                            />
+                          </Box>
+                        ) : item.type === 'list' ? (
+                          <Typography sx={{ fontWeight: 'bold' }}>
+                            {item.content}
+                          </Typography>
+                        ) : item.type === 'listItem' ? (
+                          <Box sx={{ display: 'flex', alignItems: 'flex-start' }}>
+                            <Typography sx={{ mr: 1, fontSize: '1.25rem' }}>•</Typography>
+                            <Typography>{item.content}</Typography>
+                          </Box>
+                        ) : (
+                          <Box dangerouslySetInnerHTML={{ __html: item.content || '' }} />
+                        )}
+                      </Box>
+                    </Box>
+                    
+                    <Stack direction="column" spacing={1} sx={{ ml: 2 }}>
+                      <IconButton 
+                        onClick={() => setIsEditing(true)}
+                        color="primary"
+                        title="Modifier"
+                        size="small"
+                      >
+                        <EditIcon fontSize="small" />
+                      </IconButton>
+                      <IconButton 
+                        onClick={() => removeItem(index)}
+                        color="error"
+                        title="Supprimer"
+                        size="small"
+                      >
+                        <DeleteIcon fontSize="small" />
+                      </IconButton>
+                    </Stack>
+                  </Box>
+                </Box>
               )}
-              
-              <div onClick={() => setIsEditing(true)} className="cursor-text">
-                {item.type === 'image' && item.src ? (
-                  <div className="relative">
-                    <img 
-                      src={item.src}
-                      alt={item.alt || 'Image uploadée'}
-                      className="max-w-full h-auto rounded"
-                      style={{ maxHeight: '200px' }}
-                    />
-                  </div>
-                ) : item.type === 'list' ? (
-                  <strong>{item.content}</strong>
-                ) : item.type === 'listItem' ? (
-                  <div className="flex items-start">
-                    <span className="mr-2 text-lg">•</span>
-                    <span>{item.content}</span>
-                  </div>
-                ) : (
-                  <div dangerouslySetInnerHTML={{ __html: item.content || '' }} />
-                )}
-              </div>
-            </div>
-            
-            <div className="flex space-x-1 ml-2">
-              <IconButton 
-                onClick={() => setIsEditing(true)}
-                color="primary"
-                title="Modifier"
-                size="small"
-              >
-                <EditIcon fontSize="small" />
-              </IconButton>
-              <IconButton 
-                onClick={() => removeItem(index)}
-                color="error"
-                title="Supprimer"
-                size="small"
-              >
-                <DeleteIcon fontSize="small" />
-              </IconButton>
-            </div>
-          </div>
-        )}
-      </Paper>
-    </div>
+            </Box>
+          </Paper>
+        </Box>
+      )}
+    </Draggable>
   );
 };
 

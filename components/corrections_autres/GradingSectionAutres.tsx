@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Typography, Slider, Box, Grid, Alert, FormControlLabel, Checkbox, CircularProgress } from '@mui/material';
+import { Typography, Slider, Box, Grid, Alert, FormControlLabel, Checkbox, CircularProgress, Stack } from '@mui/material';
 import { useSnackbar } from 'notistack';
 
 interface GradingSectionAutresProps {
@@ -140,7 +140,7 @@ const GradingSectionAutres: React.FC<GradingSectionAutresProps> = ({
             setSaving(false); // Indiquer que la sauvegarde est terminée
           });
       }
-    }, 2000); // Délai de 2 secondes
+    }, 3000); // Délai de 2 secondes
     
     setSaveGradeTimeout(timeout);
   };

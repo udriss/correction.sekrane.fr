@@ -1,8 +1,6 @@
 'use client';
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { DndProvider } from 'react-dnd';
-import { HTML5Backend } from 'react-dnd-html5-backend';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import Link from 'next/link';
@@ -665,357 +663,355 @@ export default function CorrectionAutreDetail({ params }: { params: Promise<{ id
   const drawerWidth = 340;
 
   return (
-    <DndProvider backend={HTML5Backend}>
-      <LocalizationProvider dateAdapter={AdapterDayjs}>
-        <Container maxWidth="xl" sx={{ py: 4, px: { xs: 2, sm: 3, md: 4 } }}>
-          <Zoom in={true} timeout={500}>
-            <Paper 
-              elevation={3} 
-              sx={{ 
-                borderRadius: 3,
-                overflow: 'hidden',
-                boxShadow: theme => `0 8px 30px ${alpha(theme.palette.primary.main, 0.1)}`,
-                transition: 'all 0.3s ease',
-                minHeight: '90vh',
-                position: 'relative',
+    <LocalizationProvider dateAdapter={AdapterDayjs}>
+      <Container maxWidth="xl" sx={{ py: 4, px: { xs: 2, sm: 3, md: 4 } }}>
+        <Zoom in={true} timeout={500}>
+          <Paper 
+            elevation={3} 
+            sx={{ 
+              borderRadius: 3,
+              overflow: 'hidden',
+              boxShadow: theme => `0 8px 30px ${alpha(theme.palette.primary.main, 0.1)}`,
+              transition: 'all 0.3s ease',
+              minHeight: '90vh',
+              position: 'relative',
+              display: 'flex',
+              flexDirection: 'column',
+            }}
+          >
+            {/* Header with gradient */}
+            <Box sx={{ position: 'relative' }}>
+              <GradientBackground variant="primary" sx={{ position: 'relative', zIndex: 1, p: { xs: 2, sm: 3 } }}>
+                <PatternBackground 
+                  pattern='dots'
+                  opacity={0.05}
+                  sx={{ 
+                    position: 'absolute', 
+                    top: 0, 
+                    left: 0, 
+                    right: 0, 
+                    bottom: 0, 
+                    zIndex: -1 
+                  }}
+                />
+                
+                <CorrectionHeader
+                  correction={correction}
+                  editedName={editedName}
+                  isEditingName={isEditingName}
+                  confirmingDelete={confirmingDelete}
+                  saving={saving}
+                  setEditedName={setEditedName}
+                  setIsEditingName={setIsEditingName}
+                  handleSaveName={handleSaveName}
+                  handleDelete={handleDelete}
+                  handleCancelDelete={handleCancelDelete}
+                  handleToggleActive={handleToggleActive}
+                  firstName={firstName  || 'Étudiant'}
+                  lastName={lastName || '#'}
+                  setFirstName={(value) => setFirstName?.(value)}
+                  setLastName={(value) => setLastName?.(value)}
+                  email={email || 'Adresse mail introuvable'}
+                  setEmail={(value) => setEmail?.(value)}
+                  correctionStatus={correctionStatus}
+                  handleChangeStatus={handleChangeStatus}
+                />
+              </GradientBackground>
+            </Box>
+            
+            {/* Structure à deux colonnes sans onglets */}
+            <Box sx={{ 
+              display: 'flex', 
+              flexDirection: { xs: 'column', lg: 'row' },
+              flexGrow: 1,
+              position: 'relative',
+              overflow: 'hidden'
+            }}>
+              {/* Colonne principale - Éditeur de correction */}
+              <Box sx={{ 
+                p: { xs: 2, sm: 3 },
+                flexGrow: 1,
+                width: { xs: '100%', lg: drawerOpen ? '60%' : '75%' },
+                transition: 'width 0.3s ease',
                 display: 'flex',
                 flexDirection: 'column',
-              }}
-            >
-              {/* Header with gradient */}
-              <Box sx={{ position: 'relative' }}>
-                <GradientBackground variant="primary" sx={{ position: 'relative', zIndex: 1, p: { xs: 2, sm: 3 } }}>
-                  <PatternBackground 
-                    pattern='dots'
-                    opacity={0.05}
-                    sx={{ 
-                      position: 'absolute', 
-                      top: 0, 
-                      left: 0, 
-                      right: 0, 
-                      bottom: 0, 
-                      zIndex: -1 
-                    }}
-                  />
-                  
-                  <CorrectionHeader
-                    correction={correction}
-                    editedName={editedName}
-                    isEditingName={isEditingName}
-                    confirmingDelete={confirmingDelete}
-                    saving={saving}
-                    setEditedName={setEditedName}
-                    setIsEditingName={setIsEditingName}
-                    handleSaveName={handleSaveName}
-                    handleDelete={handleDelete}
-                    handleCancelDelete={handleCancelDelete}
-                    handleToggleActive={handleToggleActive}
-                    firstName={firstName  || 'Étudiant'}
-                    lastName={lastName || '#'}
-                    setFirstName={(value) => setFirstName?.(value)}
-                    setLastName={(value) => setLastName?.(value)}
-                    email={email || 'Adresse mail introuvable'}
-                    setEmail={(value) => setEmail?.(value)}
-                    correctionStatus={correctionStatus}
-                    handleChangeStatus={handleChangeStatus}
-                  />
-                </GradientBackground>
-              </Box>
-              
-              {/* Structure à deux colonnes sans onglets */}
-              <Box sx={{ 
-                display: 'flex', 
-                flexDirection: { xs: 'column', lg: 'row' },
-                flexGrow: 1,
-                position: 'relative',
-                overflow: 'hidden'
+                borderRight: { xs: 'none', lg: `1px solid ${alpha(theme.palette.divider, 0.3)}` }
               }}>
-                {/* Colonne principale - Éditeur de correction */}
-                <Box sx={{ 
-                  p: { xs: 2, sm: 3 },
-                  flexGrow: 1,
-                  width: { xs: '100%', lg: drawerOpen ? '60%' : '75%' },
-                  transition: 'width 0.3s ease',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  borderRight: { xs: 'none', lg: `1px solid ${alpha(theme.palette.divider, 0.3)}` }
-                }}>
-                  {/* Titre de section */}
-                
-                  <Box sx={{ display: 'flex', justifyContent:'space-around', gap: 2, mb: 3 }}>
-                    <EmailFeedbackAutre 
-                      correctionId={correctionId} 
-                      student={correction.student_data as Student}
-                      points_earned={correction.points_earned}
-                      activityName={activity?.name}
-                      activity_parts_names={activity?.parts_names}
-                      activity_points={activity?.points}
-                      penalty={correction.penalty?.toString()}
-                    />
-                    <DuplicateCorrection correctionId={correctionId} />
-                  </Box>
-                  
-                  <Typography variant="h6" fontWeight="bold" sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
-                    <AssignmentIcon color="secondary" />
-                    Contenu de la correction
-                  </Typography>
-                  {/* Content editor component */}
-                  <Card sx={{ 
-                    flexGrow: 1, 
-                    mt: 2, 
-                    p: 2,
-                    borderRadius: 2,
-                    border: '1px solid',
-                    borderColor: alpha(theme.palette.primary.main, 0.2),
-                    boxShadow: `0 4px 20px ${alpha(theme.palette.primary.main, 0.08)}`
-                  }}>
-                    <CorrectionContentEditor
-                      contentItems={contentItems}
-                      moveItem={moveItem}
-                      updateItem={updateItem}
-                      removeItem={removeItem}
-                      addNewParagraph={addNewParagraph}
-                      addNewImage={addNewImage}
-                      activityId={correction.activity_id}
-                      correctionId={correctionId}
-                    />
-                  </Card>
-                  
-                  {/* Action buttons component */}
-                  <Box sx={{ mt: 2 }}>
-                    <ActionButtons
-                      addNewParagraph={addNewParagraph}
-                      addNewImage={addNewImage}
-                      handleUndo={handleUndo}
-                      handleSaveCorrection={handleSaveCorrection}
-                      updatePreview={updatePreview}
-                      handleCopyToClipboard={handleCopyToClipboard}
-                      setShareModalOpen={setShareModalOpen}
-                      saving={saving}
-                      historyLength={history.length}
-                      activityId={correction.activity_id}
-                      correctionId={correctionId}
-                      autoSaveActive={autoSaveActive}
-                      setAutoSaveActive={setAutoSaveActive}
-                      lastAutoSave={lastAutoSave}
-                    />
-                  </Box>
-
-                  {/* Erreur et messages de statut */}
-                  <ErrorDisplay 
-                    error={error} 
-                    onRefresh={() => {
-                  setError('');
-                  window.location.reload();
-                }}
-                  />
-                  
-                  {/* Status messages component */}
-                  <StatusMessages
-                    successMessage={successMessage}
-                    copiedMessage={copiedMessage}
-                    error={''} // Remplacer error par une chaîne vide puisque nous utilisons ErrorDisplay
-                  />
-
-                  {/* Titre de section */}
-                  <Typography variant="h6" fontWeight="bold" sx={{ mt: 4, mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
-                    <DescriptionIcon color="secondary" />
-                    Informations et notation
-                  </Typography>
-
-                  {/* Container pour les cartes avec position relative pour le CircularProgress */}
-                  <Box sx={{ position: 'relative' }}>
-                    {/* Overlay de chargement global */}
-                    {saving && (
-                      <Box
-                        sx={{
-                          position: 'absolute',
-                          top: 0,
-                          left: 0,
-                          right: 0,
-                          bottom: 0,
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          backgroundColor: theme => alpha(theme.palette.background.paper, 0.7),
-                          zIndex: 5,
-                          borderRadius: 2,
-                          backdropFilter: 'blur(2px)'
-                        }}
-                      >
-                        <CircularProgress size={50} thickness={4} />
-                      </Box>
-                    )}
-
-                    {/* Date picker section */}
-                    <Card sx={{ 
-                      p: 3, 
-                      borderRadius: 2,
-                      mb: 3,
-                      border: '1px solid',
-                      borderColor: alpha(theme.palette.primary.main, 0.2)
-                    }}>
-                      <DatePickerSection
-                        deadlineDate={deadlineDate}
-                        submissionDate={submissionDate}
-                        handleDeadlineDateChange={handleDeadlineDateChange}
-                        handleSubmissionDateChange={handleSubmissionDateChange}
-                        saving={false} /* Désactive le CircularProgress local */
-                      />
-                    </Card>
-
-                    {/* Grading section component */}
-                    <Card sx={{ 
-                      p: 3, 
-                      borderRadius: 2,
-                      border: '1px solid',
-                      borderColor: alpha(theme.palette.primary.main, 0.2)
-                    }}>
-                      <GradingSectionAutres
-                        pointsEarned={correction.points_earned || []}
-                        totalPoints={activity.points || []}
-                        partNames={activity.parts_names || []}
-                        isPenaltyEnabled={correction.penalty !== undefined && correction.penalty !== null}
-                        penalty={correction.penalty?.toString() || '0'}
-                        setPointsEarned={(index, value) => {
-                          const newPointsEarned = [...(correction.points_earned || [])];
-                          newPointsEarned[index] = value;
-                          updatePointsEarned(newPointsEarned);
-                        }}
-                        setPenalty={(value) => {
-                          setCorrection(prev => ({
-                            ...prev!,
-                            penalty: parseFloat(value)
-                          }));
-                        }}
-                        saveGradeTimeout={saveGradeTimeout}
-                        setSaveGradeTimeout={setSaveGradeTimeout}
-                        correction={correction}
-                        saving={false} /* Désactive le CircularProgress local */
-                        setSaving={(value) => {
-                          // Réutiliser la fonction setSaving du hook ou la simuler si non disponible
-                          if (correctionsHook.setSaving) {
-                            correctionsHook.setSaving(value);
-                          } else {
-                            // Fallback en utilisant l'état local
-                            // Cette partie est exécutée seulement si setSaving n'est pas disponible dans le hook
-                          }
-                        }}
-                        // Fonction pour mettre à jour uniquement la pénalité
-                        handleUpdatePenalty={async (penaltyValue) => {
-                          try {
-                            const response = await fetch(`/api/corrections_autres/${correction.id}/penalty`, {
-                              method: 'PUT',
-                              headers: {
-                                'Content-Type': 'application/json',
-                              },
-                              body: JSON.stringify({
-                                penalty: penaltyValue
-                              }),
-                            });
-                            
-                            if (!response.ok) throw new Error('Failed to update penalty');
-                            
-                            // Mettre à jour l'état local
-                            setCorrection(prev => ({
-                              ...prev!,
-                              penalty: penaltyValue
-                            }));
-                            
-                            return await response.json();
-                          } catch (error) {
-                            console.error("Erreur lors de la mise à jour de la pénalité:", error);
-                            throw error;
-                          }
-                        }}
-                      />
-                    </Card>
-                  </Box>
-                </Box>
-
-                {/* Colonne latérale - Fragments */}
-                <Box sx={{ 
-                  width: { xs: '100%', lg: drawerWidth }, 
-                  p: 2,
-                  display: { xs: 'none', lg: 'block' },
-                  flexGrow: 1,
-                  pt: 2
-                }}>
-                  <Typography variant="h6" fontWeight="bold" sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
-                    <FormatQuoteIcon color="secondary" />
-                    Fragments et modèles
-                  </Typography>
-                  <FragmentsSidebar 
-                    correctionActivityId={correction.activity_id}
-                    onAddFragmentToCorrection={handleAddFragmentToCorrection}
-                    inCorrectionContext={true}
-                  />
-                </Box>
+                {/* Titre de section */}
               
-                {/* Panneau flottant des fragments - pour les petits écrans */}
-                <Drawer
-                  variant="persistent"
-                  anchor="right"
-                  open={drawerOpen && window.innerWidth < theme.breakpoints.values.lg}
-                  sx={{
-                    width: drawerWidth,
-                    flexShrink: 0,
-                    display: { xs: 'block', lg: 'none' },
-                    '& .MuiDrawer-paper': {
-                      width: drawerWidth,
-                      border: 'none',
-                      borderLeft: `1px solid ${alpha(theme.palette.divider, 0.8)}`,
-                      boxSizing: 'border-box',
-                    },
-                  }}
-                >
-                  {/* Contenu du drawer pour les fragments */}
-                  <Box sx={{ p: 2, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <Typography variant="h6" fontWeight="bold">Fragments</Typography>
-                    <IconButton onClick={toggleDrawer} size="small"><ChevronRightIcon /></IconButton>
-                  </Box>
-                  <FragmentsSidebar 
-                    correctionActivityId={correction.activity_id}
-                    onAddFragmentToCorrection={handleAddFragmentToCorrection}
-                    inCorrectionContext={true}
+                <Box sx={{ display: 'flex', justifyContent:'space-around', gap: 2, mb: 3 }}>
+                  <EmailFeedbackAutre 
+                    correctionId={correctionId} 
+                    student={correction.student_data as Student}
+                    points_earned={correction.points_earned}
+                    activityName={activity?.name}
+                    activity_parts_names={activity?.parts_names}
+                    activity_points={activity?.points}
+                    penalty={correction.penalty?.toString()}
                   />
-                </Drawer>
+                  <DuplicateCorrection correctionId={correctionId} />
+                </Box>
+                
+                <Typography variant="h6" fontWeight="bold" sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <AssignmentIcon color="secondary" />
+                  Contenu de la correction
+                </Typography>
+                {/* Content editor component */}
+                <Card sx={{ 
+                  flexGrow: 1, 
+                  mt: 2, 
+                  p: 2,
+                  borderRadius: 2,
+                  border: '1px solid',
+                  borderColor: alpha(theme.palette.primary.main, 0.2),
+                  boxShadow: `0 4px 20px ${alpha(theme.palette.primary.main, 0.08)}`
+                }}>
+                  <CorrectionContentEditor
+                    contentItems={contentItems}
+                    moveItem={moveItem}
+                    updateItem={updateItem}
+                    removeItem={removeItem}
+                    addNewParagraph={addNewParagraph}
+                    addNewImage={addNewImage}
+                    activityId={correction.activity_id}
+                    correctionId={correctionId}
+                  />
+                </Card>
+                
+                {/* Action buttons component */}
+                <Box sx={{ mt: 2 }}>
+                  <ActionButtons
+                    addNewParagraph={addNewParagraph}
+                    addNewImage={addNewImage}
+                    handleUndo={handleUndo}
+                    handleSaveCorrection={handleSaveCorrection}
+                    updatePreview={updatePreview}
+                    handleCopyToClipboard={handleCopyToClipboard}
+                    setShareModalOpen={setShareModalOpen}
+                    saving={saving}
+                    historyLength={history.length}
+                    activityId={correction.activity_id}
+                    correctionId={correctionId}
+                    autoSaveActive={autoSaveActive}
+                    setAutoSaveActive={setAutoSaveActive}
+                    lastAutoSave={lastAutoSave}
+                  />
+                </Box>
 
-                {/* Bouton flottant pour ouvrir les fragments (petits écrans) */}
-                {!drawerOpen && (
-                  <Tooltip title="Afficher les fragments">
-                    <IconButton 
-                      onClick={toggleDrawer} 
-                      size="small" 
-                      sx={{ 
-                        position: 'fixed', 
-                        right: 20, 
-                        bottom: 20, 
-                        bgcolor: theme.palette.primary.main,
-                        color: 'white',
-                        '&:hover': {
-                          bgcolor: theme.palette.primary.dark,
-                        },
-                        zIndex: 10,
-                        display: { xs: 'flex', lg: 'none' }
+                {/* Erreur et messages de statut */}
+                <ErrorDisplay 
+                  error={error} 
+                  onRefresh={() => {
+                setError('');
+                window.location.reload();
+              }}
+                />
+                
+                {/* Status messages component */}
+                <StatusMessages
+                  successMessage={successMessage}
+                  copiedMessage={copiedMessage}
+                  error={''} // Remplacer error par une chaîne vide puisque nous utilisons ErrorDisplay
+                />
+
+                {/* Titre de section */}
+                <Typography variant="h6" fontWeight="bold" sx={{ mt: 4, mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <DescriptionIcon color="secondary" />
+                  Informations et notation
+                </Typography>
+
+                {/* Container pour les cartes avec position relative pour le CircularProgress */}
+                <Box sx={{ position: 'relative' }}>
+                  {/* Overlay de chargement global */}
+                  {saving && (
+                    <Box
+                      sx={{
+                        position: 'absolute',
+                        top: 0,
+                        left: 0,
+                        right: 0,
+                        bottom: 0,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        backgroundColor: theme => alpha(theme.palette.background.paper, 0.7),
+                        zIndex: 5,
+                        borderRadius: 2,
+                        backdropFilter: 'blur(2px)'
                       }}
                     >
-                      <FormatQuoteIcon />
-                    </IconButton>
-                  </Tooltip>
-                )}
-              </Box>
-            </Paper>
-          </Zoom>
+                      <CircularProgress size={50} thickness={4} />
+                    </Box>
+                  )}
 
-          {/* Share modal */}
-          <ShareModal
-            open={shareModalOpen}
-            onClose={() => setShareModalOpen(false)}
-            correctionId={correctionId}
-          />
-        </Container>
-      </LocalizationProvider>
-    </DndProvider>
+                  {/* Date picker section */}
+                  <Card sx={{ 
+                    p: 3, 
+                    borderRadius: 2,
+                    mb: 3,
+                    border: '1px solid',
+                    borderColor: alpha(theme.palette.primary.main, 0.2)
+                  }}>
+                    <DatePickerSection
+                      deadlineDate={deadlineDate}
+                      submissionDate={submissionDate}
+                      handleDeadlineDateChange={handleDeadlineDateChange}
+                      handleSubmissionDateChange={handleSubmissionDateChange}
+                      saving={false} /* Désactive le CircularProgress local */
+                    />
+                  </Card>
+
+                  {/* Grading section component */}
+                  <Card sx={{ 
+                    p: 3, 
+                    borderRadius: 2,
+                    border: '1px solid',
+                    borderColor: alpha(theme.palette.primary.main, 0.2)
+                  }}>
+                    <GradingSectionAutres
+                      pointsEarned={correction.points_earned || []}
+                      totalPoints={activity.points || []}
+                      partNames={activity.parts_names || []}
+                      isPenaltyEnabled={correction.penalty !== undefined && correction.penalty !== null}
+                      penalty={correction.penalty?.toString() || '0'}
+                      setPointsEarned={(index, value) => {
+                        const newPointsEarned = [...(correction.points_earned || [])];
+                        newPointsEarned[index] = value;
+                        updatePointsEarned(newPointsEarned);
+                      }}
+                      setPenalty={(value) => {
+                        setCorrection(prev => ({
+                          ...prev!,
+                          penalty: parseFloat(value)
+                        }));
+                      }}
+                      saveGradeTimeout={saveGradeTimeout}
+                      setSaveGradeTimeout={setSaveGradeTimeout}
+                      correction={correction}
+                      saving={false} /* Désactive le CircularProgress local */
+                      setSaving={(value) => {
+                        // Réutiliser la fonction setSaving du hook ou la simuler si non disponible
+                        if (correctionsHook.setSaving) {
+                          correctionsHook.setSaving(value);
+                        } else {
+                          // Fallback en utilisant l'état local
+                          // Cette partie est exécutée seulement si setSaving n'est pas disponible dans le hook
+                        }
+                      }}
+                      // Fonction pour mettre à jour uniquement la pénalité
+                      handleUpdatePenalty={async (penaltyValue) => {
+                        try {
+                          const response = await fetch(`/api/corrections_autres/${correction.id}/penalty`, {
+                            method: 'PUT',
+                            headers: {
+                              'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify({
+                              penalty: penaltyValue
+                            }),
+                          });
+                          
+                          if (!response.ok) throw new Error('Failed to update penalty');
+                          
+                          // Mettre à jour l'état local
+                          setCorrection(prev => ({
+                            ...prev!,
+                            penalty: penaltyValue
+                          }));
+                          
+                          return await response.json();
+                        } catch (error) {
+                          console.error("Erreur lors de la mise à jour de la pénalité:", error);
+                          throw error;
+                        }
+                      }}
+                    />
+                  </Card>
+                </Box>
+              </Box>
+
+              {/* Colonne latérale - Fragments */}
+              <Box sx={{ 
+                width: { xs: '100%', lg: drawerWidth }, 
+                p: 2,
+                display: { xs: 'none', lg: 'block' },
+                flexGrow: 1,
+                pt: 2
+              }}>
+                <Typography variant="h6" fontWeight="bold" sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <FormatQuoteIcon color="secondary" />
+                  Fragments et modèles
+                </Typography>
+                <FragmentsSidebar 
+                  correctionActivityId={correction.activity_id}
+                  onAddFragmentToCorrection={handleAddFragmentToCorrection}
+                  inCorrectionContext={true}
+                />
+              </Box>
+            
+              {/* Panneau flottant des fragments - pour les petits écrans */}
+              <Drawer
+                variant="persistent"
+                anchor="right"
+                open={drawerOpen && window.innerWidth < theme.breakpoints.values.lg}
+                sx={{
+                  width: drawerWidth,
+                  flexShrink: 0,
+                  display: { xs: 'block', lg: 'none' },
+                  '& .MuiDrawer-paper': {
+                    width: drawerWidth,
+                    border: 'none',
+                    borderLeft: `1px solid ${alpha(theme.palette.divider, 0.8)}`,
+                    boxSizing: 'border-box',
+                  },
+                }}
+              >
+                {/* Contenu du drawer pour les fragments */}
+                <Box sx={{ p: 2, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <Typography variant="h6" fontWeight="bold">Fragments</Typography>
+                  <IconButton onClick={toggleDrawer} size="small"><ChevronRightIcon /></IconButton>
+                </Box>
+                <FragmentsSidebar 
+                  correctionActivityId={correction.activity_id}
+                  onAddFragmentToCorrection={handleAddFragmentToCorrection}
+                  inCorrectionContext={true}
+                />
+              </Drawer>
+
+              {/* Bouton flottant pour ouvrir les fragments (petits écrans) */}
+              {!drawerOpen && (
+                <Tooltip title="Afficher les fragments">
+                  <IconButton 
+                    onClick={toggleDrawer} 
+                    size="small" 
+                    sx={{ 
+                      position: 'fixed', 
+                      right: 20, 
+                      bottom: 20, 
+                      bgcolor: theme.palette.primary.main,
+                      color: 'white',
+                      '&:hover': {
+                        bgcolor: theme.palette.primary.dark,
+                      },
+                      zIndex: 10,
+                      display: { xs: 'flex', lg: 'none' }
+                    }}
+                  >
+                    <FormatQuoteIcon />
+                  </IconButton>
+                </Tooltip>
+              )}
+            </Box>
+          </Paper>
+        </Zoom>
+
+        {/* Share modal */}
+        <ShareModal
+          open={shareModalOpen}
+          onClose={() => setShareModalOpen(false)}
+          correctionId={correctionId}
+        />
+      </Container>
+    </LocalizationProvider>
   );
 }
