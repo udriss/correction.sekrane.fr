@@ -54,16 +54,19 @@ export async function middleware(request: NextRequest) {
     path === '/demo' || 
     path === '/api/auth/logout';
     
+  // Check if path matches students/[id] pattern which should be public
+  const isStudentProfilePath = /^\/students\/\d+$/.test(path);
+  
   // Check if the path should be protected
   const isPathProtected = 
     path.startsWith('/activities') || 
     path.startsWith('/corrections') ||
     path.startsWith('/admin') ||
-    path.startsWith('/students') ||
+    (path.startsWith('/students') && !isStudentProfilePath) || // Protect /students but not individual profiles
     path.startsWith('/stats');
   
   // Si le chemin n'est pas protégé ou est public, continuer
-  if (!isPathProtected || isPublicPath) {
+  if (!isPathProtected || isPublicPath || isStudentProfilePath) {
     return NextResponse.next();
   }
   
