@@ -1,19 +1,11 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Container, Paper, Box } from '@mui/material';
 import { useSnackbar } from 'notistack';
-import { ClassHeader } from './ClassHeader';
-import { ClassStats } from './ClassStats';
-import { ClassTabs } from './ClassTabs';
-import { ActivitiesList } from './ActivitiesList';
-import { CorrectionFilters } from './CorrectionFilters';
-import { CorrectionList } from './CorrectionList';
-import { CorrectionSortControls } from './CorrectionSortControls';
 import LoadingSpinner from '@/components/LoadingSpinner';
 import ErrorDisplay from '@/components/ui/ErrorDisplay';
-import ClassStudentsManager from '@/components/classes/ClassStudentsManager';
 import AssociateActivitiesModal, { Activity as ModalActivity } from "@/components/classes/AssociateActivitiesModal";
-import CreateCorrectionsModal from "@/components/corrections/CreateCorrectionsModal";
-import ExportPDFComponent from '@/components/pdf/ExportPDFComponent';
+
+
 import { Class, CorrectionAutreEnriched, Student } from '@/lib/types';
 
 interface ClassPageProps {
@@ -150,51 +142,10 @@ export function ClassPage({ id }: ClassPageProps) {
     return result;
   }, [corrections, filterActivity, filterSubClass, searchTerm, sortField, sortDirection]);
 
-  // Gestionnaires d'événements
-  const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
-    setTabValue(newValue);
-  };
 
-  const handleUpdateClass = (updatedClass: Class) => {
-    setClassData(updatedClass);
-    setIsEditing(false);
-    enqueueSnackbar('Classe mise à jour avec succès', { variant: 'success' });
-  };
 
-  const handleDeleteCorrection = async (correction: CorrectionAutreEnriched) => {
-    try {
-      const response = await fetch(`/api/corrections_autres/${correction.id}`, {
-        method: 'DELETE'
-      });
+  
 
-      if (!response.ok) throw new Error('Erreur lors de la suppression');
-
-      setCorrections(prev => prev.filter(c => c.id !== correction.id));
-      enqueueSnackbar('Correction supprimée avec succès', { variant: 'success' });
-    } catch (error) {
-      enqueueSnackbar('Erreur lors de la suppression', { variant: 'error' });
-    }
-  };
-
-  const handleUpdateCorrection = async (correction: CorrectionAutreEnriched, updates: any) => {
-    try {
-      const response = await fetch(`/api/corrections_autres/${correction.id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(updates)
-      });
-
-      if (!response.ok) throw new Error('Erreur lors de la mise à jour');
-
-      const updatedCorrection = await response.json();
-      setCorrections(prev => prev.map(c => 
-        c.id === correction.id ? { ...c, ...updatedCorrection } : c
-      ));
-      enqueueSnackbar('Correction mise à jour avec succès', { variant: 'success' });
-    } catch (error) {
-      enqueueSnackbar('Erreur lors de la mise à jour', { variant: 'error' });
-    }
-  };
 
   if (loading) {
     return (

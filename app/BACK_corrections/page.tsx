@@ -13,7 +13,7 @@ import Grid from '@mui/material/Grid';
 import { useSnackbar } from 'notistack';
 
 import { Student as BaseStudent } from '@/lib/types';
-import ExportPDFComponentAllCorrections from '@/components/pdf/ExportPDFComponentAllCorrections';
+// import ExportPDF Component AllCorrections from '@/components/pdf/ExportPDF Component AllCorrections';
 
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import { LocalizationProvider, DatePicker } from '@mui/x-date-pickers';
@@ -87,12 +87,7 @@ function CorrectionsContent() {
   // Add state for scroll tracking
   const [stickyButtons, setStickyButtons] = useState(false);
   
-  // États pour ExportPDFComponent
-  const [classData, setClassData] = useState<any>(null);
-  const [activities, setActivities] = useState<Activity[]>([]);
-  const [classStudents, setClassStudents] = useState<any[]>([]);
-  const [students, setStudents] = useState<ClassStudent[]>([]);
-  const [filterActivity, setFilterActivity] = useState<number | 'all'>('all');
+
   const [errorDetails, setErrorDetails] = useState<any>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
@@ -269,133 +264,8 @@ function CorrectionsContent() {
     fetchSubClasses();
   }, [filters.classId]);
 
-  // Effet pour récupérer les données pour ExportPDFComponent si on est sur l'onglet 4
-  useEffect(() => {
-    if (tabValue === 4) {
-      const fetchExportData = async () => {
-        try {
-          // Récupérer toutes les corrections via l'API
-          const correctionsResponse = await fetch('/api/corrections/all');
-          if (!correctionsResponse.ok) {
-            const errorText = await correctionsResponse.text();
-            setErrorMessage('Erreur lors du chargement des corrections');
-            setErrorDetails({
-              status: correctionsResponse.status,
-              statusText: correctionsResponse.statusText,
-              responseText: errorText
-            });
-            return;
-          }
-          
-          // Récupérer tous les étudiants
-          const allStudentsResponse = await fetch('/api/students');
-          if (!allStudentsResponse.ok) {
-            const errorText = await allStudentsResponse.text();
-            setErrorMessage('Erreur lors du chargement des étudiants');
-            setErrorDetails({
-              status: allStudentsResponse.status,
-              statusText: allStudentsResponse.statusText,
-              responseText: errorText
-            });
-            return;
-          }
-          
-          
-          const studentsData = await allStudentsResponse.json();
-          setStudents(studentsData);
-          
 
-          // Récupérer toutes les activités
-          const allActivitiesResponse = await fetch('/api/activities');
-          if (!allActivitiesResponse.ok) {
-            const errorText = await allActivitiesResponse.text();
-            setErrorMessage('Erreur lors du chargement des activités');
-            setErrorDetails({
-              status: allActivitiesResponse.status,
-              statusText: allActivitiesResponse.statusText,
-              responseText: errorText
-            });
-            return;
-          }
-          
-          const activitiesData = await allActivitiesResponse.json();
-          setActivities(activitiesData);
-          
-          // Si un filtre de classe est en place (vérification que classId n'est pas une chaîne vide)
-          if (filters.classId && filters.classId.trim() !== '') {
-            const classId = parseInt(filters.classId);
-            
-            // Récupérer les données de la classe
-            const classResponse = await fetch(`/api/classes/${classId}`);
-            if (classResponse.ok) {
-              const classDataResult = await classResponse.json();
-              setClassData(classDataResult);
-              
-              // Récupérer les étudiants pour cette classe spécifique
-              const classStudentsResponse = await fetch(`/api/classes/${classId}/students`);
-              if (classStudentsResponse.ok) {
-                const classStudentsData = await classStudentsResponse.json();
-                setClassStudents(classStudentsData);
-              }
-            }
-          } else {
-            // Récupérer toutes les classes pour que l'utilisateur puisse en sélectionner une
-            const allClassesResponse = await fetch('/api/classes');
-            if (!allClassesResponse.ok) {
-              throw new Error('Erreur lors du chargement des classes');
-            }
-            
-            const allClassesData = await allClassesResponse.json();
-          }
-        } catch (error) {
-          console.error('Erreur lors de la récupération des données pour l\'export:', error);
-          enqueueSnackbar(`Erreur: ${error instanceof Error ? error.message : 'Problème de chargement des données'}`, { 
-            variant: 'error',
-            autoHideDuration: 5000
-          });
-        }
-      };
-      
-      fetchExportData();
-    }
-  }, [tabValue, filters.classId, enqueueSnackbar]);
 
-  // Calculer les données de sous-classes uniques pour ExportPDFComponent
-  const uniqueSubClasses = useMemo(() => {
-    if (!classData?.nbre_subclasses) return [];
-    return Array.from({ length: classData.nbre_subclasses }, (_, i) => ({
-      id: i + 1,
-      name: `Groupe ${i + 1}`
-    }));
-  }, [classData]);
-  
-  // Calculer les activités uniques pour ExportPDFComponent
-  const uniqueActivities = useMemo(() => {
-    // Obtenir les IDs d'activité uniques des corrections
-    const uniqueIds = new Set(filteredCorrections.map(c => c.activity_id));
-    
-    // Créer un tableau d'activités uniques avec noms appropriés
-    const uniqueActivitiesArray = Array.from(uniqueIds).map(id => {
-      const activityData = activities.find(a => a.id === id);
-      return {
-        id,
-        name: activityData?.name || `Activité ${id}`
-      };
-    });
-    
-    return uniqueActivitiesArray;
-  }, [filteredCorrections, activities]);
-  
-    // Fonctions utilitaires pour ExportPDFComponent
-    const getActivityById = (activityId: number) => {
-      return activities.find(a => a.id === activityId);
-    };
-  
-  const getStudentById = (studentId: number | null): ClassStudent | undefined => {
-    if (!studentId) return undefined;
-    return students.find(s => s.id === studentId);
-  };
-  
 
   
 
@@ -1350,37 +1220,7 @@ function CorrectionsContent() {
         />
       )}
       
-      {tabValue === 4 && (
-        <Box>
-          <Paper sx={{ p: 2, mb: 3 }}>
-            <Typography variant="h5" gutterBottom>
-              Options d'export PDF
-            </Typography>
-              < ExportPDFComponentAllCorrections
-                corrections={filteredCorrections}
-                activities={activities}
-                students={students}
-                filterActivity={filterActivity}
-                setFilterActivity={setFilterActivity}
-                uniqueActivities={uniqueActivities}
-                getActivityById={getActivityById}
-                getStudentById={getStudentById}
-                getAllClasses={async () => {
-                  try {
-                    const response = await fetch('/api/classes');
-                    if (!response.ok) throw new Error('Erreur lors du chargement des classes');
-                    return await response.json();
-                  } catch (error) {
-                    console.error('Erreur:', error);
-                    enqueueSnackbar('Erreur lors du chargement des classes', { variant: 'error' });
-                    return [];
-                  }
-                }}
-              />
-          </Paper>
-        </Box>
-      )}
-      
+
       {/* Sort Menu */}
       <Menu
         anchorEl={sortAnchorEl}

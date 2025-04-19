@@ -45,8 +45,8 @@ import KeyboardArrowLeft from '@mui/icons-material/KeyboardArrowLeft';
 import KeyboardArrowRight from '@mui/icons-material/KeyboardArrowRight';
 import LastPageIcon from '@mui/icons-material/LastPage';
 import { useTheme } from '@mui/material/styles';
-// Import ExportPDFComponent
-import ExportPDFComponent from '@/components/pdf/ExportPDFComponent';
+
+
 import { Correction as ProviderCorrection } from '@/app/components/CorrectionsDataProvider';
 import { Student as LibStudent } from '@/lib/types';
 
@@ -560,35 +560,6 @@ export default function ActivityDetail({ params }: { params: Promise<{ id: strin
   };
 
 
-  
-  // Fonction pour obtenir une activité par son ID
-  const getActivityById = (activityId: number) => {
-    return { id: activityId, name: activity?.name, experimental_points: activity?.experimental_points, theoretical_points: activity?.theoretical_points };
-  };
-  
-  // Fonction pour obtenir un étudiant par son ID
-  const getStudentById = (studentId: number | null) => {
-    if (!studentId) return undefined;
-    return students.find(s => s.id === studentId);
-  };
-  
-
-  // Conversion du type Student local vers le type Student attendu par ExportPDFComponent
-  const mapToLibStudent = (student: Student): LibStudent => {
-    return {
-      id: student.id,
-      first_name: student.first_name,
-      last_name: student.last_name,
-      email: student.email || '', // Fournir une valeur par défaut pour email qui est obligatoire
-      gender: (student.gender as 'M' | 'F' | 'N') || 'N', // S'assurer que gender est 'M', 'F' ou 'N'
-      sub_class: student.sub_class ? (typeof student.sub_class === 'string' ? parseInt(student.sub_class) : student.sub_class) : null,
-      group: student.group || '',
-      className: student.name || '', // Utiliser le nom si disponible
-      corrections_count: 0, // Valeur par défaut
-      created_at: '',  // Valeur par défaut
-      updated_at: ''   // Valeur par défaut
-    };
-  };
 
   if (loading) {
     return (
@@ -838,23 +809,7 @@ export default function ActivityDetail({ params }: { params: Promise<{ id: strin
           
           {tabValue === 4 && (
             <Box sx={{ py: 2 }}>
-              <ExportPDFComponent
-                classData={{ id: 'all', name: activity?.name || 'Activité' }}
-                corrections={filteredCorrections as ProviderCorrection[]}
-                activities={[{ id: activity?.id || 0, name: activity?.name || 'Activité' }]}
-                students={students.map(mapToLibStudent)}
-                filterActivity={activity?.id || 0}
-                setFilterActivity={() => {}} // Non utilisable dans ce contexte
-                filterSubClass={selectedSubGroup === '' ? 'all' : selectedSubGroup}
-                setFilterSubClass={(value) => setSelectedSubGroup(value === 'all' ? '' : value)}
-                uniqueSubClasses={uniqueSubClasses.filter(subClass => subClass !== undefined).map(subClass => ({ id: parseInt(subClass || "0"), name: `Groupe ${subClass}` }))}
-                uniqueActivities={[{ id: activity?.id || 0, name: activity?.name || 'Activité' }]}
-                getActivityById={getActivityById}
-                getStudentById={(studentId) => {
-                  const student = getStudentById(studentId);
-                  return student ? mapToLibStudent(student) : undefined;
-                }}
-              />
+
             </Box>
           )}
         </Box>
