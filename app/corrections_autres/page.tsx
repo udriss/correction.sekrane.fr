@@ -291,6 +291,8 @@ function CorrectionsContent() {
         return 'Inactives uniquement';
       case 'correctionId':
         return `ID: ${filters.correctionId}`;
+      case 'subClassId':
+        return `Sous-classe: ${filters.subClassId}`;
       default:
         return filter;
     }
@@ -804,7 +806,14 @@ function CorrectionsContent() {
             <Select
               name="classId"
               value={filters.classId}
-              onChange={(e) => setFilters({ ...filters, classId: e.target.value })}
+              onChange={(e: SelectChangeEvent) => {
+                // Réinitialiser le filtre de sous-classe lorsqu'une autre classe est sélectionnée
+                setFilters({ 
+                  ...filters, 
+                  classId: e.target.value,
+                  subClassId: '' 
+                });
+              }}
               label="Classe"
             >
               <MenuItem value="">
@@ -825,6 +834,51 @@ function CorrectionsContent() {
             Appliquer
           </Button>
         </Box>
+        
+        {/* Sous-classe filtrage - affiché uniquement quand une classe est sélectionnée */}
+        {filters.classId && (
+          <Box sx={{ mb: 2 }}>
+            <FormControl fullWidth size="small">
+              <InputLabel>Sous-classe</InputLabel>
+              <Select
+                name="subClassId"
+                value={filters.subClassId}
+                onChange={(e) => setFilters({ ...filters, subClassId: e.target.value })}
+                label="Sous-classe"
+              >
+                <MenuItem value="">
+                  <em>Toutes les sous-classes</em>
+                </MenuItem>
+                {/* Récupère uniquement les étudiants de la classe sélectionnée */}
+                {metaData.students
+                  .filter(s => s.classId?.toString() === filters.classId && s.sub_class)
+                  // Crée un ensemble unique de sous-classes
+                  .reduce((unique, student) => {
+                    if (student.sub_class && !unique.some(item => item.id === student.sub_class)) {
+                      unique.push({ id: student.sub_class, name: student.sub_class });
+                    }
+                    return unique;
+                  }, [] as { id: string | number; name: string | number }[])
+                  .sort((a, b) => a.name.toString().localeCompare(b.name.toString()))
+                  .map(subClass => (
+                    <MenuItem key={subClass.id} value={subClass.id.toString()}>
+                      {subClass.name}
+                    </MenuItem>
+                  ))
+                }
+              </Select>
+            </FormControl>
+            <Button 
+              variant="text" 
+              size="small" 
+              onClick={() => applyFilter('subClassId')}
+              disabled={!filters.subClassId}
+              sx={{ mt: 0.5 }}
+            >
+              Appliquer
+            </Button>
+          </Box>
+        )}
         
         <Box sx={{ mb: 2 }}>
           <FormControl fullWidth size="small">

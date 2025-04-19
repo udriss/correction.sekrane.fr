@@ -19,29 +19,29 @@ export default function CorrectionsLayout({
     let extraItems: { label: string; href?: string; icon?: React.ReactNode }[] = [];
     
     // Page des corrections
-    if (pathname === '/corrections') {
+    if (pathname === '/corrections_autres') {
       currentPageLabel = 'Toutes les corrections';
     }
     // Page de nouvelle correction
-    else if (pathname === '/corrections/new') {
+    else if (pathname === '/corrections_autres/new') {
       currentPageLabel = 'Nouvelle correction';
     }
     // Page de correction unique
-    else if (pathname === '/corrections/unique') {
+    else if (pathname === '/corrections_autres/unique') {
       extraItems = [
-        { label: 'Nouvelle correction', href: '/corrections/new' }
+        { label: 'Nouvelle correction', href: '/corrections_autres/new' }
       ];
       currentPageLabel = 'Correction unique';
     }
     // Page de corrections multiples
-    else if (pathname === '/corrections/multiples') {
+    else if (pathname === '/corrections_autres/multiples') {
       extraItems = [
-        { label: 'Nouvelle correction', href: '/corrections/new' }
+        { label: 'Nouvelle correction', href: '/corrections_autres/new' }
       ];
       currentPageLabel = 'Corrections multiples';
     }
     // Détail d'une correction individuelle
-    else if (pathname && pathname.match(/^\/corrections\/\d+$/)) {
+    else if (pathname && pathname.match(/^\/corrections_autres\/\d+$/)) {
       const correctionId = pathname.split('/').pop();
       // Utilisation de JSX avec span et couleur primary pour le #ID
       currentPageLabel = <>Correction<span style={{ color: '#1976d2', fontWeight: 'bold' }}>&nbsp;#{correctionId}</span></>;

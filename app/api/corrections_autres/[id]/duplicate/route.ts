@@ -106,7 +106,7 @@ export async function POST(
         }
       }
       
-      
+      console.log('originalCorrection', JSON.stringify(originalCorrection.content_data),);
 
 
       // 2. Vérifier si l'utilisateur souhaite écraser une correction existante
@@ -118,6 +118,7 @@ export async function POST(
             content_data = ?,
             points_earned = ?,
             grade = ?, 
+            final_grade = ?,
             penalty = ?, 
             deadline = ?, 
             submission_date = ?, 
@@ -128,11 +129,10 @@ export async function POST(
           [
             originalCorrection.content,
             // S'assurer que content_data est une chaîne JSON valide
-            typeof originalCorrection.content_data === 'string' 
-              ? originalCorrection.content_data 
-              : JSON.stringify(originalCorrection.content_data),
+            JSON.stringify(originalCorrection.content_data),
             JSON.stringify(originalCorrection.points_earned),
             originalCorrection.grade,
+            originalCorrection.final_grade,
             originalCorrection.penalty,
             originalCorrection.deadline,
             originalCorrection.submission_date,
@@ -156,9 +156,7 @@ export async function POST(
             originalCorrection.activity_id,
             studentId,
             originalCorrection.content,
-            typeof originalCorrection.content_data === 'string' 
-              ? originalCorrection.content_data 
-              : JSON.stringify(originalCorrection.content_data),
+            JSON.stringify(originalCorrection.content_data),
             JSON.stringify(originalCorrection.points_earned),
             originalCorrection.grade,
             originalCorrection.penalty,

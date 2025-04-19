@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
 import { CorrectionAutre, ActivityAutre } from '@/lib/types';
 import { Student as BaseStudent } from '@/lib/types';
 import { useSnackbar } from 'notistack';
@@ -35,11 +35,15 @@ interface Filters {
   classId: string;
   studentId: string;
   activityId: string;
-  dateFrom?: Date | null;
-  dateTo?: Date | null;
-  minGrade?: string;
-  maxGrade?: string;
-  correctionId?: string;
+  dateFrom: any | null; // Changé à any pour supporter dayjs
+  dateTo: any | null; // Changé à any pour supporter dayjs
+  minGrade: string;
+  maxGrade: string;
+  correctionId: string;
+  hideInactive: boolean;
+  showOnlyInactive: boolean;
+  subClassId: string;
+  recent: boolean;
 }
 
 interface ContextValue {
@@ -89,10 +93,18 @@ export default function CorrectionsAutresProvider({ children, initialFilters, in
     dateTo: null,
     minGrade: '',
     maxGrade: '',
-    correctionId: ''
+    correctionId: '',
+    hideInactive: false,
+    showOnlyInactive: false,
+    subClassId: '',
+    recent: false
   });
 
-  const [activeFilters, setActiveFilters] = useState<string[]>([]);
+  const [activeFilters, setActiveFilters] = useState<string[]>(
+    Object.entries(initialFilters || {})
+      .filter(([_, value]) => value && value !== '')
+      .map(([key, _]) => key)
+  );
 
   const fetchCorrections = useCallback(async () => {
     setIsLoading(true); // Activation de l'état de chargement
@@ -173,12 +185,187 @@ export default function CorrectionsAutresProvider({ children, initialFilters, in
       dateTo: null,
       minGrade: '',
       maxGrade: '',
-      correctionId: ''
+      correctionId: '',
+      hideInactive: false,
+      showOnlyInactive: false,
+      subClassId: '',
+      recent: false
     });
   };
 
+  // Corrections filtrées avec tous les filtres appliqués
+  const filteredCorrections = useMemo(() => {
+    return corrections.filter(correction => {
+      // Filtre par recherche (dans le nom d'activité, étudiant ou classe)
+      if (activeFilters.includes('search') && filters.search) {
+        const searchLower = filters.search.toLowerCase();
+        const activityName = metaData.activities.find(a => a.id === correction.activity_id)?.name.toLowerCase() || '';
+        const student = metaData.students.find(s => s.id === correction.student_id);
+        const studentName = student ? 
+          `${student.first_name} ${student.last_name}`.toLowerCase() : '';
+        const className = metaData.classes.find(c => c.id === correction.class_id)?.name.toLowerCase() || '';
+        
+        const searchMatches = activityName.includes(searchLower) || 
+                              studentName.includes(searchLower) || 
+                              className.includes(searchLower) ||
+                              (correction.id?.toString() || '').includes(searchLower);
+        
+        if (!searchMatches) return false;
+      }
+
+      // Filtre par ID de correction
+      if (activeFilters.includes('correctionId') && filters.correctionId) {
+        if (correction.id?.toString() !== filters.correctionId) return false;
+      }
+
+      // Filtre par classe
+      if (activeFilters.includes('classId') && filters.classId) {
+        if (correction.class_id?.toString() !== filters.classId) return false;
+      }
+
+      // Filtre par sous-classe
+      if (activeFilters.includes('subClassId') && filters.subClassId) {
+        const student = metaData.students.find(s => s.id === correction.student_id);
+        if (!student || student.sub_class?.toString() !== filters.subClassId) return false;
+      }
+
+      // Filtre par étudiant
+      if (activeFilters.includes('studentId') && filters.studentId) {
+        if (correction.student_id?.toString() !== filters.studentId) return false;
+      }
+
+      // Filtre par activité
+      if (activeFilters.includes('activityId') && filters.activityId) {
+        if (correction.activity_id?.toString() !== filters.activityId) return false;
+      }
+
+      // Filtre par date de début
+      if (activeFilters.includes('dateFrom') && filters.dateFrom) {
+        // Vérification que submission_date existe
+        if (!correction.submission_date) return false;
+        const submissionDate = new Date(correction.submission_date);
+        const dateFrom = new Date(filters.dateFrom);
+        dateFrom.setHours(0, 0, 0, 0); // Début de la journée
+        if (submissionDate < dateFrom) return false;
+      }
+
+      // Filtre par date de fin
+      if (activeFilters.includes('dateTo') && filters.dateTo) {
+        // Vérification que submission_date existe
+        if (!correction.submission_date) return false;
+        const submissionDate = new Date(correction.submission_date);
+        const dateTo = new Date(filters.dateTo);
+        dateTo.setHours(23, 59, 59, 999); // Fin de la journée
+        if (submissionDate > dateTo) return false;
+      }
+
+      // Filtre par note minimale
+      if (activeFilters.includes('minGrade') && filters.minGrade) {
+        const activity = metaData.activities.find(a => a.id === correction.activity_id);
+        if (!activity) return false;
+        
+        const totalPoints = activity.points.reduce((sum, p) => sum + p, 0);
+        const earnedPoints = correction.points_earned 
+          ? correction.points_earned.reduce((sum, p) => sum + p, 0) 
+          : 0;
+        const grade = (earnedPoints / totalPoints) * 20;
+        
+        if (grade < parseFloat(filters.minGrade)) return false;
+      }
+
+      // Filtre par note maximale
+      if (activeFilters.includes('maxGrade') && filters.maxGrade) {
+        const activity = metaData.activities.find(a => a.id === correction.activity_id);
+        if (!activity) return false;
+        
+        const totalPoints = activity.points.reduce((sum, p) => sum + p, 0);
+        const earnedPoints = correction.points_earned 
+          ? correction.points_earned.reduce((sum, p) => sum + p, 0) 
+          : 0;
+        const grade = (earnedPoints / totalPoints) * 20;
+        
+        if (grade > parseFloat(filters.maxGrade)) return false;
+      }
+
+      // Filtre des dernières 24h
+      if (activeFilters.includes('recent') && filters.recent) {
+        const now = new Date();
+        const yesterday = new Date(now);
+        yesterday.setDate(yesterday.getDate() - 1);
+        
+        // Vérification que submission_date existe avant de créer la Date
+        if (!correction.submission_date) return false;
+        const submissionDate = new Date(correction.submission_date);
+        if (submissionDate < yesterday) return false;
+      }
+
+      // Filtre par statut actif/inactif
+      if (activeFilters.includes('hideInactive') && filters.hideInactive) {
+        if (correction.status !== 'ACTIVE') return false;
+      }
+
+      if (activeFilters.includes('showOnlyInactive') && filters.showOnlyInactive) {
+        if (correction.status === 'ACTIVE') return false;
+      }
+
+      return true;
+    }).sort((a, b) => {
+      // Application du tri
+      switch (sortOptions.field) {
+        case 'submission_date':
+          // Vérification que les dates existent avant de les comparer
+          if (!a.submission_date && !b.submission_date) return 0;
+          if (!a.submission_date) return sortOptions.direction === 'asc' ? -1 : 1;
+          if (!b.submission_date) return sortOptions.direction === 'asc' ? 1 : -1;
+          
+          const dateA = new Date(a.submission_date).getTime();
+          const dateB = new Date(b.submission_date).getTime();
+          return sortOptions.direction === 'asc' ? dateA - dateB : dateB - dateA;
+        
+        case 'grade':
+          const activityA = metaData.activities.find(act => act.id === a.activity_id);
+          const activityB = metaData.activities.find(act => act.id === b.activity_id);
+          
+          if (!activityA || !activityB) return 0;
+          
+          const totalPointsA = activityA.points.reduce((sum, p) => sum + p, 0);
+          const totalPointsB = activityB.points.reduce((sum, p) => sum + p, 0);
+          
+          const earnedPointsA = a.points_earned ? a.points_earned.reduce((sum, p) => sum + p, 0) : 0;
+          const earnedPointsB = b.points_earned ? b.points_earned.reduce((sum, p) => sum + p, 0) : 0;
+          
+          const gradeA = (earnedPointsA / totalPointsA) * 20;
+          const gradeB = (earnedPointsB / totalPointsB) * 20;
+          
+          return sortOptions.direction === 'asc' ? gradeA - gradeB : gradeB - gradeA;
+        
+        case 'student_name':
+          const studentA = metaData.students.find(s => s.id === a.student_id);
+          const studentB = metaData.students.find(s => s.id === b.student_id);
+          
+          const nameA = studentA ? `${studentA.last_name} ${studentA.first_name}`.toLowerCase() : '';
+          const nameB = studentB ? `${studentB.last_name} ${studentB.first_name}`.toLowerCase() : '';
+          
+          return sortOptions.direction === 'asc' 
+            ? nameA.localeCompare(nameB)
+            : nameB.localeCompare(nameA);
+        
+        case 'activity_name':
+          const actNameA = metaData.activities.find(act => act.id === a.activity_id)?.name.toLowerCase() || '';
+          const actNameB = metaData.activities.find(act => act.id === b.activity_id)?.name.toLowerCase() || '';
+          
+          return sortOptions.direction === 'asc'
+            ? actNameA.localeCompare(actNameB)
+            : actNameB.localeCompare(actNameA);
+        
+        default:
+          return 0;
+      }
+    });
+  }, [corrections, metaData, filters, activeFilters, sortOptions]);
+
   const value = {
-    corrections,
+    corrections: filteredCorrections,
     metaData,
     sortOptions,
     setSortOptions,
@@ -191,7 +378,7 @@ export default function CorrectionsAutresProvider({ children, initialFilters, in
     clearAllFilters,
     refreshCorrections,
     errorString,
-    isLoading // Référence à l'état isLoading au lieu d'une valeur en dur
+    isLoading
   };
 
   return (

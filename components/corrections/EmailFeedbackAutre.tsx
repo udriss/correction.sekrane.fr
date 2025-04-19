@@ -137,7 +137,8 @@ export default function EmailFeedbackAutre({
     // }
     
     const fullStudentName = student 
-      ? `${salutation} ${student.first_name} ${student.last_name}`
+      // ? `${salutation} ${student.first_name} ${student.last_name}`
+      ? `${salutation} ${student.first_name}`
       : 'Bonjour,';
 
     // Déterminer le texte d'explication de la pénalité en fonction des valeurs

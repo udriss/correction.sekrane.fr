@@ -777,7 +777,7 @@ export default function ActivitiesAutresPage() {
                                   color="success"
                                   variant="outlined"
                                   component={Link}
-                                  href={`/activities_autres/${activity.id}?tab=1`}
+                                  href={`/activities_autres/${activity.id}?tab=2`}
                                   target="_blank"
                                   rel="noopener noreferrer"
                                   clickable

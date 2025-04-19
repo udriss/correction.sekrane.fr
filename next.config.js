@@ -1,3 +1,7 @@
+const withBundleAnalyzer = require('@next/bundle-analyzer')({
+  enabled: process.env.ANALYZE === 'true',
+})
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   allowedDevOrigins: [
@@ -23,6 +27,16 @@ const nextConfig = {
   },
   experimental: {
     serverActions: {},
+    // Optimisation du chargement des modules
+    optimizeCss: true,
+  },
+  // Activer la compression statique pour réduire la taille des fichiers
+  compress: true,
+  // Désactiver les sourceMap en production pour réduire la taille des fichiers
+  productionBrowserSourceMaps: false,
+  // Configuration des images (déplacée hors de experimental)
+  images: { 
+    formats: ['image/webp'] 
   },
   webpack: (config) => {
     // Resolve Node.js native modules
@@ -54,4 +68,4 @@ const nextConfig = {
   }
 };
 
-module.exports = nextConfig;
+module.exports = process.env.ANALYZE === 'true' ? withBundleAnalyzer(nextConfig) : nextConfig;
