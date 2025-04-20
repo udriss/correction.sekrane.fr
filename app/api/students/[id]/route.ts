@@ -300,7 +300,7 @@ export async function PUT(
         WHERE student_id = ?
       `, [studentId]);
 
-      
+
       
       const currentClassIds = currentAssociations.map(assoc => assoc.class_id);
       
@@ -395,6 +395,181 @@ export async function PUT(
     `, [studentId]);
     
     return NextResponse.json(updatedStudentData[0] || {});
+  } catch (error) {
+    console.error('Error updating student:', error);
+    return NextResponse.json(
+      { error: 'Error updating student' }, 
+      { status: 500 }
+    );
+  }
+}
+
+export async function PATCH(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    // Await the params
+    const { id } = await params;
+    const studentId = parseInt(id);
+    
+    // Authentication check
+    const session = await getServerSession(authOptions);
+    const customUser = await getUser(req);
+    const userId = customUser?.id || session?.user?.id;
+      
+    if (!userId) {
+      return NextResponse.json(
+        { error: 'authentification requise' },
+        { status: 401 }
+      );
+    }
+    
+    if (isNaN(studentId)) {
+      return NextResponse.json({ error: 'ID étudiant invalide' }, { status: 400 });
+    }
+
+    // Parse the request body
+    const studentData = await req.json();
+    
+    
+    // Validate required fields
+    if (
+      studentData.first_name === undefined || 
+      studentData.last_name === undefined
+    ) {
+      return NextResponse.json(
+        { error: 'Les champs prénom et nom sont obligatoires' }, 
+        { status: 400 }
+      );
+    }
+
+    // Check if the student exists
+    const students = await query<any[]>(`
+      SELECT * FROM students WHERE id = ?
+    `, [studentId]);
+
+    if (!students || students.length === 0) {
+      return NextResponse.json({ error: 'Étudiant non trouvé' }, { status: 404 });
+    }
+
+    // Update student base information
+    try {
+      await query(`
+        UPDATE students 
+        SET 
+          first_name = ?, 
+          last_name = ?, 
+          ${studentData.email !== undefined ? 'email = ?,' : ''} 
+          gender = ?, 
+          updated_at = CURRENT_TIMESTAMP
+        WHERE id = ?
+      `, [
+        studentData.first_name,
+        studentData.last_name,
+        ...(studentData.email !== undefined ? [studentData.email] : []),
+        studentData.gender || 'N',
+        studentId
+      ]);
+    } catch (error: any) {
+      // Handle duplicate email error
+      if (error.code === 'ER_DUP_ENTRY' && error.sqlMessage?.includes('unique_email')) {
+        const [existingStudent] = await query<any[]>(
+          'SELECT id, first_name, last_name, email FROM students WHERE email = ?',
+          [studentData.email]
+        );
+
+        return NextResponse.json({ 
+          error: 'adresse mail déjà utilisée',
+          details: `L'adresse email "${studentData.email}" est déjà associée à un autre étudiant.`,
+          code: 'DUPLICATE_EMAIL',
+          existingStudent: existingStudent
+        }, { status: 409 });
+      }
+      throw error;
+    }
+
+    // Handle class associations from allClasses field
+    if (studentData.allClasses && Array.isArray(studentData.allClasses)) {
+      // Get current class associations
+      const currentAssociations = await query<any[]>(`
+        SELECT class_id, sub_class FROM class_students 
+        WHERE student_id = ?
+      `, [studentId]);
+      
+      const currentClassIds = currentAssociations.map(assoc => assoc.class_id);
+      
+      // Process each class in allClasses
+      const processedClassIds: number[] = [];
+      
+      for (const classItem of studentData.allClasses) {
+        // Extract classId and sub_class from the item
+        const classId = classItem.classId;
+        const subClass = classItem.sub_class;
+        
+        // Skip if classId is missing
+        if (!classId) continue;
+        
+        processedClassIds.push(classId);
+        
+        // Check if this association already exists
+        const existingAssocIndex = currentClassIds.indexOf(classId);
+
+        
+
+        if (existingAssocIndex !== -1) {
+          // Update existing association
+          await query(`
+            UPDATE class_students
+            SET sub_class = ?, updated_at = CURRENT_TIMESTAMP
+            WHERE student_id = ? AND class_id = ?
+          `, [subClass, studentId, classId]);
+        } else {
+          // Create new association
+          await query(`
+            INSERT INTO class_students (student_id, class_id, sub_class, created_at, updated_at)
+            VALUES (?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+          `, [studentId, classId, subClass]);
+        }
+      }
+      
+      // Remove associations that are no longer needed
+      const classIdsToRemove = currentClassIds.filter(id => !processedClassIds.includes(id));
+      
+      if (classIdsToRemove.length > 0) {
+        // Use parameterized query with multiple placeholders
+        const placeholders = classIdsToRemove.map(() => '?').join(',');
+        await query(`
+          DELETE FROM class_students 
+          WHERE student_id = ? AND class_id IN (${placeholders})
+        `, [studentId, ...classIdsToRemove]);
+      }
+    }
+    
+    // Fetch and return the updated student data with all classes
+    const updatedStudentData = await query<any[]>(`
+      SELECT s.* 
+      FROM students s
+      WHERE s.id = ?
+    `, [studentId]);
+    
+    // Fetch all classes for this student
+    const studentClasses = await query<any[]>(`
+      SELECT cs.class_id, c.name as class_name, cs.sub_class
+      FROM class_students cs
+      JOIN classes c ON cs.class_id = c.id
+      WHERE cs.student_id = ?
+    `, [studentId]);
+    
+    // Format the response
+    const student = updatedStudentData[0] || {};
+    student.allClasses = studentClasses.map(cls => ({
+      classId: cls.class_id,
+      className: cls.class_name,
+      sub_class: cls.sub_class
+    }));
+    
+    return NextResponse.json(student);
   } catch (error) {
     console.error('Error updating student:', error);
     return NextResponse.json(

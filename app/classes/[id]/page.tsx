@@ -171,9 +171,10 @@ export default function ClassAutreDetailPage({ params }: { params: Promise<{ id:
         sub_class: editingStudent.group || editingStudent.sub_class
       };
       
-      // Appel API pour mettre à jour l'étudiant
-      const response = await fetch(`/api/students/${editingStudent.id}`, {
-        method: 'PUT',
+
+      // Appel API pour mettre à jour l'étudiant en utilisant la route PATCH de la classe
+      const response = await fetch(`/api/classes/${classId}/students/${editingStudent.id}`, {
+        method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
         },
@@ -680,25 +681,45 @@ const handleOpenEditDialog = async (student: Student) => {
     const allClassesData = await allClassesResponse.json();
     setAllAvailableClasses(allClassesData);
     
-    // Créer un objet student enrichi avec des informations supplémentaires
+    // Récupérer les classes auxquelles l'étudiant est déjà associé
+    const studentClassesResponse = await fetch(`/api/students/${student.id}/classes`);
+    let studentClasses = [];
+    
+    if (studentClassesResponse.ok) {
+      studentClasses = await studentClassesResponse.json();
+
+    } else {
+      console.error("Impossible de récupérer les classes de l'étudiant, utilisation de la classe courante uniquement");
+      // Fallback: utiliser uniquement la classe courante
+      studentClasses = [{
+        id: parseInt(classId),
+        name: classData?.name || 'Classe actuelle',
+        academic_year: classData?.academic_year || '',
+        nbre_subclasses: classData?.nbre_subclasses || 0,
+        sub_class: student.sub_class
+      }];
+    }
+    
+    // Créer un objet student enrichi avec ses classes
     const studentToEdit = {
       ...student,
-      // Initialiser allClasses si nécessaire
-      allClasses: student.allClasses || [{
-        classId: parseInt(classId),
-        className: classData?.name || 'Classe actuelle',
-        // Convertir sub_class en string si c'est un nombre
-        sub_class: student.sub_class ? String(student.sub_class) : null
-      }]
+      allClasses: studentClasses.map((cls: Class & { sub_class?: number | string | null }) => ({
+        classId: cls.id,
+        className: cls.name,
+        sub_class: cls.sub_class ? String(cls.sub_class) : null
+      }))
     };
     
+
+
     setEditingStudent(studentToEdit);
     
-    // Par défaut, l'étudiant est dans la classe actuelle
-    const initialSelectedClasses = [{ 
-      id: parseInt(classId), 
-      name: classData?.name || 'Classe actuelle' 
-    }];
+    // Initialiser les classes sélectionnées
+    const initialSelectedClasses = studentClasses.map((cls: Class & { sub_class?: number | string | null }) => ({
+      id: cls.id,
+      name: cls.name
+    }));
+
     
     setSelectedClasses(initialSelectedClasses);
     
@@ -714,11 +735,9 @@ const handleOpenEditDialog = async (student: Student) => {
     }
     
     // Charger les sous-groupes pour toutes les classes auxquelles l'étudiant appartient
-    if (student.allClasses && Array.isArray(student.allClasses)) {
-      for (const cls of student.allClasses) {
-        if (cls.classId !== parseInt(classId)) {
-          await fetchSubgroupsForClass(cls.classId);
-        }
+    for (const cls of studentClasses) {
+      if (cls.id !== parseInt(classId)) {
+        await fetchSubgroupsForClass(cls.id);
       }
     }
     
@@ -1317,10 +1336,10 @@ const handleDeleteClass = async () => {
               <TableHead>
                 <TableRow>
                   <TableCell>Nom</TableCell>
-                  <TableCell>Groupe</TableCell>
-                  <TableCell>Corrections</TableCell>
-                  <TableCell>Note moyenne</TableCell>
-                  <TableCell align="right">Actions</TableCell>
+                  <TableCell align="center">Groupe</TableCell>
+                  <TableCell align="center">Corrections</TableCell>
+                  <TableCell align="center">Note moyenne</TableCell>
+                  <TableCell align="center" sx={{ width: 150 }}>Actions</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
@@ -1354,7 +1373,7 @@ const handleDeleteClass = async () => {
                           </Typography>
                         </Box>
                       </TableCell>
-                      <TableCell>
+                      <TableCell align="center">
                         {student.sub_class ? (
                           <Chip 
                             size="small" 
@@ -1368,33 +1387,83 @@ const handleDeleteClass = async () => {
                           </Typography>
                         )}
                       </TableCell>
-                      <TableCell>
-                        {studentCorrections.length > 0 ? (
-                          <Chip 
-                            size="small"
-                            label={studentCorrections.length}
-                            color="success"
-                            component={Link}
-                            href={`/students/${student.id}`}
-                            clickable
-                            sx={{ 
-                              cursor: 'pointer',
-                              '&:hover': { 
-                                boxShadow: '0 1px 3px rgba(0,0,0,0.12)',
-                                backgroundColor: 'rgba(46, 125, 50, 0.08)'
-                              }
-                            }}
-                          />
-                        ) : (
-                          <Chip 
-                            size="small"
-                            label="0"
-                            color="default"
-                            variant="outlined"
-                          />
-                        )}
+                      <TableCell align="center">
+                        {(() => {
+                          // Pour chaque étudiant, chercher dans les données de corrections toutes les corrections disponibles
+                          const studentWithAllCorrections = corrections.find(
+                            data => data.student_id === student.id
+                          );
+                          
+                          // Si on a trouvé les données complètes, afficher le compteur
+                          if (studentWithAllCorrections) {
+                            const classCount = studentWithAllCorrections.class_corrections_count || 0;
+                            const totalCount = studentWithAllCorrections.total_corrections_count || 0;
+                            
+                            if (classCount > 0) {
+                              // S'il y a des corrections, afficher un chip cliquable
+                              return (
+                                <Chip 
+                                  size="small"
+                                  label={`${classCount} / ${totalCount}`}
+                                  color="success"
+                                  component={Link}
+                                  href={`/students/${student.id}`}
+                                  clickable
+                                  sx={{ 
+                                    cursor: 'pointer',
+                                    '&:hover': { 
+                                      boxShadow: '0 1px 3px rgba(0,0,0,0.12)',
+                                      backgroundColor: 'rgba(46, 125, 50, 0.08)'
+                                    }
+                                  }}
+                                />
+                              );
+                            } else {
+                              // S'il n'y a pas de corrections, afficher un chip vide
+                              return (
+                                <Chip 
+                                  size="small"
+                                  label="0"
+                                  color="default"
+                                  variant="outlined"
+                                />
+                              );
+                            }
+                          } else {
+                            // Fallback si on ne trouve pas les données dans l'API
+                            // On utilise l'ancien comportement basé sur le tableau de corrections filtré
+                            const studentCorrections = corrections.filter(c => 
+                              typeof c === 'object' && 'student_id' in c && c.student_id === student.id
+                            );
+                            
+                            return studentCorrections.length > 0 ? (
+                              <Chip 
+                                size="small"
+                                label={studentCorrections.length}
+                                color="success"
+                                component={Link}
+                                href={`/students/${student.id}`}
+                                clickable
+                                sx={{ 
+                                  cursor: 'pointer',
+                                  '&:hover': { 
+                                    boxShadow: '0 1px 3px rgba(0,0,0,0.12)',
+                                    backgroundColor: 'rgba(46, 125, 50, 0.08)'
+                                  }
+                                }}
+                              />
+                            ) : (
+                              <Chip 
+                                size="small"
+                                label="0"
+                                color="default"
+                                variant="outlined"
+                              />
+                            );
+                          }
+                        })()}
                       </TableCell>
-                      <TableCell>
+                      <TableCell align="center">
                         {averageGrade !== null ? (
                           <Chip 
                             label={`${averageGrade.toFixed(1)}/20`}
@@ -1408,37 +1477,24 @@ const handleDeleteClass = async () => {
                         )}
                       </TableCell>
                       <TableCell align="center">
-                        <Box sx={{ display: 'flex', gap: 0.5, justifyContent: 'flex-end' }}>
-                          <Tooltip title="Modifier étudiant">
-                            <IconButton
-                              size="small"
-                              sx={{ color: theme => theme.palette.text.secondary }}
-                              onClick={() => handleOpenEditDialog(student)}
-                            >
-                              <EditIcon fontSize="small" />
-                            </IconButton>
-                          </Tooltip>
-                          <Tooltip title="Consulter étudiant">
-                                <IconButton
-                                size="small"
-                                color="info"
-                                component={student?.id ? Link : 'button'}
-                                href={student?.id ? `/students/${student.id}` : undefined}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                disabled={!student?.id}
-                                >
-                                {student?.id ? (
-                                  <OpenInNewIcon fontSize="small" />
-                                ) : (
-                                  <LinkOffIcon fontSize="small" />
-                                )}
-                                </IconButton>
-                          </Tooltip>
-
-                          
+                        <Box sx={{ 
+                          display: 'flex', 
+                          gap: 0.5, 
+                          justifyContent: 'center',
+                          width: '100%',
+                          minWidth: 140,
+                          position: 'relative'
+                        }}>
                           {confirmingDelete === student.id ? (
-                            <>
+                            <Box sx={{ 
+                              display: 'flex', 
+                              gap: 0.5,
+                              // transform: 'translateX(-50%)',
+                              width: '100%',
+                              justifyContent: 'center',
+                              alignContent: 'center',
+                              alignItems: 'center',
+                            }}>
                               <Tooltip title="Confirmer la suppression">
                                 <IconButton
                                   size="small"
@@ -1457,17 +1513,45 @@ const handleDeleteClass = async () => {
                                   <CloseIcon fontSize="small" />
                                 </IconButton>
                               </Tooltip>
-                            </>
+                            </Box>
                           ) : (
-                            <Tooltip title="Effacer étudiant">
-                              <IconButton
-                                size="small"
-                                color="error"
-                                onClick={() => handleDeleteClick(student.id!)}
-                              >
-                                <DeleteIcon fontSize="small" />
-                              </IconButton>
-                            </Tooltip>
+                            <>
+                              <Tooltip title="Modifier étudiant">
+                                <IconButton
+                                  size="small"
+                                  sx={{ color: theme => theme.palette.text.secondary }}
+                                  onClick={() => handleOpenEditDialog(student)}
+                                >
+                                  <EditIcon fontSize="small" />
+                                </IconButton>
+                              </Tooltip>
+                              <Tooltip title="Consulter étudiant">
+                                <IconButton
+                                  size="small"
+                                  color="info"
+                                  component={student?.id ? Link : 'button'}
+                                  href={student?.id ? `/students/${student.id}` : undefined}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  disabled={!student?.id}
+                                >
+                                  {student?.id ? (
+                                    <OpenInNewIcon fontSize="small" />
+                                  ) : (
+                                    <LinkOffIcon fontSize="small" />
+                                  )}
+                                </IconButton>
+                              </Tooltip>
+                              <Tooltip title="Effacer étudiant">
+                                <IconButton
+                                  size="small"
+                                  color="error"
+                                  onClick={() => handleDeleteClick(student.id!)}
+                                >
+                                  <DeleteIcon fontSize="small" />
+                                </IconButton>
+                              </Tooltip>
+                            </>
                           )}
                         </Box>
                       </TableCell>

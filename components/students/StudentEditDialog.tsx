@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
 import {
   Dialog,
   DialogActions,
@@ -11,17 +10,11 @@ import {
   Typography,
   FormControl,
   FormLabel,
-  RadioGroup,
-  Radio,
-  FormControlLabel,
   Chip,
   Avatar,
   InputAdornment,
-  Tooltip,
-  IconButton,
   Select,
   MenuItem,
-  InputLabel,
   CircularProgress,
   List,
   ListItem,
@@ -45,8 +38,8 @@ import FemaleIcon from '@mui/icons-material/Female';
 import NotInterestedIcon from '@mui/icons-material/NotInterested';
 import GpsNotFixedIcon from '@mui/icons-material/GpsNotFixed';
 import GradientBackground from '@/components/ui/GradientBackground';
-import H1Title from '@/components/ui/H1Title';
-import { text } from 'stream/consumers';
+
+
 
 interface ExtendedClassEntry {
   classId: number;
@@ -104,10 +97,13 @@ const StudentEditDialog: React.FC<StudentEditDialogProps> = ({
   classGroupsMapping,
   onClassSelectionChange
 }) => {
-  const router = useRouter();
+
+
+
   const [classSubgroups, setClassSubgroups] = useState<{[classId: number]: string}>({});
   const [validationErrors, setValidationErrors] = useState<ValidationError>({});
-  const [existingStudent, setExistingStudent] = useState<Student | null>(null);
+
+
   
   // Déplacer le useEffect ici, avant le retour conditionnel
   useEffect(() => {
@@ -363,30 +359,56 @@ const StudentEditDialog: React.FC<StudentEditDialogProps> = ({
 
   // Modifier handleSave pour gérer l'erreur de duplication
   const handleSave = async () => {
+    if (!student) return;
+    
     try {
+      // Désactiver les validations pour les étudiants existants (id !== undefined)
+      if (student.id) {
+        setValidationErrors({});
+      } else {
+        // Validation pour les nouveaux étudiants uniquement
+        // Vérifier si l'email est valide
+        if (student.email) {
+          setValidationErrors({ 
+            email: "L'adresse e-mail n'est pas valide" 
+          });
+          return;
+        }
+      }
+      
+      
+      
+      // Utiliser PATCH plutôt que PUT pour mettre à jour l'étudiant avec ses classes
       const response = await fetch(`/api/students/${student.id}`, {
-        method: 'PUT',
+        method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(student)
+        body: JSON.stringify(student),
       });
       
       if (!response.ok) {
         const errorData = await response.json();
+        
+        // Gérer spécifiquement l'erreur d'email en doublon
         if (errorData.code === 'DUPLICATE_EMAIL') {
-          setValidationErrors({
-            email: errorData.details,
+          setValidationErrors({ 
+            email: "Cette adresse email est déjà utilisée",
             existingStudent: errorData.existingStudent
           });
           return;
         }
-        throw new Error(errorData.error || 'Erreur lors de la sauvegarde');
+        
+        throw new Error(errorData.error || 'Erreur lors de la mise à jour');
       }
-
+      
+      // Appeler la fonction onSave pour fermer le dialogue et rafraîchir les données
       onSave();
     } catch (error) {
       console.error('Error saving student:', error);
+      setValidationErrors({ 
+        general: error instanceof Error ? error.message : 'Erreur lors de la sauvegarde' 
+      });
     }
   };
 

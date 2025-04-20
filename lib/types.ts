@@ -150,4 +150,9 @@ export interface CorrectionAutreEnriched extends CorrectionAutreWithShareCode {
   placeholder?: boolean;
   noQRCode?: boolean;
   sub_class?: string | number | null;
+  // Nouvelles propriétés pour stocker les compteurs de corrections
+  total_corrections_count?: number;
+  class_corrections_count?: number;
+  // Array of all corrections for the student
+  all_corrections?: CorrectionAutreWithShareCode[];
 }

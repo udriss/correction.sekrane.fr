@@ -1,4 +1,4 @@
-export { ClassPage } from './ClassPage';
+
 export { ClassHeader } from './ClassHeader';
 export { ClassStats } from './ClassStats';
 export { ClassTabs } from './ClassTabs';

@@ -299,7 +299,7 @@ export async function DELETE(
       }, { status: 400 });
     }
     
-    // Delete the class_student relationship (not the student itself)
+    // Delete the class_students relationship (not the student itself)
     await query(
       'DELETE FROM class_students WHERE class_id = ? AND student_id = ?', 
       [classId, studentId]

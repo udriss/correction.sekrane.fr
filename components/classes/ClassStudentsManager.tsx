@@ -348,26 +348,44 @@ export default function ClassStudentsManager({
   // Add these new functions for inline editing
   const handleOpenEditDialog = async (student: Student) => {
     try {
+      // Fetch all classes for the student from the API
+      const studentClassesResponse = await fetch(`/api/students/${student.id}/classes`);
+      let studentClasses = [];
+      
+      if (studentClassesResponse.ok) {
+        studentClasses = await studentClassesResponse.json();
+      } else {
+        console.error('Failed to fetch student classes, using default');
+        // Fallback to current class if API fails
+        studentClasses = [{
+          id: classId,
+          name: classData?.name || 'Current Class'
+        }];
+      }
+      
+      // Format allClasses properly
+      const formattedAllClasses = studentClasses.map((cls: { id: number; name: string; sub_class?: number | string | null }) => ({
+        classId: cls.id,
+        className: cls.name,
+        // Include sub_class if available or null
+        sub_class: cls.sub_class ? String(cls.sub_class) : null
+      }));
+      
       // Create a properly formatted student object with all required properties
       const studentToEdit = {
         ...student,
-        // Initialize allClasses if it doesn't exist, ensure sub_class is string | null
-        allClasses: student.allClasses || [{
-          classId: classId,
-          className: classData?.name || 'Current Class',
-          // Convert sub_class to string if it's a number
-          sub_class: student.sub_class ? String(student.sub_class) : null
-        }]
+        // Use the fetched classes instead of just the current one
+        allClasses: formattedAllClasses
       };
       
       setStudentToEdit(studentToEdit);
       setEditingStudent(studentToEdit);
       
-      // Par défaut, l'étudiant est déjà dans la classe actuelle
-      const initialSelectedClasses = [{ 
-        id: classId, 
-        name: classData?.name || 'Classe actuelle' 
-      }];
+      // Initialize selected classes based on allClasses
+      const initialSelectedClasses = studentClasses.map((cls: { id: number; name: string }) => ({ 
+        id: cls.id, 
+        name: cls.name 
+      }));
       
       setSelectedClassesForEdit(initialSelectedClasses);
       
@@ -378,16 +396,9 @@ export default function ClassStudentsManager({
         setAllAvailableClasses(allClassesData);
       }
       
-      // Charger les sous-groupes disponibles
-      await fetchSubgroupsForEdit(classId);
-      
-      // Also fetch subgroups for any additional classes the student belongs to
-      if (student.allClasses && Array.isArray(student.allClasses)) {
-        for (const cls of student.allClasses) {
-          if (cls.classId !== classId) {
-            await fetchSubgroupsForClass(cls.classId);
-          }
-        }
+      // Charger les sous-groupes disponibles pour chaque classe de l'étudiant
+      for (const cls of formattedAllClasses) {
+        await fetchSubgroupsForClass(cls.classId);
       }
       
       // Ouvrir le dialog
@@ -448,13 +459,14 @@ export default function ClassStudentsManager({
         group: editingStudent.group || null,
         // Maintenir les autres propriétés importantes
         allClasses: editingStudent.allClasses || [],
-        sub_class: editingStudent.sub_class,
-        additionalClasses: editingStudent.additionalClasses,
+        sub_class: editingStudent.sub_class
       };
 
-      // 1. Mettre à jour les informations de base de l'étudiant
+      
+
+      // Utiliser la nouvelle méthode PATCH de l'API students directement
       const response = await fetch(`/api/students/${editingStudent.id}`, {
-        method: 'PUT',
+        method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
         },
@@ -463,39 +475,7 @@ export default function ClassStudentsManager({
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.error || 'Erreur lors de la sauvegarde');
-      }
-
-      // 2. Mettre à jour les associations de classe
-      for (const cls of selectedClassesForEdit) {
-        
-        
-        // Find sub_class for this specific class in allClasses
-        let subClassForThisClass = null;
-        
-        if (editingStudent.allClasses) {
-          const classEntry = editingStudent.allClasses.find(c => c.classId === cls.id);
-          if (classEntry) {
-            subClassForThisClass = classEntry.sub_class;
-          }
-        }
-        
-        
-        // S'assurer que l'étudiant est associé à cette classe avec le bon sub_class
-        await fetch(`/api/classes/${cls.id}/students/${editingStudent.id}`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            student_id: editingStudent.id,
-            sub_class: subClassForThisClass
-          }),
-        }).catch(error => {
-          // Log error but continue
-          console.error(`Error updating student in class ${cls.id}:`, error);
-        });
-
+        throw new Error(errorData.error || 'Erreur lors de la mise à jour');
       }
 
       // Refresh the students list
@@ -1019,7 +999,7 @@ export default function ClassStudentsManager({
                                   required
                                 />
                               </TableCell>
-                              <TableCell>
+                              <TableCell align="center">
                                 <TextField
                                   size="small"
                                   fullWidth
@@ -1027,7 +1007,7 @@ export default function ClassStudentsManager({
                                   onChange={(e) => handleBatchStudentFieldChange(index, 'last_name', e.target.value)}
                                 />
                               </TableCell>
-                              <TableCell>
+                              <TableCell align="center">
                                 <TextField
                                   size="small"
                                   fullWidth
@@ -1036,7 +1016,7 @@ export default function ClassStudentsManager({
                                   placeholder="Optionnel"
                                 />
                               </TableCell>
-                              <TableCell>
+                              <TableCell align="center">
                                 <FormControl fullWidth size="small">
                                   <Select
                                     value={student.gender || 'N'}
@@ -1049,7 +1029,7 @@ export default function ClassStudentsManager({
                                 </FormControl>
                               </TableCell>
                               {classData?.nbre_subclasses && classData?.nbre_subclasses > 0 && (
-                                <TableCell>
+                                <TableCell align="center">
                                   <FormControl fullWidth size="small">
                                     <Select
                                       value={student.sub_class === null ? '' : student.sub_class}
@@ -1245,7 +1225,7 @@ export default function ClassStudentsManager({
                                 }
                               }}
                             >
-                              <TableCell>
+                              <TableCell align="center">
                                 <TextField
                                   size="small"
                                   fullWidth
@@ -1262,7 +1242,7 @@ export default function ClassStudentsManager({
                                   }}
                                 />
                               </TableCell>
-                              <TableCell>
+                              <TableCell align="center">
                                 <TextField
                                   size="small"
                                   fullWidth
@@ -1278,7 +1258,7 @@ export default function ClassStudentsManager({
                                   }}
                                 />
                               </TableCell>
-                              <TableCell>
+                              <TableCell align="center">
                                 <TextField
                                   size="small"
                                   fullWidth
@@ -1295,7 +1275,7 @@ export default function ClassStudentsManager({
                                   }}
                                 />
                               </TableCell>
-                              <TableCell>
+                              <TableCell align="center">
                                 <FormControl fullWidth size="small">
                                   <Select
                                     value={student.gender || 'N'}
@@ -1310,7 +1290,7 @@ export default function ClassStudentsManager({
                                 </FormControl>
                               </TableCell>
                               {classData?.nbre_subclasses && classData?.nbre_subclasses > 0 && (
-                                <TableCell>
+                                <TableCell align="center">
                                   <FormControl fullWidth size="small">
                                     <Select
                                       value={student.sub_class === null ? '' : student.sub_class}
@@ -1433,7 +1413,7 @@ export default function ClassStudentsManager({
                     </Tooltip>
                   </Box>
                 </TableCell>
-                <TableCell>
+                <TableCell align="center">
                   <TableSortLabel
                     active={orderBy === 'first_name'}
                     direction={orderBy === 'first_name' ? order : 'asc'}
@@ -1442,8 +1422,8 @@ export default function ClassStudentsManager({
                     Prénom
                   </TableSortLabel>
                 </TableCell>               
-                <TableCell>
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                <TableCell align="center">
+                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.5 }}>
                     <EmailIcon fontSize="small" />
                     <span>Email</span>
                     <Tooltip title={showEmailColumn ? "Masquer les emails" : "Afficher les emails"}>
@@ -1453,7 +1433,7 @@ export default function ClassStudentsManager({
                     </Tooltip>
                   </Box>
                 </TableCell>
-                <TableCell>
+                <TableCell align="center">
                   <TableSortLabel
                     active={orderBy === 'gender'}
                     direction={orderBy === 'gender' ? order : 'asc'}
@@ -1463,7 +1443,7 @@ export default function ClassStudentsManager({
                   </TableSortLabel>
                 </TableCell>
                 {classData?.nbre_subclasses && classData?.nbre_subclasses > 0 && (
-                  <TableCell>
+                  <TableCell align="center">
                     <TableSortLabel
                       active={orderBy === 'sub_class'}
                       direction={orderBy === 'sub_class' ? order : 'asc'}
@@ -1473,7 +1453,7 @@ export default function ClassStudentsManager({
                     </TableSortLabel>
                   </TableCell>
                 )}
-                <TableCell align="right">Actions</TableCell>
+                <TableCell align="center">Actions</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
@@ -1504,7 +1484,7 @@ export default function ClassStudentsManager({
                       )
                     )}
                   </TableCell>
-                  <TableCell>
+                  <TableCell align="center">
                     {student.isEditing ? (
                       <TextField
                         size="small"
@@ -1519,7 +1499,7 @@ export default function ClassStudentsManager({
                       student.first_name
                     )}
                   </TableCell>
-                  <TableCell>
+                  <TableCell align="center">
                     {student.isEditing ? (
                       <TextField
                         size="small"
@@ -1545,7 +1525,7 @@ export default function ClassStudentsManager({
                       )
                     )}
                   </TableCell>
-                  <TableCell>
+                  <TableCell align="center">
                     {student.isEditing ? (
                       <FormControl fullWidth size="small">
                         <Select
@@ -1566,7 +1546,7 @@ export default function ClassStudentsManager({
                     )}
                   </TableCell>
                   {classData?.nbre_subclasses && classData?.nbre_subclasses > 0 && (
-                    <TableCell>
+                    <TableCell align="center">
                       {student.isEditing ? (
                         <FormControl fullWidth size="small">
                           <Select
@@ -1616,7 +1596,7 @@ export default function ClassStudentsManager({
                       )}
                     </TableCell>
                   )}
-                  <TableCell align="right">
+                  <TableCell align="center">
                   <>
                   <Tooltip title="Consulter étudiant">
                               <IconButton
@@ -1721,7 +1701,9 @@ export default function ClassStudentsManager({
       onClose={handleCloseEditDialog}
       student={studentToEdit ? {
         ...studentToEdit,
-        email: studentToEdit.email || '' // Garantir que email n'est jamais null
+        email: studentToEdit.email || '', // Garantir que email n'est jamais null
+        // S'assurer que allClasses est correctement transmis
+        allClasses: studentToEdit.allClasses || []
       } : null}
       onSave={handleSaveEdit}
       selectedClasses={selectedClassesForEdit}

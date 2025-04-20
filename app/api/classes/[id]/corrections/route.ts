@@ -36,35 +36,72 @@ export async function GET(
       return NextResponse.json({ error: 'Class not found' }, { status: 404 });
     }
     
-    // Get corrections with their activity information and include points data
-    const corrections = await query(`
-      SELECT 
-        c.*,
-        a.id as activity_id,
-        a.name as activity_name,
-        a.points as activity_points,
-        a.parts_names as activity_parts_names,
-        CONCAT(s.first_name, ' ', s.last_name) as student_name
-      FROM 
-        corrections_autres c
+    // 1. Get all students in this class
+    const students = await query(`
+      SELECT
+        s.id, 
+        s.first_name,
+        s.last_name,
+        s.email
+      FROM
+        students s
       JOIN
-        activities_autres a ON c.activity_id = a.id
-      LEFT JOIN
-        students s ON c.student_id = s.id
-      WHERE 
-        c.class_id = ?
+        class_students cs ON s.id = cs.student_id
+      WHERE
+        cs.class_id = ?
     `, [classId]);
     
-    // Format the response to match the CorrectionAutreEnriched structure
-    const formattedCorrections = (corrections as any[]).map(c => ({
-      ...c,
-      // Calculate score percentage if possible
-      score_percentage: c.grade !== null && c.grade !== undefined 
-        ? Number(((c.grade / 20) * 100).toFixed(2))
-        : null
-    }));
+    // Structure to hold student corrections data
+    const studentsCorrectionsData = [];
     
-    return NextResponse.json(formattedCorrections);
+    // 2. For each student, get all their corrections (both for this class and others)
+    for (const student of students as any[]) {
+      // Get all corrections for this student
+      const allCorrections = await query(`
+        SELECT 
+          c.*,
+          a.id as activity_id,
+          a.name as activity_name,
+          a.points as activity_points,
+          a.parts_names as activity_parts_names,
+          c.class_id
+        FROM 
+          corrections_autres c
+        JOIN
+          activities_autres a ON c.activity_id = a.id
+        WHERE 
+          c.student_id = ?
+      `, [student.id]);
+      
+      // Format the corrections
+      const formattedCorrections = (allCorrections as any[]).map(c => ({
+        ...c,
+        // Calculate score percentage if possible
+        score_percentage: c.grade !== null && c.grade !== undefined 
+          ? Number(((c.grade / 20) * 100).toFixed(2))
+          : null
+      }));
+      
+      // Filter corrections for the current class
+      const classCorrections = formattedCorrections.filter(c => c.class_id === classId);
+      
+      // Count total corrections and class-specific corrections
+      const totalCorrections = formattedCorrections.length;
+      const classCorrectionsCount = classCorrections.length;
+      
+      // Add to the result array
+      studentsCorrectionsData.push({
+        student_id: student.id,
+        student_name: `${student.first_name} ${student.last_name}`,
+        student_email: student.email,
+        class_corrections: classCorrections,
+        class_corrections_count: classCorrectionsCount,
+        total_corrections_count: totalCorrections,
+        all_corrections: formattedCorrections
+      });
+    }
+    
+    return NextResponse.json(studentsCorrectionsData);
   } catch (error) {
     console.error('Error fetching class corrections:', error);
     return NextResponse.json({ error: 'Failed to fetch corrections' }, { status: 500 });

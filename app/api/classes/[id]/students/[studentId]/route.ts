@@ -321,36 +321,106 @@ export async function PATCH(
     }
 
     const body = await request.json();
-    const subClass = body.sub_class;
+    
+    
+    // Utiliser sub_class du body s'il est présent, sinon chercher dans allClasses
+    let subClass = body.sub_class;
 
-    return withConnection(async (connection) => {
-      // Vérifier si l'association existe déjà
-      const [existingRows] = await connection.query(
-        'SELECT * FROM class_students WHERE class_id = ? AND student_id = ?',
-        [classId, studentIdNumber]
-      );
+    // Gérer allClasses s'il est présent
+    if (body.allClasses && Array.isArray(body.allClasses)) {
+      return withConnection(async (connection) => {
+        // Si subClass n'est pas défini, chercher dans allClasses pour la classe courante
+        if (subClass === undefined) {
+          const currentClassEntry = body.allClasses.find((cls: any) => cls.classId === classId);
+          if (currentClassEntry) {
+            subClass = currentClassEntry.sub_class;
+          }
+        }
 
-      if (Array.isArray(existingRows) && existingRows.length > 0) {
-        // Mettre à jour l'association existante
-        await connection.query(
-          'UPDATE class_students SET sub_class = ?, updated_at = NOW() WHERE class_id = ? AND student_id = ?',
-          [subClass, classId, studentIdNumber]
+        // Mettre à jour ou créer l'association pour la classe courante
+        const [existingRows] = await connection.query(
+          'SELECT * FROM class_students WHERE class_id = ? AND student_id = ?',
+          [classId, studentIdNumber]
         );
-      } else {
-        // Créer une nouvelle association
-        await connection.query(
-          'INSERT INTO class_students (class_id, student_id, sub_class, created_at, updated_at) VALUES (?, ?, ?, NOW(), NOW())',
-          [classId, studentIdNumber, subClass]
-        );
-      }
 
-      return NextResponse.json({ 
-        message: 'Student class association updated successfully',
-        class_id: classId,
-        student_id: studentIdNumber,
-        sub_class: subClass
+        if (Array.isArray(existingRows) && existingRows.length > 0) {
+          // Mettre à jour l'association existante
+          await connection.query(
+            'UPDATE class_students SET sub_class = ?, updated_at = NOW() WHERE class_id = ? AND student_id = ?',
+            [subClass, classId, studentIdNumber]
+          );
+        } else {
+          // Créer une nouvelle association
+          await connection.query(
+            'INSERT INTO class_students (class_id, student_id, sub_class, created_at, updated_at) VALUES (?, ?, ?, NOW(), NOW())',
+            [classId, studentIdNumber, subClass]
+          );
+        }
+
+        // Mettre à jour les autres associations de classes si présentes dans allClasses
+        for (const cls of body.allClasses) {
+          // Ignorer la classe courante car déjà traitée
+          // if (cls.classId === classId) continue;
+
+          const [otherExistingRows] = await connection.query(
+            'SELECT * FROM class_students WHERE class_id = ? AND student_id = ?',
+            [cls.classId, studentIdNumber]
+          );
+
+          if (Array.isArray(otherExistingRows) && otherExistingRows.length > 0) {
+            // Mettre à jour l'association existante
+            await connection.query(
+              'UPDATE class_students SET sub_class = ?, updated_at = NOW() WHERE class_id = ? AND student_id = ?',
+              [cls.sub_class, cls.classId, studentIdNumber]
+            );
+          } else {
+            // Créer une nouvelle association
+            await connection.query(
+              'INSERT INTO class_students (class_id, student_id, sub_class, created_at, updated_at) VALUES (?, ?, ?, NOW(), NOW())',
+              [cls.classId, studentIdNumber, cls.sub_class]
+            );
+          }
+        }
+
+        return NextResponse.json({ 
+          message: 'Student class associations updated successfully',
+          class_id: classId,
+          student_id: studentIdNumber,
+          sub_class: subClass,
+          allClassesUpdated: true
+        });
       });
-    });
+    } else {
+      // Comportement d'origine si allClasses n'est pas présent
+      return withConnection(async (connection) => {
+        // Vérifier si l'association existe déjà
+        const [existingRows] = await connection.query(
+          'SELECT * FROM class_students WHERE class_id = ? AND student_id = ?',
+          [classId, studentIdNumber]
+        );
+
+        if (Array.isArray(existingRows) && existingRows.length > 0) {
+          // Mettre à jour l'association existante
+          await connection.query(
+            'UPDATE class_students SET sub_class = ?, updated_at = NOW() WHERE class_id = ? AND student_id = ?',
+            [subClass, classId, studentIdNumber]
+          );
+        } else {
+          // Créer une nouvelle association
+          await connection.query(
+            'INSERT INTO class_students (class_id, student_id, sub_class, created_at, updated_at) VALUES (?, ?, ?, NOW(), NOW())',
+            [classId, studentIdNumber, subClass]
+          );
+        }
+
+        return NextResponse.json({ 
+          message: 'Student class association updated successfully',
+          class_id: classId,
+          student_id: studentIdNumber,
+          sub_class: subClass
+        });
+      });
+    }
   } catch (error) {
     console.error('Error updating student class:', error);
     return NextResponse.json(
