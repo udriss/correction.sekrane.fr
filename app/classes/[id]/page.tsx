@@ -7,6 +7,8 @@ import {
    Card, CardContent, CardActions, Chip, List, ListItem, ListItemText,
     IconButton, Divider, FormControl, InputLabel, Select, MenuItem, Slider, TextField, TableContainer, 
     Table, TableHead, TableRow, TableCell, TableBody, Checkbox, CircularProgress, Tooltip,
+    Dialog, DialogTitle, DialogContent, DialogActions, DialogContentText, LinearProgress,
+    Switch, FormControlLabel
 } from '@mui/material';
 import Grid from '@mui/material/Grid';
 import SchoolIcon from '@mui/icons-material/School';
@@ -22,6 +24,7 @@ import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 import LinkOffIcon from '@mui/icons-material/LinkOff';
 import CheckIcon from '@mui/icons-material/Check';
 import CloseIcon from '@mui/icons-material/Close';
+import EmailIcon from '@mui/icons-material/Email';
 import { alpha } from '@mui/material/styles';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -37,6 +40,7 @@ import CorrectionCardAutre from '@/components/allCorrectionsAutres/CorrectionCar
 import { getBatchShareCodes } from '@/lib/services/shareService';
 import { changeCorrectionAutreStatus } from '@/lib/services/correctionsAutresService';
 import StudentEditDialog from '@/components/students/StudentEditDialog';
+import BulkEmailDialog from '@/components/students/BulkEmailDialog';
 
 // Définition des interfaces nécessaires
 interface TabPanelProps {
@@ -84,6 +88,10 @@ export default function ClassAutreDetailPage({ params }: { params: Promise<{ id:
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<Error | string | null>(null);
     
+    // État pour le dialogue de modification de la classe
+    const [editClassDialogOpen, setEditClassDialogOpen] = useState(false);
+    const [editingClass, setEditingClass] = useState<{name: string, academic_year: string} | null>(null);
+    
     const [associateModalOpen, setAssociateModalOpen] = useState(false);
     const [createCorrectionsModalOpen, setCreateCorrectionsModalOpen] = useState(false);
     
@@ -97,6 +105,9 @@ export default function ClassAutreDetailPage({ params }: { params: Promise<{ id:
     const [allAvailableClasses, setAllAvailableClasses] = useState<Class[]>([]);
     const [loadingClasses, setLoadingClasses] = useState(false);
     const [subgroupsByClass, setSubgroupsByClass] = useState<Record<number, string[]>>({});
+    
+    // État pour l'envoi d'emails groupés
+    const [bulkEmailDialogOpen, setBulkEmailDialogOpen] = useState(false);
     
     // État pour la mise à jour des données
     const [refreshTrigger, setRefreshTrigger] = useState(0);
@@ -112,6 +123,19 @@ export default function ClassAutreDetailPage({ params }: { params: Promise<{ id:
     const [filterSubClass, setFilterSubClass] = useState<string | 'all'>('all');
     const [groupBy, setGroupBy] = useState<'student' | 'activity'>('student');
 
+    // État pour le dialogue de suppression de la classe
+    const [deleteClassDialogOpen, setDeleteClassDialogOpen] = useState(false);
+    const [deleteOptions, setDeleteOptions] = useState({
+      deleteStudents: true,
+      deleteCorrections: true
+    });
+    const [deleteProgress, setDeleteProgress] = useState({
+      isDeleting: false,
+      total: 0,
+      current: 0,
+      step: '',
+      error: null as string | null
+    });
   
   // Fonction pour gérer le changement d'onglet
   const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
@@ -707,6 +731,203 @@ const handleOpenEditDialog = async (student: Student) => {
   }
 };
 
+// Fonction pour ouvrir le dialogue de modification de la classe
+const handleEditClassOpen = () => {
+  if (classData) {
+    setEditingClass({
+      name: classData.name,
+      academic_year: classData.academic_year || ''
+    });
+    setEditClassDialogOpen(true);
+  }
+};
+
+// Fonction pour fermer le dialogue de modification de la classe
+const handleEditClassClose = () => {
+  setEditClassDialogOpen(false);
+  setEditingClass(null);
+};
+
+// Fonction pour sauvegarder les modifications de la classe
+const handleEditClassSave = async () => {
+  if (!editingClass) return;
+  
+  try {
+    const response = await fetch(`/api/classes/${classId}`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        name: editingClass.name,
+        academic_year: editingClass.academic_year
+      }),
+    });
+    
+    if (!response.ok) {
+      throw new Error("Erreur lors de la mise à jour de la classe");
+    }
+    
+    // Succès
+    enqueueSnackbar("Classe mise à jour avec succès", { variant: 'success' });
+    
+    // Fermer le dialogue et rafraîchir les données
+    handleEditClassClose();
+    refreshClass();
+  } catch (err) {
+    console.error('Erreur:', err);
+    enqueueSnackbar(err instanceof Error ? err.message : 'Une erreur est survenue', { variant: 'error' });
+  }
+};
+
+// Fonction pour ouvrir le dialogue de suppression de la classe
+const handleOpenDeleteClassDialog = () => {
+  setDeleteClassDialogOpen(true);
+  setDeleteProgress({
+    isDeleting: false,
+    total: 0,
+    current: 0,
+    step: '',
+    error: null
+  });
+};
+
+// Fonction pour fermer le dialogue de suppression de la classe
+const handleCloseDeleteClassDialog = () => {
+  if (!deleteProgress.isDeleting) {
+    setDeleteClassDialogOpen(false);
+  }
+};
+
+// Fonction pour gérer les changements d'options de suppression
+const handleDeleteOptionChange = (option: 'deleteStudents' | 'deleteCorrections') => {
+  setDeleteOptions(prev => ({
+    ...prev,
+    [option]: !prev[option]
+  }));
+};
+
+// Fonction pour supprimer la classe
+const handleDeleteClass = async () => {
+  // Mettre à jour l'état de suppression
+  setDeleteProgress({
+    isDeleting: true,
+    total: 1 + (deleteOptions.deleteStudents ? students.length : 0) + (deleteOptions.deleteCorrections ? corrections.length : 0),
+    current: 0,
+    step: 'Préparation de la suppression...',
+    error: null
+  });
+
+  try {
+    // Étape 1: Supprimer les corrections si l'option est sélectionnée
+    if (deleteOptions.deleteCorrections && corrections.length > 0) {
+      setDeleteProgress(prev => ({
+        ...prev,
+        step: 'Suppression des corrections...'
+      }));
+
+      // Supprimer les corrections une par une pour pouvoir suivre la progression
+      for (let i = 0; i < corrections.length; i++) {
+        const correction = corrections[i];
+        try {
+          await fetch(`/api/corrections_autres/${correction.id}`, {
+            method: 'DELETE'
+          });
+          
+          // Mettre à jour la progression
+          setDeleteProgress(prev => ({
+            ...prev,
+            current: prev.current + 1,
+            step: `Suppression des corrections (${i + 1}/${corrections.length})...`
+          }));
+        } catch (error) {
+          console.error(`Erreur lors de la suppression de la correction ${correction.id}:`, error);
+          // Continuer malgré l'erreur
+        }
+
+        // Petite pause pour éviter de surcharger l'API
+        await new Promise(resolve => setTimeout(resolve, 50));
+      }
+    }
+
+    // Étape 2: Supprimer les étudiants si l'option est sélectionnée
+    if (deleteOptions.deleteStudents && students.length > 0) {
+      setDeleteProgress(prev => ({
+        ...prev,
+        step: 'Suppression des étudiants...'
+      }));
+
+      // Supprimer les étudiants un par un pour pouvoir suivre la progression
+      for (let i = 0; i < students.length; i++) {
+        const student = students[i];
+        try {
+          await fetch(`/api/classes/${classId}/students/${student.id}`, {
+            method: 'DELETE'
+          });
+          
+          // Mettre à jour la progression
+          setDeleteProgress(prev => ({
+            ...prev,
+            current: prev.current + 1,
+            step: `Suppression des étudiants (${i + 1}/${students.length})...`
+          }));
+        } catch (error) {
+          console.error(`Erreur lors de la suppression de l'étudiant ${student.id}:`, error);
+          // Continuer malgré l'erreur
+        }
+
+        // Petite pause pour éviter de surcharger l'API
+        await new Promise(resolve => setTimeout(resolve, 50));
+      }
+    }
+
+    // Étape 3: Supprimer la classe
+    setDeleteProgress(prev => ({
+      ...prev,
+      step: 'Suppression de la classe...'
+    }));
+
+    const response = await fetch(`/api/classes/${classId}`, {
+      method: 'DELETE'
+    });
+
+    if (!response.ok) {
+      const data = await response.json().catch(() => ({}));
+      throw new Error(data.error || 'Erreur lors de la suppression de la classe');
+    }
+
+    // Mettre à jour la progression
+    setDeleteProgress(prev => ({
+      ...prev,
+      current: prev.current + 1,
+      step: 'Classe supprimée avec succès !'
+    }));
+
+    // Afficher un message de succès
+    enqueueSnackbar('La classe a été supprimée avec succès', { variant: 'success' });
+
+    // Rediriger vers la liste des classes après 1 seconde
+    setTimeout(() => {
+      router.push('/classes');
+    }, 1000);
+  } catch (error) {
+    console.error('Erreur lors de la suppression de la classe:', error);
+    
+    // Mettre à jour la progression avec l'erreur
+    setDeleteProgress(prev => ({
+      ...prev,
+      isDeleting: false,
+      error: error instanceof Error ? error.message : 'Une erreur est survenue lors de la suppression'
+    }));
+
+    // Afficher un message d'erreur
+    enqueueSnackbar(
+      error instanceof Error ? error.message : 'Une erreur est survenue lors de la suppression', 
+      { variant: 'error' }
+    );
+  }
+};
+
   if (loading) {
     return (
       <Container maxWidth="lg" sx={{ py: 4 }}>
@@ -784,16 +1005,34 @@ const handleOpenEditDialog = async (student: Student) => {
               <Box sx={{ display: 'flex', gap: 1 }}>
                 <Button
                   variant="contained"
-                  color="secondary"
+                  color="primary"
+                  sx={{ alignSelf: 'flex-start',
+                    fontWeight: 700,
+                   }}
                   startIcon={<EditIcon />}
-                  component={Link}
-                  href={`/classes/${classId}`}
+                  onClick={handleEditClassOpen}
                 >
                   Modifier
                 </Button>
                 
                 <Button
-                  variant="outlined"
+                  variant="contained"
+                  color="error"
+                  sx={{ alignSelf: 'flex-start',
+                    fontWeight: 700,
+                   }}
+                  startIcon={<DeleteIcon />}
+                  onClick={handleOpenDeleteClassDialog}
+                >
+                  Supprimer
+                </Button>
+                
+                <Button
+                  sx={{ alignSelf: 'flex-start',
+                    fontWeight: 700,
+                   }}
+                  variant="contained"
+                  color="secondary"
                   startIcon={<PeopleAltIcon />}
                   component={Link}
                   href={`/classes/${classId}/students`}
@@ -808,10 +1047,22 @@ const handleOpenEditDialog = async (student: Student) => {
       
       {/* Statistiques de la classe */}
       <Paper sx={{ p: 3, mb: 4, borderRadius: 2 }}>
-        <Typography variant="h6" sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
-          <BarChartIcon color="primary" />
-          Statistiques de la classe
-        </Typography>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+          <Typography variant="h6" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <BarChartIcon color="primary" />
+            Statistiques de la classe
+          </Typography>
+          
+          <Button
+            variant="outlined"
+            color="primary"
+            startIcon={<EmailIcon />}
+            onClick={() => setBulkEmailDialogOpen(true)}
+            disabled={students.length === 0}
+          >
+            Envoyer les corrections
+          </Button>
+        </Box>
         
         <Grid container spacing={2}>
           <Grid size={{ xs: 12, sm: 6, md: 3 }}>
@@ -1046,7 +1297,7 @@ const handleOpenEditDialog = async (student: Student) => {
             Étudiants de la classe ({students.length})
           </Typography>
           <Button
-            variant="contained"
+            variant="outlined"
             color="primary"
             component={Link}
             href={`/classes/${classId}/students`}
@@ -1477,6 +1728,133 @@ const handleOpenEditDialog = async (student: Student) => {
         }}
         onSelectedClassesChange={setSelectedClasses}
         fetchClassSubgroups={fetchClassSubgroups}
+      />
+
+      {/* Dialogue de modification de la classe */}
+      <Dialog 
+        open={editClassDialogOpen} 
+        onClose={handleEditClassClose}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <EditIcon color="primary" />
+            Modifier la classe
+          </Box>
+        </DialogTitle>
+        <DialogContent>
+          <Box sx={{ mt: 2, display: 'flex', flexDirection: 'column', gap: 3 }}>
+            <TextField
+              fullWidth
+              label="Nom de la classe"
+              value={editingClass?.name || ''}
+              onChange={(e) => setEditingClass(prev => prev ? { ...prev, name: e.target.value } : null)}
+              variant="outlined"
+              required
+            />
+            <TextField
+              fullWidth
+              label="Année académique"
+              value={editingClass?.academic_year || ''}
+              onChange={(e) => setEditingClass(prev => prev ? { ...prev, academic_year: e.target.value } : null)}
+              variant="outlined"
+              placeholder="Ex: 2024-2025"
+              required
+              helperText="Format: AAAA-AAAA ou AAAA"
+            />
+          </Box>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleEditClassClose} color="inherit">
+            Annuler
+          </Button>
+          <Button 
+            onClick={handleEditClassSave} 
+            color="primary" 
+            variant="contained"
+            disabled={!editingClass?.name || !editingClass?.academic_year}
+          >
+            Enregistrer
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Dialogue de suppression de la classe */}
+      <Dialog 
+        open={deleteClassDialogOpen} 
+        onClose={handleCloseDeleteClassDialog}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <DeleteIcon color="error" />
+            Supprimer la classe
+          </Box>
+        </DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            Êtes-vous sûr de vouloir supprimer cette classe ? Cette action est irréversible.
+          </DialogContentText>
+          <Box sx={{ mt: 2 }}>
+            <FormControlLabel
+              control={
+                <Checkbox 
+                  checked={deleteOptions.deleteStudents} 
+                  onChange={() => handleDeleteOptionChange('deleteStudents')} 
+                  color="primary" 
+                />
+              }
+              label="Supprimer également les étudiants de cette classe"
+            />
+            <FormControlLabel
+              control={
+                <Checkbox 
+                  checked={deleteOptions.deleteCorrections} 
+                  onChange={() => handleDeleteOptionChange('deleteCorrections')} 
+                  color="primary" 
+                />
+              }
+              label="Supprimer également les corrections de cette classe"
+            />
+          </Box>
+          {deleteProgress.isDeleting && (
+            <Box sx={{ mt: 2 }}>
+              <LinearProgress variant="determinate" value={(deleteProgress.current / deleteProgress.total) * 100} />
+              <Typography variant="body2" sx={{ mt: 1 }}>
+                {deleteProgress.step}
+              </Typography>
+            </Box>
+          )}
+          {deleteProgress.error && (
+            <Alert severity="error" sx={{ mt: 2 }}>
+              {deleteProgress.error}
+            </Alert>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleCloseDeleteClassDialog} color="inherit" disabled={deleteProgress.isDeleting}>
+            Annuler
+          </Button>
+          <Button 
+            onClick={handleDeleteClass} 
+            color="error" 
+            variant="contained"
+            disabled={deleteProgress.isDeleting}
+          >
+            Supprimer
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Dialogue d'envoi d'emails groupés */}
+      <BulkEmailDialog
+        open={bulkEmailDialogOpen}
+        onClose={() => setBulkEmailDialogOpen(false)}
+        students={students}
+        classId={parseInt(classId)}
+        classSubgroups={classData?.nbre_subclasses || 0}
       />
     </Container>
   );

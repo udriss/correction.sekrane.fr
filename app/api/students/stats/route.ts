@@ -4,6 +4,12 @@ import { getServerSession } from 'next-auth';
 import { getUser } from '@/lib/auth';
 import authOptions from '@/lib/auth';
 
+// Fonction utilitaire pour normaliser une note sur 20
+const normalizeGrade = (grade: number, maxPoints: number): number => {
+  if (!maxPoints || maxPoints === 0) return 0;
+  return (grade * 20) / maxPoints;
+};
+
 // GET endpoint pour récupérer les statistiques de tous les étudiants
 export async function GET(request: NextRequest) {
   try {
@@ -19,77 +25,136 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Requête principale pour obtenir les données de base par étudiant
-    const studentsStats = await query<any[]>(`
-      SELECT 
-        s.id as student_id,
-        COUNT(c.id) as total_corrections,
-        IFNULL(AVG(c.grade), 0) as average_grade,
-        IFNULL(MAX(c.grade), 0) as highest_grade,
-        IFNULL(MIN(c.grade), 0) as lowest_grade,
-        IFNULL(SUM(c.experimental_points_earned), 0) as total_experimental_points,
-        IFNULL(SUM(c.theoretical_points_earned), 0) as total_theoretical_points,
-        IFNULL(AVG(c.experimental_points_earned), 0) as average_experimental_points,
-        IFNULL(AVG(c.theoretical_points_earned), 0) as average_theoretical_points
-      FROM 
-        students s
-      LEFT JOIN 
-        corrections c ON s.id = c.student_id
-      GROUP BY 
-        s.id
+    // Récupérer tous les étudiants
+    const students = await query<any[]>(`
+      SELECT id, first_name, last_name
+      FROM students
+      ORDER BY last_name, first_name
     `);
 
-    // Récupérer les corrections récentes pour chaque étudiant
-    // Cette approche nécessite un post-traitement côté serveur plutôt qu'une requête SQL complexe
-    const recentCorrections = await query<any[]>(`
-      SELECT 
-        c.student_id,
-        c.id,
-        c.grade,
-        c.submission_date,
-        a.name as activity_name
-      FROM 
-        corrections c
-      JOIN 
-        activities a ON c.activity_id = a.id
-      ORDER BY 
-        c.submission_date DESC
-    `);
+    // Pour chaque étudiant, récupérer ses statistiques normalisées
+    const enrichedStats = await Promise.all(students.map(async (student) => {
+      // Récupérer les données des corrections pour cet étudiant
+      const correctionData = await query<any[]>(`
+        SELECT 
+          c.id,
+          c.grade,
+          c.points_earned,
+          c.submission_date,
+          a.name as activity_name,
+          a.points,
+          a.parts_names
+        FROM 
+          corrections_autres c
+        LEFT JOIN 
+          activities_autres a ON c.activity_id = a.id
+        WHERE 
+          c.student_id = ?
+        ORDER BY 
+          c.submission_date DESC, c.updated_at DESC
+      `, [student.id]);
 
-    // Organiser les corrections récentes par étudiant (limité à 5 par étudiant)
-    const correctionsByStudent: Record<number, any[]> = {};
-    
-    // @ts-ignore - Ignorer l'erreur de type car nous savons que recentCorrections est un tableau
-    recentCorrections.forEach((correction: any) => {
-      const studentId = correction.student_id;
+      // Variables pour stocker les statistiques normalisées
+      let normalizedGrades: number[] = [];
+      let normalizedPartStats = {
+        averages: [] as number[],
+        totals: [] as number[]
+      };
       
-      if (!correctionsByStudent[studentId]) {
-        correctionsByStudent[studentId] = [];
-      }
+      // Initialiser les tableaux pour stocker les sommes et les compteurs
+      const sums: number[] = [];
+      const counts: number[] = [];
       
-      // Ne garder que les 5 corrections les plus récentes par étudiant
-      if (correctionsByStudent[studentId].length < 5) {
-        correctionsByStudent[studentId].push({
-          id: correction.id,
-          activity_name: correction.activity_name || 'Activité sans nom',
-          grade: correction.grade,
-          submission_date: correction.submission_date
+      // Parcourir chaque correction pour calculer les statistiques
+      correctionData.forEach((correction) => {
+        const pointsEarned = correction.points_earned || [];
+        const maxPoints = correction.points || [];
+        
+        // Calculer les points totaux pour cette correction
+        const totalEarned = pointsEarned.reduce(
+          (sum: number, points: number) => sum + (typeof points === 'number' ? points : 0), 
+          0
+        );
+        const totalMax = maxPoints.reduce(
+          (sum: number, points: number) => sum + (typeof points === 'number' ? points : 0), 
+          0
+        );
+        
+        // Normaliser la note totale sur 20 et l'ajouter au tableau
+        const normalizedGrade = normalizeGrade(totalEarned, totalMax);
+        if (!isNaN(normalizedGrade)) {
+          normalizedGrades.push(normalizedGrade);
+        }
+        
+        // Accumuler les points normalisés pour chaque partie
+        pointsEarned.forEach((points: number, index: number) => {
+          if (!sums[index]) sums[index] = 0;
+          if (!counts[index]) counts[index] = 0;
+          
+          if (typeof points === 'number' && !isNaN(points) && 
+              typeof maxPoints[index] === 'number' && maxPoints[index] > 0) {
+            // Normaliser les points de cette partie sur 20 avant de les additionner
+            const normalizedPoints = normalizeGrade(points, maxPoints[index]);
+            sums[index] += normalizedPoints;
+            counts[index]++;
+          }
         });
-      }
-    });
+      });
+      
+      // Calculer les moyennes normalisées pour chaque partie
+      normalizedPartStats.averages = sums.map((sum, index) => 
+        counts[index] > 0 ? sum / counts[index] : 0
+      );
+      
+      // Stocker les totaux normalisés pour chaque partie
+      normalizedPartStats.totals = sums;
 
-    // Enrichir les statistiques des étudiants avec leurs corrections récentes
-    const enrichedStats = studentsStats.map((stats: any) => ({
-      student_id: stats.student_id,
-      total_corrections: stats.total_corrections,
-      average_grade: stats.average_grade,
-      highest_grade: stats.highest_grade,
-      lowest_grade: stats.lowest_grade,
-      total_experimental_points: stats.total_experimental_points,
-      total_theoretical_points: stats.total_theoretical_points,
-      average_experimental_points: stats.average_experimental_points,
-      average_theoretical_points: stats.average_theoretical_points,
-      recent_corrections: correctionsByStudent[stats.student_id] || []
+      // Récupérer uniquement les 5 corrections les plus récentes
+      const recentCorrections = correctionData.slice(0, 5).map(c => {
+        const pointsEarned = c.points_earned || [];
+        const maxPoints = c.points || [];
+        const totalEarned = pointsEarned.reduce(
+          (sum: number, p: number) => sum + (typeof p === 'number' ? p : 0), 
+          0
+        );
+        const totalMax = maxPoints.reduce(
+          (sum: number, p: number) => sum + (typeof p === 'number' ? p : 0), 
+          0
+        );
+        
+        return {
+          id: c.id,
+          activity_name: c.activity_name || 'Activité sans nom',
+          grade: normalizeGrade(totalEarned, totalMax),
+          original_grade: totalEarned,
+          max_points: totalMax,
+          submission_date: c.submission_date,
+          points_earned: pointsEarned,
+          points: maxPoints,
+          parts_names: c.parts_names || []
+        };
+      });
+
+      // Calculer les statistiques globales pour l'étudiant
+      return {
+        student_id: student.id,
+        student_name: `${student.first_name} ${student.last_name}`,
+        first_name: student.first_name,
+        last_name: student.last_name,
+        total_corrections: correctionData.length,
+        average_grade: normalizedGrades.length > 0 ? 
+          normalizedGrades.reduce((sum, grade) => sum + grade, 0) / normalizedGrades.length : 
+          0,
+        highest_grade: normalizedGrades.length > 0 ? 
+          Math.max(...normalizedGrades) : 
+          0,
+        lowest_grade: normalizedGrades.length > 0 ? 
+          Math.min(...normalizedGrades) : 
+          0,
+        parts_averages: normalizedPartStats.averages,
+        parts_totals: normalizedPartStats.totals,
+        recent_corrections: recentCorrections
+      };
     }));
     
     return NextResponse.json(enrichedStats);

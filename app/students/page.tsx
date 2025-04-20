@@ -92,7 +92,7 @@ export default function StudentsPage() {
       
       // Construire les enhanced students avec toutes les données
       const enhancedStudents = studentsData.map((student: any) => {
-        const stats = statsMap[student.id] || { total_corrections: 0, average_score: 0 };
+        const stats = statsMap[student.id] || { total_corrections: 0, average_score: '- -' };
         
         // Définir l'interface pour les éléments de allClasses
         interface ClassAssignment {

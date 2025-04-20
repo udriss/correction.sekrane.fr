@@ -14,9 +14,31 @@ import {
   Tab,
   CircularProgress,
   Button,
-  Tooltip
+  Tooltip,
+  Checkbox,
+  FormControlLabel,
+  List,
+  ListItem,
+  ListItemText,
+  ListItemIcon,
+  Divider,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
+  LinearProgress,
+  Chip
 } from '@mui/material';
-import { EmailOutlined, Share } from '@mui/icons-material';
+import { 
+  EmailOutlined, 
+  Share, 
+  MarkEmailRead, 
+  Warning, 
+  CheckCircle,
+  Person,
+  PersonOutline,
+  FilterList
+} from '@mui/icons-material';
 import { Student } from '@/lib/types';
 import { useEditor } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
@@ -32,6 +54,7 @@ const MESSAGE_TYPES = {
 // Interface pour le statut d'envoi
 interface SendingStatus {
   studentId: number;
+  studentName: string;
   status: 'pending' | 'processing' | 'success' | 'error';
   error?: string;
 }
@@ -105,18 +128,18 @@ export default function EmailCorrectionPage({ student }: EmailCorrectionPageProp
 <div style="font-family: Arial, sans-serif; line-height: 1.6;">
   <p>${fullStudentName},</p>
 
-  <p>Ci-dessous se trouve le lien permettant d'accéder à l'ensemble de vos corrections :</p>
+  <p>Ci-dessous se trouve le lien permettant d'accéder à l'ensemble de tes corrections :</p>
   
   <p><a href="${url}">${url}</a></p>
 
   <p><strong>Points importants à retenir :</strong></p>
   <ul>
-    <li>ce lien donne accès à toutes vos corrections</li>
-    <li>vous pouvez y accéder à tout moment</li>
-    <li>n'hésitez pas à me contacter si vous avez des questions</li>
+    <li>ce lien donne accès à toutes tes corrections</li>
+    <li>tu peux y accéder à tout moment</li>
+    <li>n'hésite pas à me contacter si tu as des questions</li>
   </ul>
 
-  <p>Je reste à votre disposition pour toute question ou clarification.</p>
+  <p>Je reste à disponible pour toute question ou clarification sur ces corrections.</p>
 
   <p>Cordialement,<br>
   M. I. SEKRANE</p>
@@ -177,6 +200,7 @@ export default function EmailCorrectionPage({ student }: EmailCorrectionPageProp
     if (student) {
       const initialStatus: SendingStatus = { 
         studentId: student.id, 
+        studentName: `${student.first_name} ${student.last_name}`,
         status: 'processing'
       };
       setSendingStatuses([initialStatus]);
@@ -388,9 +412,11 @@ export default function EmailCorrectionPage({ student }: EmailCorrectionPageProp
               fullWidth
               rows={10}
               value={editor?.getHTML() || ''}
-              InputProps={{
-                readOnly: true,
-                style: { fontFamily: 'monospace' }
+              slotProps={{
+                input: {
+                  readOnly: true,
+                  style: { fontFamily: 'monospace' }
+                }
               }}
             />
           </DialogContent>

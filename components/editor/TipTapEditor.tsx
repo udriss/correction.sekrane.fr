@@ -12,16 +12,28 @@ interface TipTapEditorProps {
   editor: Editor | null;
   onClear: () => void;
   onShowHTML: () => void;
+  readOnly?: boolean;
 }
 
-export default function TipTapEditor({ editor, onClear, onShowHTML }: TipTapEditorProps) {
+export default function TipTapEditor({ editor, onClear, onShowHTML, readOnly = false }: TipTapEditorProps) {
   if (!editor) return null;
+
+  // Si l'éditeur est en mode lecture seule, mettre à jour son état
+  if (readOnly && !editor.isEditable) {
+    // Ne rien faire, l'éditeur est déjà en lecture seule
+  } else if (readOnly && editor.isEditable) {
+    // Passer l'éditeur en lecture seule
+    editor.setEditable(false);
+  } else if (!readOnly && !editor.isEditable) {
+    // Rendre l'éditeur à nouveau éditable
+    editor.setEditable(true);
+  }
 
   return (
     <Box sx={{ border: 1, borderColor: 'divider', borderRadius: 1 }}>
       <Box sx={{ p: 1, borderBottom: 1, borderColor: 'divider', display: 'flex', justifyContent: 'space-between' }}>
         <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
-          <ToggleButtonGroup size="small">
+          <ToggleButtonGroup size="small" disabled={readOnly}>
             <ToggleButton
               value="bold"
               selected={editor.isActive('bold')}
@@ -40,7 +52,7 @@ export default function TipTapEditor({ editor, onClear, onShowHTML }: TipTapEdit
 
           <Divider orientation="vertical" flexItem />
 
-          <ToggleButtonGroup size="small">
+          <ToggleButtonGroup size="small" disabled={readOnly}>
             <ToggleButton
               value="bulletList"
               selected={editor.isActive('bulletList')}
@@ -60,9 +72,11 @@ export default function TipTapEditor({ editor, onClear, onShowHTML }: TipTapEdit
 
         <Box sx={{ display: 'flex', gap: 1 }}>
           <Tooltip title="Effacer le contenu">
-            <IconButton size="small" onClick={onClear} color="error">
-              <DeleteIcon />
-            </IconButton>
+            <span>
+              <IconButton size="small" onClick={onClear} color="error" disabled={readOnly}>
+                <DeleteIcon />
+              </IconButton>
+            </span>
           </Tooltip>
           <Tooltip title="Voir le code HTML">
             <IconButton size="small" onClick={onShowHTML}>

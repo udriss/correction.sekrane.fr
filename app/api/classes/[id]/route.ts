@@ -200,7 +200,7 @@ export async function PATCH(
     }
 
     const data = await request.json();
-    const { name } = data;
+    const { name, academic_year } = data;
 
     if (!name || !name.trim()) {
       return NextResponse.json({ error: 'Name is required' }, { status: 400 });
@@ -212,12 +212,33 @@ export async function PATCH(
       return NextResponse.json({ error: 'Class not found' }, { status: 404 });
     }
 
-    // Update just the name of the class
-    await query(`
-      UPDATE classes 
-      SET name = ?, updated_at = NOW()
-      WHERE id = ?
-    `, [name, classId]);
+    // Construction de la requête SQL et des paramètres dynamiquement en fonction des champs fournis
+    let updateQuery = 'UPDATE classes SET ';
+    const updateParams = [];
+    const updateFields = [];
+
+    // Ajouter le nom s'il est fourni
+    if (name) {
+      updateFields.push('name = ?');
+      updateParams.push(name);
+    }
+
+    // Ajouter l'année académique si elle est fournie
+    if (academic_year) {
+      updateFields.push('academic_year = ?');
+      updateParams.push(academic_year);
+    }
+
+    // Ajouter updated_at
+    updateFields.push('updated_at = NOW()');
+
+    // Compléter la requête
+    updateQuery += updateFields.join(', ');
+    updateQuery += ' WHERE id = ?';
+    updateParams.push(classId);
+
+    // Exécuter la mise à jour
+    await query(updateQuery, updateParams);
 
     // Get the updated class
     const updatedClass: Class[] = await query(`SELECT * FROM classes WHERE id = ?`, [classId]);
