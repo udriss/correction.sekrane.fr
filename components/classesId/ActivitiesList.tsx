@@ -84,7 +84,7 @@ export function ActivitiesList({
                 <Button 
                   size="small" 
                   component={Link}
-                  href={`/activities_autres/${activity.id}`}
+                  href={`/activities/${activity.id}`}
                 >
                   Voir détails
                 </Button>

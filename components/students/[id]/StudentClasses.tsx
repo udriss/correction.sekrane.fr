@@ -92,7 +92,7 @@ export default function StudentClasses({ student, classes, onAddClassClick }: St
                     variant="outlined"
                     fullWidth
                     component={Link}
-                    href={`/classes_autres/${cls.id}`}
+                    href={`/classes/${cls.id}`}
                     sx={{ mt: 1 }}
                     color="primary"
                   >

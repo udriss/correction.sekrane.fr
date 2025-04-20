@@ -359,7 +359,7 @@ const CorrectionHeader: React.FC<CorrectionHeaderProps> = ({
               Activité : 
               
               <Link 
-              href={`/activities_autres/${correction.activity_id}`}
+              href={`/activities/${correction.activity_id}`}
               style={{ color: 'primary.dark', textDecoration: 'none' , fontWeight: 'bold' }}
               target="_blank"
               rel="noopener noreferrer">

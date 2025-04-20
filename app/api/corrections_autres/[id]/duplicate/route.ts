@@ -106,7 +106,6 @@ export async function POST(
         }
       }
       
-      console.log('originalCorrection', JSON.stringify(originalCorrection.content_data),);
 
 
       // 2. Vérifier si l'utilisateur souhaite écraser une correction existante

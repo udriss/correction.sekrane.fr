@@ -58,6 +58,8 @@ import StudentEditDialogForDetail from '@/components/students/StudentEditDialogF
 import StudentEditDialog from '@/components/students/StudentEditDialog';
 
 import type { Student as ImportedStudent } from '@/lib/types';
+import { ThemeContext } from '@emotion/react';
+import { th } from 'date-fns/locale';
 
 // Define local Student type that matches the component expectations
 interface Student extends Omit<ImportedStudent, 'email'> {
@@ -87,6 +89,9 @@ interface ClassStudentsManagerProps {
   classId: number;
   classData: ClassData | null;
   embedded?: boolean;
+  initialActiveTab?: number;
+  showBatchFormInitially?: boolean;
+  onBatchFormClosed?: () => void; // Nouvelle prop pour notifier quand le formulaire est fermé
 }
 
 // Interface étendue pour l'état d'édition
@@ -104,16 +109,19 @@ interface EditableStudent extends Student {
 export default function ClassStudentsManager({ 
   classId, 
   classData, 
-  embedded = false 
+  embedded = false,
+  initialActiveTab = 0,
+  showBatchFormInitially = false,
+  onBatchFormClosed
 }: ClassStudentsManagerProps) {
   const [students, setStudents] = useState<EditableStudent[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string>('');
   const [success, setSuccess] = useState<string>('');
-  const [showBatchForm, setShowBatchForm] = useState(false);
+  const [showBatchForm, setShowBatchForm] = useState(showBatchFormInitially);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [studentToDelete, setStudentToDelete] = useState<number | null>(null);
-  const [activeTab, setActiveTab] = useState<number>(0);
+  const [activeTab, setActiveTab] = useState<number>(initialActiveTab);
   const [subClassTab, setSubClassTab] = useState<number>(0);
   const [currentFilter, setCurrentFilter] = useState<number | null>(null);
   const [manualStudentCount, setManualStudentCount] = useState<number>(1);
@@ -140,6 +148,7 @@ export default function ClassStudentsManager({
   const [loadingSubgroupsForEdit, setLoadingSubgroupsForEdit] = useState(false);
   // Structure pour mémoriser les groupes disponibles par classe
   const [classGroupsMapping, setClassGroupsMapping] = useState<{[classId: number]: string[]}>({});
+
 
   // Fonctions pour afficher/masquer les colonnes
   const toggleEmailColumn = () => {
@@ -198,6 +207,17 @@ export default function ClassStudentsManager({
     fetchStudents();
   }, [fetchStudents]);
 
+
+  // Effet pour mettre à jour showBatchForm lorsque showBatchFormInitially change
+  useEffect(() => {
+    setShowBatchForm(showBatchFormInitially);
+  }, [showBatchFormInitially]);
+
+  // Effet pour mettre à jour activeTab lorsque initialActiveTab change
+  useEffect(() => {
+    setActiveTab(initialActiveTab);
+  }, [initialActiveTab]);
+  
   const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
     setActiveTab(newValue);
   };
@@ -846,6 +866,8 @@ export default function ClassStudentsManager({
     }
   };
 
+
+
   return (
     <div>
     <Paper sx={{ p: embedded ? 0 : 2, mb: embedded ? 0 : 3 }} elevation={embedded ? 0 : 1}>
@@ -869,7 +891,12 @@ export default function ClassStudentsManager({
             <Typography variant="h6" component="h2">
               {currentFilter ? `Ajouter des étudiants au groupe ${currentFilter}` : 'Ajouter des étudiants'}
             </Typography>
-            <IconButton onClick={() => setShowBatchForm(false)}>
+            <IconButton onClick={() => {
+              setShowBatchForm(false);
+              if (onBatchFormClosed) {
+                onBatchFormClosed();
+              }
+            }}>
               <CloseIcon />
             </IconButton>
           </Box>
@@ -892,7 +919,25 @@ export default function ClassStudentsManager({
             />
           </Tabs>
           
-          <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
+          <Box 
+          sx={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            mb: 2,
+            p: 4,
+            bgcolor: theme => theme.palette.myBoxes.primary,
+            borderRadius: 2,
+            border: theme => `1px solid ${theme.palette.myBoxes.primary}`,
+            boxShadow: theme => `0 4px 12px ${theme.palette.myBoxes.primary}`,
+            transition: 'all 0.3s ease',
+            '&:hover': {
+              transform: 'translateY(-1px)',
+              boxShadow: theme => `0 6px 15px ${theme.palette.myBoxes.primary}`,
+              filter: 'brightness(1.3)',
+            }
+          }}
+          >
             {activeTab === 0 && (
               <div className="space-y-4">
                 <div className="flex flex-col md:flex-row items-center gap-4">
@@ -901,7 +946,13 @@ export default function ClassStudentsManager({
                     type="number"
                     value={manualStudentCount}
                     onChange={handleManualStudentCountChange}
-                    InputProps={{ inputProps: { min: 1 } }}
+                    slotProps={{
+                      input: {
+                        inputProps:{
+                          min: 1,
+                        }
+                      },
+                    }}
                     variant="outlined"
                     className="md:w-1/3"
                   />
@@ -920,7 +971,7 @@ export default function ClassStudentsManager({
                     transform: 'translateY(-2px)',
                     boxShadow: '0 6px 15px rgba(0,0,0,0.2)',
                     background: (theme) => theme.gradients.secondary,
-                    filter: 'brightness(1.3)',
+                    filter: 'brightness(1.1)',
                   }
                 }}
                   >
@@ -1041,7 +1092,7 @@ export default function ClassStudentsManager({
             )}
             
             {activeTab === 1 && (
-              <div className="space-y-4">
+              <div className="space-y-4 w-full">
                 <Paper variant="outlined" className="p-4 bg-blue-50 border-blue-200">
                   <Typography variant="subtitle2" component="div" sx={{ mb: 2, fontWeight: 'bold', color: '#1E40AF' }}>
                     Format de fichier accepté :
@@ -1067,7 +1118,20 @@ export default function ClassStudentsManager({
                     </Box>
                   </Box>
                   
-                  <Box mt={2} p={2} bgcolor="white" borderRadius={1} border="1px solid" borderColor="divider">
+                  <Box 
+                  sx={{
+                    mt: 2,
+                    display: 'flex',
+                    p: 2,
+                    color: 'text.secondary',
+                    bgcolor: theme => theme.palette.myBoxes.primary,
+                    borderRadius: 1,
+                    fontFamily: 'monospace',
+                    border: '1px solid',
+                    borderColor: theme => theme.palette.myBoxes.secondary,
+                    boxShadow: 1,
+                  }}
+                  >
                     <Typography variant="caption" component="div" fontFamily="monospace" whiteSpace="pre-line">
                       DUPONT;Jean;jean.dupont@exemple.fr<br />
                       MARTIN;Marie;marie.martin@exemple.fr<br />
@@ -1325,7 +1389,8 @@ export default function ClassStudentsManager({
                 )}
               </div>
             )}
-          </div>
+          </Box>
+
         </Paper>
       )}
 

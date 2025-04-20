@@ -980,7 +980,7 @@ export default function DuplicateCorrection({ correctionId }: DuplicateCorrectio
                               {status.status === 'success' && status.newCorrectionId && (
                                 <IconButton
                                   component={Link}
-                                  href={`/corrections_autres/${status.newCorrectionId}`}
+                                  href={`/corrections/${status.newCorrectionId}`}
                                   target="_blank"
                                   rel="noopener noreferrer"
                                   size="medium"

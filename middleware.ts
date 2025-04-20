@@ -31,9 +31,9 @@ function isValidRedirectUrl(path: string): boolean {
   const allowedPaths = [
     '/', 
     '/activities', 
-    '/activities_autres', 
+    '/activities', 
     '/corrections', 
-    '/corrections_autres', 
+    '/corrections', 
     '/feedback', 
     '/dashboard',
     '/stats',
@@ -67,7 +67,7 @@ export async function middleware(request: NextRequest) {
   const isPathProtected = 
     path.startsWith('/activities') || 
     path.startsWith('/corrections') ||
-    path.startsWith('/corrections_autres') ||
+    path.startsWith('/corrections') ||
     path.startsWith('/admin') ||
     (path.startsWith('/students') && !isStudentProfilePath) || // Protect /students but not individual profiles
     (path.startsWith('/api/students') && !isStudentCorrectionsApiPath) || // Only free /api/students/[id]/corrections
@@ -122,8 +122,8 @@ export async function middleware(request: NextRequest) {
 export const config = {
   matcher: [
     '/',
-    '/activities_autres/:path*',
-    '/corrections_autres/:path*',
+    '/activities/:path*',
+    '/corrections/:path*',
     '/stats/:path*',
     '/students/:path*',
     '/admin/:path*',

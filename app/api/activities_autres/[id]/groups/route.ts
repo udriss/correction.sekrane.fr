@@ -51,7 +51,7 @@ export async function GET(
       FROM 
         correction_groups cg
       LEFT JOIN
-        corrections_autres c ON c.group_id = cg.id
+        corrections c ON c.group_id = cg.id
       WHERE 
         cg.activity_id = ?
       GROUP BY

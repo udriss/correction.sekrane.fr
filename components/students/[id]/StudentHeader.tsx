@@ -92,7 +92,7 @@ export default function StudentHeader({ student, classes, onEditClick }: Student
                       icon={<SchoolIcon color='primary' />}
                       label={c.sub_class ? `${c.name || 'Classe'} (Groupe ${c.sub_class})` : (c.name || 'Classe')}
                       component={Link}
-                      href={`/classes_autres/${c.id || 0}`} // Provide fallback id if missing
+                      href={`/classes/${c.id || 0}`} // Provide fallback id if missing
                       clickable
                       sx={{ 
                         bgcolor: 'rgba(255,255,255,0.15)', 

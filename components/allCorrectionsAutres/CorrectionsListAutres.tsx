@@ -8,7 +8,7 @@ import {
   Typography
 } from '@mui/material';
 import ErrorDisplay from '../ui/ErrorDisplay';
-import CorrectionCardAutre from '@/components/allCorrections/CorrectionCard';
+import CorrectionCardAutre from '@/components/allCorrectionsAutres/CorrectionCard';
 import { CorrectionAutreEnriched } from '@/lib/types';
 import { useBatchDelete } from '@/hooks/useBatchDelete';
 import { changeCorrectionAutreStatus } from '@/lib/services/correctionsAutresService';

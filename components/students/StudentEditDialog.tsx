@@ -490,15 +490,13 @@ const StudentEditDialog: React.FC<StudentEditDialogProps> = ({
               onChange={(e) => onStudentChange({ ...student, first_name: e.target.value })}
               slotProps={{
                 input: { 
-                  inputProps: { 
-                    startAdornment: (
-                      <InputAdornment position="start">
-                        <PersonOutlineIcon fontSize="small" />
-                      </InputAdornment>
-                    )
-                   },
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <PersonOutlineIcon fontSize="small" />
+                    </InputAdornment>
+                  )
                 }
-                }}
+              }}
             />
           </Grid>
           <Grid size={{ xs: 12, sm: 6, md: 6, lg: 4 }}>
@@ -509,13 +507,11 @@ const StudentEditDialog: React.FC<StudentEditDialogProps> = ({
               onChange={(e) => onStudentChange({ ...student, last_name: e.target.value })}
               slotProps={{
                 input: { 
-                  inputProps: { 
-                    startAdornment: (
-                      <InputAdornment position="start">
-                        <PersonOutlineIcon fontSize="small" />
-                      </InputAdornment>
-                    )
-                   },
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <PersonOutlineIcon fontSize="small" />
+                    </InputAdornment>
+                  )
                 }
                 }}
             />
@@ -552,13 +548,11 @@ const StudentEditDialog: React.FC<StudentEditDialogProps> = ({
               }
               slotProps={{
                 input: { 
-                  inputProps: { 
-                    startAdornment: (
-                      <InputAdornment position="start">
-                        <PersonOutlineIcon fontSize="small" />
-                      </InputAdornment>
-                    )
-                   },
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <PersonOutlineIcon fontSize="small" />
+                    </InputAdornment>
+                  )
                 }
                 }}
             />

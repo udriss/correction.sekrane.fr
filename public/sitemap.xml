@@ -7,25 +7,25 @@
     <priority>1.0</priority>
   </url>
   <url>
-    <loc>https://correction.sekrane.fr/activities_autres</loc>
+    <loc>https://correction.sekrane.fr/activities</loc>
     <lastmod>2025-04-18</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://correction.sekrane.fr/activities_autres/new</loc>
+    <loc>https://correction.sekrane.fr/activities/new</loc>
     <lastmod>2025-04-18</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://correction.sekrane.fr/corrections_autres</loc>
+    <loc>https://correction.sekrane.fr/corrections</loc>
     <lastmod>2025-04-18</lastmod>     
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://correction.sekrane.fr/classes_autres</loc>
+    <loc>https://correction.sekrane.fr/classes</loc>
     <lastmod>2025-04-18</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>

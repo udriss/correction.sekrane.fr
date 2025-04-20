@@ -32,26 +32,24 @@ import Link from 'next/link';
 import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
 import PublishedWithChangesIcon from '@mui/icons-material/PublishedWithChanges';
 
-import { Activity } from '@/lib/activity';
+import { ActivityAutre } from '@/lib/types';
 import LoadingSpinner from '@/components/LoadingSpinner';
-
+import MultipleCorrectionsFormAutre from '@/components/MultipleCorrectionsFormAutre';
 import GradientBackground from '@/components/ui/GradientBackground';
 import PatternBackground from '@/components/ui/PatternBackground';
 import ErrorDisplay from '@/components/ui/ErrorDisplay';
 
-export default function MultipleCorrections() {
+export default function MultipleCorrectionsAutres() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const activityId = searchParams?.get('activityId') || "0"; // Utiliser "0" comme valeur par défaut au lieu de null
   
-  // Activity and points states
-  const [activity, setActivity] = useState<Activity | null>(null);
-  const [experimentalPoints, setExperimentalPoints] = useState<number>(5);
-  const [theoreticalPoints, setTheoreticalPoints] = useState<number>(15);
+  // Activity state
+  const [activity, setActivity] = useState<ActivityAutre | null>(null);
   
   // UI states
   const [loading, setLoading] = useState<boolean>(true);
-  const [error, setError] = useState<string>('');
+  const [error, setError] = useState<Error | string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string>('');
 
   // Group states
@@ -64,8 +62,8 @@ export default function MultipleCorrections() {
   const [genericActivityId, setGenericActivityId] = useState<number | null>(null);
   
   // États pour les activités disponibles
-  const [allActivities, setAllActivities] = useState<Activity[]>([]);
-  const [genericActivities, setGenericActivities] = useState<Activity[]>([]);
+  const [allActivities, setAllActivities] = useState<ActivityAutre[]>([]);
+  const [genericActivities, setGenericActivities] = useState<ActivityAutre[]>([]);
   const [selectedActivityId, setSelectedActivityId] = useState<string>(activityId);
 
   useEffect(() => {
@@ -83,20 +81,27 @@ export default function MultipleCorrections() {
   // Fetch all available activities for the dropdown
   const fetchAllActivities = async () => {
     try {
-      const response = await fetch('/api/activities');
-      if (!response.ok) throw new Error("Erreur lors du chargement des activités");
+      const response = await fetch('/api/activities_autres');
+      if (!response.ok) {
+        const errorData = await response.json();
+        // Créer une instance d'Error et y attacher les détails
+        const error = new Error('Erreur lors du chargement des activités : ' + (errorData.error || 'Erreur lors du chargement des activités disponibles'));
+        (error as any).details = errorData.details || {};
+        setError(error.message);
+        throw error;
+      }
       
       const activitiesData = await response.json();
       
       // Séparer les activités génériques des activités normales
-      const generic = activitiesData.filter((act: Activity) => act.name.includes('Activité générique'));
-      const regular = activitiesData.filter((act: Activity) => !act.name.includes('Activité générique'));
+      const generic = activitiesData.filter((act: ActivityAutre) => act.name.includes('Activité générique'));
+      const regular = activitiesData.filter((act: ActivityAutre) => !act.name.includes('Activité générique'));
       
       setAllActivities(regular);
       setGenericActivities(generic);
     } catch (err) {
       console.error('Erreur:', err);
-      setError("Erreur lors du chargement des activités disponibles");
+      setError(err instanceof Error ? err.message : String(err));
     }
   };
 
@@ -105,16 +110,21 @@ export default function MultipleCorrections() {
     
     try {
       setLoading(true);
-      const response = await fetch(`/api/activities/${activityId}`);
-      if (!response.ok) throw new Error("Erreur lors du chargement de l'activité");
+      const response = await fetch(`/api/activities_autres/${activityId}`);
+      if (!response.ok) {
+        const errorData = await response.json();
+        // Créer une instance d'Error et y attacher les détails
+        const error = new Error('Erreur lors du chargement de l\'activité : ' + (errorData.error || 'Erreur lors du chargement de l\'activité'));
+        (error as any).details = errorData.details || {};
+        setError(error.message);
+        throw error;
+      }
       
-      const activityData: Activity = await response.json();
+      const activityData: ActivityAutre = await response.json();
       setActivity(activityData);
-      setExperimentalPoints(activityData.experimental_points !== undefined ? activityData.experimental_points : 5);
-      setTheoreticalPoints(activityData.theoretical_points !== undefined ? activityData.theoretical_points : 15);
     } catch (err) {
       console.error('Erreur:', err);
-      setError("Erreur lors du chargement de l'activité");
+      setError(err instanceof Error ? err.message : String(err));
     } finally {
       setLoading(false);
     }
@@ -123,30 +133,35 @@ export default function MultipleCorrections() {
   // Fonction pour chercher des activités génériques
   const fetchGenericActivities = async () => {
     try {
-      const response = await fetch('/api/activities/generic/list');
-      if (!response.ok) throw new Error("Erreur lors du chargement des activités génériques");
+      const response = await fetch('/api/activities_autres/generic/list');
+      if (!response.ok) {
+        const errorData = await response.json();
+        // Créer une instance d'Error et y attacher les détails
+        const error = new Error('Erreur lors du chargement des activités génériques : ' + (errorData.error || 'Données non disponibles'));
+        (error as any).details = errorData.details || {};
+        setError(error.message);
+        throw error;
+      }
       
       const genericActivitiesData = await response.json();
       setGenericActivities(genericActivitiesData);
     } catch (err) {
       console.error('Erreur:', err);
-      setError("Erreur lors du chargement des activités génériques");
+      setError(err instanceof Error ? err.message : String(err));
     }
   };
 
-  // Nouvelle fonction pour chercher ou créer une activité générique
+  // Fonction pour chercher ou créer une activité générique
   const fetchOrCreateGenericActivity = async () => {
     try {
       setLoading(true);
       // Chercher une activité générique existante
-      const response = await fetch('/api/activities/generic');
+      const response = await fetch('/api/activities_autres/generic');
       
       if (response.ok) {
         const activityData = await response.json();
         setActivity(activityData);
         setGenericActivityId(activityData.id);
-        setExperimentalPoints(activityData.experimental_points || 5);
-        setTheoreticalPoints(activityData.theoretical_points || 15);
         
         // D'abord rafraîchir la liste des activités
         await fetchAllActivities();
@@ -157,26 +172,37 @@ export default function MultipleCorrections() {
         // Mettre à jour l'URL sans rafraîchir la page
         router.push(`/corrections/multiples?activityId=${activityData.id}`, { scroll: false });
       } else {
-        // Si aucune activité générique n'existe, en ajouter une nouvelle
-        const createResponse = await fetch('/api/activities', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            name: 'Activité générique',
-            content: 'Activité pour les corrections sans activité spécifique',
-            experimental_points: 5,
-            theoretical_points: 15
-          }),
-        });
+        const errorData = await response.json();
         
-        if (createResponse.ok) {
+        // Si c'est une erreur 404, c'est normal (pas d'activité générique trouvée)
+        // On va alors en créer une nouvelle
+        if (response.status === 404) {
+          // Si aucune activité générique n'existe, en ajouter une nouvelle avec des parties dynamiques
+          const createResponse = await fetch('/api/activities_autres', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              name: 'Activité générique',
+              content: 'Activité pour les corrections sans activité spécifique',
+              parts_names: ['Partie 1', 'Partie 2', 'Partie 3', 'Partie 4'],
+              points: [5, 5, 5, 5]
+            }),
+          });
+          
+          if (!createResponse.ok) {
+            const createErrorData = await createResponse.json();
+            // Créer une instance d'Error et y attacher les détails
+            const error = new Error('Erreur lors de la création d\'une activité générique : ' + (createErrorData.error || 'Échec de création'));
+            (error as any).details = createErrorData.details || {};
+            setError(error.message);
+            throw error;
+          }
+          
           const newActivity = await createResponse.json();
           setActivity(newActivity);
           setGenericActivityId(newActivity.id);
-          setExperimentalPoints(newActivity.experimental_points || 5);
-          setTheoreticalPoints(newActivity.theoretical_points || 15);
           
           // D'abord rafraîchir la liste des activités
           await fetchAllActivities();
@@ -187,12 +213,16 @@ export default function MultipleCorrections() {
           // Mettre à jour l'URL sans rafraîchir la page
           router.push(`/corrections/multiples?activityId=${newActivity.id}`, { scroll: false });
         } else {
-          throw new Error("Erreur lors de la création d'une activité générique");
+          // Créer une instance d'Error et y attacher les détails
+          const error = new Error('Erreur lors de la recherche d\'une activité générique : ' + (errorData.error || 'Échec de la recherche'));
+          (error as any).details = errorData.details || {};
+          setError(error.message);
+          throw error;
         }
       }
     } catch (err) {
       console.error('Erreur:', err);
-      setError("Erreur lors du chargement de l'activité générique");
+      setError(err instanceof Error ? err.message : String(err));
     } finally {
       setLoading(false);
     }
@@ -208,25 +238,29 @@ export default function MultipleCorrections() {
     } else {
       try {
         setLoading(true);
-        const response = await fetch(`/api/activities/${newActivityId}`);
-        if (!response.ok) throw new Error("Erreur lors du chargement de l'activité");
+        const response = await fetch(`/api/activities_autres/${newActivityId}`);
+        if (!response.ok) {
+          const errorData = await response.json();
+          // Créer une instance d'Error et y attacher les détails
+          const error = new Error('Erreur lors du chargement de l\'activité : ' + (errorData.error || 'Échec du chargement de l\'activité'));
+          (error as any).details = errorData.details || {};
+          setError(error.message);
+          throw error;
+        }
         
         const activityData = await response.json();
         setActivity(activityData);
-        setExperimentalPoints(activityData.experimental_points || 5);
-        setTheoreticalPoints(activityData.theoretical_points || 15);
         
         // Update the URL without full refresh
         router.push(`/corrections/multiples?activityId=${newActivityId}`, { scroll: false });
       } catch (err) {
         console.error('Erreur:', err);
-        setError("Erreur lors du chargement de l'activité");
+        setError(err instanceof Error ? err.message : String(err));
       } finally {
         setLoading(false);
       }
     }
   };
-
 
   // Handle form submission for creating a group
   const handleCreateGroup = async (createdCorrectionIds: string[]) => {
@@ -237,7 +271,7 @@ export default function MultipleCorrections() {
     
     try {
       // First create the group
-      const groupResponse = await fetch('/api/correction-groups', {
+      const groupResponse = await fetch('/api/correction-groups-autres', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -258,7 +292,7 @@ export default function MultipleCorrections() {
       setGroupId(groupData.id);
       
       // Then associate the corrections with the group
-      const linkResponse = await fetch(`/api/correction-groups/${groupData.id}/corrections`, {
+      const linkResponse = await fetch(`/api/correction-groups-autres/${groupData.id}/corrections`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -306,7 +340,7 @@ export default function MultipleCorrections() {
           const highlightParam = createdCorrectionIds.join(',');
           // Rediriger vers la page des corrections avec des filtres appropriés
           // Ajouter correctionId pour filtrer spécifiquement ces corrections
-          router.push(`/corrections?classId=${selectedClassId}&highlight=${highlightParam}&correctionId=${highlightParam}&activityId=${activityId !== "0" ? activityId : genericActivityId}`);
+          router.push(`/corrections?classId=${selectedClassId}&highlight={highlightParam}&correctionId=${highlightParam}&activityId=${activityId !== "0" ? activityId : genericActivityId}`);
         }, 2000);
       } else {
         // Si aucune classe n'est sélectionnée et pas de groupe, rediriger vers les corrections
@@ -333,6 +367,9 @@ export default function MultipleCorrections() {
       </div>
     );
   }
+
+  // Calculer le total des points maximum pour cette activité
+  const totalMaxPoints = activity?.points ? activity.points.reduce((sum, points) => sum + points, 0) : 0;
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-8">
@@ -454,8 +491,9 @@ export default function MultipleCorrections() {
               color="error"
               endIcon={<PublishedWithChangesIcon />}
               component={Link}
-              href={`/activities/${activityId}`}
+              href={`/activities/${selectedActivityId !== "0" ? selectedActivityId : ''}`}
               fullWidth
+              disabled={selectedActivityId === "0" || !activity}
               sx={{ mb:.5}}
             >
               Modifier cette activité
@@ -490,7 +528,10 @@ export default function MultipleCorrections() {
             <div className="w-full animate-slide-in">
               <ErrorDisplay 
                 error={error} 
-                onRefresh={() => setError('')}
+                onRefresh={() => {
+                  setError('');
+                  window.location.reload();
+                }}
                 withRefreshButton={true}
               />
             </div>
@@ -521,83 +562,88 @@ export default function MultipleCorrections() {
             </Typography>
           </Paper>
 
-          {/* Grading scale section with improved design */}
-          <Paper className="p-6 rounded-lg mb-6 shadow-md border-t-4 border-blue-600">
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-2">
-                <BarChartIcon className="text-blue-600" fontSize="large" />
-                <Typography variant="h5" className="font-bold">
-                  Barème de notation {activityId === "0" && "(modifiable)"}
-                </Typography>
+          {/* Points display section - Une partie par ligne, format simple */}
+          {activity.points && activity.points.length > 0 && (
+            <Paper className="p-6 rounded-lg mb-6 shadow-md border-t-4 border-blue-600">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-2">
+                  <BarChartIcon className="text-blue-600" fontSize="large" />
+                  <Typography variant="h5" className="font-bold">
+                    Points par partie
+                  </Typography>
+                </div>
               </div>
-            </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <Paper className="p-4 border shadow-sm transition-all hover:shadow-md flex flex-col items-center text-center">
-                <Typography variant="overline" color="textSecondary" className="mb-1">
-                  PARTIE EXPÉRIMENTALE
-                </Typography>
-                {activityId === "0" ? (
-                  <TextField
-                    type="number"
-                    value={experimentalPoints}
-                    onChange={(e) => setExperimentalPoints(Number(e.target.value))}
-                    variant="outlined"
-                    size="small"
-                    sx={{ mt: 1, width: '80px', textAlign: 'center' }}
-                    slotProps={{
-                      input: { inputProps: { min: 0, max: 20 } }
+              {/* Liste simple des parties avec une partie par ligne */}
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                {activity.parts_names && activity.points && activity.parts_names.map((partName, index) => (
+                  <Box 
+                    key={index}
+                    sx={{ 
+                      display: 'flex', 
+                      justifyContent: 'space-between', 
+                      alignItems: 'center',
+                      p: 1.5,
+                      borderBottom: '1px solid rgba(0,0,0,0.12)',
+                      '&:last-of-type': { borderBottom: 'none' },
+                      borderRadius: 1,
+                      bgcolor: 'background.paper',
                     }}
-                  />
-                ) : (
-                  <Typography variant="h3" className="font-bold text-blue-600 mb-1">
-                    {activity?.experimental_points || 5}
+                  >
+                    <Typography 
+                      variant="body1" 
+                      sx={{ 
+                        fontWeight: 'medium', 
+                        display: 'flex', 
+                        alignItems: 'center' 
+                      }}
+                    >
+                      {partName}
+                    </Typography>
+                    <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 0.5 }}>
+                      <Typography variant="h6" sx={{ fontWeight: 'bold', color: 'primary.main' }}>
+                        {activity.points[index]}
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary">
+                        points
+                      </Typography>
+                    </Box>
+                  </Box>
+                ))}
+                
+                {/* Ligne du total */}
+                <Box 
+                  sx={{ 
+                    display: 'flex', 
+                    justifyContent: 'space-between', 
+                    alignItems: 'center',
+                    p: 1.5,
+                    mt: 1,
+                    borderRadius: 1,
+                    bgcolor: 'primary.light',
+                    borderLeft: '4px solid',
+                    borderColor: 'primary.main',
+                  }}
+                >
+                  <Typography variant="body1" sx={{ fontWeight: 'bold' }}>
+                    TOTAL
                   </Typography>
-                )}
-                <Typography variant="body2" color="textSecondary">
-                  points
-                </Typography>
-              </Paper>
-              
-              <Paper className="p-4 border shadow-sm transition-all hover:shadow-md flex flex-col items-center text-center">
-                <Typography variant="overline" color="textSecondary" className="mb-1">
-                  PARTIE THÉORIQUE
-                </Typography>
-                {activityId === "0" ? (
-                  <TextField
-                    type="number"
-                    value={theoreticalPoints}
-                    onChange={(e) => setTheoreticalPoints(Number(e.target.value))}
-                    variant="outlined"
-                    size="small"
-                    sx={{ mt: 1, width: '80px', textAlign: 'center' }}
-                    slotProps={{
-                      input: { inputProps: { min: 0, max: 20 } }
-                    }}
-                  />
-                ) : (
-                  <Typography variant="h3" className="font-bold text-blue-600 mb-1">
-                    {activity?.theoretical_points || 15}
-                  </Typography>
-                )}
-                <Typography variant="body2" color="textSecondary">
-                  points
-                </Typography>
-              </Paper>
-              
-              <Paper className="p-4 border-2 border-blue-600 bg-blue-50 shadow-sm transition-all hover:shadow-md flex flex-col items-center text-center">
-                <Typography variant="overline" color="primary" className="mb-1 font-medium">
-                  TOTAL
-                </Typography>
-                <Typography variant="h3" className="font-bold text-blue-700 mb-1">
-                  {experimentalPoints + theoreticalPoints}
-                </Typography>
-                <Typography variant="body2" color="primary">
-                  points sur 20
-                </Typography>
-              </Paper>
-            </div>
-          </Paper>
+                  <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 0.5 }}>
+                    <Typography variant="h6" sx={{ fontWeight: 'bold' }}>
+                      {totalMaxPoints !== 0 ? totalMaxPoints : ''}
+                    </Typography>
+                    <Typography variant="body2">
+                      {totalMaxPoints === 0
+                        ? "Aucun point"
+                        : totalMaxPoints === 1
+                        ? "point"
+                        : "points"}
+                    </Typography>
+                  </Box>
+                </Box>
+              </Box>
+            </Paper>
+          )}
 
           {/* Group Information Section */}
           <Paper className="p-6 rounded-lg mb-6 shadow-md border-t-4 border-purple-600">
@@ -653,7 +699,15 @@ export default function MultipleCorrections() {
             </Grid>
           </Paper>
 
-
+          <MultipleCorrectionsFormAutre
+            activityId={activity.id?.toString() || "0"}
+            activity={activity}
+            onSuccess={handleSuccessfulCreateCorrections}
+            groupName={groupName}
+            requireGroupName={true}
+            onClassSelect={handleClassSelect}
+            isAutre={true}
+          />
         </>
       )}
     </div>

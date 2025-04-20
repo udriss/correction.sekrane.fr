@@ -12,7 +12,7 @@ import {
 import LoadingSpinner from '@/components/LoadingSpinner';
 import ShareModal from '@/app/components/ShareModal';
 import * as shareService from '@/lib/services/shareService';
-import AddCorrectionToGroupModal from '@/components/AddCorrectionToGroupModal';
+
 import { useSnackbar } from 'notistack';
 import { Correction as OriginalCorrection, CorrectionWithShareCode as OriginalCorrectionWithShareCode, Student } from '@/lib/types';
 
@@ -739,14 +739,7 @@ export default function CorrectionGroupDetailPage() {
         }}
       />
 
-      {/* Modal d'ajout de corrections */}
-      <AddCorrectionToGroupModal
-        open={addCorrectionsModalOpen}
-        onClose={() => setAddCorrectionsModalOpen(false)}
-        activityId={activityId}
-        groupId={groupId}
-        onSuccess={handleCorrectionsAdded}
-      />
+
 
       {/* Notifications */}
       <Snackbar 

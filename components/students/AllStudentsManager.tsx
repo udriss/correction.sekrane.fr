@@ -1076,7 +1076,7 @@ const AllStudentsManagerNEW: React.FC<AllStudentsManagerProps> = ({
                               }}
                               onClick={toggleEmailColumn}
                             >
-                              ••••@••••
+                              •••@•••
                             </Typography>
                           )}
                         </TableCell>

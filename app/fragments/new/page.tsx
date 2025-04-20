@@ -57,7 +57,7 @@ export default function NewFragmentPage() {
   // Handle back button behavior
   const handleBackClick = () => {
     if (activityIdParam) {
-      router.push(`/activities_autres/${activityIdParam}?tab=1`);
+      router.push(`/activities/${activityIdParam}?tab=1`);
     } else {
       router.push('/fragments');
     }
@@ -135,7 +135,7 @@ export default function NewFragmentPage() {
       setTimeout(() => {
         // Redirect to the correct page based on context
         if (activityIdParam) {
-          router.push(`/activities_autres/${activityIdParam}?tab=1`);
+          router.push(`/activities/${activityIdParam}?tab=1`);
         } else {
           router.push('/fragments');
         }

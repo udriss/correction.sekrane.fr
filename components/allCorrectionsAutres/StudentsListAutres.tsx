@@ -6,7 +6,7 @@ import {
 } from '@mui/material';
 import { alpha } from '@mui/material/styles';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
-import CorrectionCardAutre from '@/components/allCorrections/CorrectionCard';
+import CorrectionCardAutre from '@/components/allCorrectionsAutres/CorrectionCard';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { useSnackbar } from 'notistack';

@@ -110,7 +110,7 @@ const GroupHeader: React.FC<GroupHeaderProps> = ({
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mt: 3 }}>
             <Button
               component={Link}
-              href={`/activities_autres/${activityId}/groups`}
+              href={`/activities/${activityId}/groups`}
               startIcon={<ArrowBackIcon />}
               variant="outlined"
               size="small"
@@ -128,7 +128,7 @@ const GroupHeader: React.FC<GroupHeaderProps> = ({
             
             <Button
               component={Link}
-              href={`/activities_autres/${activityId}`}
+              href={`/activities/${activityId}`}
               variant="outlined"
               size="small"
               sx={{ 

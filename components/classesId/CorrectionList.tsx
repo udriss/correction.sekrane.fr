@@ -1,8 +1,8 @@
 import React from 'react';
 import { Box, Paper, Typography } from '@mui/material';
 import { CorrectionAutreEnriched, Class } from '@/lib/types';
-import CorrectionCardView from './views/CorrectionCardView';
-import CorrectionTableView from './views/CorrectionTableView';
+
+
 import AssociateActivitiesModal, { Activity  } from "@/components/classes/AssociateActivitiesModal";
 
 interface CorrectionListProps {

@@ -321,7 +321,7 @@ export default function StudentCorrections({ student, corrections: initialCorrec
             variant="contained"
             startIcon={<AssignmentIcon />}
             component={Link}
-            href={`/corrections_autres/unique?studentId=${student.id}`}
+            href={`/corrections/unique?studentId=${student.id}`}
           >
             Ajouter une correction
           </Button>
@@ -508,7 +508,7 @@ export default function StudentCorrections({ student, corrections: initialCorrec
                     <Button 
                       startIcon={<EditIcon />}
                       component={Link}
-                      href={`/corrections_autres/${correction.id}`}
+                      href={`/corrections/${correction.id}`}
                       variant="outlined"
                       target="_blank"
                       rel="noopener noreferrer"
@@ -581,7 +581,7 @@ export default function StudentCorrections({ student, corrections: initialCorrec
           variant="contained"
           startIcon={<AssignmentIcon />}
           component={Link}
-          href={`/corrections_autres/unique?studentId=${student.id}`}
+          href={`/corrections/unique?studentId=${student.id}`}
           target="_blank"
           rel="noopener noreferrer"
         >

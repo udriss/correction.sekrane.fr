@@ -3,7 +3,7 @@ import {
   Box, Alert, Typography, Button, Divider, Grid,
   CircularProgress
 } from '@mui/material';
-import CorrectionCardAutre from '@/components/allCorrections/CorrectionCard';
+import CorrectionCardAutre from '@/components/allCorrectionsAutres/CorrectionCard';
 import { useSnackbar } from 'notistack';
 import ErrorDisplay from '@/components/ui/ErrorDisplay';
 import { changeCorrectionAutreStatus } from '@/lib/services/correctionsAutresService';

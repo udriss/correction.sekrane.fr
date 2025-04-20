@@ -451,9 +451,9 @@ export function useCorrectionsAutres(correctionId: string) {
 
       // Navigate back to activity page
       if (correction?.activity_id) {
-        router.push(`/activities_autres/${correction.activity_id}`);
+        router.push(`/activities/${correction.activity_id}`);
       } else {
-        router.push('/activities_autres');
+        router.push('/activities');
       }
     } catch (err) {
       console.error('Erreur:', err);

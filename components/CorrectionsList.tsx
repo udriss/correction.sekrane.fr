@@ -91,7 +91,7 @@ const CorrectionsList: React.FC<CorrectionsListProps> = ({
                 color="primary"
                 startIcon={<GroupsIcon />}
                 component={Link}
-                href={`/activities_autres/${activityId}/groups`}
+                href={`/activities/${activityId}/groups`}
               >
                 Groupes
               </Button> )}

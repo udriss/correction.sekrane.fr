@@ -36,7 +36,6 @@ import LoadingSpinner from '@/components/LoadingSpinner';
 import GradientBackground from '@/components/ui/GradientBackground';
 import PatternBackground from '@/components/ui/PatternBackground';
 import CorrectionsProvider, { useCorrections } from '@/app/components/CorrectionsDataProvider';
-import ChronologyList from '@/components/allCorrections/ChronologyList';
 import QrCodeIcon from '@mui/icons-material/QrCode';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import DeleteIcon from '@mui/icons-material/Delete';
@@ -1207,18 +1206,6 @@ function CorrectionsContent() {
       </Box>
         
 
-      
-      {tabValue === 3 && (
-        <ChronologyList
-          filteredCorrections={filteredCorrections}
-          error={error}
-          activeFilters={activeFilters}
-          handleClearAllFilters={handleClearAllFilters}
-          getGradeColor={getGradeColor}
-          highlightedIds={searchParams?.get('highlight')?.split(',').filter(Boolean) || []}
-          recentFilter={activeFilters.includes('recent')}
-        />
-      )}
       
 
       {/* Sort Menu */}
