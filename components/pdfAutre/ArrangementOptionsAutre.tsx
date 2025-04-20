@@ -1,3 +1,4 @@
+// filepath: /var/www/correction.sekrane.fr/components/pdfAutre/ArrangementOptionsAutre.tsx
 import React from 'react';
 import { 
   Typography, 
@@ -11,13 +12,14 @@ import {
   alpha,
   useTheme
 } from '@mui/material';
-import GroupIcon from '@mui/icons-material/Group';
 import SchoolIcon from '@mui/icons-material/School';
 import MenuBookIcon from '@mui/icons-material/MenuBook';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import ListAltIcon from '@mui/icons-material/ListAlt';
 import TableChartIcon from '@mui/icons-material/TableChart';
 import { ArrangementType, SubArrangementType, ViewType } from './types';
+import GroupsIcon from '@mui/icons-material/Groups';
+import PersonIcon from '@mui/icons-material/Person';
 
 interface ArrangementOptionsProps {
   arrangement: ArrangementType;
@@ -29,7 +31,7 @@ interface ArrangementOptionsProps {
   availableSubArrangements: SubArrangementType[];
 }
 
-const ArrangementOptions: React.FC<ArrangementOptionsProps> = ({
+const ArrangementOptionsAutre: React.FC<ArrangementOptionsProps> = ({
   arrangement,
   setArrangement,
   subArrangement,
@@ -51,13 +53,13 @@ const ArrangementOptions: React.FC<ArrangementOptionsProps> = ({
       default: return '';
     }
   };
-
+  
   // Fonction pour obtenir une icône pour chaque option
   const getArrangementIcon = (type: ArrangementType | SubArrangementType) => {
     switch (type) {
-      case 'student': return <GroupIcon sx={{ fontSize: '1.8rem' }} />;
+      case 'student': return <PersonIcon sx={{ fontSize: '1.8rem' }} />;
       case 'class': return <SchoolIcon sx={{ fontSize: '1.8rem' }} />;
-      case 'subclass': return <SchoolIcon sx={{ fontSize: '1.8rem' }} />; // Même icône pour groupe
+      case 'subclass': return <GroupsIcon sx={{ fontSize: '1.8rem' }} />; // Icône mise à jour pour groupe
       case 'activity': return <MenuBookIcon sx={{ fontSize: '1.8rem' }} />;
       case 'none': return null;
       default: return null;
@@ -292,7 +294,7 @@ const ArrangementOptions: React.FC<ArrangementOptionsProps> = ({
                       Détaillé
                     </Typography>
                     <Typography variant="caption" align="center" color="text.secondary" display="block">
-                      Avec notes expérimentales et théoriques
+                      Avec notes détaillées par partie
                     </Typography>
                   </CardContent>
                 </Card>
@@ -371,4 +373,4 @@ const ArrangementOptions: React.FC<ArrangementOptionsProps> = ({
   );
 };
 
-export default ArrangementOptions;
+export default ArrangementOptionsAutre;

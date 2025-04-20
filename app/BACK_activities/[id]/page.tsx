@@ -39,16 +39,7 @@ import ErrorDisplay from '@/components/ui/ErrorDisplay';
 // Import the Fragment type from FragmentEditModal
 import { Fragment } from '@/lib/types';
 // Import QR Code Generator utility
-import { generateQRCodePDF } from '@/utils/BACK_qrGeneratorPDF';
-import FirstPageIcon from '@mui/icons-material/FirstPage';
-import KeyboardArrowLeft from '@mui/icons-material/KeyboardArrowLeft';
-import KeyboardArrowRight from '@mui/icons-material/KeyboardArrowRight';
-import LastPageIcon from '@mui/icons-material/LastPage';
-import { useTheme } from '@mui/material/styles';
 
-
-import { Correction as ProviderCorrection } from '@/app/components/CorrectionsDataProvider';
-import { Student as LibStudent } from '@/lib/types';
 
 // Type guard pour vérifier si une correction a un shareCode
 function hasShareCode(correction: Correction | CorrectionWithShareCode): correction is CorrectionWithShareCode & Correction {

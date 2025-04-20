@@ -1,8 +1,32 @@
+/**
+ * @fileoverview Types et constantes pour le module d'export des corrections.
+ * 
+ * Structure du module d'export:
+ * 
+ * Fichier de types :
+ * - types.ts - Contient les types partagés pour l'export (ArrangementType, SubArrangementType, ExportFormat, ViewType)
+ * 
+ * Utilitaires de formatage et d'export :
+ * - formatUtils.ts - Fonctions communes de formatage pour les notes et statuts
+ * - csvExportUtils.ts - Fonctions pour l'export CSV (détaillé et simplifié)
+ * - xlsxExportUtils.ts - Utilitaires pour la création de feuilles Excel
+ * - xlsxExportService.ts - Service d'export pour XLSX
+ * - pdfExportUtils.ts - Utilitaires pour l'export PDF
+ * - qrCodeExportUtils.ts - Fonctions pour l'export de QR codes
+ * 
+ * Composants d'interface :
+ * - CorrectionsPreview.tsx - Tableau de prévisualisation des corrections
+ * - ExportOptionsPanel.tsx - Panneau de configuration des options d'export
+ * 
+ * Composant principal :
+ * - ExportPDFComponentAllCorrectionsAutresContainer.tsx - Conteneur qui orchestre tous les composants
+ */
+
 // Types communs pour les exports PDF des corrections avec barème dynamique
 import { Student } from '@/lib/types';
 import { CorrectionAutreEnriched, ActivityAutre } from '@/lib/types';
 
-export type ArrangementType = 'student' | 'class' | 'subclass' | 'activity';
+export type ArrangementType = 'student' | 'class' | 'subclass' | 'activity' | 'none';
 export type SubArrangementType = 'student' | 'class' | 'subclass' | 'activity' | 'none';
 export type ExportFormat = 'pdf' | 'csv' | 'xlsx';
 export type ViewType = 'detailed' | 'simplified';

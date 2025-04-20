@@ -42,7 +42,7 @@ import CorrectionsListAutres from '@/components/allCorrectionsAutres/Corrections
 import ClassesListAutres from '@/components/allCorrectionsAutres/ClassesListAutres';
 import StudentsListAutres from '@/components/allCorrectionsAutres/StudentsListAutres';
 import ChronologyListAutres from '@/components/allCorrectionsAutres/ChronologyListAutres';
-import ExportPDFComponentAllCorrectionsAutres from '@/components/pdf/ExportPDFComponentAllCorrectionsAutres';
+import ExportPDFComponentAllCorrectionsAutresContainer from '@/components/pdfAutre/ExportPDFComponentAllCorrectionsAutresContainer';
 
 
 
@@ -700,12 +700,15 @@ function CorrectionsContent() {
       )}
 
       {tabValue === 4 && (
-        <Box>
+        <Box className="max-w-4xl" sx={{ 
+          mx: 'auto',
+          mb: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' 
+          }}  >
           <Paper sx={{ p: 2, mb: 3 }}>
             <Typography variant="h5" gutterBottom>
               Options d'export PDF
             </Typography>
-            <ExportPDFComponentAllCorrectionsAutres
+            <ExportPDFComponentAllCorrectionsAutresContainer
               corrections={adaptCorrections}
               activities={metaData.activities}
               students={metaData.students}

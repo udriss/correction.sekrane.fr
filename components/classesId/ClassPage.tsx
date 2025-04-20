@@ -158,7 +158,8 @@ export function ClassPage({ id }: ClassPageProps) {
   if (error || !classData) {
     return (
       <Container maxWidth="lg" className="py-8">
-        <ErrorDisplay error={error} onRefresh={() => window.location.reload()} />
+        <ErrorDisplay error={error} 
+        onRefresh={() => window.location.reload()} />
       </Container>
     );
   }

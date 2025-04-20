@@ -28,7 +28,7 @@ import PatternBackground from '@/components/ui/PatternBackground';
 import AssociateActivitiesModal, { Activity as ModalActivity } from "@/components/classes/AssociateActivitiesModal";
 import CreateCorrectionsModalAutre from "@/components/corrections_autres/CreateCorrectionsModalAutre";
 import { CorrectionAutreEnriched, Class, Student, ActivityAutre } from '@/lib/types';
-import ExportPDFComponentAllCorrectionsAutres from '@/components/pdf/ExportPDFComponentAllCorrectionsAutres';
+import ExportPDFComponentAllCorrectionsAutresContainer from '@/components/pdfAutre/ExportPDFComponentAllCorrectionsAutresContainer';
 import CorrectionCardAutre from '@/components/allCorrections/CorrectionCard';
 import { getBatchShareCodes } from '@/lib/services/shareService';
 import { changeCorrectionAutreStatus } from '@/lib/services/correctionsAutresService';
@@ -449,6 +449,14 @@ export default function ClassAutreDetailPage({ params }: { params: Promise<{ id:
       })
     );
   }, [classData]);
+  
+  // Extract unique activities for the PDF export component
+  const uniqueActivities = useMemo(() => {
+    return activities.map(activity => ({
+      id: activity.id,
+      name: activity.name
+    }));
+  }, [activities]);
   
   // Déterminer la couleur selon la note
   const getGradeColor = (grade: number): "success" | "info" | "primary" | "warning" | "error" => {
@@ -1090,32 +1098,22 @@ export default function ClassAutreDetailPage({ params }: { params: Promise<{ id:
           </Typography>
           
           {classData && (
-            <ExportPDFComponentAllCorrectionsAutres
-              corrections={corrections.map(correction => {
-                const student = students.find(s => s.id === correction.student_id);
-                return {
-                  ...correction,
-                  sub_class: student?.sub_class
-                };
-              })}
+            <ExportPDFComponentAllCorrectionsAutresContainer
+              corrections={filteredCorrections}
               activities={activities}
               students={students}
-              filterActivity={filterActivity}
+              filterActivity={'all'} // On autorise toutes les activités dans ce contexte
               setFilterActivity={setFilterActivity}
-              uniqueSubClasses={availableSubClasses}
-              uniqueActivities={activities.map(a => ({ id: a.id, name: a.name }))}
+              uniqueActivities={uniqueActivities}
               getActivityById={(activityId: number) => activities.find(a => a.id === activityId)}
-              getStudentById={(studentId: number) => students.find(s => s.id === studentId)}
+              getStudentById={(studentId: number | null) => studentId === null ? undefined : students.find(s => s.id === studentId)}
               getAllClasses={async () => {
-                try {
-                  const response = await fetch('/api/classes');
-                  if (!response.ok) throw new Error('Erreur lors du chargement des classes');
-                  return await response.json();
-                } catch (error) {
-                  console.error('Erreur:', error);
-                  enqueueSnackbar('Erreur lors du chargement des classes', { variant: 'error' });
-                  return [];
+                // Instead of fetching all classes, just return the current class
+                if (classData) {
+                  // Return an array with only the current class
+                  return [classData];
                 }
+                return [];
               }}
             />
           )}

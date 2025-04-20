@@ -1,6 +1,6 @@
 'use client';
 
-import { generateQRCodePDF } from '@/utils/BACK_qrGeneratorPDF';
+
 import { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import {
@@ -291,40 +291,7 @@ export default function CorrectionGroupDetailPage() {
     setGroupDeleteDialogOpen(true);
   };
 
-  const handleGeneratePdfReport = async () => {
-    setGeneratePdfLoading(true);
-    try {
-      const fileName = await generateQRCodePDF({
-        corrections: corrections as any, // Cast to any to bypass type check as we handle null student_id safely in the function
-        group,
-        students, // Passer les étudiants à la fonction
-        onSuccess: (updatedCorrections: any) => {
-          // Mettre à jour l'état des corrections avec les nouveaux codes de partage
-          setCorrections(updatedCorrections);
-          setUpdatedCorrections(JSON.parse(JSON.stringify(updatedCorrections)));
-        }
-      });
-      
-      if (fileName) {
-        setNotification({
-          open: true,
-          message: `Rapport PDF "${fileName}" généré avec succès`,
-          severity: 'success'
-        });
-      } else {
-        throw new Error('Échec de génération du PDF');
-      }
-    } catch (err) {
-      console.error('Erreur lors de la génération du PDF:', err);
-      setNotification({
-        open: true,
-        message: 'Erreur lors de la génération du PDF',
-        severity: 'error'
-      });
-    } finally {
-      setGeneratePdfLoading(false);
-    }
-  };
+
 
   // Fonctions pour la gestion de l'édition des notes
   const handleEditCorrections = () => {
@@ -711,21 +678,7 @@ export default function CorrectionGroupDetailPage() {
         />
       )}
 
-      {/* Cartes d'informations */}
-      {!isEditing && (
-        <InfoCards 
-          group={group}
-          activityId={activityId}
-          corrections={corrections}
-          activity={activity}
-          isSharing={isSharing}
-          handleShareCorrections={handleShareCorrections}
-          generatePdfLoading={generatePdfLoading}
-          handleGeneratePdfReport={handleGeneratePdfReport}
-          setAddCorrectionsModalOpen={setAddCorrectionsModalOpen}
-          calculateAverage={calculateAverage}
-        />
-      )}
+
 
       {/* Liste des corrections */}
       <Paper elevation={2} sx={{ borderRadius: 2, overflow: 'hidden' }}>

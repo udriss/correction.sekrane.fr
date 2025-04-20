@@ -33,7 +33,7 @@ import DragIndicatorIcon from '@mui/icons-material/DragIndicator';
 import GradientBackground from '@/components/ui/GradientBackground';
 import ErrorDisplay from '@/components/ui/ErrorDisplay';
 import ActivityStatsGraphs from '@/components/ActivityStatsGraphs';
-import ExportPDFComponentAllCorrectionsAutres from '@/components/pdf/ExportPDFComponentAllCorrectionsAutres';
+import ExportPDFComponentAllCorrectionsAutresContainer from '@/components/pdfAutre/ExportPDFComponentAllCorrectionsAutresContainer';
 // Import FragmentsList et le type Fragment
 import FragmentsList from '@/components/FragmentsList';
 import { Fragment } from '@/lib/types';
@@ -69,9 +69,7 @@ export default function ActivityAutreDetail({ params }: { params: Promise<{ id: 
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
   
-  // États pour la fonction ExportPDFComponentAutre
   const [students, setStudents] = useState<Student[]>([]);
-  const [selectedSubGroup, setSelectedSubGroup] = useState<string>('');
   const [filteredCorrections, setFilteredCorrections] = useState<CorrectionAutre[]>([]);
   
   // Calculated values for subclasses
@@ -960,21 +958,19 @@ export default function ActivityAutreDetail({ params }: { params: Promise<{ id: 
           {/* Quatrième onglet: Export PDF */}
           {tabValue === 4 && (
             <Box sx={{ py: 2 }}>
-              <ExportPDFComponentAllCorrectionsAutres
+              <ExportPDFComponentAllCorrectionsAutresContainer
                 corrections={filteredCorrections}
                 activities={activities}
                 students={students}
                 filterActivity={activity?.id || 0}
                 setFilterActivity={() => {}} // Non modifiable dans ce contexte
-                uniqueSubClasses={uniqueSubClasses.filter(subClass => subClass !== undefined).map(subClass => ({ id: subClass || "0", name: `Groupe ${subClass}` }))}
                 uniqueActivities={[{ id: activity?.id || 0, name: activity?.name || 'Activité' }]}
-                getActivityById={(activityId: number) => activities.find((a: ActivityAutre) => a.id === activityId)}
-                getStudentById={(studentId: number) => {
-                  return students.find(s => s.id === studentId);
-                }}
+                getActivityById={(activityId: number) => activities.find(a => a.id === activityId)}
+                getStudentById={(studentId: number | null) => studentId === null ? undefined : students.find(s => s.id === studentId)}
                 getAllClasses={async () => {
                   try {
-                    const response = await fetch('/api/classes');
+                    // Récupérer uniquement les classes associées à cette activité
+                    const response = await fetch(`/api/activities_autres/${activityId}/classes`);
                     if (!response.ok) throw new Error('Erreur lors du chargement des classes');
                     return await response.json();
                   } catch (error) {

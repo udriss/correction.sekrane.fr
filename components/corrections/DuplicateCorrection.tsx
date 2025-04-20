@@ -673,7 +673,9 @@ export default function DuplicateCorrection({ correctionId }: DuplicateCorrectio
             </Box>
           )}
         </DialogContent>
-        <DialogActions sx={{ px: 3, py: 2, bgcolor: 'grey.200' }}>
+        <DialogActions sx={{ px: 3, py: 2,
+           bgcolor: theme => theme.palette.myBoxes.primary,
+          }}>
           <IconButton 
             onClick={() => handleOverwriteChoice('create')} 
             color="success"

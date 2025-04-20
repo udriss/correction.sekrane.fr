@@ -1,4 +1,4 @@
-// Service de traitement des données pour ExportPDFComponentAllCorrectionsAutres
+// Service de traitement des données pour ExportPDFComponentAllCorrectionsAutresContainer
 import { 
   ArrangementType, 
   SubArrangementType,
