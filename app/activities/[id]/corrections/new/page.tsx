@@ -376,7 +376,7 @@ export default function NewCorrectionAutrePage({ params }: { params: Promise<{ i
             sx={{ p: 4, borderRadius: 2 }}
             className="border-l-4 border-yellow-500"
           >
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 3 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb:3 }}>
               <ErrorOutlineIcon color="warning" fontSize="large" />
               <Typography variant="h5" color="warning.main" className="font-bold">
                 Activité non trouvée
@@ -639,10 +639,10 @@ export default function NewCorrectionAutrePage({ params }: { params: Promise<{ i
 
               <div className="bg-blue-50 p-4 rounded-lg mb-6 border border-blue-100">
                 <Typography component={'div'} variant="body2">
-                  <strong>Information :</strong> Après avoir ajouté la correction, vous pourrez ajouter le contenu détaillé, les notes et les dates de rendu.
+                  <strong>Information :</strong> après avoir ajouté la correction, vous pourrez ajouter le contenu détaillé, les notes et les dates de rendu.
                   {classTabValue === 1 && classId && (
                     <Box sx={{ mt: 1 }}>
-                      <strong>Note :</strong> La classe sélectionnée sera automatiquement associée à cette activité.
+                      <strong>Note :</strong> la classe sélectionnée sera automatiquement associée à cette activité.
                     </Box>
                   )}
                 </Typography>

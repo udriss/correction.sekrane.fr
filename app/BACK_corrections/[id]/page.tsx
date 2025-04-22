@@ -838,7 +838,7 @@ export default function CorrectionDetail({ params }: { params: Promise<{ id: str
             boxShadow: 2
           }}
         >
-          Correction non trouvée
+          Correction introuvable
         </Alert>
       </Container>
     );
@@ -903,6 +903,7 @@ export default function CorrectionDetail({ params }: { params: Promise<{ id: str
                   
                   {/* Header component with enhanced styling */}
                   <CorrectionHeader
+                    activityName='Nom de la activité'
                     correction={correction}
                     editedName={editedName}
                     isEditingName={isEditingName}

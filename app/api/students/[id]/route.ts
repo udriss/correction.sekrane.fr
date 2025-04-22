@@ -104,11 +104,11 @@ export async function DELETE(
     const student = students[0];
     const studentName = `${student.first_name} ${student.last_name}`;
 
-    // Get related corrections before deleting them (for logging purposes)
+    // Get related corrections_autres before deleting them (for logging purposes)
     const relatedCorrections = await query<any[]>(`
       SELECT c.id, c.activity_id, a.name as activity_name, c.grade, c.class_id
-      FROM corrections c
-      LEFT JOIN activities a ON c.activity_id = a.id
+      FROM corrections_autres c
+      LEFT JOIN activities_autres a ON c.activity_id = a.id
       WHERE c.student_id = ?
     `, [studentId]);
     
@@ -119,12 +119,12 @@ export async function DELETE(
       
       // Delete corrections
       await query(`
-        DELETE FROM corrections WHERE student_id = ?
+        DELETE FROM corrections_autres WHERE student_id = ?
       `, [studentId]);
       
       // Log the deletion of corrections
       await createLogEntry({
-        action_type: 'DELETE_STUDENT_CORRECTIONS',
+        action_type: 'DELETE_STUDENT_CORRECTIONS_AUTRES',
         description: `Suppression de ${relatedCorrections.length} correction(s) associée(s) à l'étudiant ${studentName} (ID: ${studentId})`,
         entity_type: 'student',
         entity_id: studentId,

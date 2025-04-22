@@ -16,21 +16,18 @@ import {
   TableSortLabel,
   IconButton,
   Chip,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogContentText,
-  DialogTitle,
   Tabs,
   Tab,
   TextField,
   CircularProgress,
   FormControl,
-  InputLabel,
   Select,
   MenuItem,
   Link,
   Tooltip,
+  List,
+  ListItem,
+  ListItemText,
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import EditIcon from '@mui/icons-material/Edit';
@@ -40,8 +37,6 @@ import CloseIcon from '@mui/icons-material/Close';
 import PersonAddIcon from '@mui/icons-material/PersonAdd';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import CheckIcon from '@mui/icons-material/Check';
-import CancelIcon from '@mui/icons-material/Cancel';
-import SaveIcon from '@mui/icons-material/Save';
 import FilterListIcon from '@mui/icons-material/FilterList';
 import LayersIcon from '@mui/icons-material/Layers';
 import LoadingSpinner from '@/components/LoadingSpinner';
@@ -53,13 +48,12 @@ import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
 import EmailIcon from '@mui/icons-material/Email';
-import PersonIcon from '@mui/icons-material/Person';
-import StudentEditDialogForDetail from '@/components/students/StudentEditDialogForDetail';
 import StudentEditDialog from '@/components/students/StudentEditDialog';
+import AlertDialog from '@/components/AlertDialog';
+import WarningIcon from '@mui/icons-material/Warning';
+import dayjs from 'dayjs';
 
 import type { Student as ImportedStudent } from '@/lib/types';
-import { ThemeContext } from '@emotion/react';
-import { th } from 'date-fns/locale';
 
 // Define local Student type that matches the component expectations
 interface Student extends Omit<ImportedStudent, 'email'> {
@@ -121,6 +115,8 @@ export default function ClassStudentsManager({
   const [showBatchForm, setShowBatchForm] = useState(showBatchFormInitially);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [studentToDelete, setStudentToDelete] = useState<number | null>(null);
+  const [deleteProcessing, setDeleteProcessing] = useState(false);
+  const [relatedCorrections, setRelatedCorrections] = useState<any[]>([]);
   const [activeTab, setActiveTab] = useState<number>(initialActiveTab);
   const [subClassTab, setSubClassTab] = useState<number>(0);
   const [currentFilter, setCurrentFilter] = useState<number | null>(null);
@@ -149,6 +145,74 @@ export default function ClassStudentsManager({
   // Structure pour mémoriser les groupes disponibles par classe
   const [classGroupsMapping, setClassGroupsMapping] = useState<{[classId: number]: string[]}>({});
 
+  // Contenu du dialog de confirmation de suppression
+  const deleteDialogContent = useMemo(() => {
+    const student = students.find(s => s.id === studentToDelete);
+    
+    return (
+      <Box>
+        <Typography variant="body1" gutterBottom>
+          Êtes-vous sûr de vouloir supprimer l'étudiant <strong>{student?.first_name} {student?.last_name}</strong> de cette classe ?
+        </Typography>
+        <Typography variant="body1" gutterBottom sx={{ mt: 2 }}>
+          Cette action est irréversible et supprimera uniquement l'association entre l'étudiant et cette classe.
+        </Typography>
+        
+        {relatedCorrections.length > 0 ? (
+          <List sx={{ 
+            bgcolor: 'background.paper', 
+            borderRadius: 1,
+            border: '1px solid',
+            borderColor: 'divider',
+            my: 2,
+            maxHeight: '300px',
+            overflow: 'auto'
+          }}>
+            {relatedCorrections.map((correction, index) => (
+              <ListItem key={correction.id || index} divider={index < relatedCorrections.length - 1}>
+                <ListItemText
+                  primary={correction.activity_name || 'Activité sans nom'}
+                  secondary={
+                    <React.Fragment>
+                      <Typography component="span" variant="body2" color="text.primary">
+                        {correction.class_name || 'Sans classe'}
+                      </Typography>
+                      {' — '}
+                      {correction.final_grade !== null && correction.final_grade !== undefined 
+                        ? `Note : ${correction.final_grade}`
+                        : correction.grade !== null && correction.grade !== undefined
+                        ? `Note : ${correction.grade}`
+                        : 'Non noté'}
+                      {correction.submission_date && 
+                        ` - soumis le ${dayjs(correction.submission_date).format('DD/MM/YYYY')}`}
+                    </React.Fragment>
+                  }
+                />
+              </ListItem>
+            ))}
+          </List>
+        ) : (
+          <Typography variant="body2" sx={{ 
+            py: 2, 
+            px: 3, 
+            bgcolor: 'background.paper',
+            borderRadius: 1,
+            border: '1px solid',
+            borderColor: 'divider',
+            fontStyle: 'italic',
+            my: 2
+          }}>
+            Aucune correction associée trouvée
+          </Typography>
+        )}
+
+        <Typography variant="body2" color="error" sx={{ mt: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
+          <WarningIcon fontSize="small" />
+          Toutes les données associées à cet étudiant seront définitivement supprimées.
+        </Typography>
+      </Box>
+    );
+  }, [studentToDelete, students, relatedCorrections]);
 
   // Fonctions pour afficher/masquer les colonnes
   const toggleEmailColumn = () => {
@@ -533,9 +597,28 @@ export default function ClassStudentsManager({
     );
   };
   
-  const handleOpenDeleteDialog = (studentId: number) => {
-    setStudentToDelete(studentId);
-    setDeleteDialogOpen(true);
+  const handleOpenDeleteDialog = async (studentId: number) => {
+    try {
+      setStudentToDelete(studentId);
+      setDeleteProcessing(true);
+      
+      // Récupérer les corrections associées à l'étudiant avant d'ouvrir la boîte de dialogue
+      const res = await fetch(`/api/students/${studentId}/corrections`);
+      if (res.ok) {
+        const corrections = await res.json();
+        setRelatedCorrections(Array.isArray(corrections) ? corrections : []);
+      } else {
+        setRelatedCorrections([]);
+      }
+      
+      setDeleteProcessing(false);
+      setDeleteDialogOpen(true);
+    } catch (error) {
+      console.error('Error fetching related corrections:', error);
+      setRelatedCorrections([]);
+      setDeleteProcessing(false);
+      setDeleteDialogOpen(true);
+    }
   };
   
   const handleCloseDeleteDialog = () => {
@@ -547,7 +630,8 @@ export default function ClassStudentsManager({
     if (studentToDelete === null) return;
     
     try {
-      const response = await fetch(`/api/classes/${classId}/students/${studentToDelete}`, {
+      // Utilisation de l'API de suppression complète de l'étudiant au lieu de juste supprimer l'association à la classe
+      const response = await fetch(`/api/students/${studentToDelete}`, {
         method: 'DELETE',
       });
       
@@ -1664,24 +1748,19 @@ export default function ClassStudentsManager({
         </Paper>
       )}
       
-      {/* Delete confirmation dialog */}
-      <Dialog
+      {/* Delete confirmation dialog with AlertDialog */}
+      <AlertDialog
         open={deleteDialogOpen}
-        onClose={handleCloseDeleteDialog}
-      >
-        <DialogTitle>Confirmer la suppression</DialogTitle>
-        <DialogContent>
-          <DialogContentText>
-            Êtes-vous sûr de vouloir supprimer cet étudiant de la classe ? Cette action ne peut pas être annulée.
-          </DialogContentText>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={handleCloseDeleteDialog}>Annuler</Button>
-          <Button onClick={handleDeleteStudent} color="error" autoFocus>
-            Supprimer
-          </Button>
-        </DialogActions>
-      </Dialog>
+        title="Confirmation de suppression"
+        content={deleteDialogContent}
+        confirmText="Supprimer définitivement"
+        confirmColor="error"
+        cancelText="Annuler"
+        isProcessing={deleteProcessing}
+        onConfirm={handleDeleteStudent}
+        onCancel={handleCloseDeleteDialog}
+        icon={<WarningIcon />}
+      />
     </Paper>
     
     {error && (

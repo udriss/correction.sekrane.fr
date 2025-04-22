@@ -28,7 +28,7 @@ export async function POST(
       );
       
       if (!Array.isArray(currentState) || currentState.length === 0) {
-        return NextResponse.json({ error: 'Correction non trouvée' }, { status: 404 });
+        return NextResponse.json({ error: 'Correction introuvable' }, { status: 404 });
       }
       
       const oldState = (currentState[0] as any).active === 1;

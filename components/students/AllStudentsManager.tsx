@@ -994,7 +994,7 @@ const AllStudentsManagerNEW: React.FC<AllStudentsManagerProps> = ({
                             </IconButton>
                           </Tooltip>
                       </TableCell>
-                      <TableCell>
+                      <TableCell align="center">
                         <TableSortLabel
                           active={orderBy === 'first_name'}
                           direction={orderBy === 'first_name' ? order : 'asc'}
@@ -1003,18 +1003,18 @@ const AllStudentsManagerNEW: React.FC<AllStudentsManagerProps> = ({
                           Prénom
                         </TableSortLabel>
                       </TableCell>
-                          <TableCell>
-                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                              <EmailIcon fontSize="small" />
-                              <span>Email</span>
-                              <Tooltip title={showEmailColumn ? "Masquer les emails" : "Afficher les emails"}>
-                                <IconButton size="small" onClick={toggleEmailColumn}>
-                                  {showEmailColumn ? <VisibilityOffIcon fontSize="small" /> : <VisibilityIcon fontSize="small" />}
-                                </IconButton>
-                              </Tooltip>
-                            </Box>
-                          </TableCell>
-                      <TableCell>
+                      <TableCell align="center">
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, justifyContent: 'center' }}>
+                          <EmailIcon fontSize="small" />
+                          <span>Email</span>
+                          <Tooltip title={showEmailColumn ? "Masquer les emails" : "Afficher les emails"}>
+                            <IconButton size="small" onClick={toggleEmailColumn}>
+                              {showEmailColumn ? <VisibilityOffIcon fontSize="small" /> : <VisibilityIcon fontSize="small" />}
+                            </IconButton>
+                          </Tooltip>
+                        </Box>
+                      </TableCell>
+                      <TableCell align="center">
                         <TableSortLabel
                           active={orderBy === 'className'}
                           direction={orderBy === 'className' ? order : 'asc'}
@@ -1023,8 +1023,8 @@ const AllStudentsManagerNEW: React.FC<AllStudentsManagerProps> = ({
                           Classe(s)
                         </TableSortLabel>
                       </TableCell>
-                      <TableCell>Groupe(s)</TableCell>
-                      <TableCell>Corrections</TableCell>
+                      <TableCell align="center">Groupe(s)</TableCell>
+                      <TableCell align="center">Corrections</TableCell>
                       <TableCell align="right">Actions</TableCell>
                     </TableRow>
                   </TableHead>
@@ -1064,8 +1064,8 @@ const AllStudentsManagerNEW: React.FC<AllStudentsManagerProps> = ({
                             )}
                           </Box>
                         </TableCell>
-                        <TableCell>{student.first_name}</TableCell>
-                        <TableCell>
+                        <TableCell align="center">{student.first_name}</TableCell>
+                        <TableCell align="center">
                           {showEmailColumn ? student.email : (
                             <Typography 
                               variant="body2" 
@@ -1080,8 +1080,8 @@ const AllStudentsManagerNEW: React.FC<AllStudentsManagerProps> = ({
                             </Typography>
                           )}
                         </TableCell>
-                        <TableCell>
-                          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                        <TableCell align="center">
+                          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, justifyContent: 'center' }}>
                             {student.className && (
                               <Chip 
                                 size="small" 
@@ -1101,10 +1101,10 @@ const AllStudentsManagerNEW: React.FC<AllStudentsManagerProps> = ({
                             ))}
                           </Box>
                         </TableCell>
-                        <TableCell>
+                        <TableCell align="center">
                           {student && student.allClasses ? (
                             // Afficher tous les groupes de l'étudiant pour toutes ses classes
-                            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, justifyContent: 'center' }}>
                               {student.allClasses.map(cls => 
                                 cls.sub_class ? (
                                   <Chip 
@@ -1137,7 +1137,7 @@ const AllStudentsManagerNEW: React.FC<AllStudentsManagerProps> = ({
                             </Typography>
                           )}
                         </TableCell>
-                        <TableCell>
+                        <TableCell align="center">
                           {student.corrections_count ? (
                             <Tooltip title="Consulter tous les corrections">
                               <Chip 
@@ -1162,7 +1162,7 @@ const AllStudentsManagerNEW: React.FC<AllStudentsManagerProps> = ({
                             </Typography>
                           )}
                         </TableCell>
-                        <TableCell align="center">
+                        <TableCell align="right">
                           <Box sx={{ display: 'flex', gap: 0.5, justifyContent: 'flex-end' }}>
                             <Tooltip title="Modifier étudiant">
                               <IconButton
@@ -1232,7 +1232,7 @@ const AllStudentsManagerNEW: React.FC<AllStudentsManagerProps> = ({
                 </Table>
               </TableContainer>
               <TablePagination
-                rowsPerPageOptions={[5, 10, 25, 50]}
+                rowsPerPageOptions={[5, 10, 25, 50, 100, 200]}
                 component="div"
                 count={filteredStudents.length}
                 rowsPerPage={rowsPerPage}

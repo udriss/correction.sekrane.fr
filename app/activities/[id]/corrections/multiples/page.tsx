@@ -50,6 +50,13 @@ interface Class {
   name: string;
 }
 
+// Définir l'interface pour la structure des sous-classes
+interface SubClass {
+  value: string;
+  classId: number;
+  className: string;
+}
+
 export default function MultipleCorrectionsAutrePage({ params }: { params: Promise<{ id: string }> }) {
   // Unwrap the params Promise using React.use()
   const unwrappedParams = React.use(params);
@@ -71,6 +78,11 @@ export default function MultipleCorrectionsAutrePage({ params }: { params: Promi
   const [filteredStudents, setFilteredStudents] = useState<Student[]>([]);
   const [selectedStudentIds, setSelectedStudentIds] = useState<number[]>([]);
   const [classTabValue, setClassTabValue] = useState(0); // 0 = associated, 1 = unassociated
+  
+  // Mettre à jour le type de availableSubClasses 
+  const [availableSubClasses, setAvailableSubClasses] = useState<SubClass[]>([]);
+  const [selectedSubClass, setSelectedSubClass] = useState<string>('all');
+  const [subClassesLoading, setSubClassesLoading] = useState(false);
   
   const [showConfirmation, setShowConfirmation] = useState(false);
   const [warningMessages, setWarningMessages] = useState<string[]>([]);
@@ -150,6 +162,8 @@ export default function MultipleCorrectionsAutrePage({ params }: { params: Promi
     fetchClasses();
     fetchStudents();
   }, [activityId, classTabValue]);
+
+  // console.log(students);
   
   // Filtrer les étudiants lorsque les classes sélectionnées changent
   useEffect(() => {
@@ -164,6 +178,109 @@ export default function MultipleCorrectionsAutrePage({ params }: { params: Promi
       setFilteredStudents(filtered);
     }
   }, [selectedClassIds, students]);
+  
+  // Pour charger les sous-classes lorsque les classes sont sélectionnées
+  useEffect(() => {
+    const loadSubClasses = async () => {
+      if (selectedClassIds.length === 0) {
+        setAvailableSubClasses([]);
+        setSelectedSubClass('all');
+        return;
+      }
+      
+      setSubClassesLoading(true);
+      try {
+        // Récupérer tous les groupes (sous-classes) pour les classes sélectionnées
+        // Structure modifiée pour stocker les informations de classe avec chaque sous-classe
+        const subClassesMap = new Map<string, { value: string, classId: number, className: string }>();
+        
+        // Pour chaque classe sélectionnée, récupérer ses sous-classes
+        for (const classId of selectedClassIds) {
+          const response = await fetch(`/api/classes/${classId}`);
+          if (response.ok) {
+            const classData = await response.json();
+            
+            // Si la classe a des sous-classes définies
+            if (classData.nbre_subclasses && classData.nbre_subclasses > 0) {
+              // Créer un tableau de sous-classes de 1 à nbre_subclasses
+              const subClasses = Array.from(
+                { length: classData.nbre_subclasses },
+                (_, index) => ({
+                  value: (index + 1).toString(),
+                  classId: classId,
+                  className: classData.name
+                })
+              );
+              
+              // Ajouter chaque sous-classe à la Map avec une clé composite
+              subClasses.forEach(subClass => {
+                const compositeKey = `${subClass.classId}:${subClass.value}`;
+                subClassesMap.set(compositeKey, subClass);
+              });
+            }
+          }
+        }
+        
+        // Convertir la Map en tableau et trier d'abord par numéro de groupe puis par nom de classe
+        const subClassesArray = Array.from(subClassesMap.values()).sort((a, b) => {
+          // D'abord trier par numéro de groupe
+          const numComparison = parseInt(a.value) - parseInt(b.value);
+          if (numComparison !== 0) return numComparison;
+          
+          // Si même numéro de groupe, trier par nom de classe
+          return a.className.localeCompare(b.className);
+        });
+        
+        setAvailableSubClasses(subClassesArray);
+      } catch (error) {
+        console.error('Erreur lors du chargement des sous-classes:', error);
+      } finally {
+        setSubClassesLoading(false);
+      }
+    };
+    
+    loadSubClasses();
+  }, [selectedClassIds]);
+  
+  // Filtrer les étudiants par sous-classe lorsque selectedSubClass change
+  useEffect(() => {
+    if (selectedClassIds.length === 0) {
+      // Aucune classe sélectionnée, montrer tous les étudiants
+      setFilteredStudents(students);
+      return;
+    }
+    
+    // Filtrer par classe et sous-classe si applicable
+    const filtered = students.filter(student => {
+      // Vérifier si l'étudiant appartient à au moins une des classes sélectionnées
+      const inSelectedClass = student.allClasses && student.allClasses.some(cls => 
+        selectedClassIds.includes(cls.classId)
+      );
+      
+      if (!inSelectedClass) return false;
+      
+      // Si on filtre également par sous-classe
+      if (selectedSubClass !== 'all') {
+        // Extraire les composants de la clé composite "classId:subClassValue"
+        const [selectedClassIdStr, selectedSubClassValue] = selectedSubClass.split(':');
+        const selectedClassIdNum = parseInt(selectedClassIdStr);
+        
+        // Vérifier si l'étudiant a la sous-classe sélectionnée dans la classe spécifique
+        return student.allClasses && student.allClasses.some(cls => {
+          return cls.classId === selectedClassIdNum && 
+                 cls.sub_class?.toString() === selectedSubClassValue;
+        });
+      }
+      
+      // Sinon, inclure tous les étudiants des classes sélectionnées
+      return true;
+    });
+    
+    console.log(`Nombre d'étudiants après filtrage: ${filtered.length}`);
+    
+    // Mettre à jour les étudiants filtrés
+    setFilteredStudents(filtered);
+  }, [selectedClassIds, selectedSubClass, students]);
   
   // Gestionnaire pour le changement d'onglet des classes
   const handleClassTabChange = (event: React.SyntheticEvent, newValue: number) => {
@@ -237,7 +354,7 @@ export default function MultipleCorrectionsAutrePage({ params }: { params: Promi
         });
         
         if (!groupResponse.ok) {
-          throw new Error('Erreur lors de la création du groupe');
+          throw new Error('Erreur lors de l\'ajout du groupe');
         }
         
         const groupData = await groupResponse.json();
@@ -353,7 +470,7 @@ export default function MultipleCorrectionsAutrePage({ params }: { params: Promi
       }
       
       if (failures.length > 0) {
-        setError(`Échec de création pour ${failures.length} correction(s).`);
+        setError(`Échec de l'ajout pour ${failures.length} correction(s).`);
       }
     } catch (err) {
       console.error('Erreur:', err);
@@ -538,6 +655,85 @@ export default function MultipleCorrectionsAutrePage({ params }: { params: Promi
                 </FormControl>
               </div>
               
+              {/* Sélection de sous-classe (groupe) */}
+              {selectedClassIds.length > 0 && (
+                <div className="mb-6">
+                  <FormControl fullWidth disabled={subClassesLoading}>
+                    <InputLabel id="subclass-select-label">Filtrer par groupe</InputLabel>
+                    <Select
+                      labelId="subclass-select-label"
+                      id="subclass-select"
+                      value={selectedSubClass}
+                      onChange={(e) => setSelectedSubClass(e.target.value)}
+                      input={<OutlinedInput label="Filtrer par groupe" />}
+                      startAdornment={
+                        subClassesLoading ? (
+                          <CircularProgress size={20} className="mr-2" />
+                        ) : (
+                          <GroupIcon className="mr-2 text-gray-400" />
+                        )
+                      }
+                    >
+                      <MenuItem value="all">Tous les groupes</MenuItem>
+                      {availableSubClasses.map((subClass) => (
+                       <MenuItem key={`${subClass.classId}:${subClass.value}`} value={`${subClass.classId}:${subClass.value}`}>
+                          Groupe {subClass.value} - {subClass.className}
+                        </MenuItem>
+                      ))}
+                    </Select>
+                    <FormHelperText>
+                      {subClassesLoading 
+                        ? "Chargement des groupes..." 
+                        : availableSubClasses.length === 0
+                          ? "Aucun groupe disponible pour cette/ces classe(s)"
+                          : "Filtrer les étudiants par groupe"
+                      }
+                    </FormHelperText>
+                  </FormControl>
+                </div>
+              )}
+              
+              {/* Bouton pour sélectionner tous les étudiants du groupe */}
+              {selectedSubClass !== 'all' && availableSubClasses.length > 0 && (
+                <div className="mb-6">
+                  <Button
+                    variant="outlined"
+                    color="primary"
+                    fullWidth
+                    startIcon={<PeopleIcon />}
+                    onClick={() => {
+                      // Extraire les composants de la clé composite (classId:subClass)
+                      const [selectedClassId, selectedGroupValue] = selectedSubClass.split(':');
+                      const classIdNum = parseInt(selectedClassId);
+                      
+                      // Identifier la classe sélectionnée pour l'affichage
+                      const classInfo = availableSubClasses.find(
+                        sc => sc.classId === classIdNum && sc.value === selectedGroupValue
+                      );
+                      
+                      // Sélectionner tous les étudiants du groupe filtré actuel
+                      const studentsInGroup = filteredStudents.map(student => student.id);
+                      setSelectedStudentIds(studentsInGroup);
+                    }}
+                    disabled={filteredStudents.length === 0}
+                  >
+                    {(() => {
+                      // Extraire les informations du groupe sélectionné
+                      if (selectedSubClass === 'all') return "Sélectionner tous les étudiants";
+                      
+                      const [selectedClassId, selectedGroupValue] = selectedSubClass.split(':');
+                      const classIdNum = parseInt(selectedClassId);
+                      
+                      const classInfo = availableSubClasses.find(
+                        sc => sc.classId === classIdNum && sc.value === selectedGroupValue
+                      );
+                      
+                      return `Sélectionner tous les étudiants du Groupe ${selectedGroupValue} - ${classInfo?.className || ''} (${filteredStudents.length})`;
+                    })()}
+                  </Button>
+                </div>
+              )}
+              
               {/* Sélection d'étudiants */}
               <div className="mb-6">
                 <FormControl fullWidth disabled={studentsLoading}>
@@ -629,11 +825,11 @@ export default function MultipleCorrectionsAutrePage({ params }: { params: Promi
               
               <div className="bg-blue-50 p-4 rounded-lg mb-6 border border-blue-100">
                 <Typography component={'div'} variant="body2">
-                  <strong>Information :</strong> Après avoir ajouté les corrections, vous pourrez les éditer individuellement 
-                  ou les gérer en groupe. {showGroupNameField && "Le groupe créé sera accessible depuis la page de l'activité."}
+                  <strong>Information :</strong> après avoir ajouté les corrections, vous pourrez les éditer individuellement 
+                  ou les gérer en groupe. {showGroupNameField && "Le groupe ajouté sera accessible depuis la page de l'activité."}
                   {classTabValue === 1 && selectedClassIds.length > 0 && (
                     <Box sx={{ mt: 1 }}>
-                      <strong>Note :</strong> Les classes non associées sélectionnées seront automatiquement associées à cette activité.
+                      <strong>Note :</strong> les classes non associées sélectionnées seront automatiquement associées à cette activité.
                     </Box>
                   )}
                 </Typography>
@@ -653,8 +849,8 @@ export default function MultipleCorrectionsAutrePage({ params }: { params: Promi
                 
                 <Button
                   type="submit"
-                  variant="contained"
-                  color="primary"
+                  variant="outlined"
+                  color="success"
                   disabled={isSubmitting || selectedStudentIds.length === 0 || (showGroupNameField && !groupName.trim())}
                   startIcon={isSubmitting ? <HourglassEmptyIcon className="animate-spin" /> : <CheckIcon />}
                   size="large"
@@ -663,7 +859,7 @@ export default function MultipleCorrectionsAutrePage({ params }: { params: Promi
                     ? "Création en cours..." 
                     : selectedStudentIds.length === 0
                       ? "Aucune correction, choisir étudiant"
-                      : `Créer ${selectedStudentIds.length} correction${selectedStudentIds.length > 1 ? 's' : ''}`
+                      : `Ajouter ${selectedStudentIds.length} correction${selectedStudentIds.length > 1 ? 's' : ''}`
                     }
                 </Button>
               </div>

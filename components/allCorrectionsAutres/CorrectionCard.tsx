@@ -64,10 +64,11 @@ const CorrectionCardAutre: React.FC<CorrectionCardProps> = ({
   onChangeStatus,
   standalone = false
 }) => {
+
   // Utiliser le hook optionnel qui fonctionne même sans provider
   const { batchDeleteMode, selectedCorrections, toggleCorrectionSelection, deletingCorrections } = useOptionalBatchDelete();
-  const isSelected = (selectedCorrections as string[]).includes(correction.id?.toString() || '');
-  const isDeleting = deletingCorrections.has(correction.id?.toString() || '');
+  const isSelected = (selectedCorrections as string[]).includes((correction.id !== undefined && correction.id !== null) ? correction.id.toString() : '');
+  const isDeleting = deletingCorrections.has((correction.id !== undefined && correction.id !== null) ? correction.id.toString() : '');
   
   // État local pour gérer le code de partage et la modale
   const [shareCode, setShareCode] = useState<string | null>(null);
@@ -75,7 +76,7 @@ const CorrectionCardAutre: React.FC<CorrectionCardProps> = ({
   
   // État pour suivre le statut actif et l'état de chargement
   const [isActive, setIsActive] = useState<boolean>(correction.active !== undefined ? !!correction.active : true);
-  const [isToggling, setIsToggling] = useState<boolean>(false);
+
   
   // State to track correction status
   const [correctionStatus, setCorrectionStatus] = useState<string>(
@@ -372,15 +373,28 @@ const CorrectionCardAutre: React.FC<CorrectionCardProps> = ({
           )}
           
           {showStudent && (
-            <Typography 
-              variant="body2" 
-              color="text.secondary" 
-              noWrap
-              title={correction.student_name} // Ajoute un tooltip natif sur hover
-              sx={{ textOverflow: 'ellipsis' }}
+            <Link 
+              href={`/students/${correction.student_id}`}
+              target="_blank" 
+              rel="noopener noreferrer"
+              style={{ textDecoration: 'none' }}
             >
-              {correction.student_name || 'Étudiant inconnu'}
-            </Typography>
+              <Typography 
+                variant="body2" 
+                color="text.secondary" 
+                noWrap
+                title={correction.student_name} // Ajoute un tooltip natif sur hover
+                sx={{ 
+                  textOverflow: 'ellipsis',
+                  '&:hover': {
+                    textDecoration: 'underline',
+                    color: 'primary.main'
+                  }
+                }}
+              >
+                {correction.student_name || 'Étudiant inconnu'}
+              </Typography>
+            </Link>
           )}
           
           {showClass && correction.class_name && (
@@ -628,11 +642,12 @@ const CorrectionCardAutre: React.FC<CorrectionCardProps> = ({
               
               {/* Bouton d'édition */}
               <Tooltip title="Éditer la correction">
-                <Link href={`/corrections/${correction.id}`} passHref target="_blank" rel="noopener noreferrer">
+                <Link href={correction.id !== undefined && correction.id !== null ? `/corrections/${correction.id}` : '#'} passHref target="_blank" rel="noopener noreferrer">
                 <IconButton
                   size="small"
                   color="primary"
                   aria-label="edit correction"
+                  disabled={correction.id === undefined || correction.id === null}
                   sx={{ 
                   bgcolor: theme => alpha(theme.palette.primary.main, 0.1),
                   '&:hover': {
@@ -668,44 +683,11 @@ const CorrectionCardAutre: React.FC<CorrectionCardProps> = ({
       )}
 
 
-      
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
       {/* Modal de partage */}
       <ShareModal 
         open={shareModalOpen}
         onClose={handleCloseShareModal}
-        correctionId={correction.id.toString()}
+        correctionId={correction.id !== undefined && correction.id !== null ? correction.id.toString() : ''}
         onShareSuccess={handleShareSuccess}
       />
     </Paper>

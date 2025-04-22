@@ -63,7 +63,7 @@ export async function PUT(
 
     if (!result || !result.affectedRows || result.affectedRows === 0) {
       return NextResponse.json(
-        { message: 'Correction non trouvée ou non modifiée' },
+        { message: 'Correction introuvable ou non modifiée' },
         { status: 404 }
       );
     }

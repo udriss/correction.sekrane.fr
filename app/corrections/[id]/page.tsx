@@ -118,8 +118,8 @@ export default function CorrectionAutreDetail({ params }: { params: Promise<{ id
   const [submissionDate, setSubmissionDate] = useState<dayjs.Dayjs | null>(null);
   const [saveDateTimeout, setSaveDateTimeout] = useState<NodeJS.Timeout | null>(null);
   const [saveGradeTimeout, setSaveGradeTimeout] = useState<NodeJS.Timeout | null>(null);
-  // Determine if the correction is active
-  const isActive = correction?.active === 1 || correction?.status === 'ACTIVE';
+
+
 
   // Pour le calcul du pourcentage et de la note finale
   const totalPointsEarned = correction?.points_earned?.reduce((sum, points) => sum + points, 0) || 0;
@@ -142,7 +142,7 @@ export default function CorrectionAutreDetail({ params }: { params: Promise<{ id
   const handleSaveDates = async (deadline: string | null, submissionDate: string | null) => {
     try {
       if (!correction) {
-        throw new Error('Correction non trouvée');
+        throw new Error('Correction introuvable');
       }
       
       setError('');
@@ -644,7 +644,7 @@ export default function CorrectionAutreDetail({ params }: { params: Promise<{ id
     return (
       <Container maxWidth="md" sx={{ py: 4 }}>
         <ErrorDisplay 
-          error="Correction non trouvée"
+          error="Correction introuvable"
         />
         <Box sx={{ mt: 2, textAlign: 'center' }}>
           <Button 
@@ -696,6 +696,7 @@ export default function CorrectionAutreDetail({ params }: { params: Promise<{ id
                 />
                 
                 <CorrectionHeader
+                  activityName={activity.name}
                   correction={correction}
                   editedName={editedName}
                   isEditingName={isEditingName}

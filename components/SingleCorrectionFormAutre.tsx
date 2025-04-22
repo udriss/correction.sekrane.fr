@@ -255,12 +255,22 @@ const SingleCorrectionFormAutre: React.FC<SingleCorrectionFormAutreProps> = ({
       setLoading(true);
       setError('');
       
+      // Utiliser getSubClassForClassId pour obtenir la sous-classe spécifique à la classe sélectionnée
+      let subClass = null;
+      if (selectedClassId && selectedStudentId) {
+        const student = students.find(s => s.id === Number(selectedStudentId));
+        if (student) {
+          subClass = getSubClassForClassId(student, Number(selectedClassId));
+        }
+      }
+      
       const correctionData = {
         activity_id: activityId,
         student_id: selectedStudentId,
         points_earned: partScores,
         total_score: totalScore,
-        class_id: selectedClassId || null
+        class_id: selectedClassId || null,
+        sub_class: subClass
       };
       
       const response = await fetch('/api/corrections_autres', {
@@ -382,6 +392,19 @@ const SingleCorrectionFormAutre: React.FC<SingleCorrectionFormAutreProps> = ({
     return `${firstName} ${lastName}`.trim() || 'Étudiant sans nom';
   };
   
+  // Fonction utilitaire pour récupérer sub_class en fonction de la classe actuelle
+  const getSubClassForClassId = (student: any, classId: number): string | null => {
+    if (!student.allClasses || student.allClasses.length === 0) {
+      return student.sub_class || null;
+    }
+    
+    // Chercher la classe spécifiée dans allClasses
+    const classEntry = student.allClasses.find((cls: { classId: number, sub_class?: string }) => cls.classId === classId);
+    
+    // Retourner la sub_class de cette classe spécifique si elle existe
+    return classEntry?.sub_class || null;
+  };
+
   // Gestion de la fermeture de la snackbar
   const handleCloseSnackbar = (event?: React.SyntheticEvent | Event, reason?: string) => {
     if (reason === 'clickaway') {

@@ -4,13 +4,13 @@ Plateforme de gestion des corrections et de feedback pour les enseignants en sci
 
 ## Présentation
 
-Cette application web permet aux enseignants de créer, gérer et distribuer des corrections personnalisées pour des travaux pratiques et des exercices. Elle offre un système complet de gestion des étudiants, des classes, des activités pédagogiques et des fragments de correction réutilisables.
+Cette application web permet aux enseignants d'ajouter, gérer et distribuer des corrections personnalisées pour des travaux pratiques et des exercices. Elle offre un système complet de gestion des étudiants, des classes, des activités pédagogiques et des fragments de correction réutilisables.
 
 ## Structure de la base de données
 
 ### Utilisateurs et Étudiants
 
-- **utilisateurs (Users)** : enseignants et administrateurs qui peuvent créer et gérer des corrections
+- **utilisateurs (Users)** : enseignants et administrateurs qui peuvent ajouter et gérer des corrections
 - **étudiants (Students)** : apprenants organisés par classes et sous-classes, qui reçoivent les corrections
 
 ### Organisation pédagogique
@@ -271,6 +271,6 @@ Il est strictement interdit de :
 - copier ou partager les fragments de correction
 - reproduire le système de correction
 - utiliser le code source à des fins commerciales ou non-commerciales
-- créer des œuvres dérivées basées sur cette application
+- ajouter des œuvres dérivées basées sur cette application
 
 Toute utilisation non autorisée constitue une violation des droits d'auteur et peut entraîner des poursuites judiciaires.

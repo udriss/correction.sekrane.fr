@@ -53,7 +53,7 @@ export async function PUT(
         : null;
         
       if (!oldCorrection) {
-        return NextResponse.json({ error: 'Correction non trouvée' }, { status: 404 });
+        return NextResponse.json({ error: 'Correction introuvable' }, { status: 404 });
       }
 
       // Déterminer les champs à mettre à jour

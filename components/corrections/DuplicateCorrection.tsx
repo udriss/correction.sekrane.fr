@@ -890,7 +890,7 @@ export default function DuplicateCorrection({ correctionId }: DuplicateCorrectio
                         color="primary"
                       />
                       <Typography>
-                        Créer un groupe pour ces étudiants
+                        Ajouter un groupe pour ces étudiants
                       </Typography>
                     </Box>
                   </FormControl>

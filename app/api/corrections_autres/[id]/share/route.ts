@@ -67,7 +67,7 @@ export async function POST(
 
       // Stocker le code dans la base de données avec le type correction_autre
       await connection.query(
-        `INSERT INTO share_codes (code, correction_id, type) VALUES (?, ?, 'correction_autre')`,
+        `INSERT INTO share_codes (code, correction_id) VALUES (?, ?)`,
         [code, correctionId]
       );
 

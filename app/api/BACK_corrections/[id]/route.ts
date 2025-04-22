@@ -25,7 +25,7 @@ export async function GET(
     // Récupérer la correction
     const correction = await getCorrectionById(idNumber);
     if (!correction) {
-      return NextResponse.json({ error: 'CorrectionNotFound: Correction non trouvée' }, { status: 404 });
+      return NextResponse.json({ error: 'CorrectionNotFound: Correction introuvable' }, { status: 404 });
     }
 
     return await withConnection(async (connection) => {
@@ -142,7 +142,7 @@ export async function PUT(
       );
       
       if (!Array.isArray(oldCorrectionResult) || oldCorrectionResult.length === 0) {
-        return NextResponse.json({ error: 'CorrectionNotFound: Correction non trouvée' }, { status: 404 });
+        return NextResponse.json({ error: 'CorrectionNotFound: Correction introuvable' }, { status: 404 });
       }
       
       const oldCorrection = oldCorrectionResult[0] as any;
@@ -283,7 +283,7 @@ export async function PUT(
       );
       
       if ((result as any).affectedRows === 0) {
-        return NextResponse.json({ error: 'CorrectionNotFound: Correction non trouvée ou non modifiée' }, { status: 404 });
+        return NextResponse.json({ error: 'CorrectionNotFound: Correction introuvable ou non modifiée' }, { status: 404 });
       }
       
       // Récupérer la correction mise à jour pour la retourner
@@ -373,7 +373,7 @@ export async function DELETE(
       );
       
       if (!Array.isArray(rows) || rows.length === 0) {
-        return new NextResponse(JSON.stringify({ error: 'CorrectionNotFound: Correction non trouvée' }), {
+        return new NextResponse(JSON.stringify({ error: 'CorrectionNotFound: Correction introuvable' }), {
           status: 404,
           headers: {
             'Cache-Control': 'no-cache, no-store, must-revalidate',
@@ -466,7 +466,7 @@ export async function PATCH(
         : null;
         
       if (!oldCorrection) {
-        return { success: false, message: 'Correction non trouvée' };
+        return { success: false, message: 'Correction introuvable' };
       }
 
       // Construire l'ensemble des champs à mettre à jour

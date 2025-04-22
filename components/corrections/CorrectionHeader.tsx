@@ -13,7 +13,6 @@ import {
   alpha,
   Tooltip,
 } from '@mui/material';
-import { rgbToHex } from '@mui/material/styles';
 import EditIcon from '@mui/icons-material/Edit';
 import CheckIcon from '@mui/icons-material/Check';
 import CloseIcon from '@mui/icons-material/Close';
@@ -27,6 +26,7 @@ import DoNotDisturbIcon from '@mui/icons-material/DoNotDisturb';
 import HourglassDisabledIcon from '@mui/icons-material/HourglassDisabled';
 
 interface CorrectionHeaderProps {
+  activityName: string;
   correction: any;
   editedName: string;
   firstName: string;
@@ -50,8 +50,8 @@ interface CorrectionHeaderProps {
 }
 
 const CorrectionHeader: React.FC<CorrectionHeaderProps> = ({
+  activityName,
   correction,
-  editedName,
   firstName,
   lastName,
   isEditingName,
@@ -64,7 +64,6 @@ const CorrectionHeader: React.FC<CorrectionHeaderProps> = ({
   handleSaveName,
   handleDelete,
   handleCancelDelete,
-  handleToggleActive,
   email = '',
   setEmail = () => {},
   correctionStatus,
@@ -91,7 +90,6 @@ const CorrectionHeader: React.FC<CorrectionHeaderProps> = ({
     }
   }, [isEditingName, correction, firstName, lastName, email]);
 
-  
   // Add type guards around student_name usage
   const displayName = firstName + ' ' +  lastName || `${correction.activity_name || 'Activité'} - Sans nom`;
   // Mise à jour: utiliser le status au lieu de active
@@ -254,9 +252,27 @@ const CorrectionHeader: React.FC<CorrectionHeaderProps> = ({
           </Stack>
         ) : (
           <Box sx={{ display: 'flex', alignItems: 'center' }}>
-            <Typography variant="h4" component="h1" color='text.primary' fontWeight="bold">
+            <Link 
+              href={`/students/${correction.student_id}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{ textDecoration: 'none' }}
+            >
+              <Typography 
+              variant="h4" 
+              component="h1" 
+              color='text.primary' 
+              fontWeight="bold"
+              sx={{ 
+                cursor: 'pointer',
+                '&:hover': {
+                color: 'primary.main'
+                }
+              }}
+              >
               {displayName}
-            </Typography>
+              </Typography>
+            </Link>
             <IconButton
               onClick={() => setIsEditingName(true)}
               color='secondary'
@@ -356,17 +372,15 @@ const CorrectionHeader: React.FC<CorrectionHeaderProps> = ({
         {!isEditingName && (
           <>
             <Typography sx={{ color: 'text.primary', mt: 1 }}>
-              Activité : 
-              
               <Link 
               href={`/activities/${correction.activity_id}`}
               style={{ color: 'primary.dark', textDecoration: 'none' , fontWeight: 'bold' }}
               target="_blank"
               rel="noopener noreferrer">
                 <Button variant="text" sx={{
-                   textTransform: 'none', p: 0, minWidth: 0, verticalAlign: 'baseline',
-                   fontWeight: 'bold',}}>
-                  &nbsp;{correction.activity_name}
+                  textTransform: 'none', p: 0, minWidth: 0, verticalAlign: 'baseline',
+                  fontWeight: 'bold',}}>
+                  Activité{activityName ? ` : ${activityName}` : ''}
                 </Button>
               </Link>
             </Typography>

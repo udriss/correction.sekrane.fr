@@ -662,10 +662,10 @@ export default function MultipleCorrectionsPage({ params }: { params: Promise<{ 
                   size="large"
                 >
                     {isSubmitting 
-                    ? "Création en cours..." 
+                    ? "Ajout en cours..." 
                     : selectedStudentIds.length === 0
                       ? "Aucune correction, choisir étudiant"
-                      : `Créer ${selectedStudentIds.length} correction${selectedStudentIds.length > 1 ? 's' : ''}`
+                      : `Ajouter ${selectedStudentIds.length} correction${selectedStudentIds.length > 1 ? 's' : ''}`
                     }
                 </Button>
               </div>

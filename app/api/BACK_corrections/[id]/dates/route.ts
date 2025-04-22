@@ -44,7 +44,7 @@ export async function PUT(
         : null;
         
       if (!oldCorrection) {
-        return NextResponse.json({ error: 'Correction non trouvée' }, { status: 404 });
+        return NextResponse.json({ error: 'Correction introuvable' }, { status: 404 });
       }
 
       // Construire la requête SQL pour mettre à jour uniquement les dates

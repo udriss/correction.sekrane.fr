@@ -268,7 +268,7 @@ export default function FeedbackViewer({ params }: { params: Promise<{ code: str
       >
         <Box sx={{ maxWidth: '4xl', width: '100%' }}>
           <Alert severity="warning">
-            Correction non trouvée
+            Correction introuvable
           </Alert>
         </Box>
       </Box>

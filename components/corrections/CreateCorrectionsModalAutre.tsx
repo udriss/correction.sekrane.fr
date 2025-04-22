@@ -151,7 +151,7 @@ export default function CreateCorrectionsModalAutre({
       fullWidth
     >
       <DialogTitle>
-        Créer des corrections multiples
+        Ajouter des corrections multiples
       </DialogTitle>
       
       <DialogContent>
@@ -266,7 +266,7 @@ export default function CreateCorrectionsModalAutre({
                   onChange={(e) => setCreateGroup(e.target.checked)}
                 />
               }
-              label="Créer un groupe pour ces corrections"
+              label="Ajouter un groupe pour ces corrections"
             />
             
             {createGroup && (
@@ -322,7 +322,7 @@ export default function CreateCorrectionsModalAutre({
             disabled={!isStepTwoValid || loading}
             startIcon={loading ? <CircularProgress size={20} /> : null}
           >
-            Créer les corrections
+            Ajouter les corrections
           </Button>
         )}
       </DialogActions>

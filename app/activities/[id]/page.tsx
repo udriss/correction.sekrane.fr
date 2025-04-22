@@ -782,8 +782,8 @@ export default function ActivityAutreDetail({ params }: { params: Promise<{ id: 
               
               {corrections.length === 0 ? (
                 <Paper sx={{ p: 4, textAlign: 'center', mb: 2 }}>
-                  <Typography variant="body1" >
-                    Aucune correction n'a été créée pour cette activité.
+                  <Typography sx={{ mb: 2 }} variant="body1" >
+                    Aucune correction disponible pour cette activité.
                   </Typography>
                   <Button
                     variant="outlined"
@@ -791,7 +791,7 @@ export default function ActivityAutreDetail({ params }: { params: Promise<{ id: 
                     startIcon={<AddIcon />}
                     onClick={handleNewCorrectionClick}
                   >
-                    Créer une correction
+                    Ajouter une correction
                   </Button>
                 </Paper>
               ) : (

@@ -32,9 +32,7 @@ import {
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import SearchIcon from '@mui/icons-material/Search';
-import EditIcon from '@mui/icons-material/Edit';
 import MenuBookIcon from '@mui/icons-material/MenuBook';
-import ScienceIcon from '@mui/icons-material/Science';
 import FormatListBulletedIcon from '@mui/icons-material/FormatListBulleted';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import RateReviewIcon from '@mui/icons-material/RateReview';
@@ -443,7 +441,7 @@ export default function ActivitiesAutresPage() {
               </StepLabel>
               <StepContent>
                 <Typography variant="body2">
-                  Une activité à parties dynamiques vous permet de créer des barèmes flexibles en définissant autant 
+                  Une activité à parties dynamiques vous permet d'ajouter des barèmes flexibles en définissant autant 
                   de parties que nécessaire, chacune avec son propre nombre de points.
                 </Typography>
               </StepContent>
@@ -535,7 +533,7 @@ export default function ActivitiesAutresPage() {
               Aucune activité trouvée
             </Typography>
             <Typography variant="body1" color="textSecondary" mb={4} className="max-w-md mx-auto">
-              Les activités avec parties dynamiques vous permettent de créer des barèmes flexibles. 
+              Les activités avec parties dynamiques vous permettent d'ajouter des barèmes flexibles. 
               Ajoutez votre première activité pour commencer à noter vos étudiants.
             </Typography>
             <Button 

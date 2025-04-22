@@ -25,6 +25,7 @@ import LinkOffIcon from '@mui/icons-material/LinkOff';
 import CheckIcon from '@mui/icons-material/Check';
 import CloseIcon from '@mui/icons-material/Close';
 import EmailIcon from '@mui/icons-material/Email';
+import WarningIcon from '@mui/icons-material/Warning';
 import { alpha } from '@mui/material/styles';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -41,6 +42,8 @@ import { getBatchShareCodes } from '@/lib/services/shareService';
 import { changeCorrectionAutreStatus } from '@/lib/services/correctionsAutresService';
 import StudentEditDialog from '@/components/students/StudentEditDialog';
 import BulkEmailDialog from '@/components/students/BulkEmailDialog';
+import AlertDialog from '@/components/AlertDialog';
+import dayjs from 'dayjs';
 
 // Définition des interfaces nécessaires
 interface TabPanelProps {
@@ -136,6 +139,15 @@ export default function ClassAutreDetailPage({ params }: { params: Promise<{ id:
       step: '',
       error: null as string | null
     });
+
+    // État pour la map des codes de partage
+    const [shareCodesMap, setShareCodesMap] = useState<Map<string, string>>(new Map());
+
+    // États pour la suppression d'étudiant avec AlertDialog
+    const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+    const [studentToDelete, setStudentToDelete] = useState<number | null>(null);
+    const [deleteProcessing, setDeleteProcessing] = useState(false);
+    const [relatedCorrections, setRelatedCorrections] = useState<any[]>([]);
   
   // Fonction pour gérer le changement d'onglet
   const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
@@ -198,36 +210,68 @@ export default function ClassAutreDetailPage({ params }: { params: Promise<{ id:
   };
   
   // Fonction pour supprimer un étudiant (afficher confirmation)
-  const handleDeleteClick = (studentId: number) => {
-    setConfirmingDelete(studentId);
-  };
-  
-  // Fonction pour annuler la suppression
-  const handleCancelDelete = () => {
-    setConfirmingDelete(null);
-  };
-  
-  // Fonction pour confirmer la suppression d'un étudiant
-  const handleConfirmDelete = async (studentId: number) => {
+  const handleDeleteClick = async (studentId: number) => {
     try {
-      const response = await fetch(`/api/students/${studentId}`, {
+      setStudentToDelete(studentId);
+      setDeleteProcessing(true);
+      
+      // Récupérer les corrections associées à l'étudiant avant d'ouvrir la boîte de dialogue
+      const res = await fetch(`/api/students/${studentId}/corrections`);
+      if (res.ok) {
+        const corrections = await res.json();
+        setRelatedCorrections(Array.isArray(corrections) ? corrections : []);
+      } else {
+        setRelatedCorrections([]);
+      }
+      
+      setDeleteProcessing(false);
+      setDeleteDialogOpen(true);
+    } catch (error) {
+      console.error('Error fetching related corrections:', error);
+      setRelatedCorrections([]);
+      setDeleteProcessing(false);
+      setDeleteDialogOpen(true);
+    }
+  };
+  
+  // Fonction pour fermer le dialogue de confirmation de suppression
+  const handleCloseDeleteDialog = () => {
+    setDeleteDialogOpen(false);
+    setStudentToDelete(null);
+  };
+  
+  // Fonction pour confirmer la suppression de l'étudiant
+  const handleConfirmDelete = async () => {
+    if (studentToDelete === null) return;
+    
+    try {
+      setDeleteProcessing(true);
+      const response = await fetch(`/api/students/${studentToDelete}`, {
         method: 'DELETE',
       });
       
       if (!response.ok) {
-        throw new Error("Erreur lors de la suppression de l'étudiant");
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Erreur lors de la suppression de l'étudiant");
       }
       
       // Succès
       enqueueSnackbar('Étudiant supprimé avec succès', { variant: 'success' });
       
-      // Réinitialiser et rafraîchir
-      setConfirmingDelete(null);
+      // Rafraîchir les données
       refreshClass();
     } catch (err) {
-      console.error('Erreur:', err);
+      console.error('Error:', err);
       enqueueSnackbar(err instanceof Error ? err.message : 'Une erreur est survenue', { variant: 'error' });
+    } finally {
+      setDeleteProcessing(false);
+      setDeleteDialogOpen(false);
     }
+  };
+  
+  // Fonction pour annuler la suppression
+  const handleCancelDelete = () => {
+    setConfirmingDelete(null);
   };
   
   // Fonction pour récupérer les sous-groupes d'une classe
@@ -312,8 +356,36 @@ export default function ClassAutreDetailPage({ params }: { params: Promise<{ id:
           setError(error);
           throw error;
         }
+        
+        // Traitement des données de corrections avec la nouvelle structure
         const correctionsData = await correctionsResponse.json();
-        setCorrections(correctionsData);
+        
+        // Vérifier si nous avons la nouvelle structure (tableau d'objets avec class_corrections) ou l'ancienne (tableau simple)
+        if (Array.isArray(correctionsData) && correctionsData.length > 0 && 'class_corrections' in correctionsData[0]) {
+          // Nouvelle structure : extraire et aplanir les corrections de classe de chaque étudiant
+          const allClassCorrections: CorrectionAutreEnriched[] = [];
+          
+          correctionsData.forEach((studentData: any) => {
+            if (Array.isArray(studentData.class_corrections)) {
+              // Ajouter les métadonnées de l'étudiant à chaque correction
+              const studentCorrections = studentData.class_corrections.map((correction: any) => ({
+                ...correction,
+                student_id: studentData.student_id,
+                student_name: studentData.student_name,
+                student_email: studentData.student_email,
+                class_corrections_count: studentData.class_corrections_count,
+                total_corrections_count: studentData.total_corrections_count
+              }));
+              
+              allClassCorrections.push(...studentCorrections);
+            }
+          });
+          
+          setCorrections(allClassCorrections);
+        } else {
+          // Ancienne structure ou format non reconnu : utiliser directement
+          setCorrections(correctionsData);
+        }
         
       } catch (err) {
         console.error('Error fetching class:', err);
@@ -329,6 +401,47 @@ export default function ClassAutreDetailPage({ params }: { params: Promise<{ id:
     fetchClassData();
   }, [classId, refreshTrigger]);
   
+
+    // Filtrer les corrections selon les critères actuels
+    const filteredCorrections = useMemo(() => {
+      if (!corrections) return [];
+      
+      return corrections.filter(correction => {
+        // Filtrer par activité
+        if (filterActivity !== 'all' && correction.activity_id !== filterActivity) {
+          return false;
+        }
+        
+        // Filtrer par sous-classe en utilisant les données des étudiants
+        if (filterSubClass !== 'all') {
+          // Trouver l'étudiant associé à cette correction
+          const student = students.find(s => s.id === correction.student_id);
+          // Vérifier si l'étudiant appartient au groupe de filtrage
+          if (!student || student.sub_class?.toString() !== filterSubClass) {
+            return false;
+          }
+        }
+        
+        return true;
+      });
+    }, [corrections, filterActivity, filterSubClass, students]);
+
+    
+  // Effet pour charger les codes de partage
+  useEffect(() => {
+    const loadShareCodes = async () => {
+      if (filteredCorrections && filteredCorrections.length > 0) {
+        const correctionIds = filteredCorrections.map(c => c.id.toString());
+        const shareCodes = await getBatchShareCodes(correctionIds);
+        setShareCodesMap(shareCodes);
+      } else {
+        setShareCodesMap(new Map());
+      }
+    };
+    
+    loadShareCodes();
+  }, [filteredCorrections]);
+
   // Rafraîchir les données de la classe
   const refreshClass = () => {
     setRefreshTrigger(prev => prev + 1);
@@ -485,29 +598,7 @@ export default function ClassAutreDetailPage({ params }: { params: Promise<{ id:
     };
   }, [corrections]);
   
-  // Filtrer les corrections selon les critères actuels
-  const filteredCorrections = useMemo(() => {
-    if (!corrections) return [];
-    
-    return corrections.filter(correction => {
-      // Filtrer par activité
-      if (filterActivity !== 'all' && correction.activity_id !== filterActivity) {
-        return false;
-      }
-      
-      // Filtrer par sous-classe en utilisant les données des étudiants
-      if (filterSubClass !== 'all') {
-        // Trouver l'étudiant associé à cette correction
-        const student = students.find(s => s.id === correction.student_id);
-        // Vérifier si l'étudiant appartient au groupe de filtrage
-        if (!student || student.sub_class?.toString() !== filterSubClass) {
-          return false;
-        }
-      }
-      
-      return true;
-    });
-  }, [corrections, filterActivity, filterSubClass, students]);
+
   
   // Grouper les corrections selon le critère choisi
   const groupedCorrections = useMemo(() => {
@@ -1499,7 +1590,7 @@ const handleDeleteClass = async () => {
                                 <IconButton
                                   size="small"
                                   color="success"
-                                  onClick={() => handleConfirmDelete(student.id!)}
+                                  onClick={() => handleConfirmDelete()}
                                 >
                                   <CheckIcon fontSize="small" />
                                 </IconButton>
@@ -1717,6 +1808,7 @@ const handleDeleteClass = async () => {
                               showClass={false}
                               onChangeStatus={handleChangeStatus}
                               standalone={false}
+                              preloadedShareCode={correction.id ? shareCodesMap.get(correction.id.toString()) : undefined}
                             />
                           </Grid>
                         );
@@ -1939,6 +2031,82 @@ const handleDeleteClass = async () => {
         students={students}
         classId={parseInt(classId)}
         classSubgroups={classData?.nbre_subclasses || 0}
+      />
+
+      {/* AlertDialog pour la suppression d'étudiant */}
+      <AlertDialog
+        open={deleteDialogOpen}
+        title="Confirmation de suppression"
+        content={
+          <Box>
+            <Typography variant="body1" gutterBottom>
+              Êtes-vous sûr de vouloir supprimer l'étudiant <strong>{students.find(s => s.id === studentToDelete)?.first_name} {students.find(s => s.id === studentToDelete)?.last_name}</strong> ?
+            </Typography>
+            <Typography variant="body1" gutterBottom sx={{ mt: 2 }}>
+              Cette action est irréversible et supprimera également :
+            </Typography>
+            
+            {relatedCorrections.length > 0 ? (
+              <List sx={{ 
+                bgcolor: 'background.paper', 
+                borderRadius: 1,
+                border: '1px solid',
+                borderColor: 'divider',
+                my: 2,
+                maxHeight: '300px',
+                overflow: 'auto'
+              }}>
+                {relatedCorrections.map((correction, index) => (
+                  <ListItem key={correction.id || index} divider={index < relatedCorrections.length - 1}>
+                    <ListItemText
+                      primary={correction.activity_name || 'Activité sans nom'}
+                      secondary={
+                        <React.Fragment>
+                          <Typography component="span" variant="body2" color="text.primary">
+                            {correction.class_name || 'Sans classe'}
+                          </Typography>
+                          {' — '}
+                          {correction.final_grade !== null && correction.final_grade !== undefined 
+                            ? `Note: ${correction.final_grade}`
+                            : correction.grade !== null && correction.grade !== undefined
+                            ? `Note: ${correction.grade}`
+                            : 'Non noté'}
+                          {correction.submission_date && 
+                            ` - Soumis le ${dayjs(correction.submission_date).format('DD/MM/YYYY')}`}
+                        </React.Fragment>
+                      }
+                    />
+                  </ListItem>
+                ))}
+              </List>
+            ) : (
+              <Typography variant="body2" sx={{ 
+                py: 2, 
+                px: 3, 
+                bgcolor: 'background.paper',
+                borderRadius: 1,
+                border: '1px solid',
+                borderColor: 'divider',
+                fontStyle: 'italic',
+                my: 2
+              }}>
+                Aucune correction associée trouvée
+              </Typography>
+            )}
+
+            <Typography variant="body2" color="error" sx={{ mt: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
+              <WarningIcon fontSize="small" />
+              Toutes les données associées à cet étudiant seront définitivement supprimées.
+            </Typography>
+          </Box>
+        }
+        confirmText="Supprimer définitivement"
+        confirmColor="error"
+        cancelText="Annuler"
+        isProcessing={deleteProcessing}
+        onConfirm={handleConfirmDelete}
+        onCancel={handleCloseDeleteDialog}
+        icon={<WarningIcon />}
       />
     </Container>
   );

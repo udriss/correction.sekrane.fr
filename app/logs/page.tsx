@@ -429,9 +429,12 @@ export default function LogsPage() {
                 label="Type d'action"
               >
                 <MenuItem value="">Tous</MenuItem>
-                {filterOptions.actionTypes.map((type) => (
-                  <MenuItem key={type} value={type}>{type}</MenuItem>
-                ))}
+                {filterOptions.actionTypes
+                  .slice()
+                  .sort((a, b) => a.localeCompare(b))
+                  .map((type) => (
+                    <MenuItem key={type} value={type}>{type}</MenuItem>
+                  ))}
               </Select>
             </FormControl>
           </Grid>

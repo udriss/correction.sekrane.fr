@@ -231,7 +231,7 @@ export default function MultipleCorrections() {
   // Handle form submission for creating a group
   const handleCreateGroup = async (createdCorrectionIds: string[]) => {
     if (createdCorrectionIds.length === 0 || !groupName.trim()) {
-      setError('Veuillez saisir un nom de groupe et créer des corrections');
+      setError('Veuillez saisir un nom de groupe et ajouter des corrections');
       return;
     }
     

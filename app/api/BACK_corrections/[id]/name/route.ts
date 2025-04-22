@@ -61,7 +61,7 @@ export async function PUT(
       );
 
       if (!Array.isArray(correctionResult) || (correctionResult as any[]).length === 0) {
-        return NextResponse.json({ error: 'Correction non trouvée' }, { status: 404 });
+        return NextResponse.json({ error: 'Correction introuvable' }, { status: 404 });
       }
 
       const student_id = (correctionResult as any[])[0].student_id;

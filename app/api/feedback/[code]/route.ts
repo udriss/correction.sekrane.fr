@@ -117,7 +117,7 @@ export async function GET(
 
       if (!Array.isArray(rows) || rows.length === 0) {
         return NextResponse.json(
-          { error: 'Correction non trouvée' },
+          { error: 'Correction introuvable' },
           { status: 404 }
         );
       }

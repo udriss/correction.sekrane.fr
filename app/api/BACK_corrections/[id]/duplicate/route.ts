@@ -59,7 +59,7 @@ export async function POST(
       );
       
       if (!correctionRows || (correctionRows as any[]).length === 0) {
-        throw new Error('Correction non trouvée');
+        throw new Error('Correction introuvable');
       }
       
       const originalCorrection = (correctionRows as any[])[0];

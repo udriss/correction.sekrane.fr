@@ -126,11 +126,11 @@ export default function NewActivityAutrePage() {
       
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.error || 'Erreur lors de la création de l\'activité');
+        throw new Error(errorData.error || 'Erreur lors de l\'ajout de l\'activité');
       }
       
       const data = await response.json();
-      enqueueSnackbar('Activité créée avec succès', { variant: 'success' });
+      enqueueSnackbar('Activité ajoutée avec succès', { variant: 'success' });
       router.push(`/activities/${data.id}`);
     } catch (error) {
       console.error('Erreur:', error);
@@ -292,7 +292,7 @@ export default function NewActivityAutrePage() {
               type="submit"
               disabled={submitting}
             >
-              {submitting ? <LoadingSpinner size="sm" /> : 'Créer l\'activité'}
+              {submitting ? <LoadingSpinner size="sm" /> : 'Ajouter l\'activité'}
             </Button>
           </Box>
         </form>
