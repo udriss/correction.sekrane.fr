@@ -463,8 +463,8 @@ export default function MultipleCorrectionsAutrePage({ params }: { params: Promi
             const validCorrectionIds = validIds.join(',');
             
             // Utiliser les paramètres standards compatibles avec la page des corrections
-            // Ajouter correctionId pour filtrer spécifiquement ces corrections
-            router.push(`/corrections?activityId=${activityId}&highlight=${validCorrectionIds}&correctionId=${validCorrectionIds}`);
+            // Ajouter selectedCorrectionIds pour filtrer spécifiquement ces corrections
+            router.push(`/corrections?activityId=${activityId}&highlight=${validCorrectionIds}&selectedCorrectionIds=${validCorrectionIds}`);
           }, 1500);
         }
       }

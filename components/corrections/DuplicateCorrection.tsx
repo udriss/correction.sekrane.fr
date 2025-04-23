@@ -17,6 +17,10 @@ import SwapHorizIcon from '@mui/icons-material/SwapHoriz';
 import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline'; // Import de l'icône d'alerte
 import Link from 'next/link';
 import AddCircleIcon from '@mui/icons-material/AddCircle';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import Accordion from '@mui/material/Accordion';
+import AccordionSummary from '@mui/material/AccordionSummary';
+import AccordionDetails from '@mui/material/AccordionDetails';
 
 interface DuplicateCorrectionProps {
   correctionId: string;
@@ -834,80 +838,92 @@ export default function DuplicateCorrection({ correctionId }: DuplicateCorrectio
                 </Typography>
               </FormControl>
               
-              {/* Nouvelle section pour l'assignation à une classe */}
+              {/* Nouvelle section pour l'assignation à une classe et à un groupe dans un accordéon */}
               {studentsToProcess.length > 0 && (
-                <Box sx={{ mb: 3, mt: 3, p: 2, border: '1px solid', borderColor: 'divider', borderRadius: 1 }}>
-                  <Typography variant="subtitle2" gutterBottom fontWeight="medium">
-                    Association à une classe
-                  </Typography>
-                  
-                  <FormControl component="fieldset" sx={{ mb: 2 }}>
-                    <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                      <Switch
-                        checked={assignToClass}
-                        onChange={(e) => setAssignToClass(e.target.checked)}
-                        color="primary"
-                      />
-                      <Typography>
-                        Assigner tous les étudiants à une classe
-                      </Typography>
-                    </Box>
-                  </FormControl>
-                  
-                  {assignToClass && (
-                    <FormControl fullWidth sx={{ mb: 2 }}>
-                      <InputLabel id="assign-class-label">Classe</InputLabel>
-                      <Select
-                        labelId="assign-class-label"
-                        value={selectedClassId}
-                        onChange={(e) => setSelectedClassId(e.target.value as number)}
-                        input={<OutlinedInput label="Classe" />}
-                        startAdornment={<SchoolIcon sx={{ mr: 1, color: 'text.secondary' }} />}
-                        displayEmpty
-                      >
-                        <MenuItem value="">
-                          <em>Sélectionner une classe</em>
-                        </MenuItem>
-                        {classes.map((c) => (
-                          <MenuItem key={c.id} value={c.id}>
-                            {c.name}
-                          </MenuItem>
-                        ))}
-                      </Select>
+                <Accordion sx={{ mb: 3, mt: 3, boxShadow: 'none', '&:before': { display: 'none' }, border: '1px solid', borderColor: 'divider', borderRadius: 1 }}>
+                  <AccordionSummary
+                    expandIcon={<ExpandMoreIcon />}
+                    aria-controls="panel1a-content"
+                    id="panel1a-header"
+                    sx={{ bgcolor: (theme) => alpha(theme.palette.primary.light, 0.05) }}
+                  >
+                    <Typography variant="subtitle2" fontWeight="medium">
+                      Options avancées (classe/groupe)
+                    </Typography>
+                  </AccordionSummary>
+                  <AccordionDetails sx={{ pt: 2 }}>
+                    <Typography variant="subtitle2" gutterBottom fontWeight="medium">
+                      Association à une classe
+                    </Typography>
+                    
+                    <FormControl component="fieldset" sx={{ mb: 2 }}>
+                      <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                        <Switch
+                          checked={assignToClass}
+                          onChange={(e) => setAssignToClass(e.target.checked)}
+                          color="primary"
+                        />
+                        <Typography>
+                          Assigner tous les étudiants à une classe
+                        </Typography>
+                      </Box>
                     </FormControl>
-                  )}
-                  
-                  {/* Section pour le groupe personnalisé */}
-                  <Typography variant="subtitle2" gutterBottom fontWeight="medium" sx={{ mt: 3 }}>
-                    Association à un groupe
-                  </Typography>
-                  
-                  <FormControl component="fieldset" sx={{ mb: 2 }}>
-                    <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                      <Switch
-                        checked={useCustomGroup}
-                        onChange={(e) => setUseCustomGroup(e.target.checked)}
-                        color="primary"
+                    
+                    {assignToClass && (
+                      <FormControl fullWidth sx={{ mb: 2 }}>
+                        <InputLabel id="assign-class-label">Classe</InputLabel>
+                        <Select
+                          labelId="assign-class-label"
+                          value={selectedClassId}
+                          onChange={(e) => setSelectedClassId(e.target.value as number)}
+                          input={<OutlinedInput label="Classe" />}
+                          startAdornment={<SchoolIcon sx={{ mr: 1, color: 'text.secondary' }} />}
+                          displayEmpty
+                        >
+                          <MenuItem value="">
+                            <em>Sélectionner une classe</em>
+                          </MenuItem>
+                          {classes.map((c) => (
+                            <MenuItem key={c.id} value={c.id}>
+                              {c.name}
+                            </MenuItem>
+                          ))}
+                        </Select>
+                      </FormControl>
+                    )}
+                    
+                    {/* Section pour le groupe personnalisé */}
+                    <Typography variant="subtitle2" gutterBottom fontWeight="medium" sx={{ mt: 3 }}>
+                      Association à un groupe
+                    </Typography>
+                    
+                    <FormControl component="fieldset" sx={{ mb: 2 }}>
+                      <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                        <Switch
+                          checked={useCustomGroup}
+                          onChange={(e) => setUseCustomGroup(e.target.checked)}
+                          color="primary"
+                        />
+                        <Typography>
+                          Ajouter un groupe pour ces étudiants
+                        </Typography>
+                      </Box>
+                    </FormControl>
+                    
+                    {useCustomGroup && (
+                      <TextField
+                        fullWidth
+                        label="Nom du groupe"
+                        value={customGroupName}
+                        onChange={(e) => setCustomGroupName(e.target.value)}
+                        placeholder="Ex: Groupe Projet 1"
+                        variant="outlined"
+                        size="small"
+                        required={useCustomGroup}
                       />
-                      <Typography>
-                        Ajouter un groupe pour ces étudiants
-                      </Typography>
-                    </Box>
-                  </FormControl>
-                  
-                  {useCustomGroup && (
-                    <TextField
-                      fullWidth
-                      label="Nom du groupe"
-                      value={customGroupName}
-                      onChange={(e) => setCustomGroupName(e.target.value)}
-                      placeholder="Ex: Groupe Projet 1"
-                      variant="outlined"
-                      size="small"
-                      required={useCustomGroup}
-                    />
-                  )}
-                </Box>
+                    )}
+                  </AccordionDetails>
+                </Accordion>
               )}
               
               {/* List of selected students with editable emails */}

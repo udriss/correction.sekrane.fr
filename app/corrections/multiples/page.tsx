@@ -339,15 +339,15 @@ export default function MultipleCorrectionsAutres() {
         setTimeout(() => {
           const highlightParam = createdCorrectionIds.join(',');
           // Rediriger vers la page des corrections avec des filtres appropriés
-          // Ajouter correctionId pour filtrer spécifiquement ces corrections
-          router.push(`/corrections?classId=${selectedClassId}&highlight={highlightParam}&correctionId=${highlightParam}&activityId=${activityId !== "0" ? activityId : genericActivityId}`);
+          // Ajouter selectedCorrectionIds pour filtrer spécifiquement ces corrections
+          router.push(`/corrections?classId=${selectedClassId}&highlight=${highlightParam}&selectedCorrectionIds=${highlightParam}&activityId=${activityId !== "0" ? activityId : genericActivityId}`);
         }, 2000);
       } else {
         // Si aucune classe n'est sélectionnée et pas de groupe, rediriger vers les corrections
         setTimeout(() => {
           const highlightParam = createdCorrectionIds.join(',');
-          // Ajouter correctionId pour filtrer spécifiquement ces corrections
-          router.push(`/corrections?highlight=${highlightParam}&correctionId=${highlightParam}&activityId=${activityId !== "0" ? activityId : genericActivityId}`);
+          // Ajouter selectedCorrectionIds pour filtrer spécifiquement ces corrections
+          router.push(`/corrections?highlight=${highlightParam}&selectedCorrectionIds=${highlightParam}&activityId=${activityId !== "0" ? activityId : genericActivityId}`);
         }, 2000);
       }
     }

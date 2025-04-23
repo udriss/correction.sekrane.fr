@@ -19,7 +19,7 @@ export async function POST(request: Request) {
     const [activityInfo] = await query(`
       SELECT a.name as activity_name
       FROM corrections_autres c
-      JOIN activities a ON c.activity_id = a.id
+      JOIN activities_autres a ON c.activity_id = a.id
       WHERE c.id = ?
     `, [correctionId]) as any[];
 

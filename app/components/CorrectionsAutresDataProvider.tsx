@@ -17,6 +17,10 @@ interface ProviderProps {
     classId?: string;
     studentId?: string;
     activityId?: string;
+    correctionId?: string;
+    subClassId?: string;
+    recent?: boolean;
+    selectedCorrectionIds?: string;
   };
   initialSort?: SortOptions;
 }
@@ -44,6 +48,7 @@ interface Filters {
   showOnlyInactive: boolean;
   subClassId: string;
   recent: boolean;
+  selectedCorrectionIds: string; // Ajout de la propriété selectedCorrectionIds
 }
 
 interface ContextValue {
@@ -93,16 +98,18 @@ export default function CorrectionsAutresProvider({ children, initialFilters, in
     dateTo: null,
     minGrade: '',
     maxGrade: '',
-    correctionId: '',
+    correctionId: initialFilters?.correctionId || '',
     hideInactive: false,
     showOnlyInactive: false,
-    subClassId: '',
-    recent: false
+    subClassId: initialFilters?.subClassId || '',
+    recent: initialFilters?.recent === true,
+    selectedCorrectionIds: initialFilters?.selectedCorrectionIds || '' // S'assurer que cette valeur est initialisée
   });
 
+  // Modification ici pour inclure selectedCorrectionIds dans les filtres actifs initiaux
   const [activeFilters, setActiveFilters] = useState<string[]>(
     Object.entries(initialFilters || {})
-      .filter(([_, value]) => value && value !== '')
+      .filter(([key, value]) => value && value !== '')
       .map(([key, _]) => key)
   );
 
@@ -189,7 +196,8 @@ export default function CorrectionsAutresProvider({ children, initialFilters, in
       hideInactive: false,
       showOnlyInactive: false,
       subClassId: '',
-      recent: false
+      recent: false,
+      selectedCorrectionIds: '' // Ajout de la propriété selectedCorrectionIds
     });
   };
 
@@ -216,6 +224,12 @@ export default function CorrectionsAutresProvider({ children, initialFilters, in
       // Filtre par ID de correction
       if (activeFilters.includes('correctionId') && filters.correctionId) {
         if (correction.id?.toString() !== filters.correctionId) return false;
+      }
+
+      // Filtrage par plusieurs IDs de correction
+      if (activeFilters.includes('selectedCorrectionIds') && filters.selectedCorrectionIds) {
+        const ids = filters.selectedCorrectionIds.split(',').map(id => id.trim());
+        if (!ids.includes(correction.id?.toString())) return false;
       }
 
       // Filtre par classe

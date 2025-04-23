@@ -30,13 +30,26 @@ interface LocalCorrectionAutre extends Omit<CorrectionAutre, 'activity_id' | 'cl
   };
 }
 
+// Type personnalisé pour les erreurs
+interface ErrorWithDetails extends Error {
+  details?: any;
+  status?: number;
+  statusText?: string;
+  code?: string;
+  sqlMessage?: string;
+  sql?: string;
+}
+
+// Type union pour représenter soit une chaîne simple, soit un objet d'erreur
+type ErrorType = string | Error | ErrorWithDetails | null;
+
 export function useCorrectionsAutres(correctionId: string) {
   const [correction, setCorrection] = useState<LocalCorrectionAutre | null>(null);
   const [contentItems, setContentItems] = useState<ContentItem[]>([]);
   const [history, setHistory] = useState<ContentItem[][]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState('');
+  const [error, setError] = useState<ErrorType>('');
   const [correctionNotFound, setCorrectionNotFound] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
   const [editedName, setEditedName] = useState('');
@@ -84,13 +97,22 @@ export function useCorrectionsAutres(correctionId: string) {
       if (!response.ok) {
         // Récupérer les détails de l'erreur depuis la réponse
         let errorDetail = '';
+        let errorObj = new Error(`Échec de récupération de la correction`) as ErrorWithDetails;
+        errorObj.name = 'FetchError';
+        errorObj.status = response.status;
+        errorObj.statusText = response.statusText;
+        
         try {
           const errorData = await response.json();
           errorDetail = errorData.error || errorData.message || `Statut HTTP: ${response.status}`;
+          errorObj.message = `Échec de récupération de la correction: ${errorDetail}`;
+          errorObj.details = errorData.details || {};
         } catch (parseError) {
           errorDetail = `Statut HTTP: ${response.status}`;
         }
-        throw new Error(`Échec de récupération de la correction: ${errorDetail}`);
+        
+        setError(errorObj);
+        throw errorObj;
       }
       
       const data = await response.json();
@@ -247,7 +269,16 @@ export function useCorrectionsAutres(correctionId: string) {
       
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.error || 'Erreur lors de la mise à jour du nom');
+        
+        // Créer une instance d'erreur structurée avec tous les détails
+        const errorObj = new Error(errorData.error || 'Erreur lors de la mise à jour du nom') as ErrorWithDetails;
+        errorObj.name = 'StudentUpdateError';
+        errorObj.details = errorData.details || {};
+        errorObj.status = response.status;
+        errorObj.statusText = response.statusText;
+        
+        setError(errorObj);
+        throw errorObj; // On lance l'objet d'erreur complet
       }
       
       const updatedData = await response.json();
@@ -287,9 +318,22 @@ export function useCorrectionsAutres(correctionId: string) {
       setTimeout(() => {
         setSuccessMessage('');
       }, 3000);
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error in handleSaveName:', err);
-      setError('Erreur lors de la mise à jour des informations de l\'étudiant');
+      
+      // Vérifier si l'erreur a déjà été définie par le bloc if (!response.ok)
+      // Si ce n'est pas le cas, créer une nouvelle erreur structurée
+      if (!(err instanceof Error && (err as ErrorWithDetails).details)) {
+        const errorObj = new Error(err?.message || 'Erreur lors de la mise à jour des informations de l\'étudiant(e)') as ErrorWithDetails;
+        errorObj.name = 'StudentUpdateError';
+        errorObj.details = err?.details || {};
+        errorObj.status = err?.status;
+        errorObj.statusText = err?.statusText;
+        setError(errorObj);
+      }
+      console.error('Error details:', error);
+      // Si err est déjà un objet d'erreur correctement formaté, ne rien faire
+      // car setError a déjà été appelé dans le bloc if (!response.ok)
     } finally {
       setSaving(false);
     }
@@ -408,7 +452,15 @@ export function useCorrectionsAutres(correctionId: string) {
   
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.message || 'Échec de sauvegarde des dates');
+        // Créer un objet d'erreur structuré avec le constructeur Error
+        const errorObj = new Error(`Erreur lors de la sauvegarde des dates: ${errorData.message || 'Échec de sauvegarde des dates'}`) as ErrorWithDetails;
+        errorObj.name = 'DateUpdateError';
+        errorObj.details = errorData.details || {};
+        errorObj.status = response.status;
+        errorObj.statusText = response.statusText;
+        
+        setError(errorObj);
+        throw errorObj;
       }
   
       const updatedCorrection = await response.json();
@@ -426,7 +478,25 @@ export function useCorrectionsAutres(correctionId: string) {
       setTimeout(() => setSuccessMessage(''), 3000);
       return true;
     } catch (err: any) {
-      setError(`Erreur lors de la sauvegarde des dates: ${err.message}`);
+      // Si l'erreur n'a pas déjà été traitée dans le bloc if (!response.ok)
+      if (typeof err === 'object' && err !== null && !(err instanceof Error)) {
+        const errorObj = new Error(`Erreur lors de la sauvegarde des dates: ${err.message || 'Erreur inconnue'}`) as ErrorWithDetails;
+        errorObj.name = 'DateUpdateError';
+        errorObj.details = err.details || {};
+        
+        setError(errorObj);
+      } else if (typeof err === 'string') {
+        const errorObj = new Error(err) as ErrorWithDetails;
+        errorObj.name = 'DateUpdateError';
+        setError(errorObj);
+      } else if (err instanceof Error && !(err as any).name) {
+        // Si c'est une Error mais sans nom défini
+        err.name = 'DateUpdateError';
+        setError(err);
+      } else {
+        // Utiliser l'erreur telle quelle si elle a déjà un nom
+        setError(err);
+      }
       return false;
     } finally {
       setSaving(false);

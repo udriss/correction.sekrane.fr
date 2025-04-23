@@ -1,7 +1,0 @@
-User-agent: *
-Allow: /
-Disallow: /api/
-Disallow: /admin/
-Disallow: /private/
-
-Sitemap: https://correction.sekrane.fr/sitemap.xml

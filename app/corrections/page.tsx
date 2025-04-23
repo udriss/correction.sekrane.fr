@@ -1,10 +1,10 @@
 'use client';
 
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import {
   Container, Paper, Typography, Box, Chip, Button, Menu, MenuItem, TextField, FormControl,
-  InputLabel, Select, ListItemIcon, ListItemText, Badge, Divider, InputAdornment, SelectChangeEvent,
+  InputLabel, Select, ListItemIcon, ListItemText, Divider, InputAdornment, SelectChangeEvent,
   Tabs, Tab, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle,
   ToggleButton, ToggleButtonGroup
 } from '@mui/material';
@@ -57,6 +57,7 @@ export default function CorrectionsAutresPage() {
     recent: searchParams?.get('recent') === 'true',
     highlight: searchParams?.get('highlight') || '',
     correctionId: searchParams?.get('correctionId') || '',
+    selectedCorrectionIds: searchParams?.get('selectedCorrectionIds') || '',
     subClassId: searchParams?.get('subClassId') || '',
     hideInactive: false,
     showOnlyInactive: false,
@@ -108,8 +109,6 @@ function CorrectionsContent() {
     activeFilters,
     setActiveFilters,
     applyFilter,
-    removeFilter,
-    clearAllFilters,
     refreshCorrections,
     errorString,
     isLoading
@@ -293,10 +292,16 @@ function CorrectionsContent() {
         return `ID: ${filters.correctionId}`;
       case 'subClassId':
         return `Sous-classe: ${filters.subClassId}`;
+      case 'selectedCorrectionIds':
+        return `IDs: ${filters.selectedCorrectionIds}`;
+      case 'highlight':
+        const highlightIds = searchParams?.get('highlight')?.split(',').filter(Boolean) || [];
+        return `En surbrillance: ${highlightIds.join(', ')}`;
       default:
         return filter;
     }
   };
+  console.log('activeFilters', filters);
 
   // Convert CorrectionAutre to the format expected by components
   const adaptCorrections = useMemo(() => {
@@ -338,6 +343,77 @@ function CorrectionsContent() {
     window.addEventListener('scroll', handleScroll, { passive: true });
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
+
+
+  
+  const removeFilter = useCallback((filterName: string) => {
+      // Supprimer le filtre du tableau des filtres actifs
+      setActiveFilters(prev => prev.filter(f => f !== filterName));
+      
+      // Réinitialiser la valeur du filtre
+      setFilters(prev => ({
+        ...prev,
+        [filterName]: typeof prev[filterName as keyof typeof prev] === 'boolean' ? false : 
+                     typeof prev[filterName as keyof typeof prev] === 'string' ? '' : null
+      }));
+    
+    // Mettre à jour l'URL pour refléter la suppression du filtre
+    const newParams = new URLSearchParams(searchParams?.toString());
+    newParams.delete(filterName); // Supprimer le paramètre de l'URL
+    
+    // Préserver le paramètre tab s'il existe
+    const currentTab = searchParams?.get('tab');
+    if (currentTab) {
+      newParams.set('tab', currentTab);
+    }
+    
+    // Mettre à jour l'URL sans rechargement de page
+    router.push(`/corrections?${newParams.toString()}`, { scroll: false });
+  }, [router, searchParams, setActiveFilters, setFilters]);
+
+  // Fonction modifiée pour mettre à jour l'URL lors de la suppression de tous les filtres
+  const clearAllFilters = useCallback(() => {
+    // Réinitialiser les filtres dans l'état local
+    setActiveFilters([]);
+    setFilters({
+      search: '',
+      classId: '',
+      studentId: '',
+      activityId: '',
+      dateFrom: null,
+      dateTo: null,
+      minGrade: '',
+      maxGrade: '',
+      correctionId: '',
+      hideInactive: false,
+      showOnlyInactive: false,
+      subClassId: '',
+      recent: false,
+      selectedCorrectionIds: ''
+    });
+    
+    // Mettre à jour l'URL en ne conservant que le paramètre tab
+    const newParams = new URLSearchParams();
+    
+    // Préserver le paramètre tab s'il existe
+    const currentTab = searchParams?.get('tab');
+    if (currentTab) {
+      newParams.set('tab', currentTab);
+    }
+    
+    // Préserver les paramètres de tri s'ils existent
+    const sortBy = searchParams?.get('sortBy');
+    const sortDir = searchParams?.get('sortDir');
+    if (sortBy) {
+      newParams.set('sortBy', sortBy);
+    }
+    if (sortDir) {
+      newParams.set('sortDir', sortDir);
+    }
+    
+    // Mettre à jour l'URL sans rechargement de page
+    router.push(`/corrections?${newParams.toString()}`, { scroll: false });
+  }, [router, searchParams, setActiveFilters, setFilters]);
 
   return (
     <Container maxWidth="lg" sx={{ py: 4 }}>
@@ -1068,6 +1144,36 @@ function CorrectionsContent() {
             size="small" 
             onClick={() => applyFilter('correctionId')}
             disabled={!filters.correctionId}
+            sx={{ mt: 0.5 }}
+          >
+            Appliquer
+          </Button>
+        </Box>
+        
+        <Box sx={{ mb: 2 }}>
+          <TextField
+            name="selectedCorrectionIds"
+            label="Plusieurs IDs de correction (séparés par des virgules)"
+            fullWidth
+            size="small"
+            value={filters.selectedCorrectionIds}
+            onChange={(e) => setFilters({ ...filters, selectedCorrectionIds: e.target.value })}
+            placeholder="Ex: 603, 605, 607"
+            slotProps={{
+              input: {
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <SearchIcon fontSize="small" />
+                  </InputAdornment>
+                ),
+              }
+            }}
+          />
+          <Button 
+            variant="text" 
+            size="small" 
+            onClick={() => applyFilter('selectedCorrectionIds')}
+            disabled={!filters.selectedCorrectionIds}
             sx={{ mt: 0.5 }}
           >
             Appliquer

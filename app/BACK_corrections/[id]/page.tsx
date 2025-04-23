@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { useIsomorphicLayoutEffect } from '@/utils/client-hooks';
+
 import { DndProvider } from 'react-dnd';
 import { HTML5Backend } from 'react-dnd-html5-backend';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';

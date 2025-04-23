@@ -1,7 +1,13 @@
 import { MetadataRoute } from 'next';
 
-// Generate robots.txt file for improved SEO
+/**
+ * Génère le fichier robots.txt pour le site
+ * Cette fonction utilise l'API de métadonnées de Next.js pour créer un fichier robots.txt
+ * qui indique aux moteurs de recherche quelles pages peuvent être indexées
+ */
 export default function robots(): MetadataRoute.Robots {
+  const baseUrl = 'https://correction.sekrane.fr';
+  
   return {
     rules: [
       {
@@ -11,9 +17,25 @@ export default function robots(): MetadataRoute.Robots {
           '/api/',
           '/admin/',
           '/private/',
+          '/logs/',
+          '/test/',
+          '/components/',
+          '/lib/',
+          '/hooks/',
+          '/utils/',
+        ],
+      },
+      {
+        // Règles spécifiques pour Googlebot
+        userAgent: 'Googlebot',
+        allow: '/',
+        disallow: [
+          '/api/',
+          '/admin/',
         ],
       },
     ],
-    sitemap: 'https://correction.sekrane.fr/sitemap.xml',
+    sitemap: `${baseUrl}/sitemap.xml`,
+    host: baseUrl,
   };
 }

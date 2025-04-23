@@ -38,7 +38,6 @@ interface CorrectionCardProps {
   getGradeColor: (grade: number) => "success" | "info" | "primary" | "warning" | "error";
   preloadedShareCode?: string;
   highlighted?: boolean;
-  highlight?: boolean;
   className?: string;
   showClass?: boolean;
   showStudent?: boolean;
@@ -54,7 +53,6 @@ const CorrectionCardAutre: React.FC<CorrectionCardProps> = ({
   getGradeColor,
   preloadedShareCode,
   highlighted = false,
-  highlight = false,
   className = '',
   showClass = true,
   showStudent = true,
@@ -157,7 +155,7 @@ const CorrectionCardAutre: React.FC<CorrectionCardProps> = ({
     : '';
 
   // Use either highlighted prop or highlight prop (for backward compatibility)
-  const isHighlighted = highlighted || highlight;
+  const isHighlighted = highlighted ;
 
   // Gestion des points_earned comme un tableau de nombres
   let grade = 0;
@@ -293,15 +291,17 @@ const CorrectionCardAutre: React.FC<CorrectionCardProps> = ({
       )}
       <Box 
         sx={{
-          borderColor: theme => isHighlighted 
-          ? alpha(theme.palette.warning.main, 0.5) 
+          border : '2px dashed',
+        borderRadius: 3,
+          borderColor: theme => highlighted 
+          ? alpha(theme.palette.primary.main, 0.5) 
           : (isSelected && batchDeleteMode)
             ? alpha(theme.palette.error.main, 0.7)
             : correctionStatus !== 'ACTIVE'
               ? alpha(theme.palette.error.main, 0.7) // Bordure rouge pour les corrections inactives
               : alpha(theme.palette.divider, 0.5),
-        boxShadow: theme => isHighlighted 
-          ? `0 0 5px ${alpha(theme.palette.warning.main, 0.4)}` 
+        boxShadow: theme => highlighted 
+          ? `0 0 7px ${alpha(theme.palette.primary.main, 0.4)}` 
           : (isSelected && batchDeleteMode)
             ? `rgba(179, 29, 29, 0.56) 0px 22px 70px 4px;`
             : correctionStatus !== 'ACTIVE'
@@ -309,7 +309,7 @@ const CorrectionCardAutre: React.FC<CorrectionCardProps> = ({
               : 'none',
         '&:hover': {
           transform: 'translateY(0px)',
-          boxShadow: theme => isHighlighted 
+          boxShadow: theme => highlighted  
             ? `0 0px 5px ${alpha(theme.palette.warning.main, 0.4)}` 
             : (batchDeleteMode)
               ? `rgba(60, 64, 67, 0.3) 0px 1px 2px 0px, rgba(60, 64, 67, 0.15) 0px 2px 6px 2px;`

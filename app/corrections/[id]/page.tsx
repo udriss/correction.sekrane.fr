@@ -119,7 +119,19 @@ export default function CorrectionAutreDetail({ params }: { params: Promise<{ id
   const [saveDateTimeout, setSaveDateTimeout] = useState<NodeJS.Timeout | null>(null);
   const [saveGradeTimeout, setSaveGradeTimeout] = useState<NodeJS.Timeout | null>(null);
 
+  // État pour suivre si des changements sont en attente d'auto-sauvegarde
+  const [changesDetected, setChangesDetected] = useState(false);
+  const [contentChangeTimestamp, setContentChangeTimestamp] = useState<number | null>(null);
 
+  // Fonction pour detecter les changements dans le contenu
+  const handleContentChange = useCallback(() => {
+    // Marquer qu'il y a des changements à sauvegarder
+    setChangesDetected(true);
+    // Enregistrer le timestamp du changement
+    setContentChangeTimestamp(Date.now());
+    
+    console.log('Content change detected', new Date().toLocaleTimeString());
+  }, []);
 
   // Pour le calcul du pourcentage et de la note finale
   const totalPointsEarned = correction?.points_earned?.reduce((sum, points) => sum + points, 0) || 0;
@@ -162,9 +174,11 @@ export default function CorrectionAutreDetail({ params }: { params: Promise<{ id
       if (!response.ok) {
         const errorData = await response.json();
         // Créer une instance d'Error et y attacher les détails
-        const error = new Error('Erreur lors de la sauvegarde des dates : ' + (errorData.message || 'Échec de sauvegarde des dates'));
-        (error as any).details = errorData.details || {};
-        setError(error.message);
+        const error: any = new Error('Erreur lors de la sauvegarde des dates : ' + (errorData.message || 'Échec de sauvegarde des dates'));
+        error.details = errorData.details || {};
+        error.status = response.status;
+        error.statusText = response.statusText;
+        setError(error);
         throw error;
       }
   
@@ -184,7 +198,16 @@ export default function CorrectionAutreDetail({ params }: { params: Promise<{ id
       setTimeout(() => setSuccessMessage(''), 3000);
       return true;
     } catch (err: any) {
-      setError(`Erreur lors de la sauvegarde des dates: ${err.message}`);
+      const errorMsg = err.message || "Erreur inconnue lors de la sauvegarde des dates";
+      console.error("Erreur détaillée:", err);
+      
+      // Créer un objet d'erreur avec tous les détails disponibles
+      const errorWithDetails: any = new Error(errorMsg);
+      errorWithDetails.details = err.details || {};
+      errorWithDetails.status = err.status;
+      errorWithDetails.statusText = err.statusText;
+      
+      setError(errorWithDetails);
       return false;
     } finally {
       setSaving(false);
@@ -219,6 +242,9 @@ export default function CorrectionAutreDetail({ params }: { params: Promise<{ id
         
         return newItems;
       });
+      
+      // Déclencher la détection des changements pour l'auto-sauvegarde
+      handleContentChange();
     };
   
 
@@ -304,7 +330,14 @@ export default function CorrectionAutreDetail({ params }: { params: Promise<{ id
       });
       
       if (!response.ok) {
-        throw new Error('Failed to update penalty and grade');
+        const errorData = await response.json();
+        // Créer une instance d'Error et y attacher les détails
+        const error: any = new Error('Erreur lors de la mise à jour de la note : ' + (errorData.message || 'Échec de mise à jour de la note'));
+        error.details = errorData.details || {};
+        error.status = response.status;
+        error.statusText = response.statusText;
+        setError(error);
+        throw error;
       }
       
       const data = await response.json();
@@ -334,8 +367,20 @@ export default function CorrectionAutreDetail({ params }: { params: Promise<{ id
       window.dispatchEvent(event);
       
       return data;
-    } catch (error) {
+    } catch (error: any) {
       console.error("Erreur lors de la mise à jour de la pénalité:", error);
+      
+      // S'assurer que l'erreur a tous les détails nécessaires
+      if (!error.details) {
+        const errorWithDetails: any = new Error(error.message || "Erreur lors de la mise à jour de la pénalité");
+        errorWithDetails.details = error.details || {};
+        errorWithDetails.status = error.status;
+        errorWithDetails.statusText = error.statusText;
+        setError(errorWithDetails);
+      } else {
+        setError(error);
+      }
+      
       throw error;
     }
   };
@@ -418,21 +463,28 @@ export default function CorrectionAutreDetail({ params }: { params: Promise<{ id
 
   // Effect to handle auto-save functionality
   useEffect(() => {
-    if (correction && autoSaveActive) {
+    if (correction) {
       if (autoSaveTimerRef.current) {
         clearInterval(autoSaveTimerRef.current);
       }
       
+      // Configure l'intervalle qui s'exécute toutes les 70 secondes
+      // indépendamment de tout changement d'état
       autoSaveTimerRef.current = setInterval(() => {
-        if (history.length > 0 || contentItems.length > 0) {
+        // Vérifie l'état actuel de autoSaveActive au moment de l'exécution
+        if (autoSaveActive) {
+          console.log('Auto-save triggered', new Date().toLocaleTimeString());
           handleSaveCorrection()
             .then(() => {
               setLastAutoSave(new Date());
+              console.log('Auto-save successful', new Date().toLocaleTimeString());
             })
             .catch(err => {
               console.error('Auto-save failed:', err);
-              setAutoSaveActive(false);
+              // Ne pas désactiver l'auto-sauvegarde en cas d'erreur
             });
+        } else {
+          console.log('Auto-save skipped (disabled)', new Date().toLocaleTimeString());
         }
       }, 70000); // Auto-save every 70 seconds
     }
@@ -442,7 +494,7 @@ export default function CorrectionAutreDetail({ params }: { params: Promise<{ id
         clearInterval(autoSaveTimerRef.current);
       }
     };
-  }, [correction, autoSaveActive, history.length, contentItems]);
+  }, [correction, handleSaveCorrection]); // Ne pas inclure autoSaveActive dans les dépendances
 
   // Écouter les événements de mise à jour des grades/pénalités
   useEffect(() => {
@@ -498,6 +550,51 @@ export default function CorrectionAutreDetail({ params }: { params: Promise<{ id
     };
   }, [setCorrection, setError]);
 
+  // Effect pour exécuter la logique d'auto-sauvegarde basée sur les changements
+  useEffect(() => {
+    // Ne rien faire si l'auto-save est désactivé ou s'il n'y a pas de changements
+    if (!autoSaveActive || !changesDetected || !contentChangeTimestamp || !correction) {
+      return;
+    }
+    
+    // Calculer le temps restant avant la sauvegarde (70 secondes après le dernier changement)
+    const timeElapsed = Date.now() - contentChangeTimestamp;
+    const timeToWait = Math.max(0, 70000 - timeElapsed);
+    
+    console.log(`Auto-save scheduled in ${timeToWait/1000} seconds`, new Date().toLocaleTimeString());
+    
+    // Configurer un timeout pour sauvegarder après le délai
+    const autoSaveTimeout = setTimeout(() => {
+      if (autoSaveActive && changesDetected) {
+        console.log('Auto-save executing after content change', new Date().toLocaleTimeString());
+        
+        handleSaveCorrection()
+          .then(() => {
+            setLastAutoSave(new Date());
+            // Réinitialiser le détecteur de changements après sauvegarde réussie
+            setChangesDetected(false);
+            setContentChangeTimestamp(null);
+            console.log('Auto-save completed successfully', new Date().toLocaleTimeString());
+          })
+          .catch(err => {
+            console.error('Auto-save failed:', err);
+            // Garder changesDetected à true pour réessayer plus tard
+          });
+      }
+    }, timeToWait);
+    
+    // Nettoyer le timeout si le composant est démonté ou si les dépendances changent
+    return () => {
+      clearTimeout(autoSaveTimeout);
+    };
+  }, [
+    autoSaveActive, 
+    changesDetected,
+    contentChangeTimestamp,
+    correction,
+    handleSaveCorrection
+  ]);
+
   // Function to update an item's content
   // Move an item (for drag and drop)
   const moveItem = (dragIndex: number, hoverIndex: number) => {
@@ -508,6 +605,7 @@ export default function CorrectionAutreDetail({ params }: { params: Promise<{ id
     newItems.splice(hoverIndex, 0, draggedItem);
     
     setContentItems(newItems);
+    handleContentChange();
   };
 
   // Remove an item
@@ -526,6 +624,7 @@ export default function CorrectionAutreDetail({ params }: { params: Promise<{ id
         return newItems;
       });
     }
+    handleContentChange();
   };
 
   // Add a new paragraph
@@ -539,6 +638,7 @@ export default function CorrectionAutreDetail({ params }: { params: Promise<{ id
     };
     
     setContentItems(prev => [...prev, newItem]);
+    handleContentChange();
   };
 
   // Add a new image
@@ -554,6 +654,7 @@ export default function CorrectionAutreDetail({ params }: { params: Promise<{ id
     };
     
     setContentItems(prev => [...prev, newItem]);
+    handleContentChange();
   };
 
   // Handle fragment addition
@@ -572,6 +673,7 @@ export default function CorrectionAutreDetail({ params }: { params: Promise<{ id
       }));
     
     setContentItems(prev => [...prev, ...newItems]);
+    handleContentChange();
   };
 
 
@@ -614,6 +716,7 @@ export default function CorrectionAutreDetail({ params }: { params: Promise<{ id
     );
   }
 
+  console.log('error:', error);
   // Utiliser le composant ErrorDisplay avec les paramètres supportés
   // Plus besoin de transformer l'erreur, le composant ErrorDisplay s'en charge
   if (error) {
@@ -621,6 +724,7 @@ export default function CorrectionAutreDetail({ params }: { params: Promise<{ id
       <Container maxWidth="md" sx={{ py: 4 }}>
         <ErrorDisplay 
           error={error}
+          errorDetails={typeof error === 'object' && error !== null ? (error as any).details : undefined}
           withRefreshButton={true}
           onRefresh={() => {
             setError('');
@@ -802,6 +906,7 @@ export default function CorrectionAutreDetail({ params }: { params: Promise<{ id
                 {/* Erreur et messages de statut */}
                 <ErrorDisplay 
                   error={error} 
+                  errorDetails={typeof error === 'object' && error !== null ? (error as any).details : undefined}
                   onRefresh={() => {
                 setError('');
                 window.location.reload();
@@ -879,12 +984,14 @@ export default function CorrectionAutreDetail({ params }: { params: Promise<{ id
                         const newPointsEarned = [...(correction.points_earned || [])];
                         newPointsEarned[index] = value;
                         updatePointsEarned(newPointsEarned);
+                        // Ne pas déclencher l'auto-sauvegarde pour les modifications de points
                       }}
                       setPenalty={(value) => {
                         setCorrection(prev => ({
                           ...prev!,
                           penalty: parseFloat(value)
                         }));
+                        // Ne pas déclencher l'auto-sauvegarde pour les modifications de pénalité
                       }}
                       saveGradeTimeout={saveGradeTimeout}
                       setSaveGradeTimeout={setSaveGradeTimeout}
@@ -912,7 +1019,16 @@ export default function CorrectionAutreDetail({ params }: { params: Promise<{ id
                             }),
                           });
                           
-                          if (!response.ok) throw new Error('Failed to update penalty');
+                          if (!response.ok) {
+                            const errorData = await response.json();
+                            // Créer une instance d'Error et y attacher les détails
+                            const error: any = new Error('Erreur lors de la mise à jour de la pénalité : ' + (errorData.message || 'Échec de mise à jour'));
+                            error.details = errorData.details || {};
+                            error.status = response.status;
+                            error.statusText = response.statusText;
+                            setError(error);
+                            throw error;
+                          }
                           
                           // Mettre à jour l'état local
                           setCorrection(prev => ({
@@ -921,8 +1037,20 @@ export default function CorrectionAutreDetail({ params }: { params: Promise<{ id
                           }));
                           
                           return await response.json();
-                        } catch (error) {
+                        } catch (error: any) {
                           console.error("Erreur lors de la mise à jour de la pénalité:", error);
+                          
+                          // S'assurer que l'erreur a tous les détails nécessaires
+                          if (!error.details) {
+                            const errorWithDetails: any = new Error(error.message || "Erreur lors de la mise à jour de la pénalité");
+                            errorWithDetails.details = error.details || {};
+                            errorWithDetails.status = error.status;
+                            errorWithDetails.statusText = error.statusText;
+                            setError(errorWithDetails);
+                          } else {
+                            setError(error);
+                          }
+                          
                           throw error;
                         }
                       }}

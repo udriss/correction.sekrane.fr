@@ -108,8 +108,22 @@ export async function PUT(
       
       return NextResponse.json(response);
     });
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error updating student information:', error);
-    return NextResponse.json({ error: "Erreur lors de la mise à jour des informations de l'étudiant" }, { status: 500 });
+    
+    // Extraire les détails de l'erreur pour les inclure dans la réponse
+    const errorDetails = {
+      message: error.message || "Erreur inconnue",
+      code: error.code,
+      sqlMessage: error.sqlMessage,
+      sql: error.sql,
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    };
+    console.error('Error details:', errorDetails);
+    
+    return NextResponse.json({ 
+      error: "Erreur lors de la mise à jour des informations de l'étudiant", 
+      details: errorDetails 
+    }, { status: 500 });
   }
 }
