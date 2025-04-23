@@ -91,7 +91,28 @@ const CorrectionHeader: React.FC<CorrectionHeaderProps> = ({
   }, [isEditingName, correction, firstName, lastName, email]);
 
   // Add type guards around student_name usage
-  const displayName = firstName + ' ' +  lastName || `${correction.activity_name || 'Activité'} - Sans nom`;
+  const displayName = (() => {
+    // Cas 1: On a prénom et nom
+    if (firstName && lastName) {
+      return `${firstName} ${lastName}`;
+    }
+    // Cas 2: On a juste le prénom
+    else if (firstName && !lastName) {
+      return firstName;
+    }
+    // Cas 3: On a juste le nom
+    else if (!firstName && lastName) {
+      return lastName;
+    }
+    // Cas 4: On essaie de récupérer depuis correction.student_name
+    else if (correction?.student_name) {
+      return correction.student_name;
+    }
+    // Cas 5: On construit un nom par défaut
+    else {
+      return `${correction?.activity_name || 'Activité'} - Sans nom`;
+    }
+  })();
   // Mise à jour: utiliser le status au lieu de active
   const isActive = correction.status === 'ACTIVE' || (correction.status === undefined && (correction.active === 1 || correction.active === true));
 
@@ -125,11 +146,61 @@ const CorrectionHeader: React.FC<CorrectionHeaderProps> = ({
     setLocalFirstName('');
     setLocalLastName('');
     setLocalEmail('');
+    
     // Reset parent state to original values
-    setFirstName(correction?.student_first_name || correction?.firstName || '');
-    setLastName(correction?.student_last_name || correction?.lastName || '');
-    setEmail(correction?.student_data?.email || '');
-    setEditedName(correction?.student_name || '');
+    // Récupérer les valeurs originales depuis l'objet correction avec vérification approfondie
+    let originalFirstName = '';
+    let originalLastName = '';
+    let originalEmail = '';
+    
+    // Vérification des différentes structures possibles pour les données étudiantes
+    if (correction?.student_data) {
+      // Format principal avec student_data
+      originalFirstName = correction.student_data.first_name || '';
+      originalLastName = correction.student_data.last_name || '';
+      originalEmail = correction.student_data.email || '';
+    } else if (correction?.student_first_name !== undefined || correction?.student_last_name !== undefined) {
+      // Format avec propriétés directes student_first_name/student_last_name
+      originalFirstName = correction.student_first_name || '';
+      originalLastName = correction.student_last_name || '';
+    } else if (correction?.firstName !== undefined || correction?.lastName !== undefined) {
+      // Format alternatif avec propriétés camelCase
+      originalFirstName = correction.firstName || '';
+      originalLastName = correction.lastName || '';
+    } else if (correction?.student_name) {
+      // Essai de décomposition du nom complet si disponible
+      const nameParts = correction.student_name.split(' ');
+      if (nameParts.length >= 2) {
+        originalFirstName = nameParts[0] || '';
+        originalLastName = nameParts.slice(1).join(' ') || '';
+      } else if (nameParts.length === 1) {
+        originalFirstName = nameParts[0] || '';
+      }
+    }
+    
+    console.log('Restauration des valeurs originales:', { 
+      originalFirstName, 
+      originalLastName, 
+      originalEmail,
+      correctionData: correction 
+    });
+    
+    // Mettre à jour les états du composant parent
+    setFirstName(originalFirstName);
+    setLastName(originalLastName);
+    setEmail(originalEmail);
+    
+    // Reconstruire le nom complet pour editedName
+    if (correction?.student_name) {
+      setEditedName(correction.student_name);
+    } else if (originalFirstName || originalLastName) {
+      // Construire le nom à partir des composantes
+      const fullName = [originalFirstName, originalLastName].filter(Boolean).join(' ');
+      setEditedName(fullName);
+    } else {
+      // Fallback à une valeur par défaut
+      setEditedName('');
+    }
   };
 
 

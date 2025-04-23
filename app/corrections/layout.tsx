@@ -53,7 +53,7 @@ export default function CorrectionsLayout({
   const { currentPageLabel, extraItems } = getBreadcrumbConfig();
 
   return (
-    <Container maxWidth="lg" className="py-4">
+    <Container sx={{ maxWidth: '1400px' }} className="py-4">
       <CorrectionsBreadcrumbs 
         extraItems={extraItems} 
         currentPageLabel={currentPageLabel} 

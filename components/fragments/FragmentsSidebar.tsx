@@ -222,7 +222,7 @@ const FragmentsSidebar: React.FC<FragmentsSidebarProps> = ({
     selectedActivityId === correctionActivityId : true;
 
   return (
-    <Paper elevation={2} sx={{ p: 3, borderRadius: 2 }}>
+    <Paper elevation={2} sx={{ p: 1, borderRadius: 2 }}>
       {/* Sélecteur d'activité */}
       <Box sx={{ mb: 3 }}>      
         <FormControl fullWidth size="small" margin="normal">
@@ -283,8 +283,8 @@ const FragmentsSidebar: React.FC<FragmentsSidebarProps> = ({
       ) : (
         <>
           <Box sx={{ mb: 2 }}>
-            <Typography variant="body2" color="textSecondary" sx={{ mb: 1 }}>
-              Cliquez sur la puce de position pour la modifier manuellement
+            <Typography variant="overline" sx={{ mb: 1, color: theme => theme.palette.warning.dark }}>
+              Cliquez sur la puce de position pour la modifier
             </Typography>
           </Box>
           

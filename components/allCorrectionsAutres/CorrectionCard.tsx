@@ -261,7 +261,7 @@ const CorrectionCardAutre: React.FC<CorrectionCardProps> = ({
       className={className}
       sx={{ 
         position: 'relative',
-        borderRadius: 2,
+        borderRadius: 3,
         overflow: 'hidden',
         transition: 'all 0.2s ease-in-out',
         border: '1px solid rgba(0, 0, 0, 0.1)',
@@ -291,7 +291,7 @@ const CorrectionCardAutre: React.FC<CorrectionCardProps> = ({
       )}
       <Box 
         sx={{
-          border : '2px dashed',
+          border : highlighted ? '2px dashed' : '2px solid',
         borderRadius: 3,
           borderColor: theme => highlighted 
           ? alpha(theme.palette.primary.main, 0.5) 
@@ -481,11 +481,18 @@ const CorrectionCardAutre: React.FC<CorrectionCardProps> = ({
         
         {/* Points par partie */}
         {Array.isArray(correction.points_earned) && correction.points_earned.length > 0 && (
-          <Box sx={{ mt: 2 }}>
+          <Box sx={{ 
+            mt: 2,
+            gap: 1,
+            display: 'flex',
+            flexDirection: 'row',
+            justifyContent: 'start',
+            alignItems: 'center',
+            }}>
             <Typography variant="caption" color="text.secondary">
               Points par partie :
             </Typography>
-            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mt: 1 }}>
+            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
               {correction.points_earned.map((points, index) => (
                 <Chip
                   key={index}

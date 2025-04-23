@@ -26,6 +26,7 @@ import {
   Drawer,
   Zoom,
   Tooltip,
+  Fab,
 } from '@mui/material';
 
 import AssignmentIcon from '@mui/icons-material/Assignment';
@@ -110,7 +111,7 @@ export default function CorrectionAutreDetail({ params }: { params: Promise<{ id
   // Local state for this component (uniquement ceux qui ne sont pas fournis par le hook)
   const [renderedHtml, setRenderedHtml] = useState<string>('');
   const [copiedMessage, setCopiedMessage] = useState('');
-  const [drawerOpen, setDrawerOpen] = useState(true);
+  const [drawerOpen, setDrawerOpen] = useState(false); // Changer à false pour que le drawer soit fermé par défaut
   const [autoSaveActive, setAutoSaveActive] = useState(true);
   const [lastAutoSave, setLastAutoSave] = useState<Date | null>(null);
   const autoSaveTimerRef = useRef<NodeJS.Timeout>();
@@ -764,11 +765,11 @@ export default function CorrectionAutreDetail({ params }: { params: Promise<{ id
   }
 
   // Calculate drawer width
-  const drawerWidth = 340;
+  const drawerWidth = 555;
 
   return (
     <LocalizationProvider dateAdapter={AdapterDayjs}>
-      <Container maxWidth="xl" sx={{ py: 4, px: { xs: 2, sm: 3, md: 4 } }}>
+      <Container sx={{ py: 5, px: { xs: 2, sm: 2, md: 2 }, maxWidth: '100%' }}>
         <Zoom in={true} timeout={500}>
           <Paper 
             elevation={3} 
@@ -830,7 +831,7 @@ export default function CorrectionAutreDetail({ params }: { params: Promise<{ id
               flexDirection: { xs: 'column', lg: 'row' },
               flexGrow: 1,
               position: 'relative',
-              overflow: 'hidden'
+              overflow: 'auto' // Changer 'hidden' en 'auto' pour permettre le défilement
             }}>
               {/* Colonne principale - Éditeur de correction */}
               <Box sx={{ 
@@ -1044,8 +1045,8 @@ export default function CorrectionAutreDetail({ params }: { params: Promise<{ id
                           if (!error.details) {
                             const errorWithDetails: any = new Error(error.message || "Erreur lors de la mise à jour de la pénalité");
                             errorWithDetails.details = error.details || {};
-                            errorWithDetails.status = error.status;
-                            errorWithDetails.statusText = error.statusText;
+                            error.status = error.status;
+                            error.statusText = error.statusText;
                             setError(errorWithDetails);
                           } else {
                             setError(error);
@@ -1078,27 +1079,31 @@ export default function CorrectionAutreDetail({ params }: { params: Promise<{ id
                 />
               </Box>
             
-              {/* Panneau flottant des fragments - pour les petits écrans */}
+              {/* Drawer pour les fragments sur petits écrans */}
               <Drawer
-                variant="persistent"
                 anchor="right"
-                open={drawerOpen && window.innerWidth < theme.breakpoints.values.lg}
+                open={drawerOpen}
+                onClose={() => setDrawerOpen(false)}
                 sx={{
                   width: drawerWidth,
                   flexShrink: 0,
                   display: { xs: 'block', lg: 'none' },
                   '& .MuiDrawer-paper': {
                     width: drawerWidth,
-                    border: 'none',
-                    borderLeft: `1px solid ${alpha(theme.palette.divider, 0.8)}`,
                     boxSizing: 'border-box',
+                    p: 2,
+                    overflow: 'auto' // Ajouter la propriété overflow pour permettre le défilement
                   },
                 }}
               >
-                {/* Contenu du drawer pour les fragments */}
-                <Box sx={{ p: 2, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <Typography variant="h6" fontWeight="bold">Fragments</Typography>
-                  <IconButton onClick={toggleDrawer} size="small"><ChevronRightIcon /></IconButton>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                  <Typography variant="h6" fontWeight="bold" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <FormatQuoteIcon color="secondary" />
+                    Fragments et modèles
+                  </Typography>
+                  <IconButton onClick={() => setDrawerOpen(false)}>
+                    <ChevronRightIcon />
+                  </IconButton>
                 </Box>
                 <FragmentsSidebar 
                   correctionActivityId={correction.activity_id}
@@ -1107,29 +1112,23 @@ export default function CorrectionAutreDetail({ params }: { params: Promise<{ id
                 />
               </Drawer>
 
-              {/* Bouton flottant pour ouvrir les fragments (petits écrans) */}
-              {!drawerOpen && (
-                <Tooltip title="Afficher les fragments">
-                  <IconButton 
-                    onClick={toggleDrawer} 
-                    size="small" 
-                    sx={{ 
-                      position: 'fixed', 
-                      right: 20, 
-                      bottom: 20, 
-                      bgcolor: theme.palette.primary.main,
-                      color: 'white',
-                      '&:hover': {
-                        bgcolor: theme.palette.primary.dark,
-                      },
-                      zIndex: 10,
-                      display: { xs: 'flex', lg: 'none' }
-                    }}
-                  >
-                    <FormatQuoteIcon />
-                  </IconButton>
-                </Tooltip>
-              )}
+              {/* Bouton flottant pour ouvrir les fragments sur petits écrans */}
+              <Zoom in={!drawerOpen}>
+                <Fab 
+                  color="primary" 
+                  aria-label="Fragments"
+                  onClick={() => setDrawerOpen(true)}
+                  sx={{ 
+                    position: 'fixed', 
+                    bottom: 16, 
+                    right: 16,
+                    display: { xs: 'flex', lg: 'none' },
+                    zIndex: (theme) => theme.zIndex.drawer - 1 
+                  }}
+                >
+                  <FormatQuoteIcon />
+                </Fab>
+              </Zoom>
             </Box>
           </Paper>
         </Zoom>

@@ -28,7 +28,9 @@ import {
   Stepper,
   Step,
   StepLabel,
-  StepContent
+  StepContent,
+  List,
+  ListItem
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import SearchIcon from '@mui/icons-material/Search';
@@ -74,6 +76,7 @@ export default function ActivitiesAutresPage() {
   const [filterTab, setFilterTab] = useState(0);
   const [showTutorial, setShowTutorial] = useState(false);
   const [confirmingDelete, setConfirmingDelete] = useState<number | null>(null);
+  const [selectedActivityId, setSelectedActivityId] = useState<number | null>(null);
   
   useEffect(() => {
     const fetchActivities = async () => {
@@ -218,6 +221,10 @@ export default function ActivitiesAutresPage() {
     setFilterTab(newValue);
   };
   
+  const handleActivitySelect = (activityId: number) => {
+    setSelectedActivityId(activityId);
+  };
+  
   const handleDeleteClick = (activityId: number) => {
     setConfirmingDelete(activityId);
   };
@@ -259,6 +266,315 @@ export default function ActivitiesAutresPage() {
       </div>
     );
   }
+  
+  // Fonction pour afficher une activité
+  const renderActivityCard = (activity: ActivityAutre & {
+    correction_count?: number;
+    inactive_corrections_count?: number;
+    associated_classes?: number;
+    absent_count?: number;
+    non_rendu_count?: number;
+  }) => (
+    <Card className="hover:shadow-lg transition-shadow" sx={{ p: 3 }}>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 1 }}>
+        <Typography variant="h6" component="h3" className="font-bold">
+          {activity.name}
+        </Typography>
+        
+        {/* Boutons de suppression avec confirmation */}
+        <Box>
+          {confirmingDelete === activity.id ? (
+            <Box sx={{ display: 'flex', gap: 0.5 }}>
+              <IconButton
+                onClick={() => handleConfirmDelete(activity.id!)}
+                color="success"
+                size="large"
+                title="Confirmer la suppression"
+              >
+                <CheckIcon fontSize="large" />
+              </IconButton>
+              <IconButton
+                onClick={handleCancelDelete}
+                color="inherit"
+                size="large"
+                title="Annuler la suppression"
+              >
+                <CloseIcon fontSize="large" />
+              </IconButton>
+            </Box>
+          ) : (
+            <IconButton
+              onClick={() => handleDeleteClick(activity.id!)}
+              color="error"
+              size='large'
+              title="Supprimer cette activité"
+            >
+              <DeleteIcon fontSize="large" />
+            </IconButton>
+          )}
+        </Box>
+      </Box>
+      <Grid container sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' } }}>
+        <Grid size={{ xs: 12, md: 8 }}>
+          <CardContent sx={{ flex: '1 1 auto' }}>                          
+            {/* Activity details */}
+            <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', alignItems: 'flex-start' }}>
+              {/* Left side - Points information and stats */}
+              <Box sx={{ flex: '1 1 auto', minWidth: '200px' }}>
+                {/* Total points indicator */}
+                <Box sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <AssessmentIcon color="primary" />
+                  <Box>
+                    {calculateTotalPoints(activity) === 0 ? (
+                      <Typography variant="h6" color="text.secondary">
+                        Aucun point
+                      </Typography>
+                    ) : calculateTotalPoints(activity) === 1 ? (
+                      <Typography variant="h6" color="primary.main">
+                        1 seul point au total
+                      </Typography>
+                    ) : (
+                      <Typography variant="h6" color="primary.main">
+                        {calculateTotalPoints(activity)} points au total
+                      </Typography>
+                    )}
+                  </Box>
+                </Box>
+                
+                {/* Points breakdown */}
+                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1, mt: 2 }}>
+                  {Array.isArray(activity.parts_names) && activity.parts_names.map((name, index) => (
+                    <Tooltip key={index} title="Voir les détails de cette activité">
+                      <Chip 
+                        label={
+                          <Box sx={{ 
+                            display: 'flex', 
+                            alignItems: 'center', 
+                            justifyContent: 'space-between',
+                            width: '100%'
+                          }}>
+                            <Typography variant="body2" sx={{ fontWeight: 700 }}>
+                            <MenuBookIcon fontSize='medium'
+                             sx={{ 
+                              mr:1,
+                              color: theme => alpha(theme.palette.text.primary, 0.6),
+                            }}
+                             /> {name}
+                            </Typography>
+                            <Box 
+                              component="span"
+                              sx={{ 
+                                ml: 1, 
+                                bgcolor: 'rgba(25, 118, 210, 0.12)',
+                                px: 1,
+                                py: 0.2,
+                                borderRadius: 1,
+                                fontSize: '0.75rem',
+                                fontWeight: 'bold'
+                              }}
+                            >
+                              {activity.points[index]} pts
+                            </Box>
+                          </Box>
+                        }
+                        size="medium"
+                        color="primary"
+                        variant="outlined" 
+                        component={Link}
+                        href={`/activities/${activity.id}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        clickable
+                        sx={{ 
+                          cursor: 'pointer',
+                          py: 0.5,
+                          px: 0.5,
+                          '& .MuiChip-label': {
+                            px: 0.5,
+                            width: '100%'
+                          },
+                          '&:hover': { 
+                            boxShadow: '0 2px 5px rgba(0,0,0,0.1)',
+                            backgroundColor: 'rgba(25, 118, 210, 0.04)',
+                            borderColor: 'primary.main',
+                            transform: 'translateY(-1px)',
+                            transition: 'all 0.2s ease'
+                          },
+                          transition: 'all 0.2s ease'
+                        }}
+                      />
+                    </Tooltip>
+                  ))}
+                </Box>
+              </Box>
+              
+              {/* Right side - Activity description */}
+              <Box sx={{ flex: '1 1 auto', minWidth: '200px' }}>
+                {activity.content ? (
+                  <>
+                    <Typography variant="subtitle2" color="text.secondary" gutterBottom>
+                      Description :
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      {activity.content}
+                    </Typography>
+                  </>
+                ) : (
+                  <Typography variant="body2" color="text.disabled" sx={{ fontStyle: 'italic' }}>
+                    Aucune description disponible
+                  </Typography>
+                )}
+              </Box>
+            </Box>
+          </CardContent>
+        </Grid>
+        
+        <Divider orientation="vertical" flexItem sx={{ display: { xs: 'none', sm: 'block' } }} />
+        
+        <Grid size={{ xs: 12, md: 3.9 }}>
+          <Box sx={{ 
+            display: 'flex', 
+            flexDirection: 'column', 
+            justifyContent: 'center',
+            p: 2,
+            gap: 1
+          }}>
+            <Button 
+              variant="outlined" 
+              color="primary" 
+              href={`/activities/${activity.id}`} 
+              component={Link}
+              startIcon={<VisibilityIcon />}
+              size="small"
+              fullWidth
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              Détails
+            </Button>
+            <Button 
+              variant="outlined" 
+              color='primary'
+              href={`/activities/${activity.id}/corrections/`} 
+              component={Link}
+              startIcon={<RateReviewIcon />}
+              size="small"
+              fullWidth
+              target="_blank"
+              rel="noopener noreferrer"
+              sx={{color: theme => theme.palette.success.dark, 
+                bgcolor: alpha(theme.palette.success.main, 0.02), 
+                '&:hover': { bgcolor: alpha(theme.palette.success.main, 0.2) }}}
+            >
+              Nouvelle correction
+            </Button>
+          </Box>
+          <Box sx={{ mt: 1.5, display: 'flex', 
+          alignItems: 'center', 
+          gap: .75, 
+          justifyContent: 'center', 
+          flexDirection: 'column' }}> 
+            {activity.correction_count !== undefined && activity.correction_count > 0 ? (
+              <Tooltip title="Voir les corrections existantes">
+                <Chip
+                  icon={<RateReviewIcon />}
+                  label={`${activity.correction_count} correction${activity.correction_count > 1 ? 's' : ''}`}
+                  size="small"
+                  color="success"
+                  variant="outlined"
+                  component={Link}
+                  href={`/activities/${activity.id}?tab=2`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  clickable
+                  sx={{ 
+                    cursor: 'pointer', 
+                    '&:hover': { 
+                      boxShadow: '0 1px 3px rgba(0,0,0,0.12)',
+                      backgroundColor: 'rgba(46, 125, 50, 0.08)'
+                    }
+                  }}
+                />
+              </Tooltip>
+            ) : (
+              <Typography variant="body2" color="text.secondary" sx={{ mt: 1, display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                <RateReviewIcon fontSize="small" color="disabled" /> Aucune correction
+              </Typography>
+            )}
+            
+            {/* Display inactive corrections if any */}
+            {activity.inactive_corrections_count && activity.inactive_corrections_count > 0 ? (
+              <Tooltip title="Corrections inactives">
+                <Chip
+                  icon={<CloseIcon />}
+                  label={`${activity.inactive_corrections_count} inactive${activity.inactive_corrections_count > 1 ? 's' : ''}`}
+                  size="small"
+                  color="error"
+                  variant="outlined"
+                  component={Link}
+                  href={`/activities/${activity.id}?tab=1`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  clickable
+                  sx={{cursor: 'pointer' }}
+                />
+              </Tooltip>
+            ) : null}
+            
+            {/* Display absent students if any */}
+            {activity.absent_count && activity.absent_count > 0 ? (
+              <Tooltip title="Étudiants absents">
+                <Chip
+                  icon={<PersonOffIcon fontSize="small" />}
+                  label={`${activity.absent_count} absent${activity.absent_count > 1 ? 's' : ''}`}
+                  size="small"
+                  color="warning"
+                  variant="outlined"
+                  component={Link}
+                  href={`/activities/${activity.id}?tab=1`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  clickable
+                  sx={{ 
+                    cursor: 'pointer',
+                    '&:hover': { 
+                      boxShadow: '0 1px 3px rgba(0,0,0,0.12)',
+                      backgroundColor: 'rgba(237, 108, 2, 0.08)'
+                    }
+                  }}
+                />
+              </Tooltip>
+            ) : null}
+            
+            {/* Display non-submitted assignments if any */}
+            {activity.non_rendu_count && activity.non_rendu_count > 0 ? (
+              <Tooltip title="Travaux non rendus">
+                <Chip
+                  icon={<AssignmentLateIcon fontSize="small" />}
+                  label={`${activity.non_rendu_count} non rendu${activity.non_rendu_count > 1 ? 's' : ''}`}
+                  size="small"
+                  color="info"
+                  variant="outlined"
+                  component={Link}
+                  href={`/activities/${activity.id}?tab=1`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  clickable
+                  sx={{ 
+                    cursor: 'pointer',
+                    '&:hover': { 
+                      boxShadow: '0 1px 3px rgba(0,0,0,0.12)',
+                      backgroundColor: 'rgba(2, 136, 209, 0.08)'
+                    }
+                  }}
+                />
+              </Tooltip>
+            ) : null}
+          </Box>
+        </Grid>
+      </Grid>
+    </Card>
+  );
   
   return (
     <Container maxWidth="lg" className="py-8">
@@ -500,7 +816,7 @@ export default function ActivitiesAutresPage() {
             sx={{ flexGrow: 1, maxWidth: 500 }}
             slotProps={{
               input: { 
-                
+                startAdornment: <SearchIcon fontSize="small" sx={{ mr: 1, color: 'text.secondary' }} />
                }
             }}
           />
@@ -524,355 +840,147 @@ export default function ActivitiesAutresPage() {
         </Box>
       </Paper>
 
-      {/* Activities Grid or Empty State */}
-      <div className="max-w-3xl mx-auto">
-        {enhancedActivities.length === 0 ? (
-          <Box textAlign="center" my={8} className="p-8 border border-dashed border-gray-300 rounded-lg">
-            <FormatListBulletedIcon fontSize="large" className="text-gray-400 mb-4" />
-            <Typography variant="h6" gutterBottom>
-              Aucune activité trouvée
+      {/* Nouvelle mise en page avec menu latéral et contenu principal */}
+      <Box sx={{ display: 'flex', gap: 4, alignItems: 'flex-start' }}>
+        {/* Menu latéral gauche */}
+        <Paper 
+          sx={{ 
+            width: 280, 
+            flexShrink: 0, 
+            alignSelf: 'flex-start', /* Empêche l'élément de s'étirer */
+            maxHeight: 'calc(100vh - 200px)', 
+            overflowY: 'auto',
+            position: 'sticky',
+            top: 100,
+            p: 2,
+            borderRadius: 2
+          }}
+          elevation={2}
+        >
+          <Typography variant="h6" gutterBottom sx={{ borderBottom: '1px solid', borderColor: 'divider', pb: 1, mb: 2 }}>
+            Liste des activités
+          </Typography>
+          
+          {filteredActivities.length === 0 ? (
+            <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'center', py: 3 }}>
+              Aucune activité ne correspond aux critères
             </Typography>
-            <Typography variant="body1" color="textSecondary" mb={4} className="max-w-md mx-auto">
-              Les activités avec parties dynamiques vous permettent d'ajouter des barèmes flexibles. 
-              Ajoutez votre première activité pour commencer à noter vos étudiants.
-            </Typography>
-            <Button 
-              variant="contained"
-              color="primary"
-              startIcon={<AddIcon />}
-              onClick={handleCreateActivity}
-              size="large"
-              className="shadow-lg"
-            >
-              Ajouter ma première activité
-            </Button>
-          </Box>
-        ) : (
-          <div className="space-y-6">
-            {filteredActivities.length === 0 ? (
-              <Paper className="p-8 text-center">
-                <SearchIcon fontSize="large" className="text-gray-400 mb-2" />
-                <Typography variant="h6" className="mb-2">Aucune activité ne correspond à cette recherche</Typography>
-                <Button 
-                  onClick={() => {
-                    setSearchTerm('');
-                    setFilterTab(0);
+          ) : (
+            <List sx={{ p: 0, mb: 2}}>
+              {filteredActivities.map((activity) => (
+                <ListItem 
+                  key={activity.id} 
+                  disablePadding
+                  sx={{ 
+                    display: 'block', 
+                    mb: 0.5, 
                   }}
-                  variant="outlined"
                 >
-                  Réinitialiser les filtres
-                </Button>
-              </Paper>
-            ) : (
-              <Grid container spacing={5}>
-                {filteredActivities.map((activity) => (
-                  <Grid size={{ xs:12 }} key={activity.id}>
-                    <Card className="hover:shadow-lg transition-shadow" sx={{ p: 3 }}>
-                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 1 }}>
-                        <Typography variant="h6" component="h3" className="font-bold">
-                          {activity.name}
-                        </Typography>
-                        
-                        {/* Boutons de suppression avec confirmation */}
-                        <Box>
-                          {confirmingDelete === activity.id ? (
-                            <Box sx={{ display: 'flex', gap: 0.5 }}>
-                              <IconButton
-                                onClick={() => handleConfirmDelete(activity.id!)}
-                                color="success"
-                                size="large"
-                                title="Confirmer la suppression"
-                              >
-                                <CheckIcon fontSize="large" />
-                              </IconButton>
-                              <IconButton
-                                onClick={handleCancelDelete}
-                                color="inherit"
-                                size="large"
-                                title="Annuler la suppression"
-                              >
-                                <CloseIcon fontSize="large" />
-                              </IconButton>
-                            </Box>
-                          ) : (
-                            <IconButton
-                              onClick={() => handleDeleteClick(activity.id!)}
-                              color="error"
-                              size='large'
-                              title="Supprimer cette activité"
-                            >
-                              <DeleteIcon fontSize="large" />
-                            </IconButton>
-                          )}
-                        </Box>
-                      </Box>
-                      <Grid container sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' } }}>
-                        <Grid size={{ xs: 12, md: 8 }}>
-                          <CardContent sx={{ flex: '1 1 auto' }}>                          
-                            {/* Activity details */}
-                            <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', alignItems: 'flex-start' }}>
-                              {/* Left side - Points information and stats */}
-                              <Box sx={{ flex: '1 1 auto', minWidth: '200px' }}>
-                                {/* Total points indicator */}
-                                <Box sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
-                                  <AssessmentIcon color="primary" />
-                                  <Box>
-                                    {calculateTotalPoints(activity) === 0 ? (
-                                      <Typography variant="h6" color="text.secondary">
-                                        Aucun point
-                                      </Typography>
-                                    ) : calculateTotalPoints(activity) === 1 ? (
-                                      <Typography variant="h6" color="primary.main">
-                                        1 seul point au total
-                                      </Typography>
-                                    ) : (
-                                      <Typography variant="h6" color="primary.main">
-                                        {calculateTotalPoints(activity)} points au total
-                                      </Typography>
-                                    )}
-                                  </Box>
-                                </Box>
-                                
-                                {/* Points breakdown */}
-                                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1, mt: 2 }}>
-                                  {Array.isArray(activity.parts_names) && activity.parts_names.map((name, index) => (
-                                    <Tooltip key={index} title="Voir les détails de cette activité">
-                                      <Chip 
-                                        label={
-                                          <Box sx={{ 
-                                            display: 'flex', 
-                                            alignItems: 'center', 
-                                            justifyContent: 'space-between',
-                                            width: '100%'
-                                          }}>
-                                            <Typography variant="body2" sx={{ fontWeight: 700 }}>
-                                            <MenuBookIcon fontSize='medium'
-                                             sx={{ 
-                                              mr:1,
-                                              color: theme => alpha(theme.palette.text.primary, 0.6),
-                                            }}
-                                             /> {name}
-                                            </Typography>
-                                            <Box 
-                                              component="span"
-                                              sx={{ 
-                                                ml: 1, 
-                                                bgcolor: 'rgba(25, 118, 210, 0.12)',
-                                                px: 1,
-                                                py: 0.2,
-                                                borderRadius: 1,
-                                                fontSize: '0.75rem',
-                                                fontWeight: 'bold'
-                                              }}
-                                            >
-                                              {activity.points[index]} pts
-                                            </Box>
-                                          </Box>
-                                        }
-                                        size="medium"
-                                        color="primary"
-                                        variant="outlined" 
-                                        component={Link}
-                                        href={`/activities/${activity.id}`}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        clickable
-                                        sx={{ 
-                                          cursor: 'pointer',
-                                          py: 0.5,
-                                          px: 0.5,
-                                          '& .MuiChip-label': {
-                                            px: 0.5,
-                                            width: '100%'
-                                          },
-                                          '&:hover': { 
-                                            boxShadow: '0 2px 5px rgba(0,0,0,0.1)',
-                                            backgroundColor: 'rgba(25, 118, 210, 0.04)',
-                                            borderColor: 'primary.main',
-                                            transform: 'translateY(-1px)',
-                                            transition: 'all 0.2s ease'
-                                          },
-                                          transition: 'all 0.2s ease'
-                                        }}
-                                      />
-                                    </Tooltip>
-                                  ))}
-                                </Box>
-                              </Box>
-                              
-                              {/* Right side - Activity description */}
-                              <Box sx={{ flex: '1 1 auto', minWidth: '200px' }}>
-                                {activity.content ? (
-                                  <>
-                                    <Typography variant="subtitle2" color="text.secondary" gutterBottom>
-                                      Description :
-                                    </Typography>
-                                    <Typography variant="body2" color="text.secondary">
-                                      {activity.content}
-                                    </Typography>
-                                  </>
-                                ) : (
-                                  <Typography variant="body2" color="text.disabled" sx={{ fontStyle: 'italic' }}>
-                                    Aucune description disponible
-                                  </Typography>
-                                )}
-                              </Box>
-                            </Box>
-                          </CardContent>
-                        </Grid>
-                        
-                        <Divider orientation="vertical" flexItem sx={{ display: { xs: 'none', sm: 'block' } }} />
-                        
-                        <Grid size={{ xs: 12, md: 3.9 }}>
-                          <Box sx={{ 
-                            display: 'flex', 
-                            flexDirection: 'column', 
-                            justifyContent: 'center',
-                            p: 2,
-                            gap: 1
-                          }}>
-                            <Button 
-                              variant="outlined" 
-                              color="primary" 
-                              href={`/activities/${activity.id}`} 
-                              component={Link}
-                              startIcon={<VisibilityIcon />}
-                              size="small"
-                              fullWidth
-                              target="_blank"
-                              rel="noopener noreferrer"
-                            >
-                              Détails
-                            </Button>
-                            <Button 
-                              variant="outlined" 
-                              color='primary'
-                              href={`/activities/${activity.id}/corrections/`} 
-                              component={Link}
-                              startIcon={<RateReviewIcon />}
-                              size="small"
-                              fullWidth
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              sx={{color: theme => theme.palette.success.dark, 
-                                bgcolor: alpha(theme.palette.success.main, 0.02), 
-                                '&:hover': { bgcolor: alpha(theme.palette.success.main, 0.2) }}}
-                            >
-                              Nouvelle correction
-                            </Button>
-                          </Box>
-                          <Box sx={{ mt: 1.5, display: 'flex', 
-                          alignItems: 'center', 
-                          gap: .75, 
-                          justifyContent: 'center', 
-                          flexDirection: 'column' }}> 
-                            {activity.correction_count !== undefined && activity.correction_count > 0 ? (
-                              <Tooltip title="Voir les corrections existantes">
-                                <Chip
-                                  icon={<RateReviewIcon />}
-                                  label={`${activity.correction_count} correction${activity.correction_count > 1 ? 's' : ''}`}
-                                  size="small"
-                                  color="success"
-                                  variant="outlined"
-                                  component={Link}
-                                  href={`/activities/${activity.id}?tab=2`}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  clickable
-                                  sx={{ 
-                                    cursor: 'pointer', 
-                                    '&:hover': { 
-                                      boxShadow: '0 1px 3px rgba(0,0,0,0.12)',
-                                      backgroundColor: 'rgba(46, 125, 50, 0.08)'
-                                    }
-                                  }}
-                                />
-                              </Tooltip>
-                            ) : (
-                              <Typography variant="body2" color="text.secondary" sx={{ mt: 1, display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                                <RateReviewIcon fontSize="small" color="disabled" /> Aucune correction
-                              </Typography>
-                            )}
-                            
-                            {/* Display inactive corrections if any */}
-                            {activity.inactive_corrections_count && activity.inactive_corrections_count > 0 ? (
-                              <Tooltip title="Corrections inactives">
-                                <Chip
-                                  icon={<CloseIcon />}
-                                  label={`${activity.inactive_corrections_count} inactive${activity.inactive_corrections_count > 1 ? 's' : ''}`}
-                                  size="small"
-                                  color="error"
-                                  variant="outlined"
-                                  component={Link}
-                                  href={`/activities/${activity.id}?tab=1`}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  clickable
-                                  sx={{cursor: 'pointer' }}
-                                />
-                              </Tooltip>
-                            ) : null}
-                            
-                            {/* Display absent students if any */}
-                            {activity.absent_count && activity.absent_count > 0 ? (
-                              <Tooltip title="Étudiants absents">
-                                <Chip
-                                  icon={<PersonOffIcon fontSize="small" />}
-                                  label={`${activity.absent_count} absent${activity.absent_count > 1 ? 's' : ''}`}
-                                  size="small"
-                                  color="warning"
-                                  variant="outlined"
-                                  component={Link}
-                                  href={`/activities/${activity.id}?tab=1`}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  clickable
-                                  sx={{ 
-                                    cursor: 'pointer',
-                                    '&:hover': { 
-                                      boxShadow: '0 1px 3px rgba(0,0,0,0.12)',
-                                      backgroundColor: 'rgba(237, 108, 2, 0.08)'
-                                    }
-                                  }}
-                                />
-                              </Tooltip>
-                            ) : null}
-                            
-                            {/* Display non-submitted assignments if any */}
-                            {activity.non_rendu_count && activity.non_rendu_count > 0 ? (
-                              <Tooltip title="Travaux non rendus">
-                                <Chip
-                                  icon={<AssignmentLateIcon fontSize="small" />}
-                                  label={`${activity.non_rendu_count} non rendu${activity.non_rendu_count > 1 ? 's' : ''}`}
-                                  size="small"
-                                  color="info"
-                                  variant="outlined"
-                                  component={Link}
-                                  href={`/activities/${activity.id}?tab=1`}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  clickable
-                                  sx={{ 
-                                    cursor: 'pointer',
-                                    '&:hover': { 
-                                      boxShadow: '0 1px 3px rgba(0,0,0,0.12)',
-                                      backgroundColor: 'rgba(2, 136, 209, 0.08)'
-                                    }
-                                  }}
-                                />
-                              </Tooltip>
-                            ) : null}
-                          </Box>
-                        </Grid>
-                      </Grid>
-                    </Card>
-                  </Grid>
-                ))}
-              </Grid>
-            )}
-          </div>
-        )}
-      </div>
+                  <Button
+                    fullWidth
+                    onClick={() => handleActivitySelect(activity.id!)}
+                    sx={{
+                      justifyContent: 'flex-start',
+                      px: 2,
+                      py: 1,
+                      borderRadius: 2,
+                      textAlign: 'left',
+                      color: selectedActivityId === activity.id ? 'primary.main' : 'text.primary',
+                      fontWeight: selectedActivityId === activity.id ? 'bold' : 'normal',
+                      bgcolor: selectedActivityId === activity.id ? alpha(theme.palette.primary.main, 0.08) : 'transparent',
+                      '&:hover': {
+                        bgcolor: selectedActivityId === activity.id 
+                          ? alpha(theme.palette.primary.main, 0.12) 
+                          : alpha(theme.palette.primary.main, 0.04)
+                      },
+                      position: 'relative',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis'
+                    }}
+                    startIcon={<MenuBookIcon fontSize="small" />}
+                  >
+                    <Box sx={{ display: 'flex', alignItems: 'center', width: '100%' }}>
+                      <Typography 
+                        variant="body2" 
+                        sx={{ 
+                          flexGrow: 1, 
+                          overflow: 'hidden', 
+                          textOverflow: 'ellipsis', 
+                          whiteSpace: 'nowrap',
+                        }}
+                      >
+                        {activity.name}
+                      </Typography>
+                      {activity.correction_count && activity.correction_count > 0 && (
+                        <Chip
+                          size="small"
+                          label={activity.correction_count}
+                          color="success"
+                          sx={{ ml: 1, minWidth: 0, height: 20, '& .MuiChip-label': { px: 1 } }}
+                        />
+                      )}
+                    </Box>
+                  </Button>
+                </ListItem>
+              ))}
+            </List>
+          )}
+        </Paper>
+        
+        {/* Zone de contenu principal */}
+        <Box sx={{ flexGrow: 1 }}>
+          {enhancedActivities.length === 0 ? (
+            <Box textAlign="center" my={8} className="p-8 border border-dashed border-gray-300 rounded-lg">
+              <FormatListBulletedIcon fontSize="large" className="text-gray-400 mb-4" />
+              <Typography variant="h6" gutterBottom>
+                Aucune activité trouvée
+              </Typography>
+              <Typography variant="body1" color="textSecondary" mb={4} className="max-w-md mx-auto">
+                Les activités avec parties dynamiques vous permettent d'ajouter des barèmes flexibles. 
+                Ajoutez votre première activité pour commencer à noter vos étudiants.
+              </Typography>
+              <Button 
+                variant="contained"
+                color="primary"
+                startIcon={<AddIcon />}
+                onClick={handleCreateActivity}
+                size="large"
+                className="shadow-lg"
+              >
+                Ajouter ma première activité
+              </Button>
+            </Box>
+          ) : filteredActivities.length === 0 ? (
+            <Paper className="p-8 text-center">
+              <SearchIcon fontSize="large" className="text-gray-400 mb-2" />
+              <Typography variant="h6" className="mb-2">Aucune activité ne correspond à cette recherche</Typography>
+              <Button 
+                onClick={() => {
+                  setSearchTerm('');
+                  setFilterTab(0);
+                }}
+                variant="outlined"
+              >
+                Réinitialiser les filtres
+              </Button>
+            </Paper>
+          ) : !selectedActivityId ? (
+            <Box textAlign="center" my={8} className="p-8 border border-dashed border-gray-300 rounded-lg">
+              <FormatListBulletedIcon fontSize="large" className="text-gray-400 mb-4" />
+              <Typography variant="h6" gutterBottom>
+                Sélectionnez une activité
+              </Typography>
+              <Typography variant="body1" color="textSecondary" className="w-full mx-auto">
+                Cliquez sur une activité dans le menu latéral pour afficher ses détails.
+              </Typography>
+            </Box>
+          ) : (
+            <Box>
+              {renderActivityCard(filteredActivities.find(a => a.id === selectedActivityId)!)}
+            </Box>
+          )}
+        </Box>
+      </Box>
     </Container>
   );
 }

@@ -4,6 +4,7 @@ import React, { createContext, useContext, useState, useEffect, useCallback, use
 import { CorrectionAutre, ActivityAutre } from '@/lib/types';
 import { Student as BaseStudent } from '@/lib/types';
 import { useSnackbar } from 'notistack';
+import dayjs from 'dayjs';
 
 interface SortOptions {
   field: 'submission_date' | 'grade' | 'student_name' | 'activity_name';
@@ -21,6 +22,8 @@ interface ProviderProps {
     subClassId?: string;
     recent?: boolean;
     selectedCorrectionIds?: string;
+    dateFrom?: string; // Ajout des propriétés dateFrom et dateTo
+    dateTo?: string;
   };
   initialSort?: SortOptions;
 }
@@ -94,8 +97,8 @@ export default function CorrectionsAutresProvider({ children, initialFilters, in
     classId: initialFilters?.classId || '',
     studentId: initialFilters?.studentId || '',
     activityId: initialFilters?.activityId || '',
-    dateFrom: null,
-    dateTo: null,
+    dateFrom: initialFilters?.dateFrom ? dayjs(initialFilters.dateFrom) : null,
+    dateTo: initialFilters?.dateTo ? dayjs(initialFilters.dateTo) : null,
     minGrade: '',
     maxGrade: '',
     correctionId: initialFilters?.correctionId || '',

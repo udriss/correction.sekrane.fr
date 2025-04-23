@@ -28,7 +28,6 @@ import {
   DialogContent,
   DialogActions,
   Alert,
-  CircularProgress,
   alpha
 } from '@mui/material';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
