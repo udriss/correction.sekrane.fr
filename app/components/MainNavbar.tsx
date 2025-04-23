@@ -16,7 +16,14 @@ import {
   Tooltip,
   Divider,
   ListItemIcon,
-  ListItemText
+  ListItemText,
+  Badge,
+  Avatar,
+  ListItemAvatar,
+  ListItemButton,
+  List,
+  Paper,
+  CircularProgress
 } from '@mui/material';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
@@ -36,6 +43,19 @@ import CategoryIcon from '@mui/icons-material/Category';
 import SearchIcon from '@mui/icons-material/Search';
 import ThemeSwitcher from '@/components/layout/ThemeSwitcher';
 import SettingsIcon from '@mui/icons-material/Settings';
+import NotificationsIcon from '@mui/icons-material/Notifications';
+import FeedbackIcon from '@mui/icons-material/Feedback';
+import VisibilityIcon from '@mui/icons-material/Visibility';
+import DoneAllIcon from '@mui/icons-material/DoneAll';
+import { alpha, useTheme } from '@mui/material/styles';
+import { FeedbackNotification } from '@/lib/services/notificationService';
+import dayjs from 'dayjs';
+import 'dayjs/locale/fr';
+import relativeTime from 'dayjs/plugin/relativeTime';
+
+// Configurer dayjs pour afficher les dates relatives en français
+dayjs.locale('fr');
+dayjs.extend(relativeTime);
 
 interface User {
   id: number;
@@ -59,6 +79,310 @@ function HideOnScroll(props: Props) {
     <Slide appear={false} direction="down" in={!trigger}>
       {children}
     </Slide>
+  );
+}
+
+// Composant pour le badge de notifications
+function NotificationBadge() {
+  const [notificationCount, setNotificationCount] = useState<number>(0);
+  const [notifications, setNotifications] = useState<FeedbackNotification[]>([]);
+  const [loading, setLoading] = useState<boolean>(false);
+  const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
+  const open = Boolean(anchorEl);
+  const theme = useTheme();
+  const router = useRouter();
+
+  // Récupérer le nombre de notifications non lues
+  const fetchNotificationCount = async () => {
+    try {
+      const response = await fetch('/api/notifications?action=count');
+      if (response.ok) {
+        const data = await response.json();
+        setNotificationCount(data.count);
+      }
+    } catch (error) {
+      console.error('Erreur lors de la récupération du nombre de notifications:', error);
+    }
+  };
+
+  // Récupérer les notifications
+  const fetchNotifications = async () => {
+    setLoading(true);
+    try {
+      // Inclure les notifications déjà lues (paramètre includeRead=true)
+      const response = await fetch('/api/notifications?includeRead=true&limit=20');
+      if (response.ok) {
+        const data = await response.json();
+        setNotifications(data.notifications);
+      }
+    } catch (error) {
+      console.error('Erreur lors de la récupération des notifications:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Marquer une notification comme lue
+  const markAsRead = async (id: number) => {
+    try {
+      const response = await fetch('/api/notifications', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ action: 'markAsRead', id }),
+      });
+      
+      if (response.ok) {
+        // Mettre à jour la liste des notifications
+        setNotifications(prev => prev.map(notif => 
+          notif.id === id ? { ...notif, readOk: true } : notif
+        ));
+        // Mettre à jour le compteur
+        fetchNotificationCount();
+      }
+    } catch (error) {
+      console.error('Erreur lors du marquage de la notification comme lue:', error);
+    }
+  };
+
+  // Marquer toutes les notifications comme lues
+  const markAllAsRead = async () => {
+    try {
+      const response = await fetch('/api/notifications', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ action: 'markAllAsRead' }),
+      });
+      
+      if (response.ok) {
+        // Mettre à jour la liste des notifications
+        setNotifications(prev => prev.map(notif => ({ ...notif, readOk: true })));
+        // Mettre à jour le compteur
+        setNotificationCount(0);
+      }
+    } catch (error) {
+      console.error('Erreur lors du marquage de toutes les notifications comme lues:', error);
+    }
+  };
+
+  // Ouvrir le menu des notifications
+  const handleClick = (event: React.MouseEvent<HTMLElement>) => {
+    setAnchorEl(event.currentTarget);
+    fetchNotifications();
+  };
+
+  // Fermer le menu des notifications
+  const handleClose = () => {
+    setAnchorEl(null);
+  };
+
+  // Rediriger vers la page de feedback dans un nouvel onglet
+  const navigateToFeedback = (shareCode: string, notificationId: number) => {
+    markAsRead(notificationId);
+    // Ouvrir dans un nouvel onglet
+    window.open(`/feedback/${shareCode}`, '_blank');
+    handleClose();
+  };
+
+  // Rediriger vers la page complète des notifications
+  const viewAllNotifications = () => {
+    handleClose();
+    router.push('/notifications');
+  };
+
+  // Effet pour récupérer le nombre de notifications au chargement
+  useEffect(() => {
+    fetchNotificationCount();
+    
+    // Mettre à jour le nombre de notifications toutes les 30 secondes
+    const interval = setInterval(fetchNotificationCount, 30000);
+    
+    return () => clearInterval(interval);
+  }, []);
+
+  return (
+    <>
+      <Tooltip title={notificationCount > 0 ? `${notificationCount} notifications` : "Notifications"}>
+        <IconButton
+          onClick={handleClick}
+          size="small"
+          color="inherit"
+          sx={{ 
+            ml: 1,
+            animation: notificationCount > 0 ? 'pulse 2s infinite' : 'none',
+            '@keyframes pulse': {
+              '0%': { transform: 'scale(1)' },
+              '50%': { transform: 'scale(1.1)' },
+              '100%': { transform: 'scale(1)' }
+            }
+          }}
+        >
+          <Badge 
+            badgeContent={notificationCount} 
+            color="error"
+            sx={{
+              '& .MuiBadge-badge': {
+                fontSize: '0.7rem',
+                height: 16,
+                minWidth: 16,
+                padding: '0 4px'
+              }
+            }}
+          >
+            <NotificationsIcon />
+          </Badge>
+        </IconButton>
+      </Tooltip>
+
+      <Menu
+        anchorEl={anchorEl}
+        open={open}
+        onClose={handleClose}
+        PaperProps={{
+          elevation: 3,
+          sx: {
+            maxHeight: 450,
+            width: '350px',
+            maxWidth: '90vw',
+            borderRadius: 2,
+            mt: 1.5,
+            overflow: 'visible',
+            filter: 'drop-shadow(0px 2px 8px rgba(0,0,0,0.15))',
+            '&:before': {
+              content: '""',
+              display: 'block',
+              position: 'absolute',
+              top: 0,
+              right: 14,
+              width: 10,
+              height: 10,
+              bgcolor: 'background.paper',
+              transform: 'translateY(-50%) rotate(45deg)',
+              zIndex: 0,
+            },
+          },
+        }}
+        transformOrigin={{ horizontal: 'right', vertical: 'top' }}
+        anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }}
+      >
+        <Box 
+          sx={{ 
+            p: 2, 
+            display: 'flex', 
+            justifyContent: 'space-between', 
+            alignItems: 'center',
+            borderBottom: '1px solid',
+            borderColor: 'divider'
+          }}
+        >
+          <Typography variant="h6" sx={{ fontWeight: 600 }}>
+            Notifications
+          </Typography>
+          
+          {notificationCount > 0 && (
+            <Tooltip title="Tout marquer comme lu">
+              <IconButton size="small" onClick={markAllAsRead}>
+                <DoneAllIcon fontSize="small" />
+              </IconButton>
+            </Tooltip>
+          )}
+        </Box>
+
+        {loading ? (
+          <Box sx={{ display: 'flex', justifyContent: 'center', p: 3 }}>
+            <CircularProgress size={30} />
+          </Box>
+        ) : notifications.length === 0 ? (
+          <Box sx={{ p: 3, textAlign: 'center' }}>
+            <FeedbackIcon sx={{ fontSize: 40, color: 'text.disabled', mb: 1 }} />
+            <Typography color="text.secondary">
+              Aucune notification de feedback
+            </Typography>
+          </Box>
+        ) : (
+          <>
+            <List sx={{ p: 0, maxHeight: 320, overflowY: 'auto' }}>
+              {notifications.map((notification) => (
+                <ListItemButton
+                  key={notification.id}
+                  onClick={() => navigateToFeedback(notification.share_code, notification.id)}
+                  sx={{
+                    borderLeft: '3px solid',
+                    borderColor: notification.readOk ? 'transparent' : 'primary.main',
+                    backgroundColor: notification.readOk ? 'transparent' : alpha(theme.palette.primary.main, 0.04),
+                    '&:hover': {
+                      backgroundColor: alpha(theme.palette.primary.main, 0.08),
+                    },
+                    py: 1
+                  }}
+                >
+                  <ListItemAvatar>
+                    <Avatar sx={{ bgcolor: notification.readOk ? 'action.disabled' : 'primary.main' }}>
+                      <FeedbackIcon />
+                    </Avatar>
+                  </ListItemAvatar>
+                  <ListItemText 
+                    primary={
+                      <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                        {notification.student_name} a consulté son feedback
+                      </Typography>
+                    }
+                    secondary={
+                      <>
+                        <Typography variant="caption" display="block" sx={{ mt: 0.5 }}>
+                          Activité: {notification.activity_name}
+                        </Typography>
+                        <Typography variant="caption" display="block">
+                          Note: {notification.final_grade}/20
+                        </Typography>
+                        <Typography variant="caption" display="block" sx={{ fontStyle: 'italic', mt: 0.5 }}>
+                          {dayjs(notification.viewed_at).fromNow()}
+                        </Typography>
+                      </>
+                    }
+                  />
+                  <Tooltip title="Voir le feedback (nouvel onglet)">
+                    <IconButton 
+                      edge="end" 
+                      size="small"
+                      sx={{ mr: 1 }}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        navigateToFeedback(notification.share_code, notification.id);
+                      }}
+                    >
+                      <VisibilityIcon fontSize="small" />
+                    </IconButton>
+                  </Tooltip>
+                </ListItemButton>
+              ))}
+            </List>
+            
+            <Box 
+              sx={{ 
+                p: 1, 
+                borderTop: '1px solid', 
+                borderColor: 'divider', 
+                display: 'flex', 
+                justifyContent: 'center' 
+              }}
+            >
+              <Button 
+                onClick={viewAllNotifications} 
+                size="small" 
+                sx={{ textTransform: 'none' }}
+                startIcon={<FormatListBulletedIcon fontSize="small" />}
+              >
+                Voir toutes les notifications
+              </Button>
+            </Box>
+          </>
+        )}
+      </Menu>
+    </>
   );
 }
 
@@ -354,6 +678,9 @@ export default function MainNavbar() {
               {/* Authentification */}
               {user ? (
                 <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                  {/* Composant de notifications */}
+                  <NotificationBadge />
+                  
                   <Button
                     variant="outlined"
                     onClick={handleMenuClick}
@@ -365,6 +692,7 @@ export default function MainNavbar() {
                       borderRadius: '24px',
                       textTransform: 'none',
                       fontWeight: 500,
+                      ml: 1
                     }}
                   >
                     {user.name || user.username}

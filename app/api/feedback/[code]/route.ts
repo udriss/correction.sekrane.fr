@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { withConnection } from '@/lib/db';
 import { createLogEntry } from '@/lib/services/logsService';
+import { createFeedbackNotification } from '@/lib/services/notificationService';
 import { getServerSession } from "next-auth/next";
 import authOptions from "@/lib/auth";
 import { getUser } from '@/lib/auth';
@@ -167,8 +168,9 @@ export async function GET(
         const ipAddress = (request as NextRequest).headers.get('x-forwarded-for') || 
                           (request as NextRequest).headers.get('x-real-ip') || 'unknown';
         const referer = (request as NextRequest).headers.get('referer') || 'direct';
-                          
-        await createLogEntry({
+        
+        // Créer une entrée de log pour la consultation du feedback
+        const logEntry = {
           action_type: 'VIEW_FEEDBACK',
           description: `Consultation de la correction partagée #${correctionId} pour ${correction.student_name}`,
           entity_type: 'correction',
@@ -180,11 +182,44 @@ export async function GET(
             activity_id: correction.activity_id,
             student_name: correction.student_name,
             student_id: correction.student_id,
+            grade: correction.grade,
+            final_grade: correction.final_grade,
+            correction_id: correctionId,
             browser: userAgent,
             referer: referer,
             timestamp: new Date().toISOString()
           }
-        });
+        };
+        
+        try {
+          // Enregistrer le log et récupérer son ID
+          const logId = await createLogEntry(logEntry);
+          
+          // Vérifier si l'ID est un nombre (cas de succès)
+          if (typeof logId === 'number') {
+            console.log(`Log créé avec succès: ${logId}`);
+            // Créer une notification avec l'ID du log
+            const notificationId = await createFeedbackNotification(logId);
+            console.log(`Notification créée avec succès: ${notificationId} pour le log ${logId}`);
+          } else if (logId === true) {
+            // Le log a été créé mais on n'a pas récupéré son ID, chercher le dernier
+            const [lastLog] = await connection.query(
+              `SELECT id FROM system_logs 
+               WHERE action_type = 'VIEW_FEEDBACK' 
+               AND entity_id = ? 
+               ORDER BY created_at DESC LIMIT 1`,
+              [correctionId]
+            );
+            
+            if (Array.isArray(lastLog) && lastLog.length > 0) {
+              const lastLogId = (lastLog[0] as any).id;
+              const notificationId = await createFeedbackNotification(lastLogId);
+              console.log(`Notification créée avec succès (fallback): ${notificationId} pour le log ${lastLogId}`);
+            }
+          }
+        } catch (error) {
+          console.error('Erreur lors de la création de la notification:', error);
+        }
       }
 
       return NextResponse.json(correction);

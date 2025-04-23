@@ -13,8 +13,9 @@ export interface SystemLogEntry {
 
 /**
  * Enregistre une entrée de log dans le système
+ * @returns ID du log créé en cas de succès, false sinon
  */
-export async function createLogEntry(logEntry: SystemLogEntry): Promise<boolean> {
+export async function createLogEntry(logEntry: SystemLogEntry): Promise<number | boolean> {
   return withConnection(async (connection) => {
     try {
       // Préparer les données pour l'insertion
@@ -33,14 +34,19 @@ export async function createLogEntry(logEntry: SystemLogEntry): Promise<boolean>
       const metadataJson = metadata ? JSON.stringify(metadata) : null;
 
       // Exécuter la requête d'insertion
-      await connection.query(
+      const [result] = await connection.query(
         `INSERT INTO system_logs 
         (action_type, description, entity_type, entity_id, user_id, username, ip_address, metadata)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
         [action_type, description, entity_type, entity_id, user_id, username, ip_address, metadataJson]
       );
 
-      return true;
+      // Retourner l'ID du log créé
+      if (result && 'insertId' in result) {
+        return (result as any).insertId;
+      }
+
+      return true; // Retourne true pour compatibilité avec le code existant
     } catch (error) {
       console.error('Error creating log entry:', error);
       return false;
