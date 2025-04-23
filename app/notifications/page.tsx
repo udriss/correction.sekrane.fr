@@ -30,6 +30,7 @@ import FeedbackIcon from '@mui/icons-material/Feedback';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import DoneAllIcon from '@mui/icons-material/DoneAll';
 import MenuBookIcon from '@mui/icons-material/MenuBook';
+import RefreshIcon from '@mui/icons-material/Refresh';
 import GradientBackground from '@/components/ui/GradientBackground';
 import PatternBackground from '@/components/ui/PatternBackground';
 import { FeedbackNotification } from '@/lib/services/notificationService';
@@ -37,17 +38,28 @@ import dayjs from 'dayjs';
 import 'dayjs/locale/fr';
 import relativeTime from 'dayjs/plugin/relativeTime';
 import { useRouter } from 'next/navigation';
+import { useNotifications } from '@/lib/contexts/NotificationContext';
 
 // Configurer dayjs pour afficher les dates relatives en français
 dayjs.locale('fr');
 dayjs.extend(relativeTime);
 
 export default function NotificationsPage() {
+  const { 
+    unreadCount,
+    totalCount, // Utilisation du totalCount depuis le contexte
+    fetchNotificationCounts, // Remplacement des deux fonctions par la nouvelle fonction combinée
+    markAsRead: markNotificationAsRead, 
+    markAllAsRead: markAllNotificationsAsRead,
+    fetchNotifications: fetchContextNotifications
+  } = useNotifications();
+  
   const [notifications, setNotifications] = useState<FeedbackNotification[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [tabValue, setTabValue] = useState(0);
-  const [unreadCount, setUnreadCount] = useState(0);
   const [error, setError] = useState<{ code: number; message: string } | null>(null);
+  const [readCount, setReadCount] = useState<number>(0);
   const theme = useTheme();
   const router = useRouter();
 
@@ -60,10 +72,26 @@ export default function NotificationsPage() {
     503: 'Service de notifications temporairement indisponible'
   };
 
-  // Récupérer toutes les notifications
-  const fetchNotifications = async () => {
-    setLoading(true);
+  // Calculer et mettre à jour le compteur de notifications lues
+  const updateNotificationCounters = (notifications: FeedbackNotification[]) => {
+    if (!notifications || notifications.length === 0) return;
+    
+    const unreadNotifs = notifications.filter(n => !n.readOk);
+    const readNotifs = notifications.filter(n => n.readOk);
+    
+    setReadCount(readNotifs.length);
+    // Le compteur global est mis à jour via le contexte
+  };
+
+  // Récupérer toutes les notifications avec gestion de l'état de rafraîchissement
+  const fetchNotifications = async (isRefreshing = false) => {
+    if (isRefreshing) {
+      setRefreshing(true);
+    } else {
+      setLoading(true);
+    }
     setError(null);
+    
     try {
       const response = await fetch('/api/notifications?includeRead=true&limit=100');
       
@@ -71,9 +99,12 @@ export default function NotificationsPage() {
         const data = await response.json();
         setNotifications(data.notifications);
         
-        // Compter les notifications non lues
-        const unreadNotifications = data.notifications.filter((n: FeedbackNotification) => !n.readOk);
-        setUnreadCount(unreadNotifications.length);
+        // Mettre à jour les compteurs locaux et globaux
+        updateNotificationCounters(data.notifications);
+        
+        // Mettre à jour le contexte global
+        fetchNotificationCounts();
+        fetchContextNotifications();
       } else {
         // Gestion des erreurs HTTP
         const statusCode = response.status;
@@ -86,12 +117,19 @@ export default function NotificationsPage() {
       setError({ code: 0, message: 'Impossible de se connecter au serveur de notifications' });
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   };
 
-  // Marquer une notification comme lue
+  // Fonction pour actualiser les données
+  const refreshNotifications = () => {
+    fetchNotifications(true);
+  };
+
+  // Marquer une notification comme lue avec mise à jour de l'interface
   const markAsRead = async (id: number) => {
     try {
+      // Marquer comme lu via l'API directement plutôt que via le contexte
       const response = await fetch('/api/notifications', {
         method: 'POST',
         headers: {
@@ -101,18 +139,12 @@ export default function NotificationsPage() {
       });
       
       if (response.ok) {
-        // Mettre à jour la liste des notifications
-        setNotifications(prev => prev.map(notif => 
-          notif.id === id ? { ...notif, readOk: true } : notif
-        ));
+        // Plutôt que de mettre à jour l'état local, on recharge complètement les données
+        await fetchNotifications(true);
         
-        // Mettre à jour le compteur de notifications non lues
-        setUnreadCount(prev => prev - 1);
-      } else {
-        // Gestion des erreurs HTTP
-        const statusCode = response.status;
-        const errorMessage = errorMessages[statusCode] || 'Erreur lors du marquage de la notification comme lue';
-        console.error(`Erreur ${statusCode}: ${errorMessage}`);
+        // Mettre à jour également le contexte global
+        fetchNotificationCounts();
+        fetchContextNotifications();
       }
     } catch (error) {
       console.error('Erreur lors du marquage de la notification comme lue:', error);
@@ -122,6 +154,7 @@ export default function NotificationsPage() {
   // Marquer toutes les notifications comme lues
   const markAllAsRead = async () => {
     try {
+      // Appeler l'API directement plutôt que via le contexte
       const response = await fetch('/api/notifications', {
         method: 'POST',
         headers: {
@@ -131,16 +164,12 @@ export default function NotificationsPage() {
       });
       
       if (response.ok) {
-        // Mettre à jour la liste des notifications
-        setNotifications(prev => prev.map(notif => ({ ...notif, readOk: true })));
+        // Plutôt que de mettre à jour l'état local, on recharge complètement les données
+        await fetchNotifications(true);
         
-        // Mettre à jour le compteur de notifications non lues
-        setUnreadCount(0);
-      } else {
-        // Gestion des erreurs HTTP
-        const statusCode = response.status;
-        const errorMessage = errorMessages[statusCode] || 'Erreur lors du marquage des notifications comme lues';
-        console.error(`Erreur ${statusCode}: ${errorMessage}`);
+        // Mettre à jour également le contexte global
+        fetchNotificationCounts();
+        fetchContextNotifications();
       }
     } catch (error) {
       console.error('Erreur lors du marquage de toutes les notifications comme lues:', error);
@@ -168,6 +197,11 @@ export default function NotificationsPage() {
   // Charger les notifications au chargement de la page
   useEffect(() => {
     fetchNotifications();
+  }, []);
+
+  // Mettre à jour le contexte global et les compteurs
+  useEffect(() => {
+    fetchNotificationCounts();
   }, []);
 
   // Filtrer les notifications selon l'onglet actif
@@ -233,17 +267,51 @@ export default function NotificationsPage() {
                 </Box>
               </Box>
               
-              {unreadCount > 0 && (
-                <Button
-                  variant="contained"
-                  color="primary"
-                  startIcon={<DoneAllIcon />}
-                  onClick={markAllAsRead}
-                  sx={{ borderRadius: 8 }}
-                >
-                  Tout marquer comme lu ({unreadCount})
-                </Button>
-              )}
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                <Tooltip title="Actualiser les notifications">
+                  {refreshing || loading ? (
+                    <span>
+                      <IconButton 
+                        disabled={true}
+                        sx={{ 
+                          bgcolor: 'background.paper', 
+                          boxShadow: 1,
+                          animation: refreshing ? 'spin 1s linear infinite' : 'none',
+                          '@keyframes spin': {
+                            '0%': { transform: 'rotate(0deg)' },
+                            '100%': { transform: 'rotate(360deg)' }
+                          }
+                        }}
+                      >
+                        <RefreshIcon />
+                      </IconButton>
+                    </span>
+                  ) : (
+                    <IconButton 
+                      onClick={refreshNotifications}
+                      sx={{ 
+                        bgcolor: 'background.paper', 
+                        boxShadow: 1
+                      }}
+                    >
+                      <RefreshIcon />
+                    </IconButton>
+                  )}
+                </Tooltip>
+                
+                {unreadCount > 0 && (
+                  <Button
+                    variant="contained"
+                    color="primary"
+                    startIcon={<DoneAllIcon />}
+                    onClick={markAllAsRead}
+                    sx={{ borderRadius: 8 }}
+                    disabled={refreshing || loading}
+                  >
+                    Tout marquer comme lu ({unreadCount})
+                  </Button>
+                )}
+              </Box>
             </Box>
           </PatternBackground>
         </GradientBackground>
@@ -258,7 +326,7 @@ export default function NotificationsPage() {
             bgcolor: theme => alpha(theme.palette.primary.light, 0.1) 
           }}>
             <Typography variant="overline" color="text.secondary">Total</Typography>
-            <Typography variant="h3" color="text.primary" fontWeight="bold">{notifications.length}</Typography>
+            <Typography variant="h3" color="text.primary" fontWeight="bold">{totalCount}</Typography>
           </Paper>
         </Grid>
         <Grid size={{ xs: 12, sm: 4 }}>
@@ -278,7 +346,7 @@ export default function NotificationsPage() {
             bgcolor: theme => alpha(theme.palette.success.light, 0.1)
           }}>
             <Typography variant="overline" color="text.secondary">Lues</Typography>
-            <Typography variant="h3" color="success.main" fontWeight="bold">{notifications.length - unreadCount}</Typography>
+            <Typography variant="h3" color="success.main" fontWeight="bold">{totalCount - unreadCount}</Typography>
           </Paper>
         </Grid>
       </Grid>
@@ -294,7 +362,7 @@ export default function NotificationsPage() {
         >
           <Tab 
             label="Toutes" 
-            icon={<Badge badgeContent={notifications.length} color="primary" sx={{ '& .MuiBadge-badge': { fontSize: '0.6rem' } }} />} 
+            icon={<Badge badgeContent={totalCount} color="primary" sx={{ '& .MuiBadge-badge': { fontSize: '0.6rem' } }} />} 
             iconPosition="end"
             sx={{ '& .MuiTab-iconWrapper': { ml: 2.5 } }}
           />
@@ -306,7 +374,7 @@ export default function NotificationsPage() {
           />
           <Tab 
             label="Lues" 
-            icon={<Badge badgeContent={notifications.length - unreadCount} color="success" sx={{ '& .MuiBadge-badge': { fontSize: '0.6rem' } }} />} 
+            icon={<Badge badgeContent={totalCount - unreadCount} color="success" sx={{ '& .MuiBadge-badge': { fontSize: '0.6rem' } }} />} 
             iconPosition="end"
             sx={{ '& .MuiTab-iconWrapper': { ml: 2.5 } }}
           />
@@ -422,7 +490,7 @@ export default function NotificationsPage() {
                             </IconButton>
                           </Tooltip>
                         )}
-                        <Tooltip title="Voir le feedback (nouvel onglet)">
+                        <Tooltip title="Voir le feedback">
                           <IconButton 
                             onClick={() => openFeedback(notification.share_code, notification.id)}
                             color="primary"

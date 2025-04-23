@@ -52,6 +52,7 @@ import { FeedbackNotification } from '@/lib/services/notificationService';
 import dayjs from 'dayjs';
 import 'dayjs/locale/fr';
 import relativeTime from 'dayjs/plugin/relativeTime';
+import { useNotifications } from '@/lib/contexts/NotificationContext';
 
 // Configurer dayjs pour afficher les dates relatives en français
 dayjs.locale('fr');
@@ -84,94 +85,43 @@ function HideOnScroll(props: Props) {
 
 // Composant pour le badge de notifications
 function NotificationBadge() {
-  const [notificationCount, setNotificationCount] = useState<number>(0);
-  const [notifications, setNotifications] = useState<FeedbackNotification[]>([]);
-  const [loading, setLoading] = useState<boolean>(false);
+  const { 
+    unreadCount, 
+    totalCount, // Ajout de totalCount
+    notifications, 
+    loading, 
+    fetchNotifications, 
+    markAsRead, 
+    markAllAsRead,
+    fetchNotificationCounts // Remplacement de fetchUnreadCount par fetchNotificationCounts
+  } = useNotifications();
+  
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
   const open = Boolean(anchorEl);
   const theme = useTheme();
   const router = useRouter();
 
-  // Récupérer le nombre de notifications non lues
-  const fetchNotificationCount = async () => {
-    try {
-      const response = await fetch('/api/notifications?action=count');
-      if (response.ok) {
-        const data = await response.json();
-        setNotificationCount(data.count);
-      }
-    } catch (error) {
-      console.error('Erreur lors de la récupération du nombre de notifications:', error);
-    }
-  };
-
-  // Récupérer les notifications
-  const fetchNotifications = async () => {
-    setLoading(true);
-    try {
-      // Inclure les notifications déjà lues (paramètre includeRead=true)
-      const response = await fetch('/api/notifications?includeRead=true&limit=20');
-      if (response.ok) {
-        const data = await response.json();
-        setNotifications(data.notifications);
-      }
-    } catch (error) {
-      console.error('Erreur lors de la récupération des notifications:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Marquer une notification comme lue
-  const markAsRead = async (id: number) => {
-    try {
-      const response = await fetch('/api/notifications', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ action: 'markAsRead', id }),
-      });
+  // Effet pour mettre à jour le compteur de notifications non lues quand le menu est ouvert/fermé
+  useEffect(() => {
+    if (!open) {
+      // Quand le menu se ferme, on rafraîchit le compteur
+      fetchNotificationCounts();
+    } else {
+      // Quand le menu est ouvert, on met à jour périodiquement le compteur
+      const interval = setInterval(() => {
+        fetchNotificationCounts();
+      }, 1000); // Rafraîchir toutes les secondes
       
-      if (response.ok) {
-        // Mettre à jour la liste des notifications
-        setNotifications(prev => prev.map(notif => 
-          notif.id === id ? { ...notif, readOk: true } : notif
-        ));
-        // Mettre à jour le compteur
-        fetchNotificationCount();
-      }
-    } catch (error) {
-      console.error('Erreur lors du marquage de la notification comme lue:', error);
+      return () => clearInterval(interval);
     }
-  };
-
-  // Marquer toutes les notifications comme lues
-  const markAllAsRead = async () => {
-    try {
-      const response = await fetch('/api/notifications', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ action: 'markAllAsRead' }),
-      });
-      
-      if (response.ok) {
-        // Mettre à jour la liste des notifications
-        setNotifications(prev => prev.map(notif => ({ ...notif, readOk: true })));
-        // Mettre à jour le compteur
-        setNotificationCount(0);
-      }
-    } catch (error) {
-      console.error('Erreur lors du marquage de toutes les notifications comme lues:', error);
-    }
-  };
+  }, [open, fetchNotificationCounts]);
 
   // Ouvrir le menu des notifications
   const handleClick = (event: React.MouseEvent<HTMLElement>) => {
     setAnchorEl(event.currentTarget);
     fetchNotifications();
+    // Également mettre à jour le compteur quand on ouvre le menu
+    fetchNotificationCounts();
   };
 
   // Fermer le menu des notifications
@@ -181,10 +131,20 @@ function NotificationBadge() {
 
   // Rediriger vers la page de feedback dans un nouvel onglet
   const navigateToFeedback = (shareCode: string, notificationId: number) => {
+    // Marquer la notification comme lue
     markAsRead(notificationId);
+    // Mettre à jour immédiatement le compteur après marquage
+    fetchNotificationCounts();
     // Ouvrir dans un nouvel onglet
     window.open(`/feedback/${shareCode}`, '_blank');
     handleClose();
+  };
+
+  // Fonction améliorée pour marquer toutes les notifications comme lues
+  const handleMarkAllAsRead = () => {
+    markAllAsRead();
+    // Mise à jour immédiate du compteur
+    fetchNotificationCounts();
   };
 
   // Rediriger vers la page complète des notifications
@@ -193,26 +153,16 @@ function NotificationBadge() {
     router.push('/notifications');
   };
 
-  // Effet pour récupérer le nombre de notifications au chargement
-  useEffect(() => {
-    fetchNotificationCount();
-    
-    // Mettre à jour le nombre de notifications toutes les 30 secondes
-    const interval = setInterval(fetchNotificationCount, 30000);
-    
-    return () => clearInterval(interval);
-  }, []);
-
   return (
     <>
-      <Tooltip title={notificationCount > 0 ? `${notificationCount} notifications` : "Notifications"}>
+      <Tooltip title={unreadCount > 0 ? `${unreadCount} notifications` : "Notifications"}>
         <IconButton
           onClick={handleClick}
           size="small"
           color="inherit"
           sx={{ 
             ml: 1,
-            animation: notificationCount > 0 ? 'pulse 2s infinite' : 'none',
+            animation: unreadCount > 0 ? 'pulse 2s infinite' : 'none',
             '@keyframes pulse': {
               '0%': { transform: 'scale(1)' },
               '50%': { transform: 'scale(1.1)' },
@@ -221,7 +171,7 @@ function NotificationBadge() {
           }}
         >
           <Badge 
-            badgeContent={notificationCount} 
+            badgeContent={unreadCount} 
             color="error"
             sx={{
               '& .MuiBadge-badge': {
@@ -282,9 +232,9 @@ function NotificationBadge() {
             Notifications
           </Typography>
           
-          {notificationCount > 0 && (
+          {unreadCount > 0 && (
             <Tooltip title="Tout marquer comme lu">
-              <IconButton size="small" onClick={markAllAsRead}>
+              <IconButton size="small" onClick={handleMarkAllAsRead}>
                 <DoneAllIcon fontSize="small" />
               </IconButton>
             </Tooltip>
@@ -303,7 +253,7 @@ function NotificationBadge() {
             </Typography>
           </Box>
         ) : (
-          <>
+          <Box>
             <List sx={{ p: 0, maxHeight: 320, overflowY: 'auto' }}>
               {notifications.map((notification) => (
                 <ListItemButton
@@ -331,20 +281,20 @@ function NotificationBadge() {
                       </Typography>
                     }
                     secondary={
-                      <>
-                        <Typography variant="caption" display="block" sx={{ mt: 0.5 }}>
+                      <React.Fragment>
+                        <Typography variant="caption" component="span" display="block" sx={{ mt: 0.5 }}>
                           Activité: {notification.activity_name}
                         </Typography>
-                        <Typography variant="caption" display="block">
+                        <Typography variant="caption" component="span" display="block">
                           Note: {notification.final_grade}/20
                         </Typography>
-                        <Typography variant="caption" display="block" sx={{ fontStyle: 'italic', mt: 0.5 }}>
+                        <Typography variant="caption" component="span" display="block" sx={{ fontStyle: 'italic', mt: 0.5 }}>
                           {dayjs(notification.viewed_at).fromNow()}
                         </Typography>
-                      </>
+                      </React.Fragment>
                     }
                   />
-                  <Tooltip title="Voir le feedback (nouvel onglet)">
+                  <Tooltip title="Voir le feedback">
                     <IconButton 
                       edge="end" 
                       size="small"
@@ -379,7 +329,7 @@ function NotificationBadge() {
                 Voir toutes les notifications
               </Button>
             </Box>
-          </>
+          </Box>
         )}
       </Menu>
     </>

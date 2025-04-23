@@ -6,7 +6,8 @@ import {
   getFeedbackNotifications, 
   markNotificationAsRead, 
   markAllNotificationsAsRead, 
-  countUnreadNotifications 
+  countUnreadNotifications,
+  countTotalNotifications
 } from '@/lib/services/notificationService';
 
 export async function GET(request: NextRequest) {
@@ -29,6 +30,17 @@ export async function GET(request: NextRequest) {
       // Compter les notifications non lues
       const count = await countUnreadNotifications();
       return NextResponse.json({ count });
+    } else if (action === 'totalCount') {
+      // Compter le nombre total de notifications
+      const total = await countTotalNotifications();
+      return NextResponse.json({ total });
+    } else if (action === 'counts') {
+      // Compter à la fois les notifications non lues et totales
+      const [count, total] = await Promise.all([
+        countUnreadNotifications(),
+        countTotalNotifications()
+      ]);
+      return NextResponse.json({ count, total });
     } else if (action === 'markAllAsRead') {
       // Marquer toutes les notifications comme lues
       const success = await markAllNotificationsAsRead();

@@ -161,3 +161,26 @@ export async function countUnreadNotifications(): Promise<number> {
     }
   });
 }
+
+/**
+ * Compte le nombre total de notifications
+ * @returns Nombre total de notifications
+ */
+export async function countTotalNotifications(): Promise<number> {
+  return withConnection(async (connection) => {
+    try {
+      const [result] = await connection.query(
+        `SELECT COUNT(*) as total FROM feedback_notifications`
+      );
+      
+      if (!Array.isArray(result) || result.length === 0) {
+        return 0;
+      }
+      
+      return (result[0] as any).total || 0;
+    } catch (error) {
+      console.error('Error counting total notifications:', error);
+      return 0;
+    }
+  });
+}
