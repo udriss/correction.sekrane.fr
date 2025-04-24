@@ -27,7 +27,7 @@ export async function GET(request: Request) {
   try {
     // Récupérer tous les groupes avec le nombre de corrections
     // Cette route est maintenue pour la compatibilité ascendante
-    // Mais on devrait préférer utiliser /api/activities/[id]/groups
+    // Mais on devrait préférer utiliser /api/activities_autres/[id]/groups
     const groups = await query(`
       SELECT 
         cg.*, 

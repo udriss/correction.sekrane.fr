@@ -90,103 +90,60 @@ function organizeBySubArrangement(
   if (subArrangement === 'none') {
     return sortCorrectionsByStudentName(corrections, students);
   }
-  
-  // Vérifier d'abord l'arrangement principal
+
+  // Fonction utilitaire pour appliquer le sous-arrangement à chaque groupe
+  const applySubArrangement = (group: Partial<CorrectionAutreEnriched>[] | any[]) =>
+    organizeGroupBySubArrangement(group, subArrangement, students, activities);
+
+  // Regroupement principal selon arrangement
+  let result: Record<string, any> = {};
   switch (arrangement) {
-    case 'subclass': 
-      // Organisation principale par sous-classe (groupe)
-      const resultBySubClass: Record<string, Partial<CorrectionAutreEnriched>[] | any[]> = {};
-      
-      // Regrouper les corrections par sous-classe
+    case 'subclass':
       corrections.forEach(correction => {
         const subClassName = correction.sub_class 
           ? `Groupe ${correction.sub_class}` 
           : 'Sans groupe';
-        
-        if (!resultBySubClass[subClassName]) {
-          resultBySubClass[subClassName] = [];
-        }
-        
-        resultBySubClass[subClassName].push(correction);
+        if (!result[subClassName]) result[subClassName] = [];
+        result[subClassName].push(correction);
       });
-      
-      // Trier chaque groupe par ordre alphabétique
-      Object.keys(resultBySubClass).forEach(group => {
-        resultBySubClass[group] = sortCorrectionsByStudentName(resultBySubClass[group], students);
-      });
-      return resultBySubClass;
-      
+      break;
     case 'activity':
-      // Organisation principale par activité
-      const resultByActivity: Record<string, Partial<CorrectionAutreEnriched>[] | any[]> = {};
-      
-      // Regrouper les corrections par activité
       corrections.forEach(correction => {
         const activityName = getActivityName(correction.activity_id, activities);
-        
-        if (!resultByActivity[activityName]) {
-          resultByActivity[activityName] = [];
+        if (!result[activityName]) result[activityName] = [];
+        result[activityName].push(correction);
+      });
+      break;
+    case 'class':
+      corrections.forEach(correction => {
+        const className = correction.class_name || `Classe ${correction.class_id || 'inconnue'}`;
+        if (!result[className]) result[className] = [];
+        result[className].push(correction);
+      });
+      break;
+    case 'student':
+      corrections.forEach(correction => {
+        let studentName = 'Étudiant inconnu';
+        if (correction.student_id) {
+          const student = students.find(s => s.id === correction.student_id);
+          studentName = student 
+            ? `${student.last_name} ${student.first_name}`
+            : `Étudiant ${correction.student_id}`;
         }
-        
-        resultByActivity[activityName].push(correction);
+        if (!result[studentName]) result[studentName] = [];
+        result[studentName].push(correction);
       });
-      
-      // Trier chaque activité par ordre alphabétique
-      Object.keys(resultByActivity).forEach(activity => {
-        resultByActivity[activity] = sortCorrectionsByStudentName(resultByActivity[activity], students);
-      });
-      return resultByActivity;
-      
+      break;
     default:
-      // Traiter le sous-arrangement
-      if (subArrangement === 'subclass') {
-        const result: Record<string, Partial<CorrectionAutreEnriched>[] | any[]> = {};
-        
-        // Regrouper les corrections par sous-classe
-        corrections.forEach(correction => {
-          const subClassName = correction.sub_class 
-            ? `Groupe ${correction.sub_class}` 
-            : 'Sans groupe';
-          
-          if (!result[subClassName]) {
-            result[subClassName] = [];
-          }
-          
-          result[subClassName].push(correction);
-        });
-        
-        // Trier chaque groupe par ordre alphabétique
-        Object.keys(result).forEach(group => {
-          result[group] = sortCorrectionsByStudentName(result[group], students);
-        });
-        return result;
-      }
-      
-      // Pour tous les arrangements avec activité comme sous-arrangement
-      if (subArrangement === 'activity') {
-        const result: Record<string, Partial<CorrectionAutreEnriched>[] | any[]> = {};
-        
-        // Regrouper les corrections par activité
-        corrections.forEach(correction => {
-          const activityName = getActivityName(correction.activity_id, activities);
-          
-          if (!result[activityName]) {
-            result[activityName] = [];
-          }
-          
-          result[activityName].push(correction);
-        });
-        
-        // Trier chaque activité par ordre alphabétique
-        Object.keys(result).forEach(activity => {
-          result[activity] = sortCorrectionsByStudentName(result[activity], students);
-        });
-        return result;
-      }
-      
-      // Pour tous les autres cas, simplement trier par nom d'étudiant
-      return sortCorrectionsByStudentName(corrections, students);
+      // fallback: pas de regroupement principal, juste sous-arrangement
+      return applySubArrangement(corrections);
   }
+
+  // Appliquer le sous-arrangement à chaque groupe principal
+  Object.keys(result).forEach(key => {
+    result[key] = applySubArrangement(result[key]);
+  });
+  return result;
 }
 
 /**
@@ -198,12 +155,19 @@ function organizeGroupBySubArrangement(
   students: (Student | SimpleStudent)[],
   activities: Activity[]
 ): Record<string, Partial<CorrectionAutreEnriched>[] | any[]> | Partial<CorrectionAutreEnriched>[] | any[] {
-  if (subArrangement === 'none') {
-    return sortCorrectionsByStudentName(groupCorrections, students);
+  // Correction : si ce n'est pas un tableau (déjà groupé), on retourne tel quel
+  if (!Array.isArray(groupCorrections)) {
+    return groupCorrections;
+  }
+  // Vérifier la longueur
+  if (groupCorrections.length === 0) {
+    return [];
   }
 
   const result: Record<string, Partial<CorrectionAutreEnriched>[] | any[]> = {};
-
+  console.log('Organizing corrections by sub-arrangement:', subArrangement);
+  console.log('Corrections:', groupCorrections);
+  console.log('Students:', students);
   switch (subArrangement) {
     case 'activity':
       // Regrouper les corrections par activité
@@ -1139,27 +1103,30 @@ export async function generateQRCodePDF({
   arrangement = 'class', // Valeur par défaut : organisation par classe
   subArrangement = 'student', // Valeur par défaut : sous-organisation par étudiant
   groupedData = null, // Données déjà organisées selon l'arrangement
-  skipGrouping = false // Permet d'éviter de réorganiser les données déjà traitées
+  skipGrouping = true // Permet d'éviter de réorganiser les données déjà traitées
 }: QRCodePDFOptions): Promise<string | null> {
   try {
     if (!corrections || corrections.length === 0) {
       throw new Error('No corrections provided');
     }
 
+
+
+// Trier les corrections par nom d'étudiant (utilisé même si nous avons des données organisées)
+    
+    
+    // Trier les corrections par nom d'étudiant (utilisé même si nous avons des données organisées)
     
     
     // Trier les corrections par nom d'étudiant (utilisé même si nous avons des données organisées)
     let sortedCorrections = sortCorrectionsByStudentName(corrections, students);
-    
-    // Déterminer les données organisées à utiliser
     let organizedData;
-    
+
     if (skipGrouping && groupedData) {
-      // Utiliser directement les données déjà organisées
-      
       organizedData = groupedData;
+      console.log('Utilisation des données organisées fournies');
+      console.log(organizedData);
     } else {
-      // Organiser les corrections selon les options choisies
       organizedData = organizeBySubArrangement(
         sortedCorrections,
         arrangement as ArrangementType,
@@ -1169,7 +1136,7 @@ export async function generateQRCodePDF({
       );
     }
 
-    
+
     
 
     // Create a new jsPDF instance
@@ -1179,50 +1146,32 @@ export async function generateQRCodePDF({
       format: 'a4'
     });
 
-    // Récupérer les codes de partage pour toutes les corrections
     const shareCodes = await getShareCodes(corrections);
-    
-    // Récupérer les informations pertinentes
+
+    // ...infos générales pour le header...
     const firstCorrection = corrections[0];
     const activityId = firstCorrection?.activity_id;
     const classId = firstCorrection?.class_id;
-    
-    // Utiliser l'activité spécifiée dans le groupe, sinon la récupérer depuis la liste des activités
     const activityName = group?.activity_name || getActivityName(activityId, activities);
-    
-    // Récupérer le nom de la classe à partir du premier élément des corrections
     const className = firstCorrection?.class_name || group?.name || 'Classe inconnue';
-    
-    // Récupérer les barèmes si disponibles
     const experimentalPoints = firstCorrection?.experimental_points || null;
     const theoreticalPoints = firstCorrection?.theoretical_points || null;
-    
-    // Sous-titre (classe et éventuellement groupe)
     let subtitle = className;
-    
-    // Ajouter le groupe au sous-titre si disponible
     if (group && group.name && group.name.includes('Groupe')) {
       subtitle += ` - ${group.name}`;
     } else if (firstCorrection?.sub_class) {
       subtitle += ` - Groupe ${firstCorrection.sub_class}`;
     }
-    
-    // Compter les corrections selon leur statut
     const activeCorrections = corrections.filter(c => c.status === 'ACTIVE' || (!c.status && c.active !== 0));
     const nonActiveCorrections = corrections.filter(c => c.status !== 'ACTIVE' && (c.status || c.active === 0));
-    
-    // Créer un texte de statut détaillé
     let statusText = `${corrections.length} corrections`;
-    
     const statusCounts: Record<string, number> = {
       'NON_NOTE': 0,
       'ABSENT': 0,
       'NON_RENDU': 0,
       'DEACTIVATED': 0,
-      'INACTIVE': 0  // Pour la rétrocompatibilité avec les anciennes corrections
+      'INACTIVE': 0
     };
-    
-    // Compter chaque type de statut
     corrections.forEach(c => {
       if (c.status) {
         if (statusCounts[c.status] !== undefined) {
@@ -1232,107 +1181,89 @@ export async function generateQRCodePDF({
         statusCounts['INACTIVE']++;
       }
     });
-    
-    // Ajouter les statuts non-actifs au texte de statut si présents
     if (nonActiveCorrections.length > 0) {
       const statusDetails = [];
-      
       if (statusCounts['NON_NOTE'] > 0) statusDetails.push(`${statusCounts['NON_NOTE']} non notées`);
       if (statusCounts['ABSENT'] > 0) statusDetails.push(`${statusCounts['ABSENT']} absents`);
       if (statusCounts['NON_RENDU'] > 0) statusDetails.push(`${statusCounts['NON_RENDU']} non rendues`);
       if (statusCounts['DEACTIVATED'] > 0) statusDetails.push(`${statusCounts['DEACTIVATED']} désactivées`);
       if (statusCounts['INACTIVE'] > 0) statusDetails.push(`${statusCounts['INACTIVE']} inactives`);
-      
       statusText += ` (dont ${statusDetails.join(', ')})`;
     }
-    
-    // Page dimensions
     const pageWidth = doc.internal.pageSize.getWidth();
     const pageHeight = doc.internal.pageSize.getHeight();
-    const margin = 20; // Augmentation de la marge pour laisser plus d'espace
-    const qrSize = 35; // Taille des QR codes
-    const itemsPerRow = 2; // 2 codes par ligne
-    const rowsPerPage = 2; // 2 lignes par page
-    const rowHeight = qrSize + 55; // QR code + espace pour le texte
-    
-    // Hauteur de l'en-tête sur la première page
-    const headerHeight = nonActiveCorrections.length > 0 ? 80 : 75; // Ajuster si légende présente
-    
-    // Calcul de l'espace vertical disponible sur la première page
+    const margin = 20;
+    const qrSize = 35;
+    const itemsPerRow = 2;
+    const rowsPerPage = 2;
+    const rowHeight = qrSize + 55;
+    const headerHeight = nonActiveCorrections.length > 0 ? 80 : 75;
     const availableSpaceFirstPage = pageHeight - headerHeight - margin;
-    
-    // Calcul des positions horizontales des colonnes, symétriques par rapport aux marges
-    // Pour 2 colonnes : 1/3 et 2/3 de l'espace disponible entre les marges
     const horizontalSpacing = (pageWidth - 2.5 * margin);
     const colPosition = [
-      margin + horizontalSpacing / 5,               // Première colonne (1/5 de l'espace depuis la marge gauche)
-      pageWidth - margin - horizontalSpacing / 5    // Deuxième colonne (1/5 de l'espace depuis la marge droite)
+      margin + horizontalSpacing / 5,
+      pageWidth - margin - horizontalSpacing / 5
     ];
-    
-    // Calcul de l'espacement vertical pour la première page
-    // Pour centrer les lignes dans l'espace disponible
     const topMarginFirstPage = headerHeight + (availableSpaceFirstPage - (rowsPerPage * rowHeight)) / 2;
-    
-    // Espacement vertical pour les pages suivantes
     const topMarginOtherPages = margin + (pageHeight - 1*margin - (rowsPerPage * rowHeight)) / 2;
-    
     let pageNumber = 1;
-    
-    // Appliquer l'en-tête pour la première page
+
+    // Header première page
     generatePDFHeader(doc, activityName, subtitle, experimentalPoints, theoreticalPoints, statusText, nonActiveCorrections);
-    
-    // Ajouter une nouvelle page après l'en-tête
     doc.addPage();
     pageNumber++;
-    
-    // Génération du PDF selon le type d'arrangement
-    if (typeof organizedData === 'object' && !Array.isArray(organizedData)) {
-      // Traitement structuré par cas pour les données hiérarchiques
-      const groupKeys = Object.keys(organizedData);
-      
-      // Trier les clés de groupes si nécessaire (par exemple, pour les sous-classes "Groupe 1", "Groupe 2", etc.)
+
+    // --- NOUVEAU PARCOURS HIÉRARCHIQUE ---
+    if (skipGrouping && groupedData) {
+      const groupKeys = Object.keys(groupedData);
       const sortedGroupKeys = groupKeys.sort((a, b) => {
-        // Si le format est "Groupe X", trier numériquement
         const numA = parseInt(a.replace(/[^0-9]/g, ''));
         const numB = parseInt(b.replace(/[^0-9]/g, ''));
-        if (!isNaN(numA) && !isNaN(numB)) {
-          return numA - numB;
-        }
-        // Sinon, trier alphabétiquement
+        if (!isNaN(numA) && !isNaN(numB)) return numA - numB;
         return a.localeCompare(b, 'fr', { sensitivity: 'base' });
       });
-      
-      for (let groupIndex = 0; groupIndex < sortedGroupKeys.length; groupIndex++) {
-        const groupName = sortedGroupKeys[groupIndex];
-        const groupCorrections = organizedData[groupName];
-        
-        // Si ce n'est pas le premier groupe, ajouter une nouvelle page
-        if (groupIndex > 0) {
-          doc.addPage();
-          pageNumber++;
+      let isFirstPage = true;
+      for (const groupKey of sortedGroupKeys) {
+        const group = groupedData[groupKey];
+        const groupName = group.info?.name || groupKey;
+        const items = group.items || {};
+        const activityKeys = Object.keys(items);
+        const sortedActivityKeys = activityKeys.sort((a, b) => a.localeCompare(b, 'fr', { sensitivity: 'base' }));
+        for (const activityKey of sortedActivityKeys) {
+          const activityObj = items[activityKey];
+          const correctionsArr = activityObj.corrections || [];
+          if (!isFirstPage) {
+            doc.addPage();
+            pageNumber++;
+          } else {
+            isFirstPage = false;
+          }
+          // Titre de la page : groupe + activité
+          doc.setFont('helvetica', 'bold');
+          doc.setFontSize(16);
+          doc.text(groupName, 105, 20, { align: 'center' });
+          doc.setFont('helvetica', 'normal');
+          doc.setFontSize(14);
+          doc.text(activityKey, 105, 28, { align: 'center' });
+          doc.setFontSize(12);
+          doc.text(`${correctionsArr.length} corrections`, 105, 33, { align: 'center' });
+          // Générer les QR codes pour ce sous-groupe
+          await generateQRCodesForCorrections(
+            doc,
+            correctionsArr,
+            shareCodes,
+            students,
+            includeDetails,
+            activities,
+            pageNumber,
+            itemsPerRow,
+            rowsPerPage,
+            colPosition,
+            topMarginOtherPages,
+            qrSize,
+            true
+          );
         }
-        
-        // Génération du PDF pour ce groupe spécifique
-        pageNumber = await generatePDFForGroup(
-          doc,
-          groupName,
-          groupCorrections,
-          shareCodes,
-          students,
-          includeDetails,
-          activities,
-          pageNumber,
-          itemsPerRow,
-          rowsPerPage,
-          colPosition,
-          topMarginOtherPages,
-          pageWidth,
-          margin,
-          qrSize,
-          className,
-          activityName,
-          subArrangement as SubArrangementType
-        );
       }
     } else {
       // Traitement standard pour les données non hiérarchiques (tableau simple)
@@ -1407,14 +1338,10 @@ export async function generateQRCodePDF({
       doc.setFontSize(10);
       doc.text(`Page ${i + 1} sur ${pageNumber}`, pageWidth - margin, pageHeight - 10, { align: 'right' });
     }
-    
-    // Save PDF with appropriate filename
     const sanitizedActivityName = activityName.replace(/\s+/g, '_');
     const sanitizedClassName = className.replace(/\s+/g, '_');
     const fileName = `${sanitizedActivityName}_${sanitizedClassName}_${new Date().toISOString().split('T')[0]}.pdf`;
     doc.save(fileName);
-    
-    // Créer un log pour l'export
     await createExportLog(
       corrections,
       activityName,
@@ -1428,14 +1355,9 @@ export async function generateQRCodePDF({
       pageNumber,
       group?.name || null
     );
-    
-    // Pour le callback onSuccess, créer un nouvel array avec les shareCode ajoutés
-    // seulement si le callback est fourni
     if (onSuccess && typeof onSuccess === 'function') {
-      // Créer une copie profonde des corrections avec les codes de partage
       const updatedCorrectionsWithShareCodes = corrections.map(correction => {
         if (correction.id && shareCodes[correction.id]) {
-          // Utiliser une assertion de type pour éviter l'erreur TypeScript
           return {
             ...correction,
             shareCode: shareCodes[correction.id]
@@ -1443,10 +1365,8 @@ export async function generateQRCodePDF({
         }
         return correction;
       });
-      
       onSuccess(updatedCorrectionsWithShareCodes as any);
     }
-    
     return fileName;
   } catch (error) {
     console.error('Error generating QR code PDF:', error);

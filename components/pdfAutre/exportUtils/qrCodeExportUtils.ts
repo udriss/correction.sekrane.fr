@@ -6,7 +6,7 @@ import { ArrangementType as PdfArrangementType, SubArrangementType } from '@/com
 type QRCodeArrangementType = 'student' | 'class' | 'subclass' | 'activity';
 
 // Fonction pour générer un PDF de QR codes pour toutes les corrections
-export const generateQRCodePDF = async (
+export const qrCodesPDFUtils = async (
   corrections: CorrectionAutreEnriched[],
   uniqueActivities: { id: number | string; name: string }[],
   filterActivity: number | 'all',
@@ -21,7 +21,8 @@ export const generateQRCodePDF = async (
   enqueueSnackbar: (message: string, options: any) => void,
   setError: (error: Error | string | null) => void,
   setErrorDetails: (error: any | null) => void,
-  groupedData: any
+  groupedData: any,
+  includeDetails: boolean,
 ) => {
   try {
     enqueueSnackbar('Génération du PDF de QR codes en cours...', { variant: 'info' });
@@ -69,7 +70,7 @@ export const generateQRCodePDF = async (
       },
       students: studentsToUse,
       activities,
-      includeDetails: true,
+      includeDetails: includeDetails,
       // Paramètres pour l'organisation
       arrangement: qrArrangement,
       subArrangement,

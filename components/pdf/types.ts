@@ -1,7 +1,7 @@
 // Types communs pour les exports PDF
 import { Student } from '@/lib/types';
 import { CorrectionAutreEnriched } from '@/lib/types';
-export type ArrangementType = 'student' | 'class' | 'subclass' | 'activity';
+export type ArrangementType = 'student' | 'class' | 'subclass' | 'activity' | 'none';
 export type SubArrangementType = 'student' | 'class' | 'subclass' | 'activity' | 'none';
 export type ExportFormat = 'pdf' | 'csv' | 'xlsx';
 export type ViewType = 'detailed' | 'simplified';

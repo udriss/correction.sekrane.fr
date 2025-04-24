@@ -970,7 +970,7 @@ export default function ActivityAutreDetail({ params }: { params: Promise<{ id: 
                 getAllClasses={async () => {
                   try {
                     // Récupérer uniquement les classes associées à cette activité
-                    const response = await fetch(`/api/activities/${activityId}/classes`);
+                    const response = await fetch(`/api/activities_autres/${activityId}/classes`);
                     if (!response.ok) throw new Error('Erreur lors du chargement des classes');
                     return await response.json();
                   } catch (error) {

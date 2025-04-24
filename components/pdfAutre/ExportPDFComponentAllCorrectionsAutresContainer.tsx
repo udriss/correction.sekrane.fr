@@ -17,7 +17,7 @@ import { Student, CorrectionAutreEnriched, ActivityAutre } from '@/lib/types';
 // Import des services d'export
 import { exportToXLSX } from './exportUtils/xlsxExportService';
 import { generatePDF } from './exportUtils/pdfExportUtils';
-import { generateQRCodePDF } from './exportUtils/qrCodeExportUtils';
+import { qrCodesPDFUtils } from './exportUtils/qrCodeExportUtils';
 import { downloadCSV, generateDetailedCSV, generateSimplifiedCSV } from './exportUtils/csvExportUtils';
 
 interface ExportPDFComponentAllCorrectionsAutresContainerProps {
@@ -89,30 +89,28 @@ const ExportPDFComponentAllCorrectionsAutresContainer: React.FC<ExportPDFCompone
     loadClasses();
   }, [getAllClasses]);
 
-  // Effet pour charger tous les étudiants si nécessaire
+  // Effet pour charger tous les étudiants au montage du composant
   useEffect(() => {
     const loadAllStudents = async () => {
-      if (includeAllStudents) {
-        setLoading(true);
-        try {
-          const response = await fetch('/api/students');
-          if (!response.ok) {
-            throw new Error('Erreur lors du chargement des étudiants');
-          }
-          const allStudentsData = await response.json();
-          setAllStudents(allStudentsData);
-        } catch (error) {
-          console.error('Erreur lors du chargement des étudiants:', error);
-          setError('Erreur lors du chargement de tous les étudiants');
-          setErrorDetails(error);
-        } finally {
-          setLoading(false);
+      setLoading(true);
+      try {
+        const response = await fetch('/api/students');
+        if (!response.ok) {
+          throw new Error('Erreur lors du chargement des étudiants');
         }
+        const allStudentsData = await response.json();
+        setAllStudents(allStudentsData);
+      } catch (error) {
+        console.error('Erreur lors du chargement des étudiants:', error);
+        setError('Erreur lors du chargement de tous les étudiants');
+        setErrorDetails(error);
+      } finally {
+        setLoading(false);
       }
     };
 
     loadAllStudents();
-  }, [includeAllStudents]);
+  }, []);
 
   // Filtrer les corrections en fonction de l'activité sélectionnée
   const filteredCorrections = React.useMemo(() => {
@@ -162,8 +160,13 @@ const ExportPDFComponentAllCorrectionsAutresContainer: React.FC<ExportPDFCompone
         // Obtenir les données organisées
         const studentsToUse = includeAllStudents && allStudents.length > 0
           ? allStudents
-          : students;
+          : allStudents.filter(student =>
+              filteredCorrections.some(c => c.student_id === student.id)
+            );
 
+          console.log('studentsToUse', studentsToUse);
+          console.log('includeAllStudents', includeAllStudents);
+          console.log('allStudents', allStudents);
         const groupedData = allCorrectionsAutreDataProcessingService.organizeAllCorrectionsData({
           corrections: filteredCorrections,
           includeAllStudents,
@@ -186,14 +189,16 @@ const ExportPDFComponentAllCorrectionsAutresContainer: React.FC<ExportPDFCompone
           classesMap
         });
 
+        // Déterminer includeDetails à partir de viewType
+        const includeDetails = viewType === 'detailed';
         // Générer le PDF des QR codes
-        await generateQRCodePDF(
+        await qrCodesPDFUtils(
           filteredCorrections,
           uniqueActivities,
           filterActivity,
           includeAllStudents,
           allStudents,
-          students,
+          studentsToUse,
           arrangement,
           subArrangement,
           activities,
@@ -202,7 +207,8 @@ const ExportPDFComponentAllCorrectionsAutresContainer: React.FC<ExportPDFCompone
           enqueueSnackbar,
           setError,
           setErrorDetails,
-          groupedData
+          groupedData,
+          includeDetails // <-- Ajout ici
         );
         
         return;
