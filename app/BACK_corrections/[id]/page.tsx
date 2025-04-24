@@ -28,7 +28,7 @@ import CorrectionHeader from '@/components/corrections/CorrectionHeader';
 import DatePickerSection from '@/components/corrections/DatePickerSection';
 import CorrectionContentEditor from '@/components/corrections/CorrectionContentEditor';
 import ActionButtons from '@/components/corrections/ActionButtons';
-import GradingSection from '@/components/corrections/GradingSection';
+
 import StatusMessages from '@/components/corrections/StatusMessages';
 import LoadingErrorStates from '@/components/corrections/LoadingErrorStates';
 import EmailFeedback from '@/components/corrections/EmailFeedback';
@@ -1045,23 +1045,7 @@ export default function CorrectionDetail({ params }: { params: Promise<{ id: str
                     border: '1px solid',
                     borderColor: alpha(theme.palette.primary.main, 0.2)
                   }}>
-                    <GradingSection
-                      experimentalGrade={experimentalGrade}
-                      theoreticalGrade={theoreticalGrade}
-                      experimentalPoints={experimentalPoints}
-                      theoreticalPoints={theoreticalPoints}
-                      isPenaltyEnabled={isPenaltyEnabled}
-                      penalty={penalty}
-                      setExperimentalGrade={setExperimentalGrade}
-                      setTheoreticalGrade={setTheoreticalGrade}
-                      setPenalty={setPenalty}
-                      saveGradeTimeout={saveGradeTimeout}
-                      setSaveGradeTimeout={setSaveGradeTimeout}
-                      correctionsHook={correctionsHook}
-                      correction={correction}
-                      // Passer la fonction pour mettre à jour uniquement la pénalité
-                      handleUpdatePenalty={handleUpdatePenalty}
-                    />
+
                   </Card>
                 </Box>
                 

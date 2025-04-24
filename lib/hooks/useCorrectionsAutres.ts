@@ -408,7 +408,7 @@ export function useCorrectionsAutres(correctionId: string) {
           };
         });
         
-        setSuccessMessage('Points mis à jour');
+        // setSuccessMessage('Points mis à jour');
         setTimeout(() => {
           setSuccessMessage('');
         }, 1500);

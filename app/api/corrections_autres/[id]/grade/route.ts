@@ -54,10 +54,16 @@ export async function PUT(
     }
     
     // Déterminer les points_earned à utiliser
-    const pointsEarned = data.points_earned || correction.points_earned || [];
+    const pointsEarned = data.points_earned !== null && data.points_earned !== undefined 
+      ? data.points_earned 
+      : correction.points_earned || [];
     
-    // Calculer la note et la note finale
-    const totalPoints = pointsEarned.reduce((sum, point) => sum + (point || 0), 0);
+    // Calculer la note totale
+    // Si points_earned est null (travail non rendu), on utilise directement la note fournie
+    const totalPoints = data.points_earned === null
+      ? (data.grade || activity.points.reduce((sum, point) => sum + point, 0) * 0.25)
+      : pointsEarned.reduce((sum, point) => sum + (point || 0), 0);
+    
     const penaltyValue = data.penalty !== undefined ? data.penalty : (correction.penalty || 0);
     
     // Calculer la note finale selon les règles

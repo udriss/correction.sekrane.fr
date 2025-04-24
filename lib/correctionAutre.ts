@@ -141,7 +141,8 @@ export async function updateCorrectionAutre(id: number, data: {
 
   if (data.points_earned !== undefined) {
     updates.push('points_earned = ?');
-    values.push(JSON.stringify(data.points_earned));
+    // Traiter spécifiquement le cas où points_earned est null
+    values.push(data.points_earned === null ? null : JSON.stringify(data.points_earned));
   }
 
   if (data.content !== undefined) {

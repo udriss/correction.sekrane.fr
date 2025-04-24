@@ -160,7 +160,7 @@ export default function StudentDetailPage() {
           }
 
           // On filtre pour ne garder que les corrections notées
-          const gradesFiltered = correctionsData.filter((c: CorrectionAutreEnriched) => c.grade !== null);
+          const gradesFiltered = correctionsData.filter((c: CorrectionAutreEnriched) => c.final_grade !== null);
           
           // Normaliser chaque note sur 20 pour avoir des comparaisons équitables
           const normalizedGrades = gradesFiltered.map((c: CorrectionAutreEnriched) => {
@@ -173,7 +173,7 @@ export default function StudentDetailPage() {
               : 20; // Si points n'est pas défini, on suppose un barème de 20
             
             // Normaliser la note sur 20
-            return maxPoints > 0 ? (Number(c.grade) * 20) / maxPoints : 0;
+            return maxPoints > 0 ? (Number(c.final_grade) * 20) / maxPoints : 0;
           });
           
           const ungradedCount = correctionsData.length - gradesFiltered.length;

@@ -280,14 +280,14 @@ export default function FeedbackViewer({ params }: { params: Promise<{ code: str
   const hasGrade = correction.grade !== null && correction.grade !== undefined;
   const hasPenalty = correction.penalty !== null && correction.penalty !== undefined && parseFloat(correction.penalty) > 0;
   
-  // Vérifier si c'est un travail non rendu (pénalité de 15 points et note totale de 20 sans pénalité)
-  // Dans notre système, un travail non rendu est représenté par une note maximale (20/20) 
-  // avec une pénalité maximale (15 points)
-  const isNeverSubmitted = hasPenalty && 
-                          parseFloat(String(correction.penalty)) === 15 && 
-                          (parseFloat(String(correction.grade)) === 20 || 
-                          (Array.isArray(correction.points_earned) && 
-                           correction.points_earned.reduce((sum: number, p: number) => sum + (typeof p === 'number' ? p : parseFloat(String(p || '0'))), 0) === 20));
+  // Vérifier si c'est un travail non rendu
+  const isNeverSubmitted = correction.status === 'NON_RENDU' || (
+    hasPenalty && 
+    parseFloat(String(correction.penalty)) === 15 && 
+    (parseFloat(String(correction.grade)) === 20 || 
+      (Array.isArray(correction.points_earned) && 
+      correction.points_earned.reduce((sum: number, p: number) => sum + (typeof p === 'number' ? p : parseFloat(String(p || '0'))), 0) === 20))
+  );
   
   // Format pour afficher "- -" au lieu des valeurs numériques pour les travaux non rendus
   const formatGradeWithNonRendu = (value: number | string | null | undefined) => {
@@ -733,7 +733,33 @@ export default function FeedbackViewer({ params }: { params: Promise<{ code: str
                   </Grid>
                 </Grid>
 
-
+                {isNeverSubmitted && (
+                  <Paper 
+                    elevation={0} 
+                    sx={{ 
+                      p: 2, 
+                      mb: 2, 
+                      border: '1px dashed',
+                      borderColor: 'error.light',
+                      bgcolor: 'error.50',
+                      borderRadius: 2
+                    }}
+                  >
+                    <Typography variant="subtitle2" sx={{ fontWeight: 'bold', color: 'error.dark', mb: 1 }}>
+                      Travail non rendu : note automatique de 25%
+                    </Typography>
+                    
+                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                      <Typography variant="body2">
+                        Ce travail n'a pas été rendu dans les délais impartis. Conformément aux règles d'évaluation, une note forfaitaire de 25% des points maximums est attribuée.
+                      </Typography>
+                      
+                      <Typography variant="body2">
+                        Pour un barème total de {maxPoints} points, cela donne une note finale de <strong>{(maxPoints * 0.25).toFixed(1).replace('.', ',')}</strong> points.
+                      </Typography>
+                    </Box>
+                  </Paper>
+                )}
 
                 {/* Contenu de la correction avec style amélioré et transformé en accordéon */}
                 <Accordion 

@@ -150,6 +150,7 @@ export async function GET(
           student_id: correction.student_id,
           student_name: correction.student_name || 'Étudiant inconnu',
           student_first_name: correction.student_first_name || '',
+          status: correction.status,
           student_last_name: correction.student_last_name ? correction.student_last_name.substring(0, 3) : '',
           activity_name: correction.activity_name || 'Activité inconnue',
           class_name: correction.class_name || 'Sans classe'

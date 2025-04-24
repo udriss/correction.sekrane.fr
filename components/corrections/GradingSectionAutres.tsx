@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Typography, Slider, Box, Grid, Alert, FormControlLabel, Checkbox, CircularProgress, Stack } from '@mui/material';
+import { Typography, Slider, Box, Grid, Alert, FormControlLabel, Checkbox, CircularProgress, Stack, Fade } from '@mui/material';
 import { useSnackbar } from 'notistack';
+import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
+import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline';
 
 interface GradingSectionAutresProps {
   pointsEarned: number[]; // Tableau des points gagnés pour chaque partie
@@ -46,6 +48,33 @@ const GradingSectionAutres: React.FC<GradingSectionAutresProps> = ({
   // Délai minimum entre les notifications en millisecondes (5 secondes)
   const MIN_NOTIFICATION_DELAY = 5000;
   
+  // État pour suivre les sections qui viennent d'être sauvegardées avec succès
+  const [savedSections, setSavedSections] = useState<{[key: string]: boolean}>({});
+  // État pour suivre les sections qui ont eu une erreur lors de la sauvegarde
+  const [errorSections, setErrorSections] = useState<{[key: string]: boolean}>({});
+  // Durée d'affichage des badges de validation (en ms)
+  const BADGE_DISPLAY_DURATION = 3000;
+  
+  // Fonction pour marquer une section comme sauvegardée avec succès
+  const markSectionAsSaved = (sectionKey: string) => {
+    setSavedSections(prev => ({ ...prev, [sectionKey]: true }));
+    
+    // Planifier la disparition du badge après quelques secondes
+    setTimeout(() => {
+      setSavedSections(prev => ({ ...prev, [sectionKey]: false }));
+    }, BADGE_DISPLAY_DURATION);
+  };
+  
+  // Fonction pour marquer une section comme ayant eu une erreur
+  const markSectionAsError = (sectionKey: string) => {
+    setErrorSections(prev => ({ ...prev, [sectionKey]: true }));
+    
+    // Planifier la disparition du badge après quelques secondes
+    setTimeout(() => {
+      setErrorSections(prev => ({ ...prev, [sectionKey]: false }));
+    }, BADGE_DISPLAY_DURATION);
+  };
+  
   // Fonction pour afficher des notifications avec contrôle de fréquence
   const showNotification = (message: string, variant: 'success' | 'error' | 'info' | 'warning') => {
     const now = Date.now();
@@ -56,20 +85,20 @@ const GradingSectionAutres: React.FC<GradingSectionAutresProps> = ({
     }
   };
   
-  // Vérifier si la pénalité actuelle correspond au cas "travail non rendu"
+  // Vérifier si la notation correspond au cas "travail non rendu"
   useEffect(() => {
-    // Si la pénalité est de 15 points, c'est probablement un travail non rendu
-    const currentPenalty = parseFloat(penalty) || 0;
-    const totalEarned = pointsEarned.reduce((sum, points) => sum + points, 0);
+    // Vérification uniquement basée sur la nouvelle méthode (25% des points max)
+    const totalEarned = pointsEarned.reduce((sum, points) => sum + (points || 0), 0);
     const maxTotal = totalPoints.reduce((sum, points) => sum + points, 0);
+    const grade25Percent = maxTotal * 0.25; // 25% des points max
     
-    // Si pénalité de 15 et note maximale, c'est un travail non rendu
-    if (isPenaltyEnabled && currentPenalty === 15 && totalEarned === maxTotal) {
-      setNeverSubmitted(true);
-    } else {
-      setNeverSubmitted(false);
-    }
-  }, [isPenaltyEnabled, penalty, pointsEarned, totalPoints]);
+    // Vérifier uniquement la nouvelle méthode (25% des points)
+    const isNeverSubmitted = totalEarned === 0 && correction && 
+                           (Math.abs(correction.grade - grade25Percent) < 0.01 || 
+                            Math.abs(correction.final_grade - grade25Percent) < 0.01);
+    
+    setNeverSubmitted(isNeverSubmitted);
+  }, [pointsEarned, totalPoints, correction]);
   
   // Fonction pour sauvegarder les notes avec un délai
   const saveGradeWithDebounce = (newPointsEarned: number[], penaltyValue: number) => {
@@ -105,16 +134,9 @@ const GradingSectionAutres: React.FC<GradingSectionAutresProps> = ({
             penalty: penaltyValue
           }),
         })
-          .then(response => {
-            if (!response.ok) throw new Error('Failed to update grade');
-            return response.json();
-          })
+          .then((response) => response.json())
           .then((data) => {
-            // Notification de succès
-            showNotification('Note mise à jour avec succès', 'success');
-            
             // Mise à jour de l'état local de correction avec les nouvelles valeurs
-            // pour éviter que l'interface ne se désynchronise avec la base de données
             if (data && data.points_earned) {
               const event = new CustomEvent('gradeUpdated', { 
                 detail: { 
@@ -124,6 +146,9 @@ const GradingSectionAutres: React.FC<GradingSectionAutresProps> = ({
               });
               window.dispatchEvent(event);
             }
+            
+            // Afficher l'indicateur de succès central
+            markSaveSuccess();
           })
           .catch(err => {
             console.error('Erreur lors de la mise à jour de la note:', err);
@@ -133,6 +158,9 @@ const GradingSectionAutres: React.FC<GradingSectionAutresProps> = ({
               detail: { message: 'Erreur lors de la mise à jour de la note' } 
             });
             window.dispatchEvent(event);
+            
+            // Afficher l'indicateur d'erreur central
+            markSaveError();
           })
           .finally(() => {
             apiCallInProgressRef.current = false;
@@ -161,16 +189,20 @@ const GradingSectionAutres: React.FC<GradingSectionAutresProps> = ({
       if (handleUpdatePenalty) {
         handleUpdatePenalty(newPenaltyValue)
           .then(() => {
-            showNotification('Pénalité mise à jour avec succès', 'success');
-            
             const event = new CustomEvent('penaltyUpdated', { 
               detail: { message: 'Pénalité mise à jour' } 
             });
             window.dispatchEvent(event);
+            
+            // Afficher l'indicateur de succès central
+            markSaveSuccess();
           })
           .catch(err => {
             console.error('Erreur lors de la mise à jour de la pénalité:', err);
             showNotification('Erreur lors de la mise à jour de la pénalité', 'error');
+            
+            // Afficher l'indicateur d'erreur central
+            markSaveError();
           })
           .finally(() => {
             setIsUpdating(false);
@@ -207,26 +239,99 @@ const GradingSectionAutres: React.FC<GradingSectionAutresProps> = ({
     setNeverSubmitted(isChecked);
     
     if (isChecked) {
-      // Pour travail non rendu, on met les points au maximum et on applique une pénalité de 15 points
-      const maxPoints = [...totalPoints];
+      // Pour un travail non rendu, on attribue directement 25% des points max
+      const totalMaxPoints = totalPoints.reduce((sum, points) => sum + points, 0);
+      const grade25Percent = totalMaxPoints * 0.25; // 25% des points maximums
       
-      // Mettre à jour tous les points au maximum
-      maxPoints.forEach((maxPoint, index) => {
-        setPointsEarned(index, maxPoint);
+      // Créer un tableau de zéros avec la même longueur que totalPoints
+      const zeroPoints = new Array(totalPoints.length).fill(0);
+      
+      // Réinitialiser les points de chaque section à zéro (visuellement)
+      pointsEarned.forEach((_, index) => {
+        setPointsEarned(index, 0);
       });
       
-      // Appliquer la pénalité maximale
-      setPenalty('15');
-      
-      // Utiliser la fonction dédiée à la mise à jour de la pénalité
-      updatePenaltyOnly(15);
-      
-      // Mettre à jour les points dans la base de données
-      saveGradeWithDebounce(maxPoints, 15);
-    } else {
-      // Si on décoche, enlever la pénalité mais garder les points
+      // Désactiver la pénalité
       setPenalty('0');
-      updatePenaltyOnly(0);
+      
+      // Annuler tout timeout en cours
+      if (saveGradeTimeout) {
+        clearTimeout(saveGradeTimeout);
+      }
+      
+      // Configurer un nouveau timeout pour la sauvegarde différée
+      const timeout = setTimeout(() => {
+        if (!apiCallInProgressRef.current && correction) {
+          apiCallInProgressRef.current = true;
+          setIsUpdating(true);
+          setSaving(true); // Indiquer que la sauvegarde est en cours
+          
+          // Appeler l'API avec un tableau de zéros au lieu de null
+          fetch(`/api/corrections_autres/${correction.id}/grade`, {
+            method: 'PUT',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ 
+              points_earned: zeroPoints, // Utiliser le tableau de zéros
+              grade: grade25Percent,
+              final_grade: grade25Percent,
+              penalty: 0
+            }),
+          })
+            .then((response) => {
+              if (!response.ok) throw new Error('Failed to update grade');
+              return response.json();
+            })
+            .then((data) => {
+              // Mise à jour de l'objet correction avec les nouvelles valeurs
+              if (correction) {
+                correction.grade = grade25Percent;
+                correction.final_grade = grade25Percent;
+                correction.points_earned = zeroPoints; // Utiliser le tableau de zéros
+                correction.penalty = 0;
+              }
+              
+              // Afficher l'indicateur de succès central
+              markSaveSuccess();
+              
+              const event = new CustomEvent('gradeUpdated', { 
+                detail: { 
+                  message: 'Note de travail non rendu appliquée',
+                  correction: data 
+                } 
+              });
+              window.dispatchEvent(event);
+            })
+            .catch(err => {
+              console.error('Erreur lors de la mise à jour de la note:', err);
+              
+              // Afficher l'indicateur d'erreur central
+              markSaveError();
+              
+              const event = new CustomEvent('gradeError', { 
+                detail: { message: 'Erreur lors de la mise à jour de la note' } 
+              });
+              window.dispatchEvent(event);
+            })
+            .finally(() => {
+              apiCallInProgressRef.current = false;
+              setIsUpdating(false);
+              setSaving(false); // Indiquer que la sauvegarde est terminée
+            });
+        }
+      }, 2000);
+      
+      setSaveGradeTimeout(timeout);
+    } else {
+      // Si on décoche, réinitialiser à zéro
+      pointsEarned.forEach((_, index) => {
+        setPointsEarned(index, 0);
+      });
+      setPenalty('0');
+      
+      // Sauvegarder les modifications
+      saveGradeWithDebounce(new Array(pointsEarned.length).fill(0), 0);
     }
   };
 
@@ -248,6 +353,12 @@ const GradingSectionAutres: React.FC<GradingSectionAutresProps> = ({
 
   // Calculer la note finale (avec application de la pénalité si nécessaire)
   const getFinalGrade = (): number => {
+    // Si c'est un travail non rendu, renvoyer 25% des points max
+    if (neverSubmitted) {
+      const totalMaxPoints = totalPoints.reduce((sum, points) => sum + points, 0);
+      return totalMaxPoints * 0.25;
+    }
+    
     const totalGrade = calculateTotalGrade();
     const penaltyValue = parseFloat(penalty) || 0;
     
@@ -256,6 +367,11 @@ const GradingSectionAutres: React.FC<GradingSectionAutresProps> = ({
   
   // Calculer le pourcentage obtenu
   const getPercentage = (): number => {
+    // Si c'est un travail non rendu, renvoyer 25%
+    if (neverSubmitted) {
+      return 25;
+    }
+    
     const totalEarned = calculateTotalGrade();
     const totalMaxPoints = totalPoints.reduce((sum, points) => sum + points, 0);
     
@@ -317,6 +433,66 @@ const GradingSectionAutres: React.FC<GradingSectionAutresProps> = ({
     delete tempValuesRef.current['penalty'];
   };
   
+  // État pour suivre si une sauvegarde a été réussie récemment
+  const [saveSuccess, setSaveSuccess] = useState(false);
+  // État pour suivre si une erreur s'est produite récemment
+  const [saveError, setSaveError] = useState(false);
+  // Durée d'affichage des indicateurs de succès/erreur (en ms)
+  const INDICATOR_DISPLAY_DURATION = 3000;
+  
+  // Fonction pour indiquer une sauvegarde réussie
+  const markSaveSuccess = () => {
+    setSaveSuccess(true);
+    
+    // Planifier la disparition de l'indicateur après quelques secondes
+    setTimeout(() => {
+      setSaveSuccess(false);
+    }, INDICATOR_DISPLAY_DURATION);
+  };
+  
+  // Fonction pour indiquer une erreur de sauvegarde
+  const markSaveError = () => {
+    setSaveError(true);
+    
+    // Planifier la disparition de l'indicateur après quelques secondes
+    setTimeout(() => {
+      setSaveError(false);
+    }, INDICATOR_DISPLAY_DURATION);
+  };
+  
+  // État pour gérer l'animation de l'icône de succès
+  const [successAnimation, setSuccessAnimation] = useState<'enter' | 'exit' | null>(null);
+  // État pour gérer l'animation de l'icône d'erreur
+  const [errorAnimation, setErrorAnimation] = useState<'enter' | 'exit' | null>(null);
+
+  // Effet pour gérer l'animation de l'icône de succès
+  useEffect(() => {
+    if (saveSuccess) {
+      setSuccessAnimation('enter');
+      
+      // Planifier l'animation de sortie avant la disparition complète
+      const exitTimer = setTimeout(() => {
+        setSuccessAnimation('exit');
+      }, INDICATOR_DISPLAY_DURATION - 500); // Commencer l'animation de sortie 500ms avant la fin
+      
+      return () => clearTimeout(exitTimer);
+    }
+  }, [saveSuccess]);
+
+  // Effet pour gérer l'animation de l'icône d'erreur
+  useEffect(() => {
+    if (saveError) {
+      setErrorAnimation('enter');
+      
+      // Planifier l'animation de sortie avant la disparition complète
+      const exitTimer = setTimeout(() => {
+        setErrorAnimation('exit');
+      }, INDICATOR_DISPLAY_DURATION - 500); // Commencer l'animation de sortie 500ms avant la fin
+      
+      return () => clearTimeout(exitTimer);
+    }
+  }, [saveError]);
+  
   return (
     <>
       <Box sx={{ mb: 3 }}>
@@ -339,10 +515,92 @@ const GradingSectionAutres: React.FC<GradingSectionAutresProps> = ({
         
         {neverSubmitted && (
           <Alert severity="warning" sx={{ mt: 1, mb: 2 }}>
-            Note automatique de 5/20 appliquée (pénalité de 15 points)
+            Note automatique de 25% des points maximums appliquée (travail non rendu)
           </Alert>
         )}
       </Box>
+      
+      {/* Indicateur central de chargement et de succès 
+      {(saving || saveSuccess || saveError) && (
+      */}
+      {(saving || saveSuccess || saveError) && (
+        <Box sx={{ 
+          position: 'absolute', 
+          margin: 'auto',
+          left: 0, 
+          right: 0,
+          top: 0,
+          bottom: 0,
+          // transform: 'translate(-50%, -50%)', 
+          zIndex: 9999,
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          bgcolor: 'rgba(255, 255, 255, 0.8)',
+          borderRadius: 2,
+          p: 3,
+          width: 120,
+          height: 120,
+          textAlign: 'center'
+        }}>
+          {saving && (
+            <CircularProgress size={120} color="primary" />
+          )}
+          {!saveSuccess && saving && (
+            <Box sx={{
+              display: 'flex',
+              justifyContent: 'center',
+              alignItems: 'center',
+              animation: successAnimation === 'enter' 
+                ? 'zoomIn 0.5s ease forwards' 
+                : successAnimation === 'exit' 
+                  ? 'zoomOutFade 0.5s ease forwards' 
+                  : 'none',
+              '@keyframes zoomIn': {
+                '0%': {
+                  opacity: 0,
+                  transform: 'scale(0.5)'
+                },
+                '70%': {
+                  opacity: 1,
+                  transform: 'scale(1.2)'
+                },
+                '100%': {
+                  opacity: 1,
+                  transform: 'scale(1)'
+                }
+              },
+              '@keyframes zoomOutFade': {
+                '0%': {
+                  opacity: 1,
+                  transform: 'scale(1)'
+                },
+                '100%': {
+                  opacity: 0,
+                  transform: 'scale(1.5)'
+                }
+              }
+            }}>
+              <CheckCircleOutlineIcon color="success" sx={{ fontSize: 120 }} />
+            </Box>
+          )}
+          {saveError && !saving && (
+            <Box sx={{
+              display: 'flex',
+              justifyContent: 'center',
+              alignItems: 'center',
+              animation: errorAnimation === 'enter' 
+                ? 'zoomIn 0.5s ease forwards' 
+                : errorAnimation === 'exit' 
+                  ? 'zoomOutFade 0.5s ease forwards' 
+                  : 'none'
+            }}>
+              <ErrorOutlineIcon color="error" sx={{ fontSize: 80 }} />
+            </Box>
+          )}
+        </Box>
+      )}
 
       <Grid container spacing={3}>
         {/* Sliders pour chaque partie */}
@@ -377,17 +635,6 @@ const GradingSectionAutres: React.FC<GradingSectionAutresProps> = ({
                   }
                 }}
               />
-              {saving && index === 0 && (
-                <CircularProgress
-                  size={24}
-                  sx={{
-                    position: 'absolute',
-                    top: '50%',
-                    right: '5%',
-                    marginTop: '-12px',
-                  }}
-                />
-              )}
               <Typography variant="caption" color="text.secondary" align="center" sx={{ mt: 1 }}>
                 {pointsEarned[index] || '0'} / {totalPoints[index]}
               </Typography>
@@ -427,17 +674,6 @@ const GradingSectionAutres: React.FC<GradingSectionAutresProps> = ({
                   }
                 }}
               />
-              {saving && (
-                <CircularProgress
-                  size={24}
-                  sx={{
-                    position: 'absolute',
-                    top: '50%',
-                    right: '5%',
-                    marginTop: '-12px',
-                  }}
-                />
-              )}
               <Typography variant="caption" color="text.secondary" align="center" sx={{ mt: 1 }}>
                 {penalty || '0'} points
               </Typography>
@@ -447,7 +683,7 @@ const GradingSectionAutres: React.FC<GradingSectionAutresProps> = ({
 
         {/* Section pour la note totale */}
         <Grid size={{ xs: 12 }}>
-          <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', mt: 2 }}>
+          <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', mt: 2, position: 'relative' }}>
             <Typography variant="body2" id="total-grade-slider" gutterBottom>
               Note totale ({getPercentage().toFixed(1)}%)
             </Typography>

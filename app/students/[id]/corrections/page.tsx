@@ -67,6 +67,7 @@ interface Correction {
   student_name: string;
   student_first_name: string;
   student_last_name: string;
+  status: 'RENDU' | 'NON_RENDU' | 'ABSENT' | 'NON_NOTE' | 'DEACTIVATED';
   created_at: string;
   updated_at: string;
   points?: number[]; // Points maximum pour chaque partie
@@ -91,6 +92,7 @@ interface StudentStats {
     activity_name: string;
     grade: number;
     submission_date: string;
+    status: 'RENDU' | 'NON_RENDU' | 'ABSENT' | 'NON_NOTE' | 'DEACTIVATED';
   }[];
   grade_trend?: 'up' | 'down' | 'stable';
   parts_averages?: number[];
@@ -619,61 +621,92 @@ export default function StudentCorrectionsPage() {
                 }}
               >
                 <CardContent sx={{ flexGrow: 1 }}>
-                  <Box sx={{ mb: 2 }}>
-                    <Typography variant="h6" fontWeight="bold" noWrap>
+                  <Box sx={{ mb: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                    <Typography variant="h6" fontWeight="bold" noWrap sx={{ flex: 1 }}>
                       {correction.activity_name}
                     </Typography>
+                    {correction.status && ['NON_RENDU', 'ABSENT', 'NON_NOTE', 'DEACTIVATED'].includes(correction.status) && (
+                      <Chip
+                        size="small"
+                        label={correction.status === 'NON_RENDU' ? 'Non rendu' : 
+                               correction.status === 'ABSENT' ? 'Absent' : 
+                               correction.status === 'NON_NOTE' ? 'Non noté' : 
+                               correction.status === 'DEACTIVATED' ? 'Désactivé' : ''}
+                        color={correction.status === 'NON_RENDU' ? 'error' : 
+                               correction.status === 'ABSENT' ? 'warning' : 
+                               correction.status === 'NON_NOTE' ? 'info' : 
+                               correction.status === 'DEACTIVATED' ? 'default' : 'default'}
+                        sx={{ fontSize: '1.7rem', ml: 1, py:3 }}
+                      />
+                    )}
+                  </Box>
+                  <Typography 
+                    variant="overline" 
+                    color="text.secondary"
+                    sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: .2 }}
+                  >
+                    <CalendarTodayIcon fontSize="small" color="primary" />
+                    Envoyé le : {correction.submission_date 
+                      ? formatDate(correction.submission_date)
+                      : formatDate(correction.created_at)
+                    }
+                  </Typography>
+                  
+                  {correction.deadline && (
                     <Typography 
                       variant="overline" 
                       color="text.secondary"
                       sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: .2 }}
                     >
-                      <CalendarTodayIcon fontSize="small" color="primary" />
-                      Envoyé le : {correction.submission_date 
-                        ? formatDate(correction.submission_date)
-                        : formatDate(correction.created_at)
-                      }
+                      <CalendarTodayIcon fontSize="small" color="error" />
+                      Date limite : {formatDate(correction.deadline)}
                     </Typography>
-                    
-                    {correction.deadline && (
-                      <Typography 
-                        variant="overline" 
-                        color="text.secondary"
-                        sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: .2 }}
-                      >
-                        <CalendarTodayIcon fontSize="small" color="error" />
-                        Date limite : {formatDate(correction.deadline)}
-                      </Typography>
-                    )}
-                    {correction.updated_at && (
-                      <Typography 
-                        variant="overline" 
-                        color="text.secondary"
-                        sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: .2 }}
-                      >
-                        <CalendarTodayIcon fontSize="small" color="success" />
-                        Mise à jour : {formatDate2(correction.updated_at)}
-                      </Typography>
-                    )}
-                  </Box>
-
-                  
+                  )}
+                  {correction.updated_at && (
+                    <Typography 
+                      variant="overline" 
+                      color="text.secondary"
+                      sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: .2 }}
+                    >
+                      <CalendarTodayIcon fontSize="small" color="success" />
+                      Mise à jour : {formatDate2(correction.updated_at)}
+                    </Typography>
+                  )}
                   <Typography variant="overline" fontWeight={'bold'} gutterBottom>
-                    Répartition des points
+                    Répartition des point
                   </Typography>
                   
-                  <Grid container spacing={1} sx={{ mb: .2 }}>
+                  <Grid container spacing={1} sx={{ mb: .2 }} direction={'column'}>
                     {correction.parts_names?.map((partName, index) => (
-                        <Grid size={{ xs: 6 }} key={index}>
-                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                            {index === 0 ? (
-                              <ScienceIcon color="primary" fontSize="small" />
-                            ) : (
-                              <MenuBookIcon color="secondary" fontSize="small" />
+                        <Grid size={{ xs: 12 }} key={index}>
+                          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1 }}>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                              {index === 0 ? (
+                                <ScienceIcon color="primary" fontSize="small" />
+                              ) : (
+                                <MenuBookIcon color="secondary" fontSize="small" />
+                              )}
+                              <Typography variant="overline" fontWeight="medium">
+                              {partName} : {String(correction.points_earned?.[index] || 0).replace('.', ',')} / {correction.points?.[index] || 0} pts
+                              </Typography>
+                            </Box>
+                            {correction.status && (
+                              <Chip
+                                size="small"
+                                label={correction.status === 'NON_RENDU' ? 'Non rendu' : 
+                                       correction.status === 'ABSENT' ? 'Absent' : 
+                                       correction.status === 'NON_NOTE' ? 'Non noté' : 
+                                       correction.status === 'DEACTIVATED' ? 'Désactivé' : ''}
+                                color={correction.status === 'NON_RENDU' ? 'error' : 
+                                       correction.status === 'ABSENT' ? 'warning' : 
+                                       correction.status === 'NON_NOTE' ? 'info' : 
+                                       correction.status === 'DEACTIVATED' ? 'default' : 'default'}
+                                sx={{ 
+                                  display: ['NON_RENDU', 'ABSENT', 'NON_NOTE', 'DEACTIVATED'].includes(correction.status) ? 'flex' : 'none',
+                                  fontSize: '0.65rem'
+                                }}
+                              />
                             )}
-                            <Typography variant="overline" fontWeight="medium">
-                            {partName} : {String(correction.points_earned?.[index] || 0).replace('.', ',')} / {correction.points?.[index] || 0} pts
-                            </Typography>
                           </Box>
                         </Grid>
                     ))}

@@ -23,7 +23,10 @@ export async function GET(
       const session = await getServerSession(authOptions);
       const customUser = await getUser(request);
       const userId = customUser?.id || session?.user?.id;
-      
+    
+    if (!userId) {
+          return NextResponse.json({ error: 'utilisateur non authentifié' }, { status: 401 });
+      }
 
     if (isNaN(studentId)) {
       return NextResponse.json({ error: 'Invalid student ID' }, { status: 400 });
@@ -53,6 +56,7 @@ export async function GET(
         JSON_ARRAYAGG(
           JSON_OBJECT(
             'grade', grade,
+            'final_grade', final_grade,
             'points_earned', points_earned,
             'points', (
               SELECT points 
@@ -93,8 +97,13 @@ export async function GET(
             const totalEarned = pointsEarned.reduce((sum: number, points: number) => sum + (typeof points === 'number' ? points : 0), 0);
             const totalMax = maxPoints.reduce((sum: number, points: number) => sum + (typeof points === 'number' ? points : 0), 0);
             
+            // Utiliser final_grade en priorité si disponible, sinon utiliser grade
+            const gradeToUse = correction.final_grade !== null && correction.final_grade !== undefined 
+              ? parseFloat(correction.final_grade) 
+              : totalEarned;
+            
             // Normaliser la note totale sur 20 et l'ajouter au tableau
-            const normalizedGrade = normalizeGrade(totalEarned, totalMax);
+            const normalizedGrade = normalizeGrade(gradeToUse, totalMax);
             if (!isNaN(normalizedGrade)) {
               normalizedGrades.push(normalizedGrade);
             }
@@ -131,12 +140,14 @@ export async function GET(
     const recentCorrections = await query<any[]>(`
       SELECT 
         c.id, 
-        c.grade, 
+        c.grade,
+        c.final_grade,
         c.submission_date, 
         a.name as activity_name,
         c.points_earned,
         a.points,
-        a.parts_names
+        a.parts_names,
+        c.status
       FROM corrections_autres c
       LEFT JOIN activities_autres a ON c.activity_id = a.id
       WHERE c.student_id = ?
@@ -164,16 +175,24 @@ export async function GET(
         const totalEarned = pointsEarned.reduce((sum: number, p: number) => sum + (typeof p === 'number' ? p : 0), 0);
         const totalMax = maxPoints.reduce((sum: number, p: number) => sum + (typeof p === 'number' ? p : 0), 0);
         
+        // Utiliser final_grade en priorité si disponible, sinon calculer à partir des points
+        const gradeToUse = c.final_grade !== null && c.final_grade !== undefined 
+          ? parseFloat(c.final_grade) 
+          : (c.grade !== null && c.grade !== undefined 
+              ? parseFloat(c.grade) 
+              : totalEarned);
+              
         return {
           id: c.id,
           activity_name: c.activity_name || 'Unnamed activity',
-          grade: normalizeGrade(totalEarned, totalMax),
+          grade: normalizeGrade(gradeToUse, totalMax),
           original_grade: totalEarned,
           max_points: totalMax,
           submission_date: c.submission_date,
           points_earned: pointsEarned,
           points: maxPoints,
-          parts_names: c.parts_names || []
+          parts_names: c.parts_names || [],
+          status: c.status
         };
       })
     };

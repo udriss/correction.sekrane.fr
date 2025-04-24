@@ -174,9 +174,9 @@ export default function StudentCorrections({ student, corrections: initialCorrec
           return new Date(a.submission_date || a.created_at || '').getTime() - 
                  new Date(b.submission_date || b.created_at || '').getTime();
         case 'grade-high':
-          return (b.grade || 0) - (a.grade || 0);
+          return (b.final_grade || 0) - (a.final_grade || 0);
         case 'grade-low':
-          return (a.grade || 0) - (b.grade || 0);
+          return (a.final_grade || 0) - (b.final_grade || 0);
         default:
           return 0;
       }
@@ -363,14 +363,14 @@ export default function StudentCorrections({ student, corrections: initialCorrec
                       <Typography variant="h6" fontWeight="bold" noWrap>
                         {correction.activity_name}
                       </Typography>
-                      {correction.grade !== null && correction.grade !== undefined ? (
+                      {correction.final_grade !== null && correction.final_grade !== undefined ? (
                         <Chip 
                           label={
-                            correction.grade !== null && correction.grade !== undefined
+                            correction.final_grade !== null && correction.final_grade !== undefined
                               ?
                               <Box sx={{ display: 'flex', alignItems: 'center', gap: 0 }}>
                               <Typography variant="overline" fontWeight='700' noWrap>
-                                {correction.grade}&nbsp;
+                                {correction.final_grade}&nbsp;
                               </Typography>
                               <Typography variant="overline" noWrap>
                               / {activity?.points?.reduce((a, b) => a + b, 0)}
@@ -379,7 +379,7 @@ export default function StudentCorrections({ student, corrections: initialCorrec
                               : 'Non notée'
                           }
                           sx={{
-                            color: getGradeColor(correction.grade || 0),
+                            color: getGradeColor(correction.final_grade || 0),
                             fontWeight: 700,
                           }}
                           icon={<GradeIcon />}
@@ -421,7 +421,7 @@ export default function StudentCorrections({ student, corrections: initialCorrec
                           Répartition des points
                         </Typography>
                         
-                        <Grid container spacing={1} sx={{ mb: .2 }}>
+                        <Grid container spacing={1} sx={{ mb: .2 }} direction={'column'}>
                           {correction.points_earned.map((points, index) => {
                             // Obtenir le nom de la partie de l'activité
                             const partName = activity?.parts_names?.[index] || `Partie ${index + 1}`;
@@ -430,7 +430,7 @@ export default function StudentCorrections({ student, corrections: initialCorrec
                             const maxPoints = activity?.points?.[index] || 0;
                             
                             return (
-                              <Grid size={{ xs: 12, sm: 6 }} key={`part-${index}`}>
+                              <Grid size={{ xs: 12 }} key={`part-${index}`}>
                                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                                   {index === 0 ? (
                                     <ScienceIcon color="primary" fontSize="small" />
@@ -446,7 +446,7 @@ export default function StudentCorrections({ student, corrections: initialCorrec
                           })}
                           
                           {correction.penalty && parseFloat(String(correction.penalty)) > 0 && (
-                            <Grid size={{ xs: 12, sm: 6 }}>
+                            <Grid size={{ xs: 12 }}>
                               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                                 <RemoveCircleIcon color="error" fontSize="small" />
                                 <Typography variant="body2" fontWeight="medium">
@@ -457,7 +457,7 @@ export default function StudentCorrections({ student, corrections: initialCorrec
                           )}
                         </Grid>
                         
-                        {correction.grade !== null && correction.grade !== undefined && (
+                        {correction.final_grade !== null && correction.final_grade !== undefined && (
                           <Box sx={{ mt: 2 }}>
                             <Typography variant="caption" color="text.secondary" gutterBottom>
                               Pourcentage de réussite
@@ -470,7 +470,7 @@ export default function StudentCorrections({ student, corrections: initialCorrec
                               borderRadius: 5,
                                 // Styliser le fond (partie non remplie)
                                 backgroundColor: theme => {
-                                  const grade = correction.grade || 0;
+                                  const grade = correction.final_grade || 0;
                                   if (grade >= 16) return alpha(theme.palette.success.main, 0.15);
                                   if (grade >= 14) return alpha(theme.palette.primary.light, 0.15);
                                   if (grade >= 12) return alpha(theme.palette.info.main, 0.15);
@@ -481,7 +481,7 @@ export default function StudentCorrections({ student, corrections: initialCorrec
                                 // Styliser la barre de progression (partie remplie)
                                 '& .MuiLinearProgress-bar': {
                                   backgroundColor: theme => {
-                                    const grade = correction.grade || 0;
+                                    const grade = correction.final_grade || 0;
                                     if (grade >= 16) return theme.palette.success.main;
                                     if (grade >= 14) return theme.palette.primary.light;
                                     if (grade >= 12) return theme.palette.info.main;
@@ -520,7 +520,7 @@ export default function StudentCorrections({ student, corrections: initialCorrec
                     <Stack direction="row" spacing={1} sx={{ display:'flex', justifyItems:'center',
                          flexWrap: 'wrap', justifyContent: 'flex-end', alignContent: 'center' }}>
                       {/* Bouton de partage - uniquement pour les corrections notées */}
-                      <Tooltip title={correction.grade !== null && correction.grade !== undefined 
+                      <Tooltip title={correction.final_grade !== null && correction.final_grade !== undefined 
                         ? "Partager cette correction" 
                         : "Attribution d'une note nécessaire pour partager"}>
                         <span className='flex justify-center'> {/* Wrapper pour permettre le tooltip sur un bouton désactivé */}
@@ -528,7 +528,7 @@ export default function StudentCorrections({ student, corrections: initialCorrec
                             color="primary" 
                             size="small"
                             onClick={() => handleOpenShareModal(correction.id)}
-                            disabled={correction.grade === null || correction.grade === undefined}
+                            disabled={correction.final_grade === null || correction.final_grade === undefined}
                           >
                             <ShareIcon fontSize="small" />
                           </IconButton>
@@ -536,7 +536,7 @@ export default function StudentCorrections({ student, corrections: initialCorrec
                       </Tooltip>
                       
                       {/* Email Feedback */}
-                      {correction.grade !== null && correction.grade !== undefined ? (
+                      {correction.final_grade !== null && correction.final_grade !== undefined ? (
                         <EmailFeedbackAutre
                           correctionId={correction.id.toString()}
                           activityName={correction.activity_name}
