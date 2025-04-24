@@ -1,3 +1,4 @@
+// Import des fonctions requises
 import { NextRequest, NextResponse } from 'next/server';
 import { withConnection } from '@/lib/db';
 import { getServerSession } from "next-auth/next";
@@ -8,9 +9,10 @@ import { getActivityAutreById } from '@/lib/activityAutre';
 
 interface GradeData {
   points_earned?: number[];
-  grade?: number;
-  final_grade?: number;
-  penalty?: number;
+  grade?: number | null;
+  final_grade?: number | null;
+  penalty?: number | null;
+  status?: string; // Important pour gérer NON_RENDU
 }
 
 // Route pour mettre à jour la note et pénalité d'une correction
@@ -32,17 +34,17 @@ export async function PUT(
 
     // Await the params
     const { id } = await params;
-    const activityId = parseInt(id);
+    const correctionId = parseInt(id);
 
     const data: GradeData = await request.json();
     
     // Make sure we can parse the ID
-    if (isNaN(activityId)) {
+    if (isNaN(correctionId)) {
       return NextResponse.json({ error: 'Invalid ID format' }, { status: 400 });
     }
     
     // Récupérer la correction actuelle pour avoir toutes les données nécessaires
-    const correction = await getCorrectionAutreById(activityId);
+    const correction = await getCorrectionAutreById(correctionId);
     if (!correction) {
       return NextResponse.json({ error: 'Correction not found' }, { status: 404 });
     }
@@ -53,53 +55,95 @@ export async function PUT(
       return NextResponse.json({ error: 'Activity not found' }, { status: 404 });
     }
     
-    // Déterminer les points_earned à utiliser
-    const pointsEarned = data.points_earned !== null && data.points_earned !== undefined 
-      ? data.points_earned 
-      : correction.points_earned || [];
+    // Vérifier si on a un statut NON_RENDU spécifique
+    const isNonRendu = data.status === 'NON_RENDU';
     
-    // Calculer la note totale
+    // Total des points maximums pour l'activité
+    const totalMaxPoints = activity.points.reduce((sum, point) => sum + point, 0);
+    
+    // Valeurs par défaut
+    let pointsEarned = data.points_earned;
+    let gradeValue = data.grade;
+    let finalGradeValue = data.final_grade;
+    let penaltyValue = data.penalty !== undefined ? data.penalty : (correction.penalty || 0);
+    
+    // Cas spécial pour travail non rendu
+    if (isNonRendu) {
+      // Créer un tableau de zéros
+      pointsEarned = new Array(activity.points.length).fill(0);
+      
+      // Calculer 25% des points max pour grade et final_grade
+      const grade25Percent = totalMaxPoints * 0.25;
+      
+      // Définir explicitement les valeurs pour "travail non rendu"
+      gradeValue = grade25Percent;
+      finalGradeValue = grade25Percent; // Note finale = note brute pour les travaux non rendus
+      penaltyValue = 0; // Pas de pénalité pour travail non rendu
+      
+      
+    } 
     // Si points_earned est null (travail non rendu), on utilise directement la note fournie
-    const totalPoints = data.points_earned === null
-      ? (data.grade || activity.points.reduce((sum, point) => sum + point, 0) * 0.25)
-      : pointsEarned.reduce((sum, point) => sum + (point || 0), 0);
-    
-    const penaltyValue = data.penalty !== undefined ? data.penalty : (correction.penalty || 0);
-    
-    // Calculer la note finale selon les règles
-    let finalGrade;
-    if (totalPoints < 5) {
-      // Si la note est inférieure à 5, on conserve cette note
-      finalGrade = totalPoints;
-    } else {
-      // Sinon, on prend le maximum entre (note-pénalité) et 5
-      finalGrade = Math.max(5, totalPoints - penaltyValue);
+    else if (data.points_earned === null && data.grade !== undefined) {
+      // Considérer comme un travail non rendu si on passe points_earned=null
+      pointsEarned = new Array(activity.points.length).fill(0);
+      gradeValue = data.grade;
+      finalGradeValue = data.grade; // final_grade = grade pour ce cas spécial
+      penaltyValue = 0;
+    }
+    else {
+      // Cas normal: utiliser les points fournis ou existants
+      pointsEarned = data.points_earned !== undefined ? data.points_earned : correction.points_earned || [];
+      
+      // Calculer la note totale à partir des points si elle n'est pas spécifiée
+      if (gradeValue === undefined) {
+        gradeValue = pointsEarned.reduce((sum, point) => sum + (point || 0), 0);
+      }
+      
+      // Calculer la note finale selon les règles si elle n'est pas spécifiée
+      if (finalGradeValue === undefined) {
+        // Utiliser 0 comme valeur par défaut si gradeValue est null
+        const actualGradeValue = gradeValue ?? 0;
+        
+        // Si note brute < 5, pas de pénalité
+        if (actualGradeValue < 5) {
+          finalGradeValue = actualGradeValue;
+        } else {
+          // Sinon, on prend le maximum entre (note-pénalité) et 5
+          finalGradeValue = Math.max(5, actualGradeValue - (penaltyValue ?? 0));
+        }
+      }
     }
     
     // Valeurs à mettre à jour
     const updateData: GradeData = {
       points_earned: pointsEarned,
-      grade: totalPoints,
-      final_grade: finalGrade,
+      grade: gradeValue,
+      final_grade: finalGradeValue,
       penalty: penaltyValue
     };
     
+    // Ajouter le statut si fourni
+    if (data.status) {
+      updateData.status = data.status;
+    }
+    
     // Mettre à jour la correction
-    const updated = await updateCorrectionAutre(activityId, updateData);
+    const updated = await updateCorrectionAutre(correctionId, updateData);
     
     if (!updated) {
       return NextResponse.json({ error: 'No update was made' }, { status: 400 });
     }
     
     // Récupérer la correction mise à jour
-    const updatedCorrection = await getCorrectionAutreById(activityId);
+    const updatedCorrection = await getCorrectionAutreById(correctionId);
     
     return NextResponse.json({
       message: 'Grade updated successfully',
       points_earned: updatedCorrection?.points_earned,
       grade: updatedCorrection?.grade,
       final_grade: updatedCorrection?.final_grade,
-      penalty: updatedCorrection?.penalty
+      penalty: updatedCorrection?.penalty,
+      status: updatedCorrection?.status
     });
   } catch (error) {
     console.error('Error updating grade:', error);

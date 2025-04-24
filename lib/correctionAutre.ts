@@ -192,6 +192,7 @@ export async function updateCorrectionAutre(id: number, data: {
   }
 
   values.push(id);
+  
 
   const result = await query<{ affectedRows: number }>(
     `UPDATE corrections_autres SET ${updates.join(', ')} WHERE id = ?`,

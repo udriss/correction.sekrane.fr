@@ -343,6 +343,7 @@ export function useCorrectionsAutres(correctionId: string) {
   const updatePointsEarned = useCallback(async (pointsEarned: number[]) => {
     if (!correction) return false;
     
+
     // Mettre à jour l'état local immédiatement pour une UI réactive
     setCorrection(prev => {
       if (!prev) return null;

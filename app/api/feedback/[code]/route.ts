@@ -197,10 +197,10 @@ export async function GET(
           
           // Vérifier si l'ID est un nombre (cas de succès)
           if (typeof logId === 'number') {
-            console.log(`Log créé avec succès: ${logId}`);
+            
             // Créer une notification avec l'ID du log
             const notificationId = await createFeedbackNotification(logId);
-            console.log(`Notification créée avec succès: ${notificationId} pour le log ${logId}`);
+            
           } else if (logId === true) {
             // Le log a été créé mais on n'a pas récupéré son ID, chercher le dernier
             const [lastLog] = await connection.query(
@@ -214,7 +214,7 @@ export async function GET(
             if (Array.isArray(lastLog) && lastLog.length > 0) {
               const lastLogId = (lastLog[0] as any).id;
               const notificationId = await createFeedbackNotification(lastLogId);
-              console.log(`Notification créée avec succès (fallback): ${notificationId} pour le log ${lastLogId}`);
+              
             }
           }
         } catch (error) {

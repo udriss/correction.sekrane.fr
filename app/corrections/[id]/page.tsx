@@ -131,7 +131,7 @@ export default function CorrectionAutreDetail({ params }: { params: Promise<{ id
     // Enregistrer le timestamp du changement
     setContentChangeTimestamp(Date.now());
     
-    console.log('Content change detected', new Date().toLocaleTimeString());
+    
   }, []);
 
   // Pour le calcul du pourcentage et de la note finale
@@ -295,6 +295,7 @@ export default function CorrectionAutreDetail({ params }: { params: Promise<{ id
 
   // Fonction qui met à jour à la fois la pénalité et recalcule la note finale
   const handleUpdatePenaltyWithGrade = async (penaltyValue: number) => {
+    
     try {
       if (!correction || !activity) {
         throw new Error('Données de correction ou d\'activité manquantes');
@@ -474,18 +475,18 @@ export default function CorrectionAutreDetail({ params }: { params: Promise<{ id
       autoSaveTimerRef.current = setInterval(() => {
         // Vérifie l'état actuel de autoSaveActive au moment de l'exécution
         if (autoSaveActive) {
-          console.log('Auto-save triggered', new Date().toLocaleTimeString());
+          
           handleSaveCorrection()
             .then(() => {
               setLastAutoSave(new Date());
-              console.log('Auto-save successful', new Date().toLocaleTimeString());
+              
             })
             .catch(err => {
               console.error('Auto-save failed:', err);
               // Ne pas désactiver l'auto-sauvegarde en cas d'erreur
             });
         } else {
-          console.log('Auto-save skipped (disabled)', new Date().toLocaleTimeString());
+          
         }
       }, 70000); // Auto-save every 70 seconds
     }
@@ -562,12 +563,12 @@ export default function CorrectionAutreDetail({ params }: { params: Promise<{ id
     const timeElapsed = Date.now() - contentChangeTimestamp;
     const timeToWait = Math.max(0, 70000 - timeElapsed);
     
-    console.log(`Auto-save scheduled in ${timeToWait/1000} seconds`, new Date().toLocaleTimeString());
+    
     
     // Configurer un timeout pour sauvegarder après le délai
     const autoSaveTimeout = setTimeout(() => {
       if (autoSaveActive && changesDetected) {
-        console.log('Auto-save executing after content change', new Date().toLocaleTimeString());
+        
         
         handleSaveCorrection()
           .then(() => {
@@ -575,7 +576,7 @@ export default function CorrectionAutreDetail({ params }: { params: Promise<{ id
             // Réinitialiser le détecteur de changements après sauvegarde réussie
             setChangesDetected(false);
             setContentChangeTimestamp(null);
-            console.log('Auto-save completed successfully', new Date().toLocaleTimeString());
+            
           })
           .catch(err => {
             console.error('Auto-save failed:', err);
@@ -717,7 +718,7 @@ export default function CorrectionAutreDetail({ params }: { params: Promise<{ id
     );
   }
 
-  console.log('error:', error);
+  
   // Utiliser le composant ErrorDisplay avec les paramètres supportés
   // Plus besoin de transformer l'erreur, le composant ErrorDisplay s'en charge
   if (error) {
@@ -984,7 +985,7 @@ export default function CorrectionAutreDetail({ params }: { params: Promise<{ id
                       setPointsEarned={(index, value) => {
                         const newPointsEarned = [...(correction.points_earned || [])];
                         newPointsEarned[index] = value;
-                        updatePointsEarned(newPointsEarned);
+                        // updatePointsEarned(newPointsEarned);
                         // Ne pas déclencher l'auto-sauvegarde pour les modifications de points
                       }}
                       setPenalty={(value) => {

@@ -316,7 +316,7 @@ function CorrectionsContent() {
         return filter;
     }
   };
-  console.log('activeFilters', activeFilters);
+  
 
   // Convert CorrectionAutre to the format expected by components
   const adaptCorrections = useMemo(() => {

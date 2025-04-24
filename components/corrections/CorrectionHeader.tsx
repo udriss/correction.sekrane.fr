@@ -178,13 +178,6 @@ const CorrectionHeader: React.FC<CorrectionHeaderProps> = ({
       }
     }
     
-    console.log('Restauration des valeurs originales:', { 
-      originalFirstName, 
-      originalLastName, 
-      originalEmail,
-      correctionData: correction 
-    });
-    
     // Mettre à jour les états du composant parent
     setFirstName(originalFirstName);
     setLastName(originalLastName);

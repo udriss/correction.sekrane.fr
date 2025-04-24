@@ -163,7 +163,7 @@ export default function MultipleCorrectionsAutrePage({ params }: { params: Promi
     fetchStudents();
   }, [activityId, classTabValue]);
 
-  // console.log(students);
+  // 
   
   // Filtrer les étudiants lorsque les classes sélectionnées changent
   useEffect(() => {
@@ -276,7 +276,7 @@ export default function MultipleCorrectionsAutrePage({ params }: { params: Promi
       return true;
     });
     
-    console.log(`Nombre d'étudiants après filtrage: ${filtered.length}`);
+    
     
     // Mettre à jour les étudiants filtrés
     setFilteredStudents(filtered);
