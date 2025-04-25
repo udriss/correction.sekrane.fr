@@ -251,6 +251,11 @@ export default function CorrectionAutreDetail({ params }: { params: Promise<{ id
 
   // Fonction pour calculer et appliquer la pénalité de retard
   const calculateAndApplyLatePenalty = (deadlineDate: dayjs.Dayjs, submissionDate: dayjs.Dayjs) => {
+    // Prendre en compte le status NON_RENDU
+    if (correction?.status === 'NON_RENDU') {
+      handleUpdatePenaltyWithGrade(0, { forceNonRendu: true });
+      return;
+    }
     // Calculer les jours de retard
     const daysLate = submissionDate.diff(deadlineDate, 'day');
     
@@ -294,11 +299,65 @@ export default function CorrectionAutreDetail({ params }: { params: Promise<{ id
   };
 
   // Fonction qui met à jour à la fois la pénalité et recalcule la note finale
-  const handleUpdatePenaltyWithGrade = async (penaltyValue: number) => {
+  const handleUpdatePenaltyWithGrade = async (penaltyValue: number, options?: { forceNonRendu?: boolean }) => {
     
     try {
       if (!correction || !activity) {
         throw new Error('Données de correction ou d\'activité manquantes');
+      }
+      // Si on force le NON_RENDU, appliquer la logique spéciale
+      if (options?.forceNonRendu) {
+        const totalMaxPoints = activity.points?.reduce((sum, points) => sum + points, 0) || 0;
+        const grade25Percent = Math.round(totalMaxPoints * 0.25 * 100) / 100;
+        const zeroPoints = (activity.points || []).map(() => 0);
+        const response = await fetch(`/api/corrections_autres/${correction.id}/grade`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            points_earned: zeroPoints,
+            grade: grade25Percent,
+            final_grade: grade25Percent,
+            penalty: 0,
+            status: 'NON_RENDU'
+          }),
+        });
+        if (!response.ok) {
+          const errorData = await response.json();
+          const error: any = new Error('Erreur lors de la mise à jour de la note : ' + (errorData.message || 'Échec de mise à jour de la note'));
+          error.details = errorData.details || {};
+          error.status = response.status;
+          error.statusText = response.statusText;
+          setError(error);
+          throw error;
+        }
+        const data = await response.json();
+        setCorrection(prev => {
+          if (!prev) return null;
+          return {
+            ...prev,
+            penalty: 0,
+            grade: grade25Percent,
+            final_grade: grade25Percent,
+            points_earned: zeroPoints,
+            status: 'NON_RENDU'
+          };
+        });
+        const event = new CustomEvent('gradeUpdated', { 
+          detail: { 
+            message: 'Note NON_RENDU appliquée',
+            correction: {
+              penalty: 0,
+              grade: grade25Percent,
+              final_grade: grade25Percent,
+              points_earned: zeroPoints,
+              status: 'NON_RENDU'
+            }
+          } 
+        });
+        window.dispatchEvent(event);
+        return data;
       }
 
       // Récupérer les points actuels
@@ -376,8 +435,8 @@ export default function CorrectionAutreDetail({ params }: { params: Promise<{ id
       if (!error.details) {
         const errorWithDetails: any = new Error(error.message || "Erreur lors de la mise à jour de la pénalité");
         errorWithDetails.details = error.details || {};
-        errorWithDetails.status = error.status;
-        errorWithDetails.statusText = error.statusText;
+        error.status = error.status;
+        error.statusText = error.statusText;
         setError(errorWithDetails);
       } else {
         setError(error);

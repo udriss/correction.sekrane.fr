@@ -1,8 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Typography, Slider, Box, Grid, Alert, FormControlLabel, Checkbox, CircularProgress, Stack, Fade } from '@mui/material';
+import { Typography, Slider, Box, Grid, Alert, FormControlLabel, Checkbox, CircularProgress, Stack, Fade, Button } from '@mui/material';
 import { useSnackbar } from 'notistack';
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
 import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline';
+import RefreshIcon from '@mui/icons-material/Refresh';
+import DoneIcon from '@mui/icons-material/Done';
 
 interface GradingSectionAutresProps {
   pointsEarned: number[]; // Tableau des points gagnés pour chaque partie
@@ -41,6 +43,9 @@ const GradingSectionAutres: React.FC<GradingSectionAutresProps> = ({
   const apiCallInProgressRef = useRef(false);
   // État pour désactiver les sliders pendant la mise à jour
   const [isUpdating, setIsUpdating] = useState(false);
+  // État pour le chargement du calcul de note finale
+  const [isCalculating, setIsCalculating] = useState(false);
+
   // Hook pour les notifications
   const { enqueueSnackbar } = useSnackbar();
   // Référence pour contrôler la fréquence des notifications
@@ -102,9 +107,6 @@ const GradingSectionAutres: React.FC<GradingSectionAutresProps> = ({
         const grade = totalEarned;
         const finalGrade = calculateFinalGrade(grade, penaltyValue);
         
-        
-        
-
         // Appeler l'API
         fetch(`/api/corrections_autres/${correction.id}/grade`, {
           method: 'PUT',
@@ -199,22 +201,6 @@ const GradingSectionAutres: React.FC<GradingSectionAutresProps> = ({
     }, 2000);
     
     setSaveGradeTimeout(timeout);
-  };
-
-  // Fonction pour gérer le changement sur un slider de points
-  const handlePointsChange = (index: number, newValue: number) => {
-    // Mettre à jour l'état local
-    const newPointsEarned = [...pointsEarned];
-    newPointsEarned[index] = newValue;
-    
-    // Appeler la fonction de mise à jour fournie
-    setPointsEarned(index, newValue);
-    
-    // Sauvegarder après un délai
-    saveGradeWithDebounce(
-      newPointsEarned,
-      isPenaltyEnabled ? parseFloat(penalty || '0') : 0
-    );
   };
 
   // Fonction pour appliquer la notation "travail non rendu"
@@ -548,11 +534,75 @@ const GradingSectionAutres: React.FC<GradingSectionAutresProps> = ({
     }
   }, [saveError]);
   
+  // Fonction pour recalculer et mettre à jour la note finale
+  const handleRecalculateGrade = async () => {
+    if (!correction || isCalculating) return;
+    
+    try {
+      setIsCalculating(true);
+      
+      // Appeler l'API de recalcul de note finale
+      const response = await fetch(`/api/corrections_autres/${correction.id}/recalculate-grade`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        }
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Erreur lors du recalcul de la note finale');
+      }
+      
+      const updatedCorrection = await response.json();
+      
+      // Émettre un événement pour informer les autres composants de la mise à jour
+      const event = new CustomEvent('gradeUpdated', { 
+        detail: { 
+          message: 'Note finale recalculée avec succès',
+          correction: updatedCorrection
+        } 
+      });
+      window.dispatchEvent(event);
+      
+      // Afficher un message de succès
+      showNotification('Note finale recalculée avec succès', 'success');
+      
+      // Afficher l'indicateur de succès central
+      markSaveSuccess();
+    } catch (error: any) {
+      console.error('Erreur lors du recalcul de la note finale:', error);
+      showNotification('Erreur lors du recalcul de la note finale', 'error');
+      
+      // Émettre un événement d'erreur
+      const event = new CustomEvent('gradeError', { 
+        detail: { message: error.message || 'Erreur lors du recalcul de la note finale' } 
+      });
+      window.dispatchEvent(event);
+      
+      // Afficher l'indicateur d'erreur central
+      markSaveError();
+    } finally {
+      setIsCalculating(false);
+    }
+  };
+
   return (
     <>
       <Box sx={{ mb: 3 }}>
-        <Typography variant="h6">
-          Notation sur {totalPoints.reduce((sum, points) => sum + points, 0)} points
+        <Typography variant="h6" sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <span>Notation sur {totalPoints.reduce((sum, points) => sum + points, 0)} points</span>
+          <Button 
+            variant="outlined" 
+            size="small" 
+            color="primary"
+            startIcon={correction?.final_grade ? <RefreshIcon /> : <DoneIcon />}
+            onClick={handleRecalculateGrade}
+            disabled={saving || isCalculating}
+          >
+            {correction?.final_grade ? 'Recalculer la note finale' : 'Calculer la note finale'}
+            {isCalculating && <CircularProgress size={16} color="inherit" sx={{ ml: 1 }} />}
+          </Button>
         </Typography>
         
         {/* Checkbox pour les travaux non rendus */}

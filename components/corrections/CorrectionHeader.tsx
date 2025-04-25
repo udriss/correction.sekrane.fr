@@ -394,6 +394,18 @@ const CorrectionHeader: React.FC<CorrectionHeaderProps> = ({
                 </IconButton>
               </Tooltip>
               
+              <Tooltip title={correctionStatus === 'NON_RENDU' ? "Marquer comme rendu" : "Marquer comme non rendu"}>
+                <IconButton
+                  onClick={() => handleChangeStatus(correctionStatus === 'NON_RENDU' ? 'ACTIVE' : 'NON_RENDU')}
+                  color={correctionStatus === 'NON_RENDU' ? "error" : "default"}
+                  size="large"
+                  disabled={isStatusChanging}
+                  sx={{ mx: 0.5 }}
+                >
+                  <DoNotDisturbIcon fontSize="large"/>
+                </IconButton>
+              </Tooltip>
+              
               <Tooltip title="Marquer comme absent">
                 <IconButton
                   onClick={() => handleChangeStatus('ABSENT')}
@@ -403,18 +415,6 @@ const CorrectionHeader: React.FC<CorrectionHeaderProps> = ({
                   sx={{ mx: 0.5 }}
                 >
                   <PersonOffIcon fontSize="large"/>
-                </IconButton>
-              </Tooltip>
-              
-              <Tooltip title="Marquer comme non rendu">
-                <IconButton
-                  onClick={() => handleChangeStatus('NON_RENDU')}
-                  color={correctionStatus === 'NON_RENDU' ? "error" : "default"}
-                  size="large"
-                  disabled={isStatusChanging}
-                  sx={{ mx: 0.5 }}
-                >
-                  <DoNotDisturbIcon fontSize="large"/>
                 </IconButton>
               </Tooltip>
               

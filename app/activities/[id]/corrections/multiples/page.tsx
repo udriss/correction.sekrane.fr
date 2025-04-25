@@ -34,6 +34,7 @@ import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import HourglassEmptyIcon from '@mui/icons-material/HourglassEmpty';
 import TuneIcon from '@mui/icons-material/Tune';
 import CheckIcon from '@mui/icons-material/Check';
+import GroupAddIcon from '@mui/icons-material/GroupAdd';
 
 
 
@@ -787,6 +788,18 @@ export default function MultipleCorrectionsAutrePage({ params }: { params: Promi
                     }
                   </FormHelperText>
                 </FormControl>
+                {/* Bouton pour sélectionner tous les étudiants filtrés */}
+                <Button
+                  variant="outlined"
+                  color="primary"
+                  fullWidth
+                  sx={{ mt: 1 }}
+                  onClick={() => setSelectedStudentIds(filteredStudents.map(s => s.id))}
+                  disabled={filteredStudents.length === 0}
+                  startIcon={<GroupAddIcon />}
+                >
+                  Sélectionner tous les étudiants affichés ({filteredStudents.length})
+                </Button>
               </div>
               
               {/* Options de groupage */}
