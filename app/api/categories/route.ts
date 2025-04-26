@@ -16,7 +16,7 @@ export async function GET(request: NextRequest) {
 
   try {
     const categories = await query<any[]>(`
-      SELECT id, name, created_at, updated_at
+      SELECT id, name, highlighted, created_at, updated_at
       FROM categories 
       ORDER BY name ASC
     `);
@@ -24,7 +24,8 @@ export async function GET(request: NextRequest) {
     // Ensure we have properly formatted data for the client
     const formattedCategories = categories.map(category => ({
       id: category.id,
-      name: category.name
+      name: category.name,
+      highlighted: Boolean(category.highlighted)
     }));
     
     return NextResponse.json(formattedCategories);
@@ -48,7 +49,7 @@ export async function POST(request: NextRequest) {
   }
 
   // Parse the request body
-  const { name } = await request.json();
+  const { name, highlighted } = await request.json();
 
   if (!name || typeof name !== 'string') {
     return NextResponse.json({ error: 'Le nom de la catégorie est requis' }, { status: 400 });
@@ -56,12 +57,12 @@ export async function POST(request: NextRequest) {
 
   try {
     const result = await query<any>(`
-      INSERT INTO categories (name) 
-      VALUES (?)
-    `, [name]);
+      INSERT INTO categories (name, highlighted) 
+      VALUES (?, ?)
+    `, [name, highlighted ? 1 : 0]);
 
     const newCategory = await query<any[]>(`
-      SELECT id, name, created_at, updated_at 
+      SELECT id, name, highlighted, created_at, updated_at 
       FROM categories 
       WHERE id = ?
     `, [result.insertId]);
@@ -69,7 +70,8 @@ export async function POST(request: NextRequest) {
     // Return a consistent format with only the essential fields
     return NextResponse.json({
       id: newCategory[0].id,
-      name: newCategory[0].name
+      name: newCategory[0].name,
+      highlighted: Boolean(newCategory[0].highlighted)
     }, { status: 201 });
   } catch (error) {
     console.error('Erreur lors de la création de la catégorie:', error);

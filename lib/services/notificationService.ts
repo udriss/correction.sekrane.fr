@@ -184,3 +184,35 @@ export async function countTotalNotifications(): Promise<number> {
     }
   });
 }
+
+/**
+ * Fonction d'optimisation pour compter à la fois les notifications non lues et totales
+ * en utilisant une seule connexion à la base de données au lieu de deux
+ */
+export async function countBothNotifications(): Promise<[number, number]> {
+  return withConnection(async (connection) => {
+    try {
+      // Exécuter les deux requêtes dans la même connexion
+      const [unreadResult] = await connection.query(
+        `SELECT COUNT(*) as count FROM feedback_notifications WHERE readOk = FALSE`
+      );
+      
+      const [totalResult] = await connection.query(
+        `SELECT COUNT(*) as total FROM feedback_notifications`
+      );
+      
+      const unreadCount = Array.isArray(unreadResult) && unreadResult.length > 0 
+        ? (unreadResult[0] as any).count || 0 
+        : 0;
+        
+      const totalCount = Array.isArray(totalResult) && totalResult.length > 0 
+        ? (totalResult[0] as any).total || 0 
+        : 0;
+        
+      return [unreadCount, totalCount];
+    } catch (error) {
+      console.error('Error counting notifications:', error);
+      return [0, 0];
+    }
+  });
+}

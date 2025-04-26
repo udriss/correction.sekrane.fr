@@ -10,19 +10,31 @@ import {
   TextField,
   Chip,
   alpha,
-  Theme
+  Theme,
+  Switch,
+  FormControlLabel,
+  IconButton,
+  Tooltip
 } from '@mui/material';
 import CategoryIcon from '@mui/icons-material/CategoryOutlined';
 import AddIcon from '@mui/icons-material/Add';
+import HighlightIcon from '@mui/icons-material/Highlight';
+
+interface Category {
+  id: number;
+  name: string;
+  highlighted: boolean;
+}
 
 interface CategoryManagementDialogProps {
   open: boolean;
   setOpen: (open: boolean) => void;
   newCategory: string;
   setNewCategory: (category: string) => void;
-  managedCategories: string[];
+  managedCategories: Category[];
   handleAddCategory: () => void;
-  openDeleteCategoryDialog: (categoryName: string) => void;
+  openDeleteCategoryDialog: (categoryId: number, categoryName: string) => void;
+  toggleCategoryHighlight: (categoryId: number, currentHighlighted: boolean) => void;
   isAddingCategory: boolean;
   theme: Theme;
 }
@@ -35,6 +47,7 @@ export const CategoryManagementDialog: React.FC<CategoryManagementDialogProps> =
   managedCategories,
   handleAddCategory,
   openDeleteCategoryDialog,
+  toggleCategoryHighlight,
   isAddingCategory,
   theme
 }) => {
@@ -62,6 +75,7 @@ export const CategoryManagementDialog: React.FC<CategoryManagementDialogProps> =
         <Box sx={{ mb: 3 }}>
           <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
             Les catégories vous aident à organiser vos fragments pour une recherche et une utilisation plus faciles.
+            Utilisez l'option de mise en évidence pour les catégories qui doivent être distinctes dans les corrections.
           </Typography>
           
           <Box sx={{ display: 'flex', gap: 1, mb: 2 }}>
@@ -83,7 +97,7 @@ export const CategoryManagementDialog: React.FC<CategoryManagementDialogProps> =
               color="primary"
               startIcon={<AddIcon />}
               onClick={handleAddCategory}
-              disabled={!newCategory.trim() || managedCategories.includes(newCategory.trim()) || isAddingCategory}
+              disabled={!newCategory.trim() || managedCategories.some(cat => cat.name === newCategory.trim()) || isAddingCategory}
             >
               {isAddingCategory ? 'Ajout...' : 'Ajouter'}
             </Button>
@@ -97,11 +111,19 @@ export const CategoryManagementDialog: React.FC<CategoryManagementDialogProps> =
         <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
           {managedCategories.map((cat) => (
             <Chip
-              key={cat}
-              label={cat}
-              onDelete={() => openDeleteCategoryDialog(cat)}
-              color="primary"
+              key={cat.id}
+              label={cat.name}
+              onDelete={() => openDeleteCategoryDialog(cat.id, cat.name)}
+              color={cat.highlighted ? "secondary" : "primary"}
               variant="filled"
+              icon={cat.highlighted ? <HighlightIcon /> : undefined}
+              sx={{
+                position: 'relative',
+                '&:hover .highlight-toggle': {
+                  opacity: 1,
+                }
+              }}
+              onClick={() => toggleCategoryHighlight(cat.id, cat.highlighted)}
             />
           ))}
           
@@ -110,6 +132,13 @@ export const CategoryManagementDialog: React.FC<CategoryManagementDialogProps> =
               Aucune catégorie définie
             </Typography>
           )}
+        </Box>
+        
+        <Box sx={{ mt: 3 }}>
+          <Typography variant="body2" color="text.secondary">
+            <HighlightIcon fontSize="small" sx={{ verticalAlign: 'middle', mr: 0.5 }} />
+            Les catégories mises en évidence apparaîtront avec un style spécial dans les corrections partagées.
+          </Typography>
         </Box>
       </DialogContent>
       <DialogActions>

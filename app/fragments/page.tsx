@@ -62,6 +62,7 @@ export default function FragmentsLibraryPage() {
   const [sortBy, setSortBy] = useState('newest');
   const [userOnly, setUserOnly] = useState(false);
   
+  // États pour la gestion des fragments
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [fragmentToDelete, setFragmentToDelete] = useState<Fragment | null>(null);
   const [deleteError, setDeleteError] = useState('');
@@ -75,32 +76,33 @@ export default function FragmentsLibraryPage() {
   const [page, setPage] = useState(1);
   const [fragmentsPerPage] = useState(10);
   
+  // États pour la gestion des catégories
   const [categoryDialogOpen, setCategoryDialogOpen] = useState(false);
   const [newCategory, setNewCategory] = useState('');
-  const [managedCategories, setManagedCategories] = useState<string[]>([]);
-  
-  const [loadingCategories, setLoadingCategories] = useState(false);
-  const [editModalOpen, setEditModalOpen] = useState(false);
-  const [editingFragment, setEditingFragment] = useState<Fragment | null>(null);
-  const [editingSuccess, setEditingSuccess] = useState(false);
-  // Ajout d'un état pour suivre l'ID du fragment en cours de mise à jour
-  const [updatingFragmentId, setUpdatingFragmentId] = useState<number | undefined>(undefined);
-
-  const [newFragmentModalOpen, setNewFragmentModalOpen] = useState(false);
-  const [creatingSuccess, setCreatingSuccess] = useState(false);
-  const [selectedActivityId, setSelectedActivityId] = useState<number | null>(null);
-  const [activities, setActivities] = useState<Activity[]>([]);
-  const [loadingActivities, setLoadingActivities] = useState(false);
-
+  const [managedCategories, setManagedCategories] = useState<Category[]>([]);
+  const [isAddingCategory, setIsAddingCategory] = useState(false);
   const [categoryToDelete, setCategoryToDelete] = useState<Category | null>(null);
   const [showDeleteWarning, setShowDeleteWarning] = useState(false);
   const [isDeletingCategory, setIsDeletingCategory] = useState(false);
   const [categoryDeleteError, setCategoryDeleteError] = useState<string | null>(null);
   const [categoryDeleteSuccess, setCategoryDeleteSuccess] = useState(false);
+  const [isUpdatingCategory, setIsUpdatingCategory] = useState(false);
 
-  const [isAddingCategory, setIsAddingCategory] = useState(false);
+  // États pour l'édition des fragments
+  const [loadingCategories, setLoadingCategories] = useState(false);
+  const [editModalOpen, setEditModalOpen] = useState(false);
+  const [editingFragment, setEditingFragment] = useState<Fragment | null>(null);
+  const [editingSuccess, setEditingSuccess] = useState(false);
+  const [updatingFragmentId, setUpdatingFragmentId] = useState<number | undefined>(undefined);
+
+  // États pour la création de fragments
+  const [newFragmentModalOpen, setNewFragmentModalOpen] = useState(false);
+  const [creatingSuccess, setCreatingSuccess] = useState(false);
+  const [selectedActivityId, setSelectedActivityId] = useState<number | null>(null);
+  const [activities, setActivities] = useState<Activity[]>([]);
+  const [loadingActivities, setLoadingActivities] = useState(false);
   
-  // Ajouter un état pour suivre l'état de synchronisation des données
+  // État pour suivre la synchronisation des données
   const [fragmentsData, setFragmentsData] = useState<{
     fragments: Fragment[];
     lastUpdated: number;
@@ -305,9 +307,11 @@ export default function FragmentsLibraryPage() {
     fetchCategories();
   }, [fetchCategories]);
   
+  // Mise à jour de l'initialisation des catégories managées
   useEffect(() => {
     if (categories.length > 0) {
-      setManagedCategories(categories.map(cat => cat.name));
+      // Utiliser directement les objets catégories complets au lieu de juste les noms
+      setManagedCategories(categories);
     }
   }, [categories]);
   
@@ -348,7 +352,7 @@ export default function FragmentsLibraryPage() {
   // Utiliser les fragments avec clés pour la pagination
   const currentFragments = fragmentsWithKeys.slice(indexOfFirstFragment, indexOfLastFragment);
   const totalPages = Math.ceil(filteredFragments.length / fragmentsPerPage);
-  
+
   const copyToClipboard = async (text: string) => {
     try {
       // Vérifier si l'API Clipboard est disponible dans l'environnement courant
@@ -438,7 +442,7 @@ export default function FragmentsLibraryPage() {
   
   // Remplacer handleAddCategory par une version corrigée sans appel de hook à l'intérieur
   const handleAddCategory = async () => {
-    if (!newCategory.trim() || managedCategories.includes(newCategory.trim())) {
+    if (!newCategory.trim() || managedCategories.some(cat => cat.name === newCategory.trim())) {
       return;
     }
     
@@ -461,8 +465,15 @@ export default function FragmentsLibraryPage() {
       // Récupérer la nouvelle catégorie ajoutée avec son ID
       const newCategoryData = await response.json();
       
+      // Créer un nouvel objet Category avec la structure correcte
+      const newCategoryObj: Category = {
+        id: newCategoryData.id || Date.now(), // Utiliser l'ID retourné ou un ID temporaire si nécessaire
+        name: newCategory.trim(),
+        highlighted: false // Par défaut, les nouvelles catégories ne sont pas mises en évidence
+      };
+      
       // Mettre à jour l'interface utilisateur
-      setManagedCategories([...managedCategories, newCategory.trim()]);
+      setManagedCategories([...managedCategories, newCategoryObj]);
       
       // Rafraîchir la liste complète des catégories pour inclure le nouvel ID
       await fetchCategories();
@@ -491,7 +502,7 @@ export default function FragmentsLibraryPage() {
     }
   };
 
-  // Remplacer handleDeleteCategory par une version améliorée
+  // Remplacer handleDeleteCategory par une version qui utilise des objets Category complets
   const handleDeleteCategory = async () => {
     if (!categoryToDelete) return;
     
@@ -500,15 +511,8 @@ export default function FragmentsLibraryPage() {
     setCategoryDeleteSuccess(false);
     
     try {
-      // Rechercher l'ID de la catégorie à partir de son nom
-      const categoryObj = categories.find(cat => cat.name === categoryToDelete.name);
-      
-      if (!categoryObj) {
-        throw new Error('Catégorie non trouvée');
-      }
-      
-      // Appeler l'API pour supprimer la catégorie
-      const response = await fetch(`/api/categories/${categoryObj.id}`, {
+      // Utiliser directement l'ID de l'objet Category
+      const response = await fetch(`/api/categories/${categoryToDelete.id}`, {
         method: 'DELETE',
       });
       
@@ -518,7 +522,7 @@ export default function FragmentsLibraryPage() {
       }
       
       // Mise à jour des états après suppression réussie
-      setManagedCategories(managedCategories.filter(cat => cat !== categoryToDelete.name));
+      setManagedCategories(managedCategories.filter(cat => cat.id !== categoryToDelete.id));
       setCategoryDeleteSuccess(true);
       
       // Rafraîchir la liste des catégories
@@ -538,9 +542,70 @@ export default function FragmentsLibraryPage() {
     }
   };
   
+  // Ajouter la fonction pour basculer l'état de mise en évidence d'une catégorie
+  const toggleCategoryHighlight = async (categoryId: number, currentHighlighted: boolean) => {
+    if (!categoryId) return;
+    
+    setIsUpdatingCategory(true);
+    
+    try {
+      // Appeler l'API pour mettre à jour l'état de mise en évidence
+      const response = await fetch(`/api/categories/${categoryId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ highlighted: !currentHighlighted }),
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Erreur lors de la mise à jour de la catégorie');
+      }
+      
+      // Récupérer la catégorie mise à jour
+      const updatedCategory = await response.json();
+      
+      // Mettre à jour l'état des catégories
+      setCategories(prevCategories => 
+        prevCategories.map(cat => 
+          cat.id === categoryId 
+            ? { ...cat, highlighted: !currentHighlighted } 
+            : cat
+        )
+      );
+      
+      // Mettre à jour également managedCategories
+      setManagedCategories(prevManagedCategories => 
+        prevManagedCategories.map(cat => 
+          cat.id === categoryId 
+            ? { ...cat, highlighted: !currentHighlighted } 
+            : cat
+        )
+      );
+      
+      // Afficher un message de succès
+      setNotification({
+        open: true,
+        message: `La catégorie "${updatedCategory.name}" a été ${!currentHighlighted ? 'mise en évidence' : 'désactivée de la mise en évidence'}`,
+        severity: 'success'
+      });
+      
+    } catch (error: any) {
+      console.error('Error updating category highlight:', error);
+      
+      // Afficher un message d'erreur
+      setNotification({
+        open: true,
+        message: `Erreur: ${error.message || 'Problème lors de la mise à jour de la catégorie'}`,
+        severity: 'error'
+      });
+    } finally {
+      setIsUpdatingCategory(false);
+    }
+  };
+  
   // Fonction pour ouvrir le dialogue de confirmation de suppression
-  const openDeleteCategoryDialog = (categoryName: string) => {
-    const category = categories.find(cat => cat.name === categoryName);
+  const openDeleteCategoryDialog = (categoryId: number, categoryName: string) => {
+    const category = categories.find(cat => cat.id === categoryId);
     if (!category) return;
     
     setCategoryToDelete(category);
@@ -592,83 +657,102 @@ export default function FragmentsLibraryPage() {
     }
   };
 
-  const handleEditSuccess = (updatedFragment: ImportedFragment) => {
+  const handleEditSuccess = async (updatedFragment: ImportedFragment) => {
     // Définir l'ID du fragment en cours de mise à jour pour afficher le spinner
     setUpdatingFragmentId(updatedFragment.id);
     
-    // Vérifier et normaliser les tags
-    // Si les tags sont vides et qu'il y a un fragment en édition, utiliser ses tags
-    if (Array.isArray(updatedFragment.tags) && updatedFragment.tags.length === 0 && editingFragment) {
-      updatedFragment.tags = [...editingFragment.tags];
+    try {
+      
+      // S'assurer que les tags sont toujours un tableau, même vide
+      const tagsToSend = Array.isArray(updatedFragment.tags) 
+        ? [...updatedFragment.tags] // Créer une copie pour éviter les problèmes de référence
+        : (typeof updatedFragment.tags === 'string' 
+            ? JSON.parse(updatedFragment.tags) 
+            : []);
+      
+      // Préparer les catégories correctement
+      const categoriesToSend = Array.isArray(updatedFragment.categories) 
+        ? updatedFragment.categories.map(cat => 
+            typeof cat === 'object' && cat !== null && 'id' in cat 
+              ? { id: cat.id } // Envoyer seulement l'ID pour alléger la requête
+              : { id: Number(cat) }
+          )
+        : [];
+      
+      // Préparer toutes les données du fragment à envoyer à l'API
+      const fragmentData = {
+        id: updatedFragment.id,
+        activity_id: updatedFragment.activity_id,
+        content: updatedFragment.content,
+        created_at: updatedFragment.created_at,
+        updated_at: new Date().toISOString(),
+        // Utiliser les tags traités
+        tags: tagsToSend,
+        user_id: updatedFragment.user_id,
+        // Utiliser les catégories traitées
+        categories: categoriesToSend,
+        isOwner: updatedFragment.isOwner,
+        _updateKey: Date.now()
+      };
+      
+      
+      // Appel API pour mettre à jour le fragment avec toutes les données
+      const response = await fetch(`/api/fragments/${updatedFragment.id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(fragmentData),
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => null);
+        console.error('Erreur API:', errorData);
+        throw new Error('Erreur lors de la mise à jour du fragment');
+      }
+      
+      // Récupérer le fragment mis à jour depuis la réponse de l'API
+      const updatedFragmentFromApi = await response.json();
+      // Mettre à jour uniquement le fragment modifié dans l'état local
+      // au lieu de recharger tous les fragments
+      setFragments(prevFragments => 
+        prevFragments.map(f => 
+          f.id === updatedFragment.id ? {...updatedFragmentFromApi, _renderKey: Date.now()} : f
+        )
+      );
+      
+      // Mettre à jour également les fragments filtrés
+      setFilteredFragments(prevFragments => 
+        prevFragments.map(f => 
+          f.id === updatedFragment.id ? {...updatedFragmentFromApi, _renderKey: Date.now()} : f
+        )
+      );
+      
+      // Mettre à jour l'UI après succès
+      setEditingSuccess(true);
+      setNotification({
+        open: true,
+        message: 'Fragment mis à jour avec succès',
+        severity: 'success'
+      });
+      
+      // NE PAS appeler fetchFragments() pour éviter le rechargement complet
+    } catch (error) {
+      console.error('Erreur lors de la mise à jour du fragment:', error);
+      setNotification({
+        open: true,
+        message: error instanceof Error ? error.message : 'Erreur lors de la mise à jour du fragment',
+        severity: 'error'
+      });
+    } finally {
+      // Fermer la modal après un délai
+      setTimeout(() => {
+        setEditModalOpen(false);
+        setEditingFragment(null);
+        setEditingSuccess(false);
+        setUpdatingFragmentId(undefined);
+      }, 1500);
     }
-    
-    // S'assurer que les tags sont toujours un tableau
-    const normalizedTags = Array.isArray(updatedFragment.tags) ? 
-      [...updatedFragment.tags] : 
-      (typeof updatedFragment.tags === 'string' ? 
-        JSON.parse(updatedFragment.tags as string) : []);
-    
-    // Forcer une mise à jour visuelle avec un nouvel objet et un timestamp
-    const normalizedUpdateTime = Date.now();
-    
-    // Créer un fragment normalisé qui est compatible avec le type Fragment
-    const normalizedFragment: Fragment = {
-      ...updatedFragment,
-      tags: normalizedTags,
-      // Convertir null en undefined pour activity_name pour résoudre l'erreur de type
-      activity_name: updatedFragment.activity_name === null ? undefined : updatedFragment.activity_name,
-      // Ces propriétés supplémentaires sont utilisées pour forcer la mise à jour visuelle
-      _forceUpdate: normalizedUpdateTime,
-      _renderKey: Math.random(),
-    };
-    
-    // Mettre à jour le fragment dans le tableau et définir le succès
-    setFragments(prevFragments => {
-      return prevFragments.map(f => {
-        if (f.id === normalizedFragment.id) {
-          
-          return normalizedFragment; // Remplacer par le fragment mis à jour complet
-        }
-        return f;
-      });
-    });
-    
-    // Forcer la mise à jour des fragments filtrés également
-    setFilteredFragments(prevFiltered => {
-      return prevFiltered.map(f => {
-        if (f.id === normalizedFragment.id) {
-          
-          return normalizedFragment;  // Remplacer par le fragment mis à jour complet
-        }
-        return f;
-      });
-    });
-    
-    // Mettre à jour fragmentsData pour forcer le rendu de la liste
-    setFragmentsData(prev => ({
-      ...prev,
-      lastUpdated: normalizedUpdateTime
-    }));
-    
-    setEditingSuccess(true);
-    setNotification({
-      open: true,
-      message: 'Fragment mis à jour avec succès',
-      severity: 'success'
-    });
-    
-    // Réinitialiser l'ID du fragment en cours de mise à jour après un délai
-    // pour que le spinner disparaisse progressivement
-    setTimeout(() => {
-      setUpdatingFragmentId(undefined);
-    }, 800);
-    
-    // Fermer la modal après un délai
-    setTimeout(() => {
-      setEditModalOpen(false);
-      setEditingFragment(null);
-      setEditingSuccess(false);
-    }, 1500);
   };
 
   const formatFragmentCategories = (fragment: Fragment): React.ReactNode => {
@@ -939,6 +1023,7 @@ export default function FragmentsLibraryPage() {
         managedCategories={managedCategories}
         handleAddCategory={handleAddCategory}
         openDeleteCategoryDialog={openDeleteCategoryDialog}
+        toggleCategoryHighlight={toggleCategoryHighlight}
         isAddingCategory={isAddingCategory}
         theme={theme}
       />

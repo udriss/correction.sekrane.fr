@@ -16,6 +16,7 @@ export interface Fragment {
 export interface Category {
   id: number;
   name: string;
+  highlighted: boolean;
 }
 
 export interface Activity {

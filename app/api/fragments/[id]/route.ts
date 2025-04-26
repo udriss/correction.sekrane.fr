@@ -162,6 +162,7 @@ export async function PUT(
 
     // Parse the JSON body to get fragmentData
     const fragmentData = await request.json();
+    console.log('Fragment data:', fragmentData);
     
     // Get user from both auth systems
     const session = await getServerSession(authOptions);
@@ -255,41 +256,186 @@ export async function PUT(
       );
       
       // Handle categories through junction table
-      const fragmentCategoriesTableExists = await doesTableExist(connection, 'fragments_categories');
+      // const fragmentCategoriesTableExists = await doesTableExist(connection, 'fragments_categories');
       
-      if (fragmentCategoriesTableExists && fragmentData.categories) {
-        // Make sure we're accessing the categories correctly
-        const categories = fragmentData.categories;
+
+      // Make sure we're accessing the categories correctly
+      const categories = fragmentData.categories;
+      
+      // Add new associations
+      if (Array.isArray(categories) && categories.length > 0) {
+        // Log pour le debug
+        console.log('Catégories à insérer:', categories);
         
+        // Traiter uniquement le format d'objets avec id et name
+        const categoryValues = categories
+          .filter(category => typeof category === 'object' && category !== null && 'id' in category)
+          .map(category => [fragmentId, Number(category.id)]);
         
-        // Delete existing associations
+        console.log('Valeurs formatées pour insertion:', categoryValues);
+        
+        if (categoryValues.length > 0) {
+          try {
+            // 1. Récupérer les associations existantes pour ce fragment
+            const [existingAssociations] = await connection.query(
+              'SELECT category_id FROM fragments_categories WHERE fragment_id = ?',
+              [fragmentId]
+            );
+            
+            // Convertir le résultat en un ensemble d'IDs de catégories déjà associées
+            const existingCategoryIds = new Set();
+            if (Array.isArray(existingAssociations)) {
+              existingAssociations.forEach((row: any) => {
+                if (row && typeof row.category_id === 'number') {
+                  existingCategoryIds.add(row.category_id);
+                }
+              });
+            }
+            
+            console.log('Catégories déjà associées:', Array.from(existingCategoryIds));
+            
+            // 2. Filtrer pour ne garder que les associations qui n'existent pas déjà
+            const newCategoryValues = categoryValues.filter(([_, categoryId]) => 
+              !existingCategoryIds.has(categoryId)
+            );
+            
+            // 3. Supprimer les associations qui ne sont plus nécessaires
+            const categoriesToKeep = new Set<number>();
+            categoryValues.forEach(([_, categoryId]) => {
+              if (typeof categoryId === 'number') {
+                categoriesToKeep.add(categoryId);
+              }
+            });
+            
+            const categoriesToRemove: number[] = [];
+            existingCategoryIds.forEach((id: unknown) => {
+              if (typeof id === 'number' && !categoriesToKeep.has(id)) {
+                categoriesToRemove.push(id);
+              }
+            });
+            
+            if (categoriesToRemove.length > 0) {
+              console.log('Catégories à supprimer:', categoriesToRemove);
+              // Supprimer chaque association individuellement pour éviter les problèmes de typage
+              for (const categoryId of categoriesToRemove) {
+                await connection.query(
+                  'DELETE FROM fragments_categories WHERE fragment_id = ? AND category_id = ?',
+                  [fragmentId, categoryId]
+                );
+              }
+            }
+            
+            // 4. Insérer uniquement les nouvelles associations
+            if (newCategoryValues.length > 0) {
+              console.log('Nouvelles catégories à insérer:', newCategoryValues);
+              
+              // Utiliser la méthode d'insertion multiple avec des valeurs explicites
+              const insertQuery = `INSERT INTO fragments_categories (fragment_id, category_id) VALUES ?`;
+              await connection.query(insertQuery, [newCategoryValues]);
+              
+              console.log('Insertion réussie dans fragments_categories');
+            } else {
+              console.log('Aucune nouvelle catégorie à insérer, toutes existent déjà');
+            }
+          } catch (sqlError) {
+            console.error('Erreur lors de la gestion des catégories:', sqlError);
+            
+            // Méthode alternative : traiter une par une en cas d'erreur
+            try {
+              // Récupérer les associations existantes pour ce fragment
+              const [existingAssociations] = await connection.query(
+                'SELECT category_id FROM fragments_categories WHERE fragment_id = ?',
+                [fragmentId]
+              );
+              
+              // Convertir en Set pour faciliter les vérifications
+              const existingCategoryIds = new Set();
+              if (Array.isArray(existingAssociations)) {
+                existingAssociations.forEach((row: any) => {
+                  if (row && typeof row.category_id === 'number') {
+                    existingCategoryIds.add(row.category_id);
+                  }
+                });
+              }
+              
+              // Traiter les catégories une par une
+              for (const [fragId, catId] of categoryValues) {
+                try {
+                  // Si cette catégorie n'est pas déjà associée, l'ajouter
+                  if (!existingCategoryIds.has(catId)) {
+                    await connection.query(
+                      'INSERT INTO fragments_categories (fragment_id, category_id) VALUES (?, ?)',
+                      [fragId, catId]
+                    );
+                    console.log(`Insertion individuelle réussie pour fragment_id=${fragId}, category_id=${catId}`);
+                    existingCategoryIds.add(catId); // Mettre à jour la liste des existants
+                  } else {
+                    console.log(`Association déjà existante pour fragment_id=${fragId}, category_id=${catId}`);
+                  }
+                } catch (innerError) {
+                  console.error(`Échec d'insertion pour fragment_id=${fragId}, category_id=${catId}:`, innerError);
+                }
+              }
+              
+              // Supprimer les associations qui ne sont plus nécessaires
+              const categoriesToKeep = new Set<number>();
+              categoryValues.forEach(([_, categoryId]) => {
+                if (typeof categoryId === 'number') {
+                  categoriesToKeep.add(categoryId);
+                }
+              });
+              
+              const categoriesToRemove: number[] = [];
+              existingCategoryIds.forEach((id: unknown) => {
+                if (typeof id === 'number' && !categoriesToKeep.has(id)) {
+                  categoriesToRemove.push(id);
+                }
+              });
+              
+              if (categoriesToRemove.length > 0) {
+                console.log('Catégories à supprimer (méthode alternative):', categoriesToRemove);
+                
+                // Supprimer chaque association individuellement
+                for (const catId of categoriesToRemove) {
+                  try {
+                    await connection.query(
+                      'DELETE FROM fragments_categories WHERE fragment_id = ? AND category_id = ?',
+                      [fragmentId, catId]
+                    );
+                    console.log(`Suppression réussie pour fragment_id=${fragmentId}, category_id=${catId}`);
+                  } catch (deleteError) {
+                    console.error(`Échec de suppression pour fragment_id=${fragmentId}, category_id=${catId}:`, deleteError);
+                  }
+                }
+              }
+              
+            } catch (fallbackError) {
+              console.error('Erreur lors de la méthode alternative de gestion des catégories:', fallbackError);
+            }
+          }
+        } else {
+          console.log('Aucune catégorie à insérer, suppression des associations existantes');
+          
+          // Si aucune catégorie n'est fournie, supprimer toutes les associations
+          await connection.query(
+            'DELETE FROM fragments_categories WHERE fragment_id = ?', 
+            [fragmentId]
+          );
+        }
+      } else {
+        console.log('Aucune catégorie à insérer, suppression des associations existantes');
+        
+        // Si aucune catégorie n'est fournie, supprimer toutes les associations
         await connection.query(
           'DELETE FROM fragments_categories WHERE fragment_id = ?', 
           [fragmentId]
         );
-        
-        // Add new associations
-        if (Array.isArray(categories) && categories.length > 0) {
-          const categoryValues = categories
-            .filter((categoryId: number | string) => categoryId && Number(categoryId) > 0)
-            .map((categoryId: number | string) => [fragmentId, Number(categoryId)]);
-          
-          if (categoryValues.length > 0) {
-            await connection.query(
-              `INSERT INTO fragments_categories (fragment_id, category_id) VALUES ?`,
-              [categoryValues]
-            );
-            
-          }
-        }
       }
       
       // Get updated fragment with categories
       const [rows] = await connection.query<FragmentRow[]>(
-        `SELECT f.*, a.name as activity_name
-         ${fragmentCategoriesTableExists ? 
-          ', (SELECT GROUP_CONCAT(fc.category_id) FROM fragments_categories fc WHERE fc.fragment_id = f.id) as category_ids' :
-          ', NULL as category_ids'}
+        `SELECT f.*, a.name as activity_name,
+         (SELECT GROUP_CONCAT(fc.category_id) FROM fragments_categories fc WHERE fc.fragment_id = f.id) as category_ids
          FROM fragments f
          LEFT JOIN activities_autres a ON f.activity_id = a.id
          WHERE f.id = ?`,
@@ -314,11 +460,12 @@ export async function PUT(
       };
       
       // Process category_ids if they exist
-      if (fragmentCategoriesTableExists && updatedFragment.category_ids) {
+      if (updatedFragment.category_ids) {
         processedFragment.categories = updatedFragment.category_ids.split(',')
           .filter((id: string) => id.trim() !== '')
           .map((id: string) => parseInt(id));
       }
+
       
       // Add isModified flag by comparing dates
       if (updatedFragment.updated_at && updatedFragment.created_at) {

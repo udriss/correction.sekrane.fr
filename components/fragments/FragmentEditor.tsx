@@ -98,13 +98,18 @@ export default function FragmentEditor({
         return category || { id: categoryId, name: `Category ${categoryId}` };
       });
 
+      // Créer un fragment mis à jour avec toutes les modifications locales
       const updatedFragment = {
         ...fragment,
         content,
-        tags: tags.length > 0 ? tags : (fragment.tags || []), // Préserver les tags existants si aucun nouveau tag n'est fourni
+        // Utiliser TOUJOURS l'état actuel des tags, même s'il est vide,
+        // pour respecter l'intention de l'utilisateur
+        tags: tags,
         categories: categoriesObjects
       };
 
+
+      // Maintenant effectuer l'appel au composant parent qui fera l'appel API
       await onUpdate(updatedFragment);
       setSuccess(true);
       
@@ -138,6 +143,9 @@ export default function FragmentEditor({
       value.split(',').map(Number) : 
       value;
     setSelectedCategories(newSelectedCategories);
+    
+    // Les modifications de catégories sont stockées localement mais ne sont pas
+    // envoyées au parent immédiatement - elles seront envoyées lors de la validation finale
   };
 
   // Gérer l'ajout d'une nouvelle catégorie
@@ -163,7 +171,8 @@ export default function FragmentEditor({
       const newCategory = await response.json();
       
       // Ajouter automatiquement la nouvelle catégorie à la sélection
-      setSelectedCategories(prev => [...prev, newCategory.id]);
+      const updatedSelectedCategories = [...selectedCategories, newCategory.id];
+      setSelectedCategories(updatedSelectedCategories);
       
       // Rafraîchir la liste des catégories
       if (refreshCategories) {
@@ -173,11 +182,11 @@ export default function FragmentEditor({
       // Afficher un message de succès
       setCategoryAddSuccess(true);
       
-      // Réinitialiser après un court délai
+      // Réinitialiser après un court délai mais garder le dialogue ouvert
       setTimeout(() => {
         setNewCategoryName('');
         setCategoryAddSuccess(false);
-        setShowNewCategoryDialog(false);
+        // Ne pas fermer automatiquement le dialogue, permettre à l'utilisateur de faire plus d'ajouts
       }, 1500);
     } catch (error: any) {
       setCategoryAddError(error.message || 'Erreur lors de la création de la catégorie');
@@ -211,7 +220,8 @@ export default function FragmentEditor({
       }
       
       // Supprimer la catégorie de la sélection
-      setSelectedCategories(prev => prev.filter(id => id !== categoryToDelete.id));
+      const updatedSelectedCategories = selectedCategories.filter(id => id !== categoryToDelete.id);
+      setSelectedCategories(updatedSelectedCategories);
       
       // Rafraîchir la liste des catégories
       if (refreshCategories) {
@@ -255,20 +265,20 @@ export default function FragmentEditor({
           <Select
             labelId="categories-select-label"
             multiple
-            value={selectedCategories}
+            value={selectedCategories.filter(id => id !== undefined && id !== null)}
             onChange={handleCategoryChange}
             renderValue={(selected) => (
               <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
                 {selected.map((value) => {
                   const category = categories.find(cat => cat.id === value);
-                  return (
+                  return category ? (
                     <Chip 
                       key={`selected-cat-${value}`} 
-                      label={category ? category.name : `ID:${value}`} 
+                      label={category.name} 
                       size="small" 
                     />
-                  );
-                })}
+                  ) : null;
+                }).filter(Boolean)}
               </Box>
             )}
           >

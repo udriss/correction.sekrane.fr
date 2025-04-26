@@ -65,28 +65,22 @@ export const FragmentsList: React.FC<FragmentsListProps> = ({
   lastUpdated,
   updatingFragmentId
 }) => {
-  // Utiliser un compteur pour forcer le rendu
-  const [renderCount, setRenderCount] = useState(0);
+  // Ne pas déclencher de re-rendu global basé sur lastUpdated
+  // Utiliser un état local uniquement pour le fragment spécifique en cours de mise à jour
+  const [, setRenderCount] = useState(0);
   
-  // Force un nouveau rendu quand fragments ou lastUpdated changent
-  useEffect(() => {
-    setRenderCount(prev => prev + 1);
-    
-  }, [fragments, lastUpdated]);
-
-  // Générer une clé unique pour chaque rendu afin de forcer le rafraîchissement complet
-  const renderKey = `fragments-list-${lastUpdated || Date.now()}-${renderCount}`;
+  // Optimisation : Ne plus forcer de re-rendu global quand fragments ou lastUpdated changent
+  // Cela permet d'éviter que tous les fragments soient re-rendus lors de la mise à jour d'un seul fragment
   
-  // Formatter les tags dans un élément React - version optimisée pour forcer le rendu
+  // Formatter les tags dans un élément React - version optimisée
   const formatTags = React.useCallback((fragment: Fragment) => {
     // S'assurer que les tags sont toujours un tableau valide et créer une nouvelle référence
     const normalizedTags = Array.isArray(fragment.tags) ? [...fragment.tags] : 
                           (typeof fragment.tags === 'string' ? 
                             JSON.parse(fragment.tags as string) : []);
     
-    
-    // Générer une clé unique pour ce rendu spécifique qui change à chaque rendu
-    const uniqueKey = `tags-${fragment.id}-${renderCount}-${Date.now()}-${Math.random()}`;
+    // Utiliser l'ID du fragment et un identifiant stable pour la clé au lieu d'un nombre aléatoire
+    const uniqueKey = `tags-${fragment.id}`;
     
     if (!normalizedTags || normalizedTags.length === 0) {
       return (
@@ -106,7 +100,6 @@ export const FragmentsList: React.FC<FragmentsListProps> = ({
       );
     }
     
-    // Utiliser React.Fragment avec une clé unique pour forcer un nouveau rendu
     return (
       <React.Fragment key={uniqueKey}>
         <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
@@ -131,7 +124,7 @@ export const FragmentsList: React.FC<FragmentsListProps> = ({
         </Box>
       </React.Fragment>
     );
-  }, [renderCount, theme]); // Dépendances mises à jour pour recréer la fonction à chaque changement de rendu
+  }, [theme]); // Ne dépend plus du renderCount, uniquement du thème
   
   if (fragments.length === 0) {
     return (
@@ -151,20 +144,14 @@ export const FragmentsList: React.FC<FragmentsListProps> = ({
   }
 
   return (
-    <Box sx={{ mb: 5 }} key={renderKey}>
+    <Box sx={{ mb: 5 }}>
       <Grid container spacing={2}>
         {fragments.map((fragment) => {
-          // Créer une copie profonde du fragment pour éviter les problèmes de référence
-          const fragmentCopy = JSON.parse(JSON.stringify(fragment));
-          if(fragment.id === 109) {
-            
-          }
-          
-          // Ajouter un identifiant de rendu unique
-          fragmentCopy._renderKey = Date.now() + Math.random();
+          // Utiliser directement le fragment sans créer de copie profonde inutile
+          // et sans générer de clés aléatoires qui forcent des re-rendus
           
           return (
-            <Grid size={{ xs: 12 }} key={`fragment-${fragment.id}-${fragmentCopy._renderKey}`}>
+            <Grid size={{ xs: 12 }} key={`fragment-${fragment.id}-${fragment._renderKey || ''}`}>
               <Fade in={true} timeout={300} style={{ transitionDelay: '50ms' }}>
                 <Card 
                   sx={{ 
@@ -181,7 +168,7 @@ export const FragmentsList: React.FC<FragmentsListProps> = ({
                   }}
                 >
                   {/* Overlay spinner pour le fragment en cours de modification */}
-                  {updatingFragmentId === fragmentCopy.id && (
+                  {updatingFragmentId === fragment.id && (
                     <Box
                       sx={{
                         position: 'absolute',
@@ -215,7 +202,7 @@ export const FragmentsList: React.FC<FragmentsListProps> = ({
                   <CardContent>
                     <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                        {fragmentCopy.activity_id === null ? (
+                        {fragment.activity_id === null ? (
                           <Tooltip title="Aucune activité associée">
                             <Chip
                               icon={<HelpOutlineIcon fontSize="small" />}
@@ -243,10 +230,10 @@ export const FragmentsList: React.FC<FragmentsListProps> = ({
                               fontSize: '0.75rem'
                             }}
                           >
-                            {fragmentCopy.activity_name || 'Général'}
+                            {fragment.activity_name || 'Général'}
                           </Typography>
                         )}
-                        {fragmentCopy.isOwner && (
+                        {fragment.isOwner && (
                           <Chip
                             label="Mon fragment"
                             size="small"
@@ -261,7 +248,7 @@ export const FragmentsList: React.FC<FragmentsListProps> = ({
                         <Tooltip title="Copier">
                           <IconButton 
                             size="small" 
-                            onClick={() => copyToClipboard(fragmentCopy.content)}
+                            onClick={() => copyToClipboard(fragment.content)}
                             sx={{ 
                               color: theme.palette.primary.main,
                               '&:hover': { 
@@ -273,12 +260,12 @@ export const FragmentsList: React.FC<FragmentsListProps> = ({
                           </IconButton>
                         </Tooltip>
                         
-                        {fragmentCopy.isOwner === true && (
+                        {fragment.isOwner === true && (
                           <>
                             <Tooltip title="Modifier">
                               <IconButton 
                                 size="small" 
-                                onClick={() => handleEditFragment(fragmentCopy)}
+                                onClick={() => handleEditFragment(fragment)}
                                 color="primary"
                                 sx={{ 
                                   '&:hover': { 
@@ -294,7 +281,7 @@ export const FragmentsList: React.FC<FragmentsListProps> = ({
                               <IconButton 
                                 size="small" 
                                 color="error"
-                                onClick={() => openDeleteDialog(fragmentCopy)}
+                                onClick={() => openDeleteDialog(fragment)}
                                 sx={{ 
                                   '&:hover': { 
                                     bgcolor: alpha(theme.palette.error.main, 0.1)
@@ -319,16 +306,16 @@ export const FragmentsList: React.FC<FragmentsListProps> = ({
                         color: theme.palette.text.primary
                       }}
                     >
-                      {fragmentCopy.content}
+                      {fragment.content}
                     </Typography>
                     
                     <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mt: 2 }}>
-                      {formatFragmentCategories(fragmentCopy)}
-                      {formatTags(fragmentCopy)}
+                      {formatFragmentCategories(fragment)}
+                      {formatTags(fragment)}
                       
-                      {fragmentCopy.usage_count !== undefined && fragmentCopy.usage_count > 0 && (
+                      {fragment.usage_count !== undefined && fragment.usage_count > 0 && (
                         <Chip 
-                          label={`Utilisé ${fragmentCopy.usage_count} fois`} 
+                          label={`Utilisé ${fragment.usage_count} fois`} 
                           size="small" 
                           variant="filled"
                           color="secondary"

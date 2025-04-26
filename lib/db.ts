@@ -1,5 +1,5 @@
 import mysql from 'mysql2/promise';
-import { Pool, PoolConnection } from 'mysql2/promise';
+import { Pool, PoolConnection, PoolOptions } from 'mysql2/promise';
 import { updateFragmentsTable } from './migrations/updateFragmentsTable';
 
 // Database configuration
@@ -9,12 +9,12 @@ const dbConfig = {
   password: process.env.DB_PASSWORD || '',
   database: process.env.DB_NAME || 'correction',
   waitForConnections: true,
-  connectionLimit: 10,
-  queueLimit: 0
+  connectionLimit: 40,
+  queueLimit: 50
 };
 
-// Create pool
-const pool: Pool = mysql.createPool({
+// Create pool with optimized settings
+const poolOptions: PoolOptions = {
   host: process.env.DB_HOST,
   port: parseInt(process.env.DB_PORT || '3306'),
   user: process.env.DB_USER,
@@ -25,22 +25,38 @@ const pool: Pool = mysql.createPool({
   queueLimit: 0, // 0 = illimité, défini un nombre max pour limiter la file d'attente
   waitForConnections: true, // Attendre une connexion disponible ou rejeter
   connectTimeout: 10000, // Timeout de connexion en millisecondes
-  // acquireTimeout is not a valid option in mysql2/promise PoolOptions
-  idleTimeout: 60000, // Temps d'inactivité avant fermeture d'une connexion (ms)
-  // Paramètres supplémentaires utiles
-  enableKeepAlive: true, // Maintenir les connexions actives
-  keepAliveInitialDelay: 10000, // Délai initial pour keepAlive
-});
+  // Paramètres pour améliorer la fermeture des connexions
+  idleTimeout: 20000, // Réduire davantage le temps d'inactivité (20 secondes au lieu de 30)
+  // Ajouter des paramètres pour gérer les connexions dormantes
+  enableKeepAlive: false, // Désactiver keepAlive pour permettre aux connexions de se fermer
+  // Configuration des timeouts MySQL pour fermer les connexions plus rapidement
+  namedPlaceholders: true, // Utiliser des paramètres nommés (optimisation)
+};
 
-// Helper function to handle database connections
+// Créer le pool de connexions
+const pool: Pool = mysql.createPool(poolOptions);
+
+// Helper function to handle database connections with explicit force release
 export async function withConnection<T>(
   callback: (connection: PoolConnection) => Promise<T>
 ): Promise<T> {
-  const connection = await pool.getConnection();
+  let connection: PoolConnection | null = null;
   try {
+    connection = await pool.getConnection();
+    // Configurer un court timeout pour cette connexion spécifique
+    await connection.query('SET SESSION interactive_timeout=60'); // 1 minute
+    await connection.query('SET SESSION wait_timeout=60'); // 1 minute
+    
     return await callback(connection);
   } finally {
-    connection.release();
+    // Forcer la libération de la connexion, même en cas d'erreur
+    if (connection) {
+      try {
+        connection.release();
+      } catch (e) {
+        console.error('Erreur lors de la libération de la connexion:', e);
+      }
+    }
   }
 }
 
@@ -48,19 +64,22 @@ export default pool;
 
 // Fonction utilitaire pour les requêtes simples
 export async function query<T = any[]>(sql: string, params?: any[]): Promise<T> {
-  try {
-    const [results] = await pool.execute(sql, params);
-    // Fix pour l'erreur "Type 'unknown' is not an array type"
-    // Vérifier si le résultat est un tableau avant de le retourner
-    if (Array.isArray(results)) {
-      return results as T;
+  // Utiliser pool.execute au lieu de pool.query pour les requêtes ponctuelles
+  // Cela garantit que la connexion est rendue au pool immédiatement après l'exécution
+  return withConnection(async (connection) => {
+    try {
+      const [results] = await connection.execute(sql, params);
+      // Vérifier si le résultat est un tableau avant de le retourner
+      if (Array.isArray(results)) {
+        return results as T;
+      }
+      // Si ce n'est pas un tableau, c'est probablement un objet de résultat
+      return results as unknown as T;
+    } catch (error) {
+      console.error('Database query error:', error);
+      throw error;
     }
-    // Si ce n'est pas un tableau, c'est probablement un objet de résultat
-    return results as unknown as T;
-  } catch (error) {
-    console.error('Database query error:', error);
-    throw error;
-  }
+  });
 }
 
 // Fonction de nettoyage à appeler lors de l'arrêt de l'application
@@ -319,9 +338,81 @@ export async function initializeDatabase() {
          VALUES ('Activité générique N° 1', 'Activité pour les corrections sans activité spécifique', 5, 15, NOW(), NOW())`
       );
     }
+
+    // Create settings table for application configuration
+    await query(`
+      CREATE TABLE IF NOT EXISTS app_settings (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        setting_key VARCHAR(100) NOT NULL UNIQUE,
+        setting_value TEXT NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+      )
+    `);
+
+    // Initialize default settings if they don't exist
+    const cronEnabledExists = await query<any[]>(
+      'SELECT COUNT(*) as count FROM app_settings WHERE setting_key = ?',
+      ['cron_cleanup_enabled']
+    );
     
+    if (Array.isArray(cronEnabledExists) && cronEnabledExists[0].count === 0) {
+      await query(
+        'INSERT INTO app_settings (setting_key, setting_value) VALUES (?, ?)',
+        ['cron_cleanup_enabled', 'false']
+      );
+    }
+
+    const cronLastRunExists = await query<any[]>(
+      'SELECT COUNT(*) as count FROM app_settings WHERE setting_key = ?',
+      ['cron_cleanup_last_run']
+    );
+    
+    if (Array.isArray(cronLastRunExists) && cronLastRunExists[0].count === 0) {
+      await query(
+        'INSERT INTO app_settings (setting_key, setting_value) VALUES (?, ?)',
+        ['cron_cleanup_last_run', '0']
+      );
+    }
+
   } catch (error) {
-    console.error('Erreur lors de l\'initialisation de la base de données:', error);
+    console.error('Error initializing database:', error);
     throw error;
+  }
+}
+
+// Ajouter cette fonction pour nettoyer périodiquement les connexions dormantes
+export async function cleanupIdleConnections(maxIdleTimeSeconds = 30): Promise<number> {
+  try {
+    // 1. Obtenir la liste des processus en état Sleep depuis plus de X secondes pour la base correction
+    const sleepingConnections = await query<Array<{Id: number, Time: number}>>(
+      `SELECT Id, Time 
+       FROM information_schema.processlist 
+       WHERE Command = 'Sleep' 
+       AND Time > ? 
+       AND db = 'correction'
+       AND Id != CONNECTION_ID()`, 
+      [maxIdleTimeSeconds]
+    );
+    
+    let killedCount = 0;
+    
+    // 2. Tuer chacune de ces connexions
+    if (Array.isArray(sleepingConnections) && sleepingConnections.length > 0) {
+      for (const conn of sleepingConnections) {
+        try {
+          await query(`KILL ${conn.Id}`);
+          killedCount++;
+          console.log(`Connexion dormante fermée: ID=${conn.Id}, Temps inactif=${conn.Time}s`);
+        } catch (err) {
+          console.error(`Erreur lors de la fermeture de la connexion ${conn.Id}:`, err);
+        }
+      }
+    }
+    
+    return killedCount;
+  } catch (error) {
+    console.error('Erreur lors du nettoyage des connexions inactives:', error);
+    return 0;
   }
 }

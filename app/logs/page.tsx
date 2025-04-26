@@ -28,7 +28,9 @@ import {
   DialogContent,
   DialogActions,
   Alert,
-  alpha
+  alpha,
+  Tabs,
+  Tab
 } from '@mui/material';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import { LocalizationProvider, DatePicker } from '@mui/x-date-pickers';
@@ -38,11 +40,14 @@ import RefreshIcon from '@mui/icons-material/Refresh';
 import DescriptionIcon from '@mui/icons-material/Description';
 import InfoIcon from '@mui/icons-material/Info';
 import ClearIcon from '@mui/icons-material/Clear';
+import StorageIcon from '@mui/icons-material/Storage';
+import ListAltIcon from '@mui/icons-material/ListAlt';
 import dayjs from 'dayjs';
 import { useSnackbar } from 'notistack';
 import LoadingSpinner from '@/components/LoadingSpinner';
 import GradientBackground from '@/components/ui/GradientBackground';
 import PatternBackground from '@/components/ui/PatternBackground';
+import DatabaseMonitoring from '@/components/DatabaseMonitoring';
 
 // Types pour les entrées de logs
 interface LogEntry {
@@ -72,8 +77,39 @@ interface FilterOptions {
   entityTypes: string[];
 }
 
+// Interface TabPanel
+interface TabPanelProps {
+  children?: React.ReactNode;
+  index: number;
+  value: number;
+}
+
+// Composant TabPanel pour afficher le contenu des onglets
+function TabPanel(props: TabPanelProps) {
+  const { children, value, index, ...other } = props;
+
+  return (
+    <div
+      role="tabpanel"
+      hidden={value !== index}
+      id={`logs-tabpanel-${index}`}
+      aria-labelledby={`logs-tab-${index}`}
+      {...other}
+    >
+      {value === index && (
+        <Box sx={{ py: 3 }}>
+          {children}
+        </Box>
+      )}
+    </div>
+  );
+}
+
 // Page principale des logs
 export default function LogsPage() {
+  // État pour les onglets
+  const [tabValue, setTabValue] = useState(0);
+
   // États pour les données et le chargement
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [pagination, setPagination] = useState<PaginationInfo>({
@@ -110,11 +146,18 @@ export default function LogsPage() {
   // Hook de notification
   const { enqueueSnackbar } = useSnackbar();
   
+  // Gestionnaire de changement d'onglet
+  const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
+    setTabValue(newValue);
+  };
+
   // Charger les logs au chargement de la page et lorsque les filtres changent
   useEffect(() => {
-    fetchLogs();
-    fetchFilterOptions();
-  }, [pagination.page, pagination.limit]);
+    if (tabValue === 0) {
+      fetchLogs();
+      fetchFilterOptions();
+    }
+  }, [pagination.page, pagination.limit, tabValue]);
   
   // Fonction pour récupérer les logs
   const fetchLogs = async (page = pagination.page, limit = pagination.limit) => {
@@ -341,17 +384,45 @@ export default function LogsPage() {
               </Box>
               
               <Box>
-                <Typography variant="h4" fontWeight={700} color="text.primary">Logs du système</Typography>
+                <Typography variant="h4" fontWeight={700} color="text.primary">Monitoring du système</Typography>
                 <Typography variant="subtitle1" color="text.secondary" sx={{ opacity: 0.9 }}>
-                  Visualisez et analysez les actions importantes effectuées dans l'application
+                  Visualisez les logs et l'état de la base de données
                 </Typography>
               </Box>
             </Box>
           </PatternBackground>
         </GradientBackground>
         
+        {/* Onglets de navigation */}
+        <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
+          <Tabs 
+            value={tabValue} 
+            onChange={handleTabChange} 
+            indicatorColor="primary"
+            textColor="primary"
+            variant="fullWidth"
+          >
+            <Tab 
+              icon={<ListAltIcon />} 
+              iconPosition="start" 
+              label="Logs du système" 
+              id="logs-tab-0" 
+              aria-controls="logs-tabpanel-0" 
+            />
+            <Tab 
+              icon={<StorageIcon />} 
+              iconPosition="start" 
+              label="Monitoring de la base de données" 
+              id="logs-tab-1" 
+              aria-controls="logs-tabpanel-1" 
+            />
+          </Tabs>
+        </Box>
+      </Paper>
+      
+      <TabPanel value={tabValue} index={0}>
         {/* Statistiques */}
-        <Box sx={{ p: 2 }}>
+        <Box sx={{ p: 2, mb: 3 }}>
           <Grid container spacing={2}>
             <Grid size={{ xs: 12, sm: 6, md: 3 }}>
               <Paper 
@@ -409,268 +480,275 @@ export default function LogsPage() {
             </Grid>
           </Grid>
         </Box>
-      </Paper>
-      
-      {/* Filtres */}
-      <Paper sx={{ p: 3, mb: 3, borderRadius: 2 }}>
-        <Typography variant="h6" sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
-          <FilterListIcon color="primary" />
-          Filtres
-        </Typography>
         
-        <Grid container spacing={2}>
-          <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-            <FormControl fullWidth size="small">
-              <InputLabel>Type d'action</InputLabel>
-              <Select
-                value={filters.actionType}
-                onChange={(e) => handleFilterChange('actionType', e.target.value)}
-                label="Type d'action"
-              >
-                <MenuItem value="">Tous</MenuItem>
-                {filterOptions.actionTypes
-                  .slice()
-                  .sort((a, b) => a.localeCompare(b))
-                  .map((type) => (
-                    <MenuItem key={type} value={type}>{type}</MenuItem>
-                  ))}
-              </Select>
-            </FormControl>
-          </Grid>
+        {/* Filtres */}
+        <Paper sx={{ p: 3, mb: 3, borderRadius: 2 }}>
+          <Typography variant="h6" sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
+            <FilterListIcon color="primary" />
+            Filtres
+          </Typography>
           
-          <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-            <FormControl fullWidth size="small">
-              <InputLabel>Type d'entité</InputLabel>
-              <Select
-                value={filters.entityType}
-                onChange={(e) => handleFilterChange('entityType', e.target.value)}
-                label="Type d'entité"
-              >
-                <MenuItem value="">Tous</MenuItem>
-                {filterOptions.entityTypes.map((type) => (
-                  <MenuItem key={type} value={type}>{type}</MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-          </Grid>
-          
-          <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-            <TextField
-              fullWidth
-              size="small"
-              label="ID d'entité"
-              type="number"
-              value={filters.entityId}
-              onChange={(e) => handleFilterChange('entityId', e.target.value)}
-            />
-          </Grid>
-          
-          <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-            <TextField
-              fullWidth
-              size="small"
-              label="Nom d'utilisateur"
-              value={filters.username}
-              onChange={(e) => handleFilterChange('username', e.target.value)}
-            />
-          </Grid>
-          
-          <LocalizationProvider dateAdapter={AdapterDayjs}>
+          <Grid container spacing={2}>
             <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-              <DatePicker
-                label="Date de début"
-                value={filters.startDate}
-                onChange={(newValue) => handleFilterChange('startDate', newValue)}
-                slotProps={{ textField: { size: 'small', fullWidth: true } }}
-              />
-            </Grid>
-            
-            <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-              <DatePicker
-                label="Date de fin"
-                value={filters.endDate}
-                onChange={(newValue) => handleFilterChange('endDate', newValue)}
-                slotProps={{ textField: { size: 'small', fullWidth: true } }}
-              />
-            </Grid>
-          </LocalizationProvider>
-          
-          <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-            <TextField
-              fullWidth
-              size="small"
-              label="Rechercher"
-              value={filters.searchTerm}
-              onChange={(e) => handleFilterChange('searchTerm', e.target.value)}
-              slotProps={{
-                input: {
-                  startAdornment: <SearchIcon fontSize="small" sx={{ mr: 1, color: 'text.secondary' }} />
-                }
-              }}
-            />
-          </Grid>
-          
-          <Grid size={{ xs: 12, sm: 6, md: 3 }} sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <Button 
-              variant="outlined" 
-              color="success" 
-              onClick={handleApplyFilters}
-              startIcon={<FilterListIcon />}
-              fullWidth
-            >
-              Appliquer les filtres
-            </Button>
-            
-
-          </Grid>
-        </Grid>
-      </Paper>
-      
-      {/* Tableau des logs */}
-      <Paper sx={{ p: 3, borderRadius: 2 }}>
-        {loading ? (
-          <Box sx={{ display: 'flex', justifyContent: 'center', py: 5 }}>
-            <LoadingSpinner size="md" text="Chargement des logs..." />
-          </Box>
-        ) : error ? (
-          <Alert severity="error" sx={{ mb: 3 }}>
-            <Typography variant="subtitle1" fontWeight="bold">
-              {error}
-            </Typography>
-            {errorDetails && (
-              <Box sx={{ mt: 2, p: 2, bgcolor: alpha('#000', 0.05), borderRadius: 1, overflow: 'auto' }}>
-                <Typography variant="body2" fontFamily="monospace" style={{ whiteSpace: 'pre-wrap' }}>
-                  {errorDetails}
-                </Typography>
-                {errorQuery && (
-                  <>
-                    <Typography variant="subtitle2" fontWeight="bold" sx={{ mt: 1 }}>Requête SQL:</Typography>
-                    <Typography variant="body2" fontFamily="monospace" style={{ whiteSpace: 'pre-wrap' }}>
-                      {errorQuery}
-                    </Typography>
-                  </>
-                )}
-                {errorParams && (
-                  <>
-                    <Typography variant="subtitle2" fontWeight="bold" sx={{ mt: 1 }}>Paramètres:</Typography>
-                    <Typography variant="body2" fontFamily="monospace" style={{ whiteSpace: 'pre-wrap' }}>
-                      {JSON.stringify(errorParams, null, 2)}
-                    </Typography>
-                  </>
-                )}
-              </Box>
-            )}
-          </Alert>
-        ) : logs.length === 0 ? (
-          <Alert severity="info" sx={{ mb: 3 }}>
-            Aucun log trouvé pour les filtres sélectionnés.
-          </Alert>
-        ) : (
-          <>
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-              <Typography variant="subtitle1">
-                Affichage de {(pagination.page - 1) * pagination.limit + 1} à {Math.min(pagination.page * pagination.limit, pagination.total)} sur {pagination.total} logs
-              </Typography>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-              <Button 
-              color='error'
-              variant="outlined" 
-              startIcon={<ClearIcon />}
-              onClick={handleResetFilters}
-            >
-              Réinitialiser
-            </Button>
-              <Button 
-                variant="outlined" 
-                color="primary" 
-                startIcon={<RefreshIcon />}
-                onClick={() => fetchLogs()}
-              >
-                Actualiser
-              </Button>
-              </Box>  
-            </Box>
-            
-            <TableContainer>
-              <Table size="small">
-                <TableHead>
-                  <TableRow>
-                    <TableCell>ID</TableCell>
-                    <TableCell>Date</TableCell>
-                    <TableCell>Type d'action</TableCell>
-                    <TableCell>Description</TableCell>
-                    <TableCell>Entité</TableCell>
-                    <TableCell>Utilisateur</TableCell>
-                    <TableCell>Actions</TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {logs.map((log) => (
-                    <TableRow key={log.id} hover>
-                      <TableCell>{log.id}</TableCell>
-                      <TableCell>{formatDate(log.created_at)}</TableCell>
-                      <TableCell>
-                        <Chip 
-                          label={log.action_type} 
-                          size="small" 
-                          color={getActionTypeColor(log.action_type) as any}
-                          variant="outlined"
-                        />
-                      </TableCell>
-                      <TableCell sx={{ maxWidth: 300, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                        {log.description}
-                      </TableCell>
-                      <TableCell>
-                        {log.entity_type ? (
-                          <Typography variant="body2">
-                            {log.entity_type} {log.entity_id ? `#${log.entity_id}` : ''}
-                          </Typography>
-                        ) : (
-                          '-'
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        {log.username || '-'}
-                      </TableCell>
-                      <TableCell>
-                        <Tooltip title="Voir les détails">
-                          <IconButton size="small" onClick={() => handleOpenDetails(log)}>
-                            <InfoIcon fontSize="small" />
-                          </IconButton>
-                        </Tooltip>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </TableContainer>
-            
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mt: 3 }}>
-              <FormControl size="small" sx={{ minWidth: 120 }}>
-                <InputLabel>Lignes par page</InputLabel>
+              <FormControl fullWidth size="small">
+                <InputLabel>Type d'action</InputLabel>
                 <Select
-                  value={pagination.limit}
-                  onChange={handleLimitChange as any}
-                  label="Lignes par page"
+                  value={filters.actionType}
+                  onChange={(e) => handleFilterChange('actionType', e.target.value)}
+                  label="Type d'action"
                 >
-                  <MenuItem value={20}>20</MenuItem>
-                  <MenuItem value={50}>50</MenuItem>
-                  <MenuItem value={100}>100</MenuItem>
+                  <MenuItem value="">Tous</MenuItem>
+                  {filterOptions.actionTypes
+                    .slice()
+                    .sort((a, b) => a.localeCompare(b))
+                    .map((type) => (
+                      <MenuItem key={type} value={type}>{type}</MenuItem>
+                    ))}
                 </Select>
               </FormControl>
-              
-              <Pagination 
-                count={pagination.totalPages} 
-                page={pagination.page}
-                onChange={handlePageChange}
-                color="primary"
-                showFirstButton
-                showLastButton
+            </Grid>
+            
+            <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+              <FormControl fullWidth size="small">
+                <InputLabel>Type d'entité</InputLabel>
+                <Select
+                  value={filters.entityType}
+                  onChange={(e) => handleFilterChange('entityType', e.target.value)}
+                  label="Type d'entité"
+                >
+                  <MenuItem value="">Tous</MenuItem>
+                  {filterOptions.entityTypes.map((type) => (
+                    <MenuItem key={type} value={type}>{type}</MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+            </Grid>
+            
+            <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+              <TextField
+                fullWidth
+                size="small"
+                label="ID d'entité"
+                type="number"
+                value={filters.entityId}
+                onChange={(e) => handleFilterChange('entityId', e.target.value)}
               />
+            </Grid>
+            
+            <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+              <TextField
+                fullWidth
+                size="small"
+                label="Nom d'utilisateur"
+                value={filters.username}
+                onChange={(e) => handleFilterChange('username', e.target.value)}
+              />
+            </Grid>
+            
+            <LocalizationProvider dateAdapter={AdapterDayjs}>
+              <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+                <DatePicker
+                  label="Date de début"
+                  value={filters.startDate}
+                  onChange={(newValue) => handleFilterChange('startDate', newValue)}
+                  slotProps={{ textField: { size: 'small', fullWidth: true } }}
+                />
+              </Grid>
+              
+              <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+                <DatePicker
+                  label="Date de fin"
+                  value={filters.endDate}
+                  onChange={(newValue) => handleFilterChange('endDate', newValue)}
+                  slotProps={{ textField: { size: 'small', fullWidth: true } }}
+                />
+              </Grid>
+            </LocalizationProvider>
+            
+            <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+              <TextField
+                fullWidth
+                size="small"
+                label="Rechercher"
+                value={filters.searchTerm}
+                onChange={(e) => handleFilterChange('searchTerm', e.target.value)}
+                slotProps={{
+                  input: {
+                    startAdornment: <SearchIcon fontSize="small" sx={{ mr: 1, color: 'text.secondary' }} />
+                  }
+                }}
+              />
+            </Grid>
+            
+            <Grid size={{ xs: 12, sm: 6, md: 3 }} sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <Button 
+                variant="outlined" 
+                color="success" 
+                onClick={handleApplyFilters}
+                startIcon={<FilterListIcon />}
+                fullWidth
+              >
+                Appliquer les filtres
+              </Button>
+              
+
+            </Grid>
+          </Grid>
+        </Paper>
+        
+        {/* Tableau des logs */}
+        <Paper sx={{ p: 3, borderRadius: 2 }}>
+          {loading ? (
+            <Box sx={{ display: 'flex', justifyContent: 'center', py: 5 }}>
+              <LoadingSpinner size="md" text="Chargement des logs..." />
             </Box>
-          </>
-        )}
-      </Paper>
+          ) : error ? (
+            <Alert severity="error" sx={{ mb: 3 }}>
+              <Typography variant="subtitle1" fontWeight="bold">
+                {error}
+              </Typography>
+              {errorDetails && (
+                <Box sx={{ mt: 2, p: 2, bgcolor: alpha('#000', 0.05), borderRadius: 1, overflow: 'auto' }}>
+                  <Typography variant="body2" fontFamily="monospace" style={{ whiteSpace: 'pre-wrap' }}>
+                    {errorDetails}
+                  </Typography>
+                  {errorQuery && (
+                    <>
+                      <Typography variant="subtitle2" fontWeight="bold" sx={{ mt: 1 }}>Requête SQL:</Typography>
+                      <Typography variant="body2" fontFamily="monospace" style={{ whiteSpace: 'pre-wrap' }}>
+                        {errorQuery}
+                      </Typography>
+                    </>
+                  )}
+                  {errorParams && (
+                    <>
+                      <Typography variant="subtitle2" fontWeight="bold" sx={{ mt: 1 }}>Paramètres:</Typography>
+                      <Typography variant="body2" fontFamily="monospace" style={{ whiteSpace: 'pre-wrap' }}>
+                        {JSON.stringify(errorParams, null, 2)}
+                      </Typography>
+                    </>
+                  )}
+                </Box>
+              )}
+            </Alert>
+          ) : logs.length === 0 ? (
+            <Alert severity="info" sx={{ mb: 3 }}>
+              Aucun log trouvé pour les filtres sélectionnés.
+            </Alert>
+          ) : (
+            <>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                <Typography variant="subtitle1">
+                  Affichage de {(pagination.page - 1) * pagination.limit + 1} à {Math.min(pagination.page * pagination.limit, pagination.total)} sur {pagination.total} logs
+                </Typography>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <Button 
+                color='error'
+                variant="outlined" 
+                startIcon={<ClearIcon />}
+                onClick={handleResetFilters}
+              >
+                Réinitialiser
+              </Button>
+                <Button 
+                  variant="outlined" 
+                  color="primary" 
+                  startIcon={<RefreshIcon />}
+                  onClick={() => fetchLogs()}
+                >
+                  Actualiser
+                </Button>
+                </Box>  
+              </Box>
+              
+              <TableContainer>
+                <Table size="small">
+                  <TableHead>
+                    <TableRow>
+                      <TableCell>ID</TableCell>
+                      <TableCell>Date</TableCell>
+                      <TableCell>Type d'action</TableCell>
+                      <TableCell>Description</TableCell>
+                      <TableCell>Entité</TableCell>
+                      <TableCell>Utilisateur</TableCell>
+                      <TableCell>Actions</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {logs.map((log) => (
+                      <TableRow key={log.id} hover>
+                        <TableCell>{log.id}</TableCell>
+                        <TableCell>{formatDate(log.created_at)}</TableCell>
+                        <TableCell>
+                          <Chip 
+                            label={log.action_type} 
+                            size="small" 
+                            color={getActionTypeColor(log.action_type) as any}
+                            variant="outlined"
+                          />
+                        </TableCell>
+                        <TableCell sx={{ maxWidth: 300, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {log.description}
+                        </TableCell>
+                        <TableCell>
+                          {log.entity_type ? (
+                            <Typography variant="body2">
+                              {log.entity_type} {log.entity_id ? `#${log.entity_id}` : ''}
+                            </Typography>
+                          ) : (
+                            '-'
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          {log.username || '-'}
+                        </TableCell>
+                        <TableCell>
+                          <Tooltip title="Voir les détails">
+                            <IconButton size="small" onClick={() => handleOpenDetails(log)}>
+                              <InfoIcon fontSize="small" />
+                            </IconButton>
+                          </Tooltip>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+              
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mt: 3 }}>
+                <FormControl size="small" sx={{ minWidth: 120 }}>
+                  <InputLabel>Lignes par page</InputLabel>
+                  <Select
+                    value={pagination.limit}
+                    onChange={handleLimitChange as any}
+                    label="Lignes par page"
+                  >
+                    <MenuItem value={20}>20</MenuItem>
+                    <MenuItem value={50}>50</MenuItem>
+                    <MenuItem value={100}>100</MenuItem>
+                  </Select>
+                </FormControl>
+                
+                <Pagination 
+                  count={pagination.totalPages} 
+                  page={pagination.page}
+                  onChange={handlePageChange}
+                  color="primary"
+                  showFirstButton
+                  showLastButton
+                />
+              </Box>
+            </>
+          )}
+        </Paper>
+      </TabPanel>
+      
+      <TabPanel value={tabValue} index={1}>
+        <Paper sx={{ p: 3, borderRadius: 2 }}>
+          
+          <DatabaseMonitoring />
+        </Paper>
+      </TabPanel>
       
       {/* Dialogue de détails du log */}
       <Dialog 

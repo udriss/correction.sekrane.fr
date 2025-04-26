@@ -98,21 +98,39 @@ export async function PUT(
   }
 
   // Parse the request body
-  const { name } = await request.json();
+  const body = await request.json();
+  const { name, highlighted } = body;
 
-  if (!name || typeof name !== 'string') {
-    return NextResponse.json({ error: 'Le nom de la catégorie est requis' }, { status: 400 });
+  // Vérifier si nous avons au moins une propriété à mettre à jour
+  if ((!name || typeof name !== 'string') && highlighted === undefined) {
+    return NextResponse.json({ error: 'Aucune donnée valide à mettre à jour' }, { status: 400 });
   }
 
   try {
-    await query(`
-      UPDATE categories 
-      SET name = ? 
-      WHERE id = ?
-    `, [name, categoryId]);
+    // Construction dynamique de la requête SQL en fonction des paramètres présents
+    let updateQuery = 'UPDATE categories SET ';
+    const updateValues = [];
+    
+    if (name && typeof name === 'string') {
+      updateQuery += 'name = ?';
+      updateValues.push(name);
+      
+      if (highlighted !== undefined) {
+        updateQuery += ', highlighted = ?';
+        updateValues.push(highlighted ? 1 : 0);
+      }
+    } else if (highlighted !== undefined) {
+      updateQuery += 'highlighted = ?';
+      updateValues.push(highlighted ? 1 : 0);
+    }
+    
+    updateQuery += ' WHERE id = ?';
+    updateValues.push(categoryId);
+
+    await query(updateQuery, updateValues);
 
     const updatedCategory = await query<any[]>(`
-      SELECT id, name, created_at, updated_at 
+      SELECT id, name, highlighted, created_at, updated_at 
       FROM categories 
       WHERE id = ?
     `, [categoryId]);
@@ -121,7 +139,11 @@ export async function PUT(
       return NextResponse.json({ error: 'Catégorie non trouvée' }, { status: 404 });
     }
 
-    return NextResponse.json(updatedCategory[0]);
+    return NextResponse.json({
+      id: updatedCategory[0].id,
+      name: updatedCategory[0].name,
+      highlighted: Boolean(updatedCategory[0].highlighted)
+    });
   } catch (error) {
     console.error('Erreur lors de la mise à jour de la catégorie:', error);
     return NextResponse.json(

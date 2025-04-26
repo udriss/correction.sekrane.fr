@@ -13,7 +13,7 @@ import {
   useScrollTrigger,
   Slide,
   IconButton,
-  Tooltip,
+  Tooltip as MuiTooltip,
   Divider,
   ListItemIcon,
   ListItemText,
@@ -23,7 +23,11 @@ import {
   ListItemButton,
   List,
   Paper,
-  CircularProgress
+  CircularProgress,
+  Dialog,
+  DialogContent,
+  Switch,
+  FormControlLabel
 } from '@mui/material';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
@@ -47,12 +51,17 @@ import NotificationsIcon from '@mui/icons-material/Notifications';
 import FeedbackIcon from '@mui/icons-material/Feedback';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import DoneAllIcon from '@mui/icons-material/DoneAll';
+import StorageIcon from '@mui/icons-material/Storage';
+import ListAltIcon from '@mui/icons-material/ListAlt';
+import DatabaseMonitoring from '@/components/DatabaseMonitoring';
 import { alpha, useTheme } from '@mui/material/styles';
 import { FeedbackNotification } from '@/lib/services/notificationService';
 import dayjs from 'dayjs';
 import 'dayjs/locale/fr';
 import relativeTime from 'dayjs/plugin/relativeTime';
 import { useNotifications } from '@/lib/contexts/NotificationContext';
+import { useDbCleanup } from '@/lib/contexts/DbCleanupContext';
+import AutoDeleteIcon from '@mui/icons-material/AutoDelete';
 
 // Configurer dayjs pour afficher les dates relatives en français
 dayjs.locale('fr');
@@ -155,7 +164,7 @@ function NotificationBadge() {
 
   return (
     <>
-      <Tooltip title={unreadCount > 0 ? `${unreadCount} notifications` : "Notifications"}>
+      <MuiTooltip title={unreadCount > 0 ? `${unreadCount} notifications` : "Notifications"}>
         <IconButton
           onClick={handleClick}
           size="small"
@@ -185,33 +194,35 @@ function NotificationBadge() {
             <NotificationsIcon />
           </Badge>
         </IconButton>
-      </Tooltip>
+      </MuiTooltip>
 
       <Menu
         anchorEl={anchorEl}
         open={open}
         onClose={handleClose}
-        PaperProps={{
-          elevation: 3,
-          sx: {
-            maxHeight: 450,
-            width: '350px',
-            maxWidth: '90vw',
-            borderRadius: 2,
-            mt: 1.5,
-            overflow: 'visible',
-            filter: 'drop-shadow(0px 2px 8px rgba(0,0,0,0.15))',
-            '&:before': {
-              content: '""',
-              display: 'block',
-              position: 'absolute',
-              top: 0,
-              right: 14,
-              width: 10,
-              height: 10,
-              bgcolor: 'background.paper',
-              transform: 'translateY(-50%) rotate(45deg)',
-              zIndex: 0,
+        slotProps={{
+          paper: {
+            elevation: 3,
+            sx: {
+              maxHeight: 450,
+              width: '350px',
+              maxWidth: '90vw',
+              borderRadius: 2,
+              mt: 1.5,
+              overflow: 'visible',
+              filter: 'drop-shadow(0px 2px 8px rgba(0,0,0,0.15))',
+              '&:before': {
+                content: '""',
+                display: 'block',
+                position: 'absolute',
+                top: 0,
+                right: 14,
+                width: 10,
+                height: 10,
+                bgcolor: 'background.paper',
+                transform: 'translateY(-50%) rotate(45deg)',
+                zIndex: 0,
+              },
             },
           },
         }}
@@ -233,11 +244,11 @@ function NotificationBadge() {
           </Typography>
           
           {unreadCount > 0 && (
-            <Tooltip title="Tout marquer comme lu">
+            <MuiTooltip title="Tout marquer comme lu">
               <IconButton size="small" onClick={handleMarkAllAsRead}>
                 <DoneAllIcon fontSize="small" />
               </IconButton>
-            </Tooltip>
+            </MuiTooltip>
           )}
         </Box>
 
@@ -294,7 +305,7 @@ function NotificationBadge() {
                       </React.Fragment>
                     }
                   />
-                  <Tooltip title="Voir le feedback">
+                  <MuiTooltip title="Voir le feedback">
                     <IconButton 
                       edge="end" 
                       size="small"
@@ -306,7 +317,7 @@ function NotificationBadge() {
                     >
                       <VisibilityIcon fontSize="small" />
                     </IconButton>
-                  </Tooltip>
+                  </MuiTooltip>
                 </ListItemButton>
               ))}
             </List>
@@ -336,6 +347,45 @@ function NotificationBadge() {
   );
 }
 
+// Composant pour le switch d'auto-nettoyage
+function DbCleanupSwitch() {
+  const { autoCleanupEnabled, setAutoCleanupEnabled, lastRunFormatted, isLoading, isCronJob } = useDbCleanup();
+  
+  return (
+    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+        {isLoading ? (
+          <CircularProgress size={16} color="inherit" />
+        ) : (
+          <AutoDeleteIcon color={autoCleanupEnabled ? "success" : "action"} fontSize="small" />
+        )}
+        <Box>
+          <Typography variant="body2" fontWeight="medium">
+            Auto-nettoyage BDD
+          </Typography>
+          <Typography variant="caption" color="text.secondary">
+            {autoCleanupEnabled 
+              ? `Activé ${isCronJob ? '(cron serveur)' : '(navigateur)'}`
+              : 'Désactivé'}
+          </Typography>
+          {autoCleanupEnabled && (
+            <Typography variant="caption" display="block" color="text.secondary">
+              Dernière exécution: {lastRunFormatted}
+            </Typography>
+          )}
+        </Box>
+      </Box>
+      <Switch
+        checked={autoCleanupEnabled}
+        onChange={(e) => setAutoCleanupEnabled(e.target.checked)}
+        color="success"
+        size="small"
+        disabled={isLoading}
+      />
+    </Box>
+  );
+}
+
 export default function MainNavbar() {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
@@ -345,12 +395,16 @@ export default function MainNavbar() {
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
   const [classMenuAnchor, setClassMenuAnchor] = useState<null | HTMLElement>(null);
   const [activitiesMenuAnchor, setActivitiesMenuAnchor] = useState<null | HTMLElement>(null);
+  const [adminMenuAnchor, setAdminMenuAnchor] = useState<null | HTMLElement>(null);
   const open = Boolean(anchorEl);
   const classMenuOpen = Boolean(classMenuAnchor);
   const activitiesMenuOpen = Boolean(activitiesMenuAnchor);
+  const adminMenuOpen = Boolean(adminMenuAnchor);
   
   // État pour le modal de changement de mot de passe
   const [passwordModalOpen, setPasswordModalOpen] = useState(false);
+  // État pour le modal de monitoring de la base de données
+  const [dbMonitoringOpen, setDbMonitoringOpen] = useState(false);
 
   useEffect(() => {
     const fetchUser = async () => {
@@ -443,16 +497,73 @@ export default function MainNavbar() {
               {/* ThemeSwitcher and Settings icon on the left */}
               <Box sx={{ marginLeft: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
                 <ThemeSwitcher />
-                <Tooltip title="Journaux d'activité">
+                <MuiTooltip title="Administration">
                   <IconButton 
-                    component={Link} 
-                    href="/logs" 
-                    size="small" 
+                    size="small"
+                    onClick={(e) => setAdminMenuAnchor(e.currentTarget)}
                     sx={{ color: 'text.secondary' }}
                   >
                     <SettingsIcon />
                   </IconButton>
-                </Tooltip>
+                </MuiTooltip>
+                {/* Menu pour les outils d'administration */}
+                <Menu
+                  anchorEl={adminMenuAnchor}
+                  open={adminMenuOpen}
+                  onClose={() => setAdminMenuAnchor(null)}
+                  slotProps={{
+                    paper: {
+                      sx: {
+                        mt: 1,
+                        minWidth: 250,
+                        borderRadius: 2,
+                        '& .MuiMenuItem-root': {
+                          px: 2,
+                          py: 1,
+                        },
+                      },
+                    },
+                  }}
+                  transformOrigin={{ horizontal: 'center', vertical: 'top' }}
+                  anchorOrigin={{ horizontal: 'center', vertical: 'bottom' }}
+                >
+                  {/* Titre du menu avec icône */}
+                  <Box sx={{ px: 2, py: 1.5, display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <SettingsIcon fontSize="small" color="primary" />
+                    <Typography variant="subtitle1" fontWeight="bold">
+                      Administration
+                    </Typography>
+                  </Box>
+                  
+                  <Divider />
+                  
+                  {/* Switch pour l'auto-nettoyage des connexions - affiché conditionnellement sans utiliser de Fragment */}
+                  {user?.id === 1 ? (
+                    [
+                      <Box key="db-cleanup-switch" sx={{ px: 2, py: 1.5 }}>
+                        <DbCleanupSwitch />
+                      </Box>,
+                      <Divider key="db-cleanup-divider" />
+                    ]
+                  ) : null}
+                  
+                  <MenuItem component={Link} href="/logs" onClick={() => setAdminMenuAnchor(null)}>
+                    <ListItemIcon>
+                      <ListAltIcon fontSize="small" />
+                    </ListItemIcon>
+                    <ListItemText primary="Logs" />
+                  </MenuItem>
+                  
+                  <MenuItem onClick={() => {
+                    setDbMonitoringOpen(true);
+                    setAdminMenuAnchor(null);
+                  }}>
+                    <ListItemIcon>
+                      <StorageIcon fontSize="small" />
+                    </ListItemIcon>
+                    <ListItemText primary="Base de données" />
+                  </MenuItem>
+                </Menu>
               </Box>
               {/* Logo et titre de l'app */}
               <Typography 
@@ -484,7 +595,7 @@ export default function MainNavbar() {
                 </Button>
                 
                 {/* Modified Activities button to trigger dropdown */}
-                <Tooltip title="Activités">
+                <MuiTooltip title="Activités">
                   <Button
                     color="inherit"
                     onClick={handleActivitiesMenuClick}
@@ -492,7 +603,7 @@ export default function MainNavbar() {
                   >
                     <ViewListIcon sx={{ fontSize: '1.5rem' }} />
                   </Button>
-                </Tooltip>
+                </MuiTooltip>
                 
                 {/* Activities Dropdown Menu */}
                 <Menu
@@ -500,15 +611,17 @@ export default function MainNavbar() {
                   open={activitiesMenuOpen}
                   onClose={handleActivitiesMenuClose}
                   onClick={handleActivitiesMenuClose}
-                  PaperProps={{
-                    elevation: 3,
-                    sx: {
-                      mt: 1,
-                      minWidth: 200,
-                      borderRadius: 2,
-                      '& .MuiMenuItem-root': {
-                        px: 2,
-                        py: 1,
+                  slotProps={{
+                    paper: {
+                      elevation: 3,
+                      sx: {
+                        mt: 1,
+                        minWidth: 200,
+                        borderRadius: 2,
+                        '& .MuiMenuItem-root': {
+                          px: 2,
+                          py: 1,
+                        },
                       },
                     },
                   }}
@@ -569,7 +682,7 @@ export default function MainNavbar() {
                 </Menu>
                 
                 {/* Nouveau bouton pour la gestion des classes */}
-                <Tooltip title="Gestion des classes">
+                <MuiTooltip title="Gestion des classes">
                   <Button
                     color="inherit"
                     onClick={handleClassMenuClick}
@@ -577,7 +690,7 @@ export default function MainNavbar() {
                   >
                     <SchoolIcon sx={{ fontSize: '1.5rem' }} />
                   </Button>
-                </Tooltip>
+                </MuiTooltip>
                 
                 {/* Menu déroulant pour la gestion des classes */}
                 <Menu
@@ -585,15 +698,17 @@ export default function MainNavbar() {
                   open={classMenuOpen}
                   onClose={handleClassMenuClose}
                   onClick={handleClassMenuClose}
-                  PaperProps={{
-                    elevation: 3,
-                    sx: {
-                      mt: 1,
-                      minWidth: 200,
-                      borderRadius: 2,
-                      '& .MuiMenuItem-root': {
-                        px: 2,
-                        py: 1,
+                  slotProps={{
+                    paper: {
+                      elevation: 3,
+                      sx: {
+                        mt: 1,
+                        minWidth: 200,
+                        borderRadius: 2,
+                        '& .MuiMenuItem-root': {
+                          px: 2,
+                          py: 1,
+                        },
                       },
                     },
                   }}
@@ -659,12 +774,14 @@ export default function MainNavbar() {
                       vertical: 'top',
                       horizontal: 'right',
                     }}
-                    PaperProps={{
-                      elevation: 3,
-                      sx: {
-                        borderRadius: 2,
-                        minWidth: 180,
-                        mt: 1
+                    slotProps={{
+                      paper: {
+                        elevation: 3,
+                        sx: {
+                          borderRadius: 2,
+                          minWidth: 180,
+                          mt: 1
+                        }
                       }
                     }}
                   >
@@ -704,6 +821,26 @@ export default function MainNavbar() {
         open={passwordModalOpen}
         onClose={() => setPasswordModalOpen(false)}
       />
+      
+      {/* Modal pour le monitoring de la base de données */}
+      <Dialog
+        open={dbMonitoringOpen}
+        onClose={() => setDbMonitoringOpen(false)}
+        maxWidth="lg"
+        fullWidth
+        slotProps={{
+          paper: {
+            sx: {
+              borderRadius: 2,
+              pt: 2
+            }
+          }
+        }}
+      >
+        <DialogContent sx={{ p: 0 }}>
+          <DatabaseMonitoring expanded={true} />
+        </DialogContent>
+      </Dialog>
     </>
   );
 }

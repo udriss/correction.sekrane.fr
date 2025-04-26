@@ -53,16 +53,11 @@ export const EditFragmentDialog: React.FC<EditFragmentDialogProps> = ({
   
   // Function to convert between Fragment types
   const handleFragmentUpdate = (updatedFragment: LibFragment) => {
-    // Debug pour vérifier les tags reçus de FragmentEditor
+    // Cette fonction est appelée uniquement lors de la soumission finale du formulaire
+    // pour enregistrer toutes les modifications apportées au fragment
     
-    
-    
-    // Préserver les tags originaux si aucun tag n'a été spécifié dans la mise à jour
-    const preservedTags = Array.isArray(updatedFragment.tags) && updatedFragment.tags.length === 0 && currentFragment
-      ? currentFragment.tags
-      : updatedFragment.tags;
-    
-    
+    // Ne plus utiliser la logique de préservation des tags qui était problématique
+    // On respecte maintenant toujours les tags fournis, même s'ils sont vides
     
     // Forcer une copie totalement nouvelle de l'objet
     const randomKey = Math.floor(Math.random() * 10000000);
@@ -73,37 +68,92 @@ export const EditFragmentDialog: React.FC<EditFragmentDialogProps> = ({
       // Conserver explicitement les valeurs null si présentes
       activity_id: updatedFragment.activity_id,
       activity_name: updatedFragment.activity_name,
-      // Garantir que tags est toujours un tableau valide, en préservant les tags originaux si nécessaire
-      tags: Array.isArray(preservedTags) && preservedTags.length > 0 
-            ? [...preservedTags] 
-            : (currentFragment && Array.isArray(currentFragment.tags) 
-                ? [...currentFragment.tags] 
-                : []),
+      // Utiliser TOUJOURS les tags du formulaire, même s'ils sont vides
+      // afin de respecter l'intention de l'utilisateur de supprimer tous les tags
+      tags: Array.isArray(updatedFragment.tags) ? [...updatedFragment.tags] : [],
+      // Assurer que les catégories sont correctement traitées (peuvent être des objets ou des IDs)
+      categories: Array.isArray(updatedFragment.categories) 
+          ? updatedFragment.categories.map(cat => 
+              typeof cat === 'object' && cat !== null && 'id' in cat 
+                ? cat 
+                : { id: Number(cat), name: `Category ${cat}` }
+            )
+          : [],
       created_at: updatedFragment.created_at || '',
       updated_at: new Date().toISOString(), // Ajouter un timestamp pour l'horodatage
       _updateKey: randomKey,
       _forceUpdate: Date.now(),
     }));
     
-    // Debug pour vérifier la conversion
-    
-    
     // Vérifier si des modifications ont été apportées
+    // Pour les catégories, on compare désormais les IDs au lieu de comparer les objets complets
     const hasChanges = !originalFragmentRef.current || 
-                        convertedFragment.content !== originalFragmentRef.current.content ||
-                        JSON.stringify(convertedFragment.tags) !== JSON.stringify(originalFragmentRef.current.tags) ||
-                        JSON.stringify(convertedFragment.categories) !== JSON.stringify(originalFragmentRef.current.categories);
+                       convertedFragment.content !== originalFragmentRef.current.content ||
+                       haveTagsChanged(convertedFragment.tags, originalFragmentRef.current.tags) ||
+                       !compareCategoriesById(convertedFragment.categories, originalFragmentRef.current.categories);
     
     // Si aucune modification, afficher un message et ne pas envoyer la mise à jour
     if (!hasChanges) {
-      
+      console.log('Aucune modification détectée');
+      return;
     }
-    
-    // Mettre à jour l'état local pour refléter les changements immédiatement
+   
+    // Mettre à jour l'état local pour refléter les changements
     setCurrentFragment(convertedFragment);
     
+    
     // Appeler onUpdate avec le fragment converti
+    // C'est la fonction handleEditSuccess dans app/fragments/page.tsx 
+    // qui est responsable de faire l'appel API PUT /api/fragments/[id]
     onUpdate(convertedFragment);
+  };
+  
+  // Fonction d'aide pour comparer les catégories par ID
+  const compareCategoriesById = (
+    categories1: Array<{ id: number } | number> | undefined, 
+    categories2: Array<{ id: number } | number> | undefined
+  ): boolean => {
+    if (!categories1 && !categories2) return true;
+    if (!categories1 || !categories2) return false;
+    
+    // Extraire les IDs de chaque tableau de catégories
+    const getIds = (cats: Array<{ id: number } | number>): number[] => {
+      return cats.map(cat => typeof cat === 'object' && cat !== null ? cat.id : Number(cat)).sort();
+    };
+    
+    const ids1 = getIds(categories1);
+    const ids2 = getIds(categories2);
+    
+    // Comparer les tableaux d'IDs triés
+    return JSON.stringify(ids1) === JSON.stringify(ids2);
+  };
+  
+  // Fonction pour vérifier si les tags ont changé - traite correctement les tableaux vides
+  const haveTagsChanged = (newTags: string[] | undefined, originalTags: string[] | undefined): boolean => {
+    // Si l'un est undefined et l'autre non, ils sont différents
+    if ((!newTags && originalTags) || (newTags && !originalTags)) return true;
+    
+    // Si les deux sont undefined, ils sont identiques
+    if (!newTags && !originalTags) return false;
+    
+    // Si les longueurs sont différentes, ils sont différents
+    if (newTags!.length !== originalTags!.length) return true;
+    
+    // Si l'un des tableaux est vide et l'autre non, ils sont différents
+    if ((newTags!.length === 0 && originalTags!.length > 0) || 
+        (newTags!.length > 0 && originalTags!.length === 0)) return true;
+    
+    // Convertir en ensembles pour une comparaison insensible à l'ordre
+    const set1 = new Set(newTags);
+    const set2 = new Set(originalTags);
+    
+    // Si les tailles sont différentes, ils sont différents
+    if (set1.size !== set2.size) return true;
+    
+    // Vérifier si chaque élément de set1 est dans set2
+    return Array.from(set1).some(item => !set2.has(item));
+    
+    return false;
   };
 
   return (

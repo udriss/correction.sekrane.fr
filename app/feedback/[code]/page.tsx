@@ -85,6 +85,10 @@ export default function FeedbackViewer({ params }: { params: Promise<{ code: str
   const [correction, setCorrection] = useState<Correction | null>(null);
   const [renderedHtml, setRenderedHtml] = useState('');
 
+  // Pour gérer les fragments de catégorie 26 (titres d'exercices)
+  const [fragmentsWithCategory26, setFragmentsWithCategory26] = useState<Set<number>>(new Set());
+  const [isProcessingFragments, setIsProcessingFragments] = useState<boolean>(false);
+  const [processedHtml, setProcessedHtml] = useState<string>('');
   
   // Ajout des états manquants
   const [correctionContent, setCorrectionContent] = useState<string>('');
@@ -171,7 +175,126 @@ export default function FeedbackViewer({ params }: { params: Promise<{ code: str
     fetchSharedCorrection();
   }, [code]);
 
+  // Effet pour récupérer les informations sur les fragments et identifier ceux avec des catégories mises en évidence
+  useEffect(() => {
+    const fetchFragmentsCategories = async () => {
+      if (correction?.content_data?.items && !isProcessingFragments) {
+        setIsProcessingFragments(true);
+        
+        try {
+          // Extraire tous les IDs de fragments originaux
+          const originalFragmentIds = correction.content_data.items
+            .filter((item: any) => item.originalFragmentId)
+            .map((item: any) => item.originalFragmentId);
+          
+          // Supprimer les doublons
+          const uniqueFragmentIds = Array.from(new Set(originalFragmentIds));
+          
+          // Si nous avons des fragments originaux, récupérer leurs catégories
+          if (uniqueFragmentIds.length > 0) {
+            const highlightedFragments = new Set<number>();
+            
+            // Récupérer les informations de catégorie pour chaque fragment
+            for (const fragmentId of uniqueFragmentIds) {
+              try {
+                const response = await fetch(`/api/fragments/${fragmentId}`);
+                if (response.ok) {
+                  const fragmentData = await response.json();
+                  
+                  // Vérifier si ce fragment a des catégories avec highlighted=true
+                  if (fragmentData.categories) {
+                    // Récupérer les IDs des catégories
+                    let categoryIds: number[] = [];
+                    
+                    if (Array.isArray(fragmentData.categories)) {
+                      if (typeof fragmentData.categories[0] === 'object') {
+                        // Si categories est un tableau d'objets avec id
+                        categoryIds = fragmentData.categories
+                          .filter((cat: any) => cat && typeof cat === 'object' && 'id' in cat)
+                          .map((cat: any) => cat.id);
+                      } else if (typeof fragmentData.categories[0] === 'number') {
+                        // Si categories est un tableau d'IDs
+                        categoryIds = fragmentData.categories as number[];
+                      }
+                    }
+                    
+                    // Vérifier chaque catégorie pour voir si elle est mise en évidence
+                    if (categoryIds.length > 0) {
+                      const categoriesResponse = await fetch('/api/categories');
+                      if (categoriesResponse.ok) {
+                        const categoriesData = await categoriesResponse.json();
+                        const highlightedCategoryIds = categoriesData
+                          .filter((cat: any) => cat.highlighted)
+                          .map((cat: any) => cat.id);
+                        
+                        // Si l'une des catégories du fragment est mise en évidence
+                        if (categoryIds.some(id => highlightedCategoryIds.includes(id))) {
+                          highlightedFragments.add(fragmentId);
+                        }
+                      }
+                    }
+                  }
+                }
+              } catch (error) {
+                console.error(`Erreur lors de la récupération du fragment ${fragmentId}:`, error);
+              }
+            }
+            
+            setFragmentsWithCategory26(highlightedFragments);
+          }
+        } catch (error) {
+          console.error('Erreur lors du traitement des fragments:', error);
+        } finally {
+          setIsProcessingFragments(false);
+        }
+      }
+    };
+    
+    fetchFragmentsCategories();
+  }, [correction]);
 
+  // Effet pour traiter le HTML une fois que les fragments de catégorie 26 sont identifiés
+  useEffect(() => {
+    if (renderedHtml && fragmentsWithCategory26.size > 0) {
+      const processed = processHtmlForExerciseTitles(renderedHtml);
+      setProcessedHtml(processed);
+    } else {
+      setProcessedHtml(renderedHtml);
+    }
+  }, [renderedHtml, fragmentsWithCategory26]);
+
+  // Nouvelle fonction pour identifier et modifier les fragments de catégorie 26 (titres d'exercices)
+  const processHtmlForExerciseTitles = (html: string): string => {
+    if (!correction || !correction.content_data || !correction.content_data.items) {
+      return html;
+    }
+
+    let updatedHtml = html;
+    
+    // Parcourir les items du contenu
+    correction.content_data.items.forEach((item: any, index: number) => {
+      // Vérifier si ce fragment provient d'un fragment original de catégorie 26
+      if (item.originalFragmentId && fragmentsWithCategory26.has(item.originalFragmentId)) {
+        // Créer un identifiant unique pour cet élément
+        const itemId = `fragment-${index}-${item.id || Date.now()}`;
+        
+        // Trouver le texte de l'item dans le HTML (en échappant les caractères spéciaux)
+        const escapedContent = item.content
+          .replace(/[.*+?^${}()|[\]\\]/g, '\\$&') // échapper les caractères spéciaux
+          .replace(/\n/g, '\\s*'); // permettre des espaces ou sauts de ligne
+        
+        // Créer un modèle de regex pour trouver ce fragment
+        const regex = new RegExp(`(<[^>]+>)?${escapedContent}(<\\/[^>]+>)?`, 'i');
+        
+        // Remplacer le fragment trouvé par une version stylisée
+        updatedHtml = updatedHtml.replace(regex, (match) => {
+          return `<div id="${itemId}" class="exercise-title">${match}</div>`;
+        });
+      }
+    });
+    
+    return updatedHtml;
+  };
 
   if (loading) {
     return (
@@ -808,8 +931,38 @@ export default function FeedbackViewer({ params }: { params: Promise<{ code: str
                     p: 3,
                     boxShadow: 'inset 0 2px 4px 0 rgba(0,0,0,0.06)'
                   }}>
+                    {/* Utilisation de la fonction pour les styles des titres d'exercices */}
+                    <style jsx global>{`
+                      .exercise-title {
+                        margin-top: 1.5rem;
+                        margin-bottom: 1rem;
+                        padding: 0.75rem 1rem;
+                        font-weight: bold;
+                        font-size: 1.1rem;
+                        background: linear-gradient(90deg, ${theme.palette.primary.main}20, transparent);
+                        border-left: 4px solid ${theme.palette.primary.main};
+                        border-radius: 0.25rem;
+                        page-break-before: auto;
+                        page-break-after: avoid;
+                      }
+                      
+                      .exercise-title:first-child {
+                        margin-top: 0;
+                      }
+                      
+                      /* S'assurer que les titres d'exercices ne sont pas affectés par les styles des paragraphes */
+                      .exercise-title::before {
+                        content: none !important;
+                      }
+                      
+                      .exercise-title p {
+                        margin: 0;
+                        padding: 0;
+                      }
+                    `}</style>
+
                     <Box 
-                      dangerouslySetInnerHTML={{ __html: renderedHtml }} 
+                      dangerouslySetInnerHTML={{ __html: processHtmlForExerciseTitles(renderedHtml) }}
                       sx={{
                         '& h1, & h2, & h3, & h4, & h5, & h6': {
                           color: 'primary.800'
@@ -1002,14 +1155,16 @@ export default function FeedbackViewer({ params }: { params: Promise<{ code: str
                     {/* Nouveau message pour les retards d'un jour avec indulgence */}
                     {isOneDayLate && !hasPenalty && (
                       <Alert 
-                        severity="warning"
-                        sx={{ mt: 2, mb: 1 }}
+                        severity="warning" 
+                        variant="outlined"
+                        sx={{ mb: 1.5 }}
                         icon={<CalendarTodayIcon />}
                       >
-                        <Typography variant="body2">
-                          <strong>Jour de grâce accordé :</strong> bien que ce travail ait été rendu avec un retard d'un jour, 
-                          aucune pénalité n'a été appliquée par mesure d'indulgence. Les retards plus importants entraîneraient 
-                          une pénalité de 2 points par jour de retard.
+                        <Typography variant="subtitle2" sx={{ fontWeight: 'bold' }}>
+                          Jour de grâce accordé
+                        </Typography>
+                        <Typography variant="caption">
+                          La pénalité pour 1 jour de retard a été levée par indulgence.
                         </Typography>
                       </Alert>
                     )}
@@ -1072,3 +1227,5 @@ export default function FeedbackViewer({ params }: { params: Promise<{ code: str
     </Box>
   );
 }
+
+
