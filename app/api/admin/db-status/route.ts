@@ -84,7 +84,7 @@ async function getPoolStatusManual() {
     
     // Estimer les connexions libres (difficile à obtenir directement)
     // On peut estimer en se basant sur la limite du pool et les connexions actives
-    const connLimit = 10; // Valeur fixe basée sur la configuration connue
+    const connLimit = 30; // Valeur fixe basée sur la configuration connue
     const activeConns = parseInt(totalConnections);
     if (!isNaN(activeConns)) {
       const freeConns = Math.max(0, connLimit - activeConns);

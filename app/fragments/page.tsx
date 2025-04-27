@@ -50,6 +50,7 @@ export default function FragmentsLibraryPage() {
   const theme = useTheme();
   
   const isAuthenticated = status === 'authenticated';
+  const isLoading = status === 'loading';
   
   const [fragments, setFragments] = useState<Fragment[]>([]);
   const [filteredFragments, setFilteredFragments] = useState<Fragment[]>([]);
@@ -115,6 +116,10 @@ export default function FragmentsLibraryPage() {
   
   // Fonction pour charger les activités
   const fetchActivities = useCallback(async () => {
+    if (!isAuthenticated) {
+      return;
+    }
+    
     try {
       setLoadingActivities(true);
       const response = await fetch('/api/activities_autres');
@@ -145,12 +150,14 @@ export default function FragmentsLibraryPage() {
     } finally {
       setLoadingActivities(false);
     }
-  }, [selectedActivityId]);
+  }, [selectedActivityId, isAuthenticated]);
   
-  // Charger les activités au chargement de la page
+  // Charger les activités seulement si l'utilisateur est authentifié
   useEffect(() => {
-    fetchActivities();
-  }, [fetchActivities]);
+    if (isAuthenticated) {
+      fetchActivities();
+    }
+  }, [fetchActivities, isAuthenticated]);
   
   // Fonction de gestion de la création réussie d'un fragment
   const handleCreateSuccess = (newFragment: Fragment) => {
@@ -216,6 +223,10 @@ export default function FragmentsLibraryPage() {
 
   // Correction de la dépendance circulaire dans fetchFragments
   const fetchFragments = useCallback(async () => {
+    if (!isAuthenticated) {
+      return;
+    }
+    
     setLoading(true);
     try {
       const queryParams = new URLSearchParams();
@@ -274,6 +285,10 @@ export default function FragmentsLibraryPage() {
   }, [userOnly, categoryFilter, searchQuery, isAuthenticated, categories]);
   
   const fetchCategories = useCallback(async (): Promise<void> => {
+    if (!isAuthenticated) {
+      return;
+    }
+    
     try {
       setLoadingCategories(true);
       const response = await fetch('/api/categories');
@@ -288,24 +303,22 @@ export default function FragmentsLibraryPage() {
     } finally {
       setLoadingCategories(false);
     }
-  }, []);
+  }, [isAuthenticated]);
   
   // Modifions useEffect pour éviter les appels inutiles ou redondants
   useEffect(() => {
-    // Nous chargeons les fragments uniquement au montage initial
-    // mais pas en réponse à des changements de fetchFragments qui pourraient créer des cycles
-    const initialLoad = async () => {
-      await fetchFragments();
-    };
-    
-    initialLoad();
-    // Pas de dépendance à fetchFragments pour éviter les boucles
-  }, []);
+    // Nous chargeons les fragments uniquement quand l'utilisateur est authentifié
+    if (isAuthenticated) {
+      fetchFragments();
+    }
+  }, [isAuthenticated, fetchFragments]);
   
   // Appel séparé pour les catégories
   useEffect(() => {
-    fetchCategories();
-  }, [fetchCategories]);
+    if (isAuthenticated) {
+      fetchCategories();
+    }
+  }, [isAuthenticated, fetchCategories]);
   
   // Mise à jour de l'initialisation des catégories managées
   useEffect(() => {
@@ -316,25 +329,27 @@ export default function FragmentsLibraryPage() {
   }, [categories]);
   
   useEffect(() => {
-    let result = [...fragmentsData.fragments];
-    
-    switch(sortBy) {
-      case 'newest':
-        result.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-        break;
-      case 'oldest':
-        result.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
-        break;
-      case 'mostUsed':
-        result.sort((a, b) => (b.usage_count || 0) - (a.usage_count || 0));
-        break;
-      case 'alphabetical':
-        result.sort((a, b) => a.content.localeCompare(b.content));
-        break;
+    if (fragmentsData.fragments.length > 0) {
+      let result = [...fragmentsData.fragments];
+      
+      switch(sortBy) {
+        case 'newest':
+          result.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+          break;
+        case 'oldest':
+          result.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+          break;
+        case 'mostUsed':
+          result.sort((a, b) => (b.usage_count || 0) - (a.usage_count || 0));
+          break;
+        case 'alphabetical':
+          result.sort((a, b) => a.content.localeCompare(b.content));
+          break;
+      }
+      
+      setFilteredFragments(result);
+      setPage(1);
     }
-    
-    setFilteredFragments(result);
-    setPage(1);
   }, [fragmentsData, sortBy]);
   
   const indexOfLastFragment = page * fragmentsPerPage;
@@ -874,20 +889,65 @@ export default function FragmentsLibraryPage() {
     }, 50);
   };
 
+  if (status === 'loading') {
+    return (
+      <Container maxWidth="lg">
+        <Box
+          className="max-w-4xl mx-auto"
+          sx={{ 
+            minHeight: '100vh',
+            pb: 8,
+            background: theme.palette.mode === 'dark' 
+              ? 'linear-gradient(180deg, #1a1a2e 0%, #16213e 100%)' 
+              : 'linear-gradient(180deg, #f8f9fa 0%, #e9ecef 100%)'
+          }}
+        >
+          <GradientBackground variant="primary" sx={{ pt: 5, pb: 6, px: 3, mb: 4 }}>
+            <PatternBackground 
+              pattern='dots'
+              opacity={0.05}
+              sx={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: -1 }}
+            >
+              <Typography variant="h4" component="h1" color='text.parimary' gutterBottom>
+                Bibliothèque de fragments
+              </Typography>
+              <div className="py-10 flex justify-center max-w-[400px] mx-auto">
+                <LoadingSpinner text="Chargement de l'authentification" />
+              </div>
+            </PatternBackground>
+          </GradientBackground>
+        </Box>  
+      </Container>
+    );
+  }
+
   if (status === 'unauthenticated') {
     return (
       <Container maxWidth="lg" className="py-8 max-w-4xl mx-auto">
-        <Typography variant="h4" component="h1" color='text.parimary' gutterBottom>
-          Bibliothèque de fragments
-        </Typography>
-        <Alert severity="error" className="mb-4">
-          Erreur d'authentification: utilisateur non authentifié. 
+        <GradientBackground variant="primary" sx={{ pt: 5, pb: 6, px: 3, mb: 4 }}>
+          <PatternBackground 
+            pattern='dots'
+            opacity={0.05}
+            sx={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: -1 }}
+          >
+            <Typography variant="h4" component="h1" color='text.parimary' gutterBottom>
+              Bibliothèque de fragments
+            </Typography>
+          </PatternBackground>
+        </GradientBackground>
+        <Alert severity="warning" className="mb-4"
+        sx={{
+        display: 'flex',
+        alignItems: 'center',
+        }}
+        >
+          Veuillez vous connecter pour accéder à la bibliothèque de fragments
           <Button 
-            color="inherit" 
+            color="primary" 
             size="small" 
             href="/login" 
             sx={{ ml: 1 }}
-            variant="outlined"
+            variant="contained"
           >
             Se connecter
           </Button>
@@ -896,7 +956,7 @@ export default function FragmentsLibraryPage() {
     );
   }
 
-  if (loading) {
+  if (loading && isAuthenticated) {
     return (
       <Container maxWidth="lg">
         <Box
@@ -929,11 +989,22 @@ export default function FragmentsLibraryPage() {
   }
 
   // Add a check to make sure we have data before rendering components that depend on it
-  if (!categories || categories.length === 0) {
+  if (isAuthenticated && (!categories || categories.length === 0)) {
     return (
       <Container maxWidth="lg">
         <Box className="max-w-4xl mx-auto">
-          <Typography variant="h6" color="text.secondary">
+          <GradientBackground variant="primary" sx={{ pt: 5, pb: 6, px: 3, mb: 4 }}>
+            <PatternBackground 
+              pattern='dots'
+              opacity={0.05}
+              sx={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: -1 }}
+            >
+              <Typography variant="h4" component="h1" color='text.parimary' gutterBottom>
+                Bibliothèque de fragments
+              </Typography>
+            </PatternBackground>
+          </GradientBackground>
+          <Typography variant="h6" color="text.secondary" className="text-center">
             Chargement des catégories...
           </Typography>
         </Box>

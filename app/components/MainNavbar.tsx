@@ -266,60 +266,97 @@ function NotificationBadge() {
         ) : (
           <Box>
             <List sx={{ p: 0, maxHeight: 320, overflowY: 'auto' }}>
-              {notifications.map((notification) => (
-                <ListItemButton
-                  key={notification.id}
-                  onClick={() => navigateToFeedback(notification.share_code, notification.id)}
-                  sx={{
-                    borderLeft: '3px solid',
-                    borderColor: notification.readOk ? 'transparent' : 'primary.main',
-                    backgroundColor: notification.readOk ? 'transparent' : alpha(theme.palette.primary.main, 0.04),
-                    '&:hover': {
-                      backgroundColor: alpha(theme.palette.primary.main, 0.08),
-                    },
-                    py: 1
-                  }}
-                >
-                  <ListItemAvatar>
-                    <Avatar sx={{ bgcolor: notification.readOk ? 'action.disabled' : 'primary.main' }}>
-                      <FeedbackIcon />
-                    </Avatar>
-                  </ListItemAvatar>
-                  <ListItemText 
-                    primary={
-                      <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                        {notification.student_name} a consulté son feedback
-                      </Typography>
-                    }
-                    secondary={
-                      <React.Fragment>
-                        <Typography variant="caption" component="span" display="block" sx={{ mt: 0.5 }}>
-                          Activité: {notification.activity_name}
+              {(() => {
+                // Trier les notifications par date (les plus récentes d'abord)
+                const sortedNotifications = [...notifications].sort((a, b) => 
+                  new Date(b.viewed_at).getTime() - new Date(a.viewed_at).getTime()
+                );
+                
+                // Séparer les notifications lues et non lues
+                const unreadNotifications = sortedNotifications.filter(n => !n.readOk);
+                const readNotifications = sortedNotifications.filter(n => n.readOk);
+                
+                // Combiner pour avoir toutes les non lues + compléter avec des lues jusqu'à 10 max
+                const displayNotifications = [
+                  ...unreadNotifications,
+                  ...readNotifications.slice(0, Math.max(0, 10 - unreadNotifications.length))
+                ];
+                
+                // Renvoyer le JSX pour les notifications
+                return (
+                  <>
+                    {displayNotifications.map((notification) => (
+                      <ListItemButton
+                        key={notification.id}
+                        onClick={() => navigateToFeedback(notification.share_code, notification.id)}
+                        sx={{
+                          borderLeft: '3px solid',
+                          borderColor: notification.readOk ? 'transparent' : 'primary.main',
+                          backgroundColor: notification.readOk ? 'transparent' : alpha(theme.palette.primary.main, 0.04),
+                          '&:hover': {
+                            backgroundColor: alpha(theme.palette.primary.main, 0.08),
+                          },
+                          py: 1
+                        }}
+                      >
+                        <ListItemAvatar>
+                          <Avatar sx={{ bgcolor: notification.readOk ? 'action.disabled' : 'primary.main' }}>
+                            <FeedbackIcon />
+                          </Avatar>
+                        </ListItemAvatar>
+                        <ListItemText 
+                          primary={
+                            <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                              {notification.student_name} a consulté son feedback
+                            </Typography>
+                          }
+                          secondary={
+                            <React.Fragment>
+                              <Typography variant="caption" component="span" display="block" sx={{ mt: 0.5 }}>
+                                Activité: {notification.activity_name}
+                              </Typography>
+                              <Typography variant="caption" component="span" display="block">
+                                Note: {notification.final_grade}/20
+                              </Typography>
+                              <Typography variant="caption" component="span" display="block" sx={{ fontStyle: 'italic', mt: 0.5 }}>
+                                {dayjs(notification.viewed_at).fromNow()}
+                              </Typography>
+                            </React.Fragment>
+                          }
+                        />
+                        <MuiTooltip title="Voir le feedback">
+                          <IconButton 
+                            edge="end" 
+                            size="small"
+                            sx={{ mr: 1 }}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              navigateToFeedback(notification.share_code, notification.id);
+                            }}
+                          >
+                            <VisibilityIcon fontSize="small" />
+                          </IconButton>
+                        </MuiTooltip>
+                      </ListItemButton>
+                    ))}
+                    
+                    {/* Message d'information sur les notifications supplémentaires */}
+                    {totalCount > displayNotifications.length && (
+                      <Box sx={{ 
+                        p: 1.5, 
+                        textAlign: 'center', 
+                        borderTop: '1px dashed',
+                        borderColor: 'divider',
+                        bgcolor: theme => alpha(theme.palette.info.light, 0.05)
+                      }}>
+                        <Typography variant="caption" color="text.secondary">
+                          {totalCount - displayNotifications.length} autres notifications disponibles
                         </Typography>
-                        <Typography variant="caption" component="span" display="block">
-                          Note: {notification.final_grade}/20
-                        </Typography>
-                        <Typography variant="caption" component="span" display="block" sx={{ fontStyle: 'italic', mt: 0.5 }}>
-                          {dayjs(notification.viewed_at).fromNow()}
-                        </Typography>
-                      </React.Fragment>
-                    }
-                  />
-                  <MuiTooltip title="Voir le feedback">
-                    <IconButton 
-                      edge="end" 
-                      size="small"
-                      sx={{ mr: 1 }}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        navigateToFeedback(notification.share_code, notification.id);
-                      }}
-                    >
-                      <VisibilityIcon fontSize="small" />
-                    </IconButton>
-                  </MuiTooltip>
-                </ListItemButton>
-              ))}
+                      </Box>
+                    )}
+                  </>
+                );
+              })()}
             </List>
             
             <Box 
@@ -497,19 +534,25 @@ export default function MainNavbar() {
               {/* ThemeSwitcher and Settings icon on the left */}
               <Box sx={{ marginLeft: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
                 <ThemeSwitcher />
-                <MuiTooltip title="Administration">
-                  <IconButton 
-                    size="small"
-                    onClick={(e) => setAdminMenuAnchor(e.currentTarget)}
-                    sx={{ color: 'text.secondary' }}
-                  >
-                    <SettingsIcon />
-                  </IconButton>
+                <MuiTooltip title={user?.id === 1 ? "Administration" : "Administration (accès restreint)"}>
+                  <span>
+                    <IconButton 
+                      size="small"
+                      onClick={(e) => user?.id === 1 ? setAdminMenuAnchor(e.currentTarget) : null}
+                      sx={{ 
+                        color: user?.id === 1 ? 'text.secondary' : 'text.disabled',
+                        cursor: user?.id === 1 ? 'pointer' : 'not-allowed' 
+                      }}
+                      disabled={user?.id !== 1}
+                    >
+                      <SettingsIcon />
+                    </IconButton>
+                  </span>
                 </MuiTooltip>
                 {/* Menu pour les outils d'administration */}
                 <Menu
                   anchorEl={adminMenuAnchor}
-                  open={adminMenuOpen}
+                  open={adminMenuOpen && user?.id === 1}
                   onClose={() => setAdminMenuAnchor(null)}
                   slotProps={{
                     paper: {

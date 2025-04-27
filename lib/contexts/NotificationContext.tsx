@@ -23,9 +23,38 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
   const [notifications, setNotifications] = useState<FeedbackNotification[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
   const [lastCheck, setLastCheck] = useState<number>(Date.now());
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
+
+  // Vérifier si l'utilisateur est authentifié
+  const checkAuthentication = async () => {
+    try {
+      const response = await fetch('/api/auth/user');
+      if (response.ok) {
+        const data = await response.json();
+        const isAuth = data.authenticated === true && data.user !== null;
+        setIsAuthenticated(isAuth);
+        return isAuth;
+      } else {
+        setIsAuthenticated(false);
+        return false;
+      }
+    } catch (error) {
+      console.error('Erreur lors de la vérification de l\'authentification:', error);
+      setIsAuthenticated(false);
+      return false;
+    }
+  };
 
   // Récupérer le nombre de notifications non lues et le nombre total de notifications
   const fetchNotificationCounts = async () => {
+    // Vérifier d'abord si l'utilisateur est authentifié (si on ne le sait pas encore)
+    if (isAuthenticated === null) {
+      const isUserAuthenticated = await checkAuthentication();
+      if (!isUserAuthenticated) return;
+    } else if (!isAuthenticated) {
+      return;
+    }
+
     try {
       const response = await fetch('/api/notifications?action=counts');
       if (response.ok) {
@@ -40,6 +69,10 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
 
   // Récupérer les notifications récentes
   const fetchNotifications = async () => {
+    // Ne pas procéder si l'utilisateur n'est pas authentifié
+    if (isAuthenticated === false) return;
+    if (isAuthenticated === null && !await checkAuthentication()) return;
+
     setLoading(true);
     try {
       const response = await fetch('/api/notifications?includeRead=true&limit=20');
@@ -56,6 +89,10 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
 
   // Marquer une notification comme lue
   const markAsRead = async (id: number) => {
+    // Ne pas procéder si l'utilisateur n'est pas authentifié
+    if (isAuthenticated === false) return;
+    if (isAuthenticated === null && !await checkAuthentication()) return;
+
     try {
       const response = await fetch('/api/notifications', {
         method: 'POST',
@@ -84,6 +121,10 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
 
   // Marquer toutes les notifications comme lues
   const markAllAsRead = async () => {
+    // Ne pas procéder si l'utilisateur n'est pas authentifié
+    if (isAuthenticated === false) return;
+    if (isAuthenticated === null && !await checkAuthentication()) return;
+
     try {
       const response = await fetch('/api/notifications', {
         method: 'POST',
@@ -108,25 +149,36 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  // Effet pour vérifier l'authentification au chargement
+  useEffect(() => {
+    checkAuthentication();
+  }, []);
+
   // Effet pour récupérer le nombre de notifications au chargement
   // et configurer une vérification périodique
   useEffect(() => {
-    // Charger les données initiales
-    fetchNotificationCounts();
+    // Ne pas procéder si l'utilisateur n'est pas authentifié
+    if (isAuthenticated === false) return;
     
-    // Configurer l'intervalle de vérification périodique (toutes les 30 secondes)
-    const intervalId = setInterval(() => {
-      const now = Date.now();
-      // Vérifier seulement si la dernière vérification date de plus de 30 secondes
-      if (now - lastCheck > 30000) {
-        fetchNotificationCounts();
-        setLastCheck(now);
-      }
-    }, 30000);
-    
-    // Nettoyer l'intervalle lors du démontage du composant
-    return () => clearInterval(intervalId);
-  }, [lastCheck]);
+    // Lorsque l'authentification est confirmée, charger les données
+    if (isAuthenticated === true) {
+      // Charger les données initiales
+      fetchNotificationCounts();
+      
+      // Configurer l'intervalle de vérification périodique (toutes les 30 secondes)
+      const intervalId = setInterval(() => {
+        const now = Date.now();
+        // Vérifier seulement si la dernière vérification date de plus de 30 secondes
+        if (now - lastCheck > 30000) {
+          fetchNotificationCounts();
+          setLastCheck(now);
+        }
+      }, 30000);
+      
+      // Nettoyer l'intervalle lors du démontage du composant
+      return () => clearInterval(intervalId);
+    }
+  }, [lastCheck, isAuthenticated]);
 
   return (
     <NotificationContext.Provider 

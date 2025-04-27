@@ -9,7 +9,7 @@ const dbConfig = {
   password: process.env.DB_PASSWORD || '',
   database: process.env.DB_NAME || 'correction',
   waitForConnections: true,
-  connectionLimit: 40,
+  connectionLimit: 30,
   queueLimit: 50
 };
 
@@ -21,7 +21,7 @@ const poolOptions: PoolOptions = {
   password: process.env.DB_PASSWORD,
   database: process.env.DB_NAME,
   // Paramètres de pool pour limiter les connexions
-  connectionLimit: 10, // Limiter le nombre maximum de connexions
+  connectionLimit: 30, // Limiter le nombre maximum de connexions
   queueLimit: 0, // 0 = illimité, défini un nombre max pour limiter la file d'attente
   waitForConnections: true, // Attendre une connexion disponible ou rejeter
   connectTimeout: 10000, // Timeout de connexion en millisecondes

@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { 
   Button, 
@@ -10,7 +10,10 @@ import {
   Card,
   CardContent,
   Divider,
-  Paper
+  Paper,
+  useTheme,
+  CircularProgress,
+  alpha
 } from '@mui/material';
 import Grid from '@mui/material/Grid';
 import AssignmentTurnedIn from '@mui/icons-material/AssignmentTurnedIn';
@@ -37,13 +40,36 @@ import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import InsightsIcon from '@mui/icons-material/Insights';
 import TimelineIcon from '@mui/icons-material/Timeline';
 
-export default function LandingPage() {
+// Composant côté client pour empêcher les erreurs de pré-rendu
+const ClientSideLandingPage = () => {
+  const theme = useTheme();
+  const [isLoaded, setIsLoaded] = useState(false);
+  
+  // S'assurer que le composant est chargé uniquement côté client
+  useEffect(() => {
+    setIsLoaded(true);
+  }, []);
+  
+  if (!isLoaded) {
+    return (
+      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
+        <CircularProgress />
+      </Box>
+    );
+  }
+  
+  // Valeurs par défaut sécurisées pour les propriétés du thème qui pourraient être undefined
+  const myBoxesPrimary = theme.palette.myBoxes?.primary;
+  const myBoxesSecondary = theme.palette.myBoxes?.secondary;
+  
   return (
-    <div className="min-h-screen bg-gradient-to-b from-gray-50 to-blue-50">
+    <Container className="min-h-screen" sx={{ bgcolor: 'background.default' }}>
       {/* Hero Section */}
       <Box 
-        className="bg-gradient-to-r from-black to-indigo-700 text-white py-16 md:py-24"
         sx={{ 
+          background: `linear-gradient(to right, ${theme.palette.common.black}, ${theme.palette.primary.dark})`,
+          color: 'text.primary',
+          py: { xs: 8, md: 12 },
           clipPath: {
             xs: 'none',
             md: 'polygon(0 0, 100% 0, 100% 85%, 0 100%)'
@@ -57,15 +83,17 @@ export default function LandingPage() {
                 variant="h3" 
                 component="h1" 
                 className="text-4xl md:text-5xl font-extrabold mb-4"
+                sx={{ color: 'common.white' }}
               >
                 Plateforme complète d'évaluation pédagogique
               </Typography>
-              <Typography variant="h6" className="mb-8 text-blue-100">
-                Créez, gérez et analysez vos corrections avec un système complet d'évaluation basé sur des points expérimentaux et théoriques
+              <Typography variant="h6" className="mb-8" sx={{ color: 'primary.light' }}>
+                Ajoutez, gérez et analysez vos corrections avec un système complet d'évaluation basé sur des points expérimentaux et théoriques
               </Typography>
               <Box className="flex mt-4 flex-wrap gap-4">
               <Button 
                 variant="outlined" 
+                color="secondary"
                 size="large" 
                 component={Link}
                 href="/demo"
@@ -73,11 +101,13 @@ export default function LandingPage() {
                 className="text-lg py-3 px-6"
                 sx={{ 
                   fontWeight: 'bold',
-                  color: 'secondary.light', 
-                  borderColor: 'secondary.light', 
+                  borderColor: theme => theme.palette.secondary.dark,
+                  color: theme => theme.palette.primary.main,
+                  borderWidth: 2,
                   '&:hover': {
-                    borderColor: 'secondary.main', 
-                    color: 'secondary.main',
+                    borderColor: theme => theme.palette.secondary.main,
+                    color: theme => theme.palette.secondary.light,
+                    borderWidth: 2,
                     boxShadow: 2,
                     transform: 'translateY(-2px)',
                     transition: 'all 0.2s',
@@ -95,11 +125,11 @@ export default function LandingPage() {
                 className="text-lg border-2"
                 sx={{ 
                   fontWeight: 'bold',
-                  borderColor: 'primary.main',
-                  color: 'primary.main',
+                  borderColor: theme => theme.palette.primary.dark,
+                  color: theme => theme.palette.primary.main,
                   '&:hover': {
-                    borderColor: 'primary.dark',
-                    color: 'primary.dark',
+                    borderColor: theme => theme.palette.primary.main,
+                    color: theme => theme.palette.primary.light,
                     boxShadow: 2,
                     transform: 'translateY(-2px)',
                     transition: 'all 0.2s',
@@ -127,12 +157,12 @@ export default function LandingPage() {
       </Box>
 
       {/* Key Features Section */}
-      <Container maxWidth="lg" className="py-16">
+      <Container maxWidth="lg" sx={{ py: 8 }}>
         <Box className="text-center mb-12 flex flex-col items-center justify-center">
-          <Typography variant="h3" component="h2" className="font-bold mb-3 text-gray-800">
+          <Typography variant="h3" component="h2" className="font-bold mb-3" sx={{ color: 'text.primary' }}>
             Une plateforme complète d'évaluation
           </Typography>
-          <Typography variant="h6" className="text-gray-600 mx-auto max-w-3xl">
+          <Typography variant="h6" sx={{ color: 'text.secondary', mx: 'auto', maxWidth: '3xl' }}>
             Optimisez votre processus d'évaluation avec un système complet d'analyse de performance
           </Typography>
         </Box>
@@ -143,9 +173,9 @@ export default function LandingPage() {
             <Card className="h-full hover:shadow-lg transition-shadow">
               <CardContent className="p-6">
                 <Box className="flex justify-center mb-4">
-                  <AssignmentTurnedIn fontSize="large" className="text-blue-600" />
+                  <AssignmentTurnedIn fontSize="large" sx={{ color: 'primary.main' }} />
                 </Box>
-                <Typography variant="h5" className="font-bold mb-2 text-center">
+                <Typography variant="h5" className="font-bold mb-2 text-center" sx={{ color: 'text.primary' }}>
                   Système de points dual
                 </Typography>
                 <Typography variant="body1" color="text.secondary" className="text-center">
@@ -160,13 +190,13 @@ export default function LandingPage() {
             <Card className="h-full hover:shadow-lg transition-shadow">
               <CardContent className="p-6">
                 <Box className="flex justify-center mb-4">
-                  <CategoryIcon fontSize="large" className="text-green-600" />
+                  <CategoryIcon fontSize="large" sx={{ color: 'success.main' }} />
                 </Box>
-                <Typography variant="h5" className="font-bold mb-2 text-center">
+                <Typography variant="h5" className="font-bold mb-2 text-center" sx={{ color: 'text.primary' }}>
                   Bibliothèque de fragments
                 </Typography>
                 <Typography variant="body1" color="text.secondary" className="text-center">
-                  Créez et réutilisez des commentaires organisés par catégories pour gagner du temps
+                Ajoutez et réutilisez des commentaires organisés par catégories pour gagner du temps
                 </Typography>
               </CardContent>
             </Card>
@@ -177,9 +207,9 @@ export default function LandingPage() {
             <Card className="h-full hover:shadow-lg transition-shadow">
               <CardContent className="p-6">
                 <Box className="flex justify-center mb-4">
-                  <Analytics fontSize="large" className="text-purple-600" />
+                  <Analytics fontSize="large" sx={{ color: 'secondary.main' }} />
                 </Box>
-                <Typography variant="h5" className="font-bold mb-2 text-center">
+                <Typography variant="h5" className="font-bold mb-2 text-center" sx={{ color: 'text.primary' }}>
                   Analyse statistique
                 </Typography>
                 <Typography variant="body1" color="text.secondary" className="text-center">
@@ -192,37 +222,37 @@ export default function LandingPage() {
       </Container>
 
       {/* Student and Class Management */}
-      <Box className="py-16 bg-white">
+      <Box sx={{ py: 8, bgcolor: 'background.paper' }}>
         <Container maxWidth="lg">
           <Grid container spacing={6} alignItems="center">
             <Grid size={{ xs: 12, md: 6 }}>
-              <Box className="p-3">
-                <Typography variant="h4" className="font-bold mb-4 text-gray-800">
+              <Box sx={{ p: 3 }}>
+                <Typography variant="h4" sx={{ fontWeight: 'bold', mb: 2, color: 'text.primary' }}>
                   Gestion complète des étudiants et des classes
                 </Typography>
-                <Typography variant="body1" className="mb-6 text-gray-600">
+                <Typography variant="body1" sx={{ mb: 4, color: 'text.secondary' }}>
                   Structurez vos groupes d'élèves et obtenez des analyses détaillées de leurs performances.
                 </Typography>
                 
-                <Box className="space-y-3">
-                  <Paper elevation={0} className="p-3 flex items-center bg-blue-50">
-                    <PeopleAltIcon className="text-blue-600 mr-3" />
-                    <Typography>Organisation des étudiants par classe et sous-groupes</Typography>
+                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                  <Paper elevation={0} sx={{ p: 2, display: 'flex', alignItems: 'center', bgcolor: myBoxesSecondary, opacity: 0.8 }}>
+                    <PeopleAltIcon sx={{ color: 'primary.dark', mr: 2 }} />
+                    <Typography sx={{ color: 'text.primary' }}>Organisation des étudiants par classe et sous-groupes</Typography>
                   </Paper>
                   
-                  <Paper elevation={0} className="p-3 flex items-center bg-blue-50">
-                    <AccountTreeIcon className="text-blue-600 mr-3" />
-                    <Typography>Association des activités à des classes spécifiques</Typography>
+                  <Paper elevation={0} sx={{ p: 2, display: 'flex', alignItems: 'center', bgcolor: myBoxesSecondary, opacity: 0.8 }}>
+                    <AccountTreeIcon sx={{ color: 'primary.dark', mr: 2 }} />
+                    <Typography sx={{ color: 'text.primary' }}>Association des activités à des classes spécifiques</Typography>
                   </Paper>
                   
-                  <Paper elevation={0} className="p-3 flex items-center bg-blue-50">
-                    <TimelineIcon className="text-blue-600 mr-3" />
-                    <Typography>Statistiques détaillées sur les performances des classes</Typography>
+                  <Paper elevation={0} sx={{ p: 2, display: 'flex', alignItems: 'center', bgcolor: myBoxesSecondary, opacity: 0.8 }}>
+                    <TimelineIcon sx={{ color: 'primary.dark', mr: 2 }} />
+                    <Typography sx={{ color: 'text.primary' }}>Statistiques détaillées sur les performances des classes</Typography>
                   </Paper>
                   
-                  <Paper elevation={0} className="p-3 flex items-center bg-blue-50">
-                    <InsightsIcon className="text-blue-600 mr-3" />
-                    <Typography>Suivi de progression individuelle des étudiants</Typography>
+                  <Paper elevation={0} sx={{ p: 2, display: 'flex', alignItems: 'center', bgcolor: myBoxesSecondary, opacity: 0.8 }}>
+                    <InsightsIcon sx={{ color: 'primary.dark', mr: 2 }} />
+                    <Typography sx={{ color: 'text.primary' }}>Suivi de progression individuelle des étudiants</Typography>
                   </Paper>
                 </Box>
               </Box>
@@ -230,11 +260,13 @@ export default function LandingPage() {
             
             <Grid size={{ xs: 12, md: 6 }}>
               <Box 
-                className="rounded-lg shadow-xl overflow-hidden"
                 sx={{ 
                   position: 'relative', 
                   height: {xs: '300px', md: '400px'}, 
-                  background: 'linear-gradient(135deg, #2a4365 0%, #4299e1 100%)' 
+                  background: `linear-gradient(135deg, ${myBoxesPrimary} 0%, ${myBoxesSecondary} 100%)`,
+                  borderRadius: 2,
+                  boxShadow: 4,
+                  overflow: 'hidden'
                 }}
               >
                 <Groups 
@@ -244,22 +276,22 @@ export default function LandingPage() {
                     left: '50%', 
                     transform: 'translate(-50%, -50%)', 
                     fontSize: 180, 
-                    color: 'white', 
+                    color: theme => theme.palette.primary.main, 
                     opacity: 0.2 
                   }} 
                 />
                 <Box sx={{ position: 'relative', zIndex: 1, p: 4, height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
                   <Box>
-                    <Typography variant="h5" className="text-white font-bold">
+                    <Typography variant="h5" sx={{ color: theme => theme.palette.text.primary, fontWeight: 'bold' }}>
                       Structure hiérarchique
                     </Typography>
-                    <Typography className="text-blue-100 mt-2">
+                    <Typography sx={{ color: 'primary.light', mt: 2 }}>
                       Classes → Sous-groupes → Étudiants
                     </Typography>
                   </Box>
                   
-                  <Box className="bg-white/10 p-3 rounded-lg backdrop-blur-sm">
-                    <Typography className="text-white">
+                  <Box sx={{ bgcolor: myBoxesPrimary, p: 3, borderRadius: 2, backdropFilter: 'blur(4px)' }}>
+                    <Typography sx={{ color: theme => theme.palette.text.primary }}>
                       "Une organisation claire et flexible qui s'adapte à tous les contextes d'enseignement"
                     </Typography>
                   </Box>
@@ -271,32 +303,32 @@ export default function LandingPage() {
       </Box>
 
       {/* Extended Features Grid */}
-      <Box className="py-16 bg-gray-50">
+      <Box sx={{ py: 8, bgcolor: 'background.default' }}>
         <Container maxWidth="lg">
-          <Typography variant="h4" component="h3" className="text-center font-bold mb-12">
+          <Typography variant="h4" component="h3" sx={{ textAlign: 'center', fontWeight: 'bold', mb: 6, color: 'text.primary' }}>
             Caractéristiques principales
           </Typography>
 
           <Grid container spacing={5}>
-            <Grid size={{ xs: 12, sm: 6, md: 4 }} className="mb-1">
-              <Box className="flex items-start">
-                <MergeTypeIcon className="text-blue-600 mr-3 mt-1" fontSize="medium" />
+            <Grid size={{ xs: 12, sm: 6, md: 4 }} sx={{ mb: 1 }}>
+              <Box sx={{ display: 'flex', alignItems: 'flex-start' }}>
+                <MergeTypeIcon sx={{ color: 'primary.main', mr: 2, mt: 0.5 }} fontSize="medium" />
                 <div>
-                  <Typography variant="h6" className="font-semibold mb-1">
+                  <Typography variant="h6" sx={{ fontWeight: 600, mb: 1, color: 'text.primary' }}>
                     Corrections avec fragments
                   </Typography>
                   <Typography variant="body2" color="text.secondary">
-                    Créez des retours détaillés en utilisant des fragments réutilisables classés par catégories
+                  Ajoutez des retours détaillés en utilisant des fragments réutilisables classés par catégories
                   </Typography>
                 </div>
               </Box>
             </Grid>
 
-            <Grid size={{ xs: 12, sm: 6, md: 4 }} className="mb-1">
-              <Box className="flex items-start">
-                <AutoGraph className="text-indigo-600 mr-3 mt-1" fontSize="medium" />
+            <Grid size={{ xs: 12, sm: 6, md: 4 }} sx={{ mb: 1 }}>
+              <Box sx={{ display: 'flex', alignItems: 'flex-start' }}>
+                <AutoGraph sx={{ color: 'secondary.main', mr: 2, mt: 0.5 }} fontSize="medium" />
                 <div>
-                  <Typography variant="h6" className="font-semibold mb-1">
+                  <Typography variant="h6" sx={{ fontWeight: 600, mb: 1, color: 'text.primary' }}>
                     Statistiques comparatives
                   </Typography>
                   <Typography variant="body2" color="text.secondary">
@@ -306,11 +338,11 @@ export default function LandingPage() {
               </Box>
             </Grid>
 
-            <Grid size={{ xs: 12, sm: 6, md: 4 }} className="mb-1">
-              <Box className="flex items-start">
-                <Share className="text-green-600 mr-3 mt-1" fontSize="medium" />
+            <Grid size={{ xs: 12, sm: 6, md: 4 }} sx={{ mb: 1 }}>
+              <Box sx={{ display: 'flex', alignItems: 'flex-start' }}>
+                <Share sx={{ color: 'success.main', mr: 2, mt: 0.5 }} fontSize="medium" />
                 <div>
-                  <Typography variant="h6" className="font-semibold mb-1">
+                  <Typography variant="h6" sx={{ fontWeight: 600, mb: 1, color: 'text.primary' }}>
                     Partage sécurisé
                   </Typography>
                   <Typography variant="body2" color="text.secondary">
@@ -320,11 +352,11 @@ export default function LandingPage() {
               </Box>
             </Grid>
 
-            <Grid size={{ xs: 12, sm: 6, md: 4 }} className="mb-1">
-              <Box className="flex items-start">
-                <PersonSearch className="text-amber-600 mr-3 mt-1" fontSize="medium" />
+            <Grid size={{ xs: 12, sm: 6, md: 4 }} sx={{ mb: 1 }}>
+              <Box sx={{ display: 'flex', alignItems: 'flex-start' }}>
+                <PersonSearch sx={{ color: 'warning.main', mr: 2, mt: 0.5 }} fontSize="medium" />
                 <div>
-                  <Typography variant="h6" className="font-semibold mb-1">
+                  <Typography variant="h6" sx={{ fontWeight: 600, mb: 1, color: 'text.primary' }}>
                     Recherche avancée
                   </Typography>
                   <Typography variant="body2" color="text.secondary">
@@ -334,11 +366,11 @@ export default function LandingPage() {
               </Box>
             </Grid>
 
-            <Grid size={{ xs: 12, sm: 6, md: 4 }} className="mb-6">
-              <Box className="flex items-start">
-                <DataSaverOn className="text-purple-600 mr-3 mt-1" fontSize="medium" />
+            <Grid size={{ xs: 12, sm: 6, md: 4 }} sx={{ mb: 3 }}>
+              <Box sx={{ display: 'flex', alignItems: 'flex-start' }}>
+                <DataSaverOn sx={{ color: 'secondary.dark', mr: 2, mt: 0.5 }} fontSize="medium" />
                 <div>
-                  <Typography variant="h6" className="font-semibold mb-1">
+                  <Typography variant="h6" sx={{ fontWeight: 600, mb: 1, color: 'text.primary' }}>
                     Analyses détaillées
                   </Typography>
                   <Typography variant="body2" color="text.secondary">
@@ -348,11 +380,11 @@ export default function LandingPage() {
               </Box>
             </Grid>
 
-            <Grid size={{ xs: 12, sm: 6, md: 4 }} className="mb-6">
-              <Box className="flex items-start">
-                <Devices className="text-cyan-600 mr-3 mt-1" fontSize="medium" />
+            <Grid size={{ xs: 12, sm: 6, md: 4 }} sx={{ mb: 3 }}>
+              <Box sx={{ display: 'flex', alignItems: 'flex-start' }}>
+                <Devices sx={{ color: 'info.main', mr: 2, mt: 0.5 }} fontSize="medium" />
                 <div>
-                  <Typography variant="h6" className="font-semibold mb-1">
+                  <Typography variant="h6" sx={{ fontWeight: 600, mb: 1, color: 'text.primary' }}>
                     Interface adaptative
                   </Typography>
                   <Typography variant="body2" color="text.secondary">
@@ -366,12 +398,25 @@ export default function LandingPage() {
       </Box>
 
       {/* Fragments System Feature Focus */}
-      <Box className="py-16 bg-white">
+      <Box sx={{ py: 8, bgcolor: 'background.paper' }}>
         <Container maxWidth="lg">
           <Grid container spacing={6} alignItems="center">
             <Grid size={{ xs: 12, md: 5 }}>
-              <Box className="relative rounded-lg overflow-hidden shadow-xl" sx={{ height: '400px' }}>
-                <div className="bg-gradient-to-br from-purple-500 to-indigo-700 p-8 h-full flex items-center justify-center">
+              <Box sx={{ 
+                position: 'relative', 
+                borderRadius: 2, 
+                overflow: 'hidden', 
+                boxShadow: 4, 
+                height: '400px'
+              }}>
+                <Box sx={{ 
+                  background: `linear-gradient(to bottom right, ${alpha(theme.palette.secondary.light,0.3)}, ${alpha(theme.palette.primary.light,0.3)})`,
+                  p: 4,
+                  height: '100%',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}>
                   <CategoryIcon
                     sx={{
                       position: 'absolute',
@@ -380,55 +425,55 @@ export default function LandingPage() {
                       width: '100%',
                       height: '100%',
                       opacity: 0.2,
-                      color:'white',
+                      color: theme => theme.palette.primary.light,
                     }}
                   />
-                  <div className="relative text-center">
-                    <FormatQuoteIcon sx={{ fontSize: 80, color: 'white', opacity: 0.9 }} />
-                    <Typography variant="h5" className="text-white mt-4 font-bold">
+                  <Box sx={{ position: 'relative', textAlign: 'center' }}>
+                    <FormatQuoteIcon sx={{ fontSize: 80, color: theme.palette.primary.dark, opacity: 0.9 }} />
+                    <Typography variant="h5" sx={{ color: theme.palette.text.primary, mt: 2, fontWeight: 'bold' }}>
                       Bibliothèque de fragments intelligente
                     </Typography>
-                  </div>
-                </div>
+                  </Box>
+                </Box>
               </Box>
             </Grid>
 
             <Grid size={{ xs: 12, md: 7 }}>
-              <Typography variant="h4" className="font-bold mb-4 text-gray-800">
+              <Typography variant="h4" sx={{ fontWeight: 'bold', mb: 2, color: theme.palette.text.primary }}>
                 Système de fragments catégorisés
               </Typography>
-              <Typography variant="body1" sx={{marginBottom: '10px'}} className="text-gray-600">
+              <Typography variant="body1" sx={{ mb: 3, color: theme.palette.text.secondary }}>
                 Optimisez votre flux de travail avec notre système unique de fragments :
               </Typography>
               
-              <Box className="space-y-4 mt-6">
-                <Box className="flex items-start">
-                  <CheckCircleIcon className="text-green-600 mr-3 mt-1" />
-                  <Typography variant="body1">
-                    <strong>Fragments réutilisables</strong> - Créez une bibliothèque de commentaires que vous pouvez utiliser dans toutes vos corrections
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mt: 3 }}>
+                <Box sx={{ display: 'flex', alignItems: 'flex-start' }}>
+                  <CheckCircleIcon sx={{ color: 'success.main', mr: 2, mt: 0.5 }} />
+                  <Typography variant="body1" color="text.primary">
+                    <strong>Fragments réutilisables</strong> - Ajoutez une bibliothèque de commentaires que vous pouvez utiliser dans toutes vos corrections
                   </Typography>
                 </Box>
-                <Box className="flex items-start">
-                  <CheckCircleIcon className="text-green-600 mr-3 mt-1" />
-                  <Typography variant="body1">
+                <Box sx={{ display: 'flex', alignItems: 'flex-start' }}>
+                  <CheckCircleIcon sx={{ color: 'success.main', mr: 2, mt: 0.5 }} />
+                  <Typography variant="body1" color="text.primary">
                     <strong>Organisation par catégories</strong> - Classez vos fragments pour un accès rapide et efficace
                   </Typography>
                 </Box>
-                <Box className="flex items-start">
-                  <CheckCircleIcon className="text-green-600 mr-3 mt-1" />
-                  <Typography variant="body1">
-                    <strong>Association à des activités</strong> - Créez des fragments spécifiques pour certains types d'activités
+                <Box sx={{ display: 'flex', alignItems: 'flex-start' }}>
+                  <CheckCircleIcon sx={{ color: 'success.main', mr: 2, mt: 0.5 }} />
+                  <Typography variant="body1" color="text.primary">
+                    <strong>Association à des activités</strong> - Ajoutez des fragments spécifiques pour certains types d'activités
                   </Typography>
                 </Box>
-                <Box className="flex items-start">
-                  <CheckCircleIcon className="text-green-600 mr-3 mt-1" />
-                  <Typography variant="body1">
+                <Box sx={{ display: 'flex', alignItems: 'flex-start' }}>
+                  <CheckCircleIcon sx={{ color: 'success.main', mr: 2, mt: 0.5 }} />
+                  <Typography variant="body1" color="text.primary">
                     <strong>Recherche intelligente</strong> - Retrouvez rapidement les fragments dont vous avez besoin grâce à notre moteur de recherche
                   </Typography>
                 </Box>
-                <Box className="flex items-start">
-                  <CheckCircleIcon className="text-green-600 mr-3 mt-1" />
-                  <Typography variant="body1">
+                <Box sx={{ display: 'flex', alignItems: 'flex-start' }}>
+                  <CheckCircleIcon sx={{ color: 'success.main', mr: 2, mt: 0.5 }} />
+                  <Typography variant="body1" color="text.primary">
                     <strong>Système d'étiquettes</strong> - Ajoutez des tags à vos fragments pour une organisation encore plus flexible
                   </Typography>
                 </Box>
@@ -441,7 +486,6 @@ export default function LandingPage() {
                 component={Link}
                 href="/fragments"
                 sx={{ mt: 4 }}
-                className="text-md font-medium"
               >
                 Explorer les fragments
               </Button>
@@ -451,47 +495,59 @@ export default function LandingPage() {
       </Box>
 
       {/* Analysis Feature Section */}
-      <Box className="py-16 bg-gray-50">
+      <Box sx={{ py: 8, bgcolor: 'background.default' }}>
         <Container maxWidth="lg">
           <Grid container spacing={6} alignItems="center">
             <Grid size={{ xs: 12, md: 7 }}>
-              <Typography variant="h4" className="font-bold mb-4 text-gray-800">
+              <Typography variant="h4" sx={{ fontWeight: 'bold', mb: 2, color: 'text.primary' }}>
                 Analyses statistiques avancées
               </Typography> 
-              <Typography variant="body1" sx={{marginTop: '20px', marginBottom: '10px'}} className="text-gray-600">
+              <Typography variant="body1" sx={{ mt: 2, mb: 3, color: 'text.secondary' }}>
                 Obtenez des insights précieux sur les performances avec nos outils d'analyse :
               </Typography>
               
-              <Box className="space-y-4">
-                <Box className="flex items-start">
-                  <PieChart className="text-blue-600 mr-3 mt-1" />
-                  <Typography variant="body1">
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                <Box sx={{ display: 'flex', alignItems: 'flex-start' }}>
+                  <PieChart sx={{ color: 'info.main', mr: 2, mt: 0.5 }} />
+                  <Typography variant="body1" color="text.primary">
                     <strong>Statistiques individuelles</strong> - Suivez la progression de chaque étudiant avec des métriques détaillées
                   </Typography>
                 </Box>
-                <Box className="flex items-start">
-                  <BarChart className="text-blue-600 mr-3 mt-1" />
-                  <Typography variant="body1">
+                <Box sx={{ display: 'flex', alignItems: 'flex-start' }}>
+                  <BarChart sx={{ color: 'info.main', mr: 2, mt: 0.5 }} />
+                  <Typography variant="body1" color="text.primary">
                     <strong>Analyses de groupe</strong> - Comparez les performances entre différentes classes et sous-groupes
                   </Typography>
                 </Box>
-                <Box className="flex items-start">
-                  <Speed className="text-blue-600 mr-3 mt-1" />
-                  <Typography variant="body1">
+                <Box sx={{ display: 'flex', alignItems: 'flex-start' }}>
+                  <Speed sx={{ color: 'info.main', mr: 2, mt: 0.5 }} />
+                  <Typography variant="body1" color="text.primary">
                     <strong>Ventilation des points</strong> - Distinguez les performances sur les aspects expérimentaux et théoriques
                   </Typography>
                 </Box>
-                <Box className="flex items-start">
-                  <Equalizer className="text-blue-600 mr-3 mt-1" />
-                  <Typography variant="body1">
+                <Box sx={{ display: 'flex', alignItems: 'flex-start' }}>
+                  <Equalizer sx={{ color: 'info.main', mr: 2, mt: 0.5 }} />
+                  <Typography variant="body1" color="text.primary">
                     <strong>Évaluation des tendances</strong> - Identifiez les points forts et les axes d'amélioration
                   </Typography>
                 </Box>
               </Box>
             </Grid>
             <Grid size={{ xs: 12, md: 5 }}>
-              <Box className="relative rounded-lg overflow-hidden shadow-xl">
-                <div className="bg-gradient-to-br from-blue-500 to-cyan-700 p-8 h-80 flex items-center justify-center">
+              <Box sx={{ 
+                position: 'relative', 
+                borderRadius: 2, 
+                overflow: 'hidden', 
+                boxShadow: 4
+              }}>
+                <Box sx={{ 
+                  background: `linear-gradient(to bottom right, ${alpha(theme.palette.primary.light,0.3)}, ${alpha(theme.palette.secondary.light,0.3)})`,
+                  p: 4,
+                  height: '320px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}>
                   <BarChart
                     sx={{
                       position: 'absolute',
@@ -500,16 +556,16 @@ export default function LandingPage() {
                       width: '100%',
                       height: '100%',
                       opacity: 0.2,
-                      color:'white',
+                      color: theme => theme.palette.primary.light,
                     }}
                   />
-                  <div className="relative text-center">
-                    <Analytics sx={{ fontSize: 100, color: 'white', opacity: 0.9 }} />
-                    <Typography variant="h5" className="text-white mt-4 font-bold">
+                  <Box sx={{ position: 'relative', textAlign: 'center' }}>
+                    <Analytics sx={{ fontSize: 100, color: theme => theme.palette.primary.dark, opacity: 0.9 }} />
+                    <Typography variant="h5" sx={{ color: theme => theme.palette.text.primary, mt: 2, fontWeight: 'bold' }}>
                       Visualisation des performances
                     </Typography>
-                  </div>
-                </div>
+                  </Box>
+                </Box>
               </Box>
             </Grid>
           </Grid>
@@ -517,38 +573,55 @@ export default function LandingPage() {
       </Box>
 
       {/* Call to Action */}
-      <Box className="py-16 text-white" style={{ backgroundColor: 'rgba(7, 31, 97, 1)' }}>
-        <Container maxWidth="md" className="text-center">
-          <Typography variant="h4" className="font-bold mb-4">
+      <Box sx={{ 
+        py: 8, 
+        bgcolor: myBoxesSecondary, 
+        color: theme => theme.palette.text.primary
+      }}>
+        <Container maxWidth="md" sx={{ textAlign: 'center' }}>
+          <Typography variant="h4" sx={{ fontWeight: 'bold', mb: 2, color: theme => theme.palette.text.primary }}>
             Commencez dès aujourd'hui
           </Typography>
-          <Typography variant="body1" sx={{ mb: 8 }}>
+          <Typography variant="body1" sx={{ mb: 5, color: theme => theme.palette.text.primary }}>
             Rejoignez les enseignants qui optimisent leur processus d'évaluation et fournissent des retours de qualité à leurs étudiants.
           </Typography>
-          <Box className="flex flex-wrap justify-center gap-4">
+          <Box sx={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: 2 }}>
             <Button 
-              variant="contained" 
-              color="secondary" 
+              variant="outlined" 
+              color="success" 
               size="large" 
               component={Link}
               href="/activities"
-              className="text-lg font-medium"
+              sx={{ fontSize: '1.1rem', fontWeight: 500 }}
             >
               Commencer maintenant
             </Button>
             <Button 
-              variant="contained" 
-              color="primary"
+              variant="outlined" 
               size="large" 
+              color="primary"
               component={Link}
               href="/demo"
-              className="text-lg font-medium border-2"
+              sx={{ 
+                fontSize: '1.1rem', 
+                fontWeight: 500, 
+                color: theme => theme.palette.primary.dark, 
+                borderColor: theme => theme.palette.primary.light,
+                '&:hover': {
+                  borderColor: theme => theme.palette.primary.light,
+                }
+              }}
             >
               Voir des exemples
             </Button>
           </Box>
         </Container>
       </Box>
-    </div>
+    </Container>
   );
+};
+
+// Export le composant côté client uniquement
+export default function LandingPage() {
+  return <ClientSideLandingPage />;
 }

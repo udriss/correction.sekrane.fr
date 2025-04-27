@@ -7,36 +7,44 @@ export async function GET() {
     const token = (await cookies()).get('auth_token')?.value;
     
     if (!token) {
+      // Retourner un 200 OK au lieu d'un 401 pour éviter les erreurs dans la console
+      // tout en indiquant que l'utilisateur n'est pas authentifié
       return NextResponse.json({ 
         user: null, 
-        error: "aucun token d'authentification trouvé" 
-      }, { status: 401 });
+        authenticated: false
+      }, { status: 200 });
     }
     
     const secret = new TextEncoder().encode(process.env.JWT_SECRET || 'changeme');
-    const { payload } = await jwtVerify(token, secret);
     
-    return NextResponse.json({ 
-      user: {
-        id: payload.id,
-        username: payload.username,
-        name: payload.name
-      }
-    });
-  } catch (error) {
-    console.error('Error verifying token:', error);
-    
-    // Extraire et retourner les détails de l'erreur
-    const errorMessage = error instanceof Error 
-      ? error.message 
-      : "Erreur inconnue lors de la vérification du token";
+    try {
+      const { payload } = await jwtVerify(token, secret);
       
-    // Retourner à la fois le statut d'erreur et les détails
+      return NextResponse.json({ 
+        user: {
+          id: payload.id,
+          username: payload.username,
+          name: payload.name
+        },
+        authenticated: true
+      });
+    } catch (tokenError) {
+      // En cas d'erreur de vérification du token (token expiré ou invalide)
+      // on retourne également un 200 OK pour éviter les erreurs dans la console
+      return NextResponse.json({ 
+        user: null, 
+        authenticated: false,
+        reason: 'token_invalid'
+      }, { status: 200 });
+    }
+  } catch (error) {
+    console.error('Error in auth/user endpoint:', error);
+    
+    // Même en cas d'erreur serveur, on retourne un 200 OK pour éviter les erreurs console
     return NextResponse.json({ 
       user: null, 
-      error: errorMessage,
-      errorType: error instanceof Error ? error.name : 'UnknownError',
-      errorDetails: process.env.NODE_ENV === 'development' ? String(error) : undefined
-    }, { status: 401 });
+      authenticated: false,
+      reason: 'server_error'
+    }, { status: 200 });
   }
 }

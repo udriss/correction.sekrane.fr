@@ -17,9 +17,45 @@ export function DbCleanupProvider({ children }: { children: ReactNode }) {
   const [lastRunFormatted, setLastRunFormatted] = useState<string>('jamais');
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isCronJob, setIsCronJob] = useState<boolean>(true); // Par défaut, on utilise le cron job
+  const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
+
+  // Vérifier si l'utilisateur est admin (id = 1)
+  const checkAdminStatus = async () => {
+    try {
+      const response = await fetch('/api/auth/user');
+      if (response.ok) {
+        const data = await response.json();
+        // Vérifier que l'utilisateur est authentifié et qu'il a l'ID d'admin (1)
+        const isUserAdmin = data.authenticated === true && 
+                           data.user && 
+                           data.user.id === 1;
+        setIsAdmin(isUserAdmin);
+        return isUserAdmin;
+      } else {
+        setIsAdmin(false);
+        return false;
+      }
+    } catch (error) {
+      console.error('Erreur lors de la vérification du statut admin:', error);
+      setIsAdmin(false);
+      return false;
+    }
+  };
 
   // Fetch the server state for the cron job
   const fetchCronState = async () => {
+    // Vérifier d'abord si l'utilisateur est admin
+    if (isAdmin === null) {
+      const isUserAdmin = await checkAdminStatus();
+      if (!isUserAdmin) {
+        setIsLoading(false);
+        return;
+      }
+    } else if (!isAdmin) {
+      setIsLoading(false);
+      return;
+    }
+
     try {
       setIsLoading(true);
       const response = await fetch('/api/admin/db-status/cron-cleanup', {
@@ -52,16 +88,33 @@ export function DbCleanupProvider({ children }: { children: ReactNode }) {
 
   // Charger l'état initial depuis le serveur
   useEffect(() => {
-    fetchCronState();
-    
-    // Rafraîchir l'état toutes les 60 secondes
-    const intervalId = setInterval(fetchCronState, 60000);
-    
-    return () => clearInterval(intervalId);
+    checkAdminStatus();
   }, []);
+
+  // Configurer l'intervalle de rafraîchissement uniquement si admin
+  useEffect(() => {
+    // Ne pas procéder si l'utilisateur n'est pas admin
+    if (isAdmin === false) {
+      setIsLoading(false);
+      return;
+    }
+    
+    if (isAdmin === true) {
+      fetchCronState();
+      
+      // Rafraîchir l'état toutes les 60 secondes
+      const intervalId = setInterval(fetchCronState, 60000);
+      
+      return () => clearInterval(intervalId);
+    }
+  }, [isAdmin]);
   
   // Handler pour mettre à jour l'état
   const handleSetAutoCleanupEnabled = async (enabled: boolean) => {
+    // Ne pas procéder si l'utilisateur n'est pas admin
+    if (isAdmin === false) return;
+    if (isAdmin === null && !await checkAdminStatus()) return;
+
     setIsLoading(true);
     
     if (isCronJob) {
