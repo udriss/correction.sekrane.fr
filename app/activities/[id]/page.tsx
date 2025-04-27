@@ -17,13 +17,22 @@ import {
   Box, 
   FormHelperText, 
   Chip,
-  alpha
+  alpha,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  List,
+  ListItem,
+  Alert
 } from '@mui/material';
 import EditIcon from '@mui/icons-material/Edit';
 import SaveIcon from '@mui/icons-material/Save';
 import CloseIcon from '@mui/icons-material/Close';
 import DeleteIcon from '@mui/icons-material/Delete';
 import CheckIcon from '@mui/icons-material/Check';
+import WarningIcon from '@mui/icons-material/Warning';
+
 import { useSnackbar } from 'notistack';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import QrCodeIcon from '@mui/icons-material/QrCode';
@@ -37,6 +46,8 @@ import ExportPDFComponentAllCorrectionsAutresContainer from '@/components/pdfAut
 // Import FragmentsList et le type Fragment
 import FragmentsList from '@/components/FragmentsList';
 import { Fragment } from '@/lib/types';
+// Import du composant modal déplacé
+import UpdateCorrectionsModal from '@/components/corrections/UpdateCorrectionsModal';
 
 
 
@@ -68,6 +79,18 @@ export default function ActivityAutreDetail({ params }: { params: Promise<{ id: 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
+  
+  // États pour la gestion de la mise à jour des corrections
+  const [updateCorrectionsModalOpen, setUpdateCorrectionsModalOpen] = useState(false);
+  const [correctionsToUpdate, setCorrectionsToUpdate] = useState<CorrectionAutreEnriched[]>([]);
+  const [selectedCorrectionIds, setSelectedCorrectionIds] = useState<number[]>([]);
+  const [partsChanges, setPartsChanges] = useState<{
+    added: { name: string; points: number }[];
+    removed: { index: number; name: string; points: number }[];
+  }>({ added: [], removed: [] });
+  const [isUpdatingCorrections, setIsUpdatingCorrections] = useState(false);
+  const [updateCorrectionsSuccess, setUpdateCorrectionsSuccess] = useState(false);
+  const [updateCorrectionsError, setUpdateCorrectionsError] = useState<string | null>(null);
   
   const [students, setStudents] = useState<Student[]>([]);
   const [filteredCorrections, setFilteredCorrections] = useState<CorrectionAutre[]>([]);
@@ -302,6 +325,17 @@ export default function ActivityAutreDetail({ params }: { params: Promise<{ id: 
     
     setIsSubmitting(true);
     try {
+      // Vérifier si activity et ses propriétés nécessaires existent
+      if (!activity || !activity.parts_names || !activity.points) {
+        throw new Error('Les données de l\'activité sont invalides');
+      }
+      
+      // Sauvegarde des anciennes parties pour calculer les différences
+      const oldParts = activity.parts_names.map((name: string, index: number) => ({
+        name,
+        points: activity.points[index] || 0
+      }));
+      
       const response = await fetch(`/api/activities_autres/${activityId}`, {
         method: 'PUT',
         headers: {
@@ -324,6 +358,43 @@ export default function ActivityAutreDetail({ params }: { params: Promise<{ id: 
       setActivity(updatedActivity);
       setIsEditing(false);
       enqueueSnackbar('Activité mise à jour avec succès', { variant: 'success' });
+      
+      // Comparaison des parties pour trouver les différences qui affectent les points
+      const added: { name: string; points: number }[] = [];
+      const removed: { index: number; name: string; points: number }[] = [];
+      
+      // Détecter les parties supprimées ou dont les points ont changé
+      oldParts.forEach((oldPart, index) => {
+        // Chercher une partie avec les mêmes points dans les nouvelles parties
+        const foundWithSamePoints = parts.find(newPart => newPart.points === oldPart.points);
+        if (!foundWithSamePoints) {
+          // Si on ne trouve pas de partie avec les mêmes points, cette partie est considérée comme supprimée
+          // du point de vue des corrections (qui ne s'intéressent qu'aux points)
+          removed.push({ index, ...oldPart });
+        }
+      });
+      
+      // Détecter les parties ajoutées ou dont les points ont changé
+      parts.forEach((newPart) => {
+        // Chercher une partie avec les mêmes points dans les anciennes parties
+        const foundWithSamePoints = oldParts.find(oldPart => oldPart.points === newPart.points);
+        if (!foundWithSamePoints) {
+          // Si on ne trouve pas de partie avec les mêmes points, cette partie est considérée comme ajoutée
+          // du point de vue des corrections
+          added.push(newPart);
+        }
+      });
+      
+      // Si les points ont changé, afficher le modal pour mettre à jour les corrections
+      if (added.length > 0 || removed.length > 0) {
+        // Vérifier s'il y a des corrections associées
+        if (corrections.length > 0) {
+          setPartsChanges({ added, removed });
+          setCorrectionsToUpdate(corrections);
+          setSelectedCorrectionIds(corrections.map(c => c.id));
+          setUpdateCorrectionsModalOpen(true);
+        }
+      }
     } catch (error) {
       console.error('Erreur:', error);
       enqueueSnackbar(`Erreur: ${(error as Error).message}`, { variant: 'error' });
@@ -367,6 +438,93 @@ export default function ActivityAutreDetail({ params }: { params: Promise<{ id: 
     router.push(`/activities/${activityId}/corrections/`);
   };
   
+  // Fonction pour mettre à jour les corrections après modification de l'activité
+  const handleUpdateCorrections = async () => {
+    if (selectedCorrectionIds.length === 0) {
+      return;
+    }
+
+    setIsUpdatingCorrections(true);
+    setUpdateCorrectionsError(null);
+    
+    try {
+      // Pour chaque correction sélectionnée, nous devons mettre à jour ses points_earned
+      const updateResults = await Promise.all(
+        selectedCorrectionIds.map(async (correctionId) => {
+          const correction = correctionsToUpdate.find(c => c.id === correctionId);
+          if (!correction) return null;
+          
+          // Obtenir les points_earned actuels
+          let newPointsEarned = [...correction.points_earned];
+          
+          // Supprimer les points pour les parties retirées (dans l'ordre inverse pour préserver les index)
+          partsChanges.removed
+            .sort((a, b) => b.index - a.index) // Trier par index décroissant
+            .forEach(removedPart => {
+              newPointsEarned.splice(removedPart.index, 1);
+            });
+          
+          // Ajouter des zéros pour les nouvelles parties
+          partsChanges.added.forEach(() => {
+            newPointsEarned.push(0);
+          });
+          
+          // Mettre à jour la correction
+          const response = await fetch(`/api/corrections_autres/${correctionId}/update_parts`, {
+            method: 'PUT',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ 
+              points_earned: newPointsEarned
+            }),
+          });
+          
+          if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.error || `Erreur lors de la mise à jour de la correction #${correctionId}`);
+          }
+          
+          return await response.json();
+        })
+      );
+      
+      // Vérifier si toutes les mises à jour ont réussi
+      const failedUpdates = updateResults.filter(result => result === null);
+      if (failedUpdates.length > 0) {
+        throw new Error(`${failedUpdates.length} correction(s) n'ont pas pu être mises à jour`);
+      }
+      
+      // Mettre à jour la liste des corrections localement
+      const updatedCorrections = [...corrections];
+      updateResults.forEach(updatedCorrection => {
+        if (!updatedCorrection) return;
+        
+        const index = updatedCorrections.findIndex(c => c.id === updatedCorrection.id);
+        if (index >= 0) {
+          updatedCorrections[index] = updatedCorrection;
+        }
+      });
+      
+      setCorrections(updatedCorrections);
+      setUpdateCorrectionsSuccess(true);
+      enqueueSnackbar(`${updateResults.length} correction(s) mise(s) à jour avec succès`, { variant: 'success' });
+      
+      // Fermer automatiquement le modal après un délai
+      setTimeout(() => {
+        setUpdateCorrectionsModalOpen(false);
+        setUpdateCorrectionsSuccess(false);
+      }, 3000);
+      
+    } catch (error) {
+      console.error('Erreur lors de la mise à jour des corrections:', error);
+      setUpdateCorrectionsError((error as Error).message);
+      enqueueSnackbar(`Erreur: ${(error as Error).message}`, { variant: 'error' });
+    } finally {
+      setIsUpdatingCorrections(false);
+    }
+  };
+
   // Modifier la fonction handleTabChange pour mettre à jour l'URL
   const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
     setTabValue(newValue);
@@ -586,8 +744,10 @@ export default function ActivityAutreDetail({ params }: { params: Promise<{ id: 
                   size="large"
                   color="primary"
                   aria-label="edit"
+                  title="Modifier cette activité"
+                  sx={{ ml: 2 }}
                 >
-                  <EditIcon className="ml-2" sx={{color: "secondary.light" }} />
+                  <EditIcon sx={{color: "secondary.light" }} />
                 </IconButton>
                 {confirmingDelete ? (
                   <>
@@ -671,7 +831,7 @@ export default function ActivityAutreDetail({ params }: { params: Promise<{ id: 
                     
                     <Box sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
                       <Typography variant="body1">
-                        Total des points: <strong>{totalPoints}</strong>
+                        Total des points : <strong>{totalPoints}</strong>
                       </Typography>
                       <Button
                         variant="outlined"
@@ -984,6 +1144,22 @@ export default function ActivityAutreDetail({ params }: { params: Promise<{ id: 
           )}
         </Box>
       </Paper>
+
+      {/* Composant modal pour mettre à jour les corrections après modification d'une activité */}
+      <UpdateCorrectionsModal
+        open={updateCorrectionsModalOpen}
+        onClose={() => setUpdateCorrectionsModalOpen(false)}
+        corrections={correctionsToUpdate}
+        selectedCorrectionIds={selectedCorrectionIds}
+        setSelectedCorrectionIds={setSelectedCorrectionIds}
+        partsChanges={partsChanges}
+        isUpdating={isUpdatingCorrections}
+        onUpdateCorrections={handleUpdateCorrections}
+        updateSuccess={updateCorrectionsSuccess}
+        updateError={updateCorrectionsError}
+        students={students}
+      />
     </Container>
   );
 }
+
