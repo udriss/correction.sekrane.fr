@@ -41,6 +41,8 @@ import DeleteIcon from '@mui/icons-material/Delete';
 import CheckIcon from '@mui/icons-material/Check';
 import SchoolIcon from '@mui/icons-material/School';
 import LayersIcon from '@mui/icons-material/Layers';
+import SearchIcon from '@mui/icons-material/Search';
+
 import { 
     IconButton,
   } from '@mui/material';
@@ -122,6 +124,8 @@ export default function MultipleCorrectionsFormAutre({
   // Student data states
   const [manualStudentCount, setManualStudentCount] = useState<number>(1);
   const [students, setStudents] = useState<Student[]>([]);
+  const [filteredStudents, setFilteredStudents] = useState<Student[]>([]);
+  const [searchTerm, setSearchTerm] = useState<string>('');
   const [csvContent, setCsvContent] = useState<string>('');
   const [classes, setClasses] = useState<Class[]>([]);
   const [selectedClassId, setSelectedClassId] = useState<string>('');
@@ -486,6 +490,32 @@ export default function MultipleCorrectionsFormAutre({
   // Calculer le total des points maximum pour cette activité
   const totalMaxPoints = activity.points ? activity.points.reduce((sum, points) => sum + points, 0) : 0;
   
+  // Function to filter students by search term
+  const handleSearch = (term: string) => {
+    setSearchTerm(term);
+    if (!term.trim()) {
+      // Si le terme de recherche est vide, on utilise la liste complète des étudiants
+      setFilteredStudents(students);
+    } else {
+      // Filtrer les étudiants par nom
+      const filtered = students.filter(student => 
+        `${student.firstName} ${student.lastName}`.toLowerCase().includes(term.toLowerCase())
+      );
+      setFilteredStudents(filtered);
+    }
+  };
+
+  // Update filtered students when students list changes
+  useEffect(() => {
+    if (searchTerm.trim()) {
+      // Si un terme de recherche existe, on filtre la liste
+      handleSearch(searchTerm);
+    } else {
+      // Sinon, on utilise tous les étudiants
+      setFilteredStudents(students);
+    }
+  }, [students]);
+
   return (
     <div className="space-y-6">
       {/* Input selection section - Always visible */}
@@ -772,6 +802,30 @@ export default function MultipleCorrectionsFormAutre({
               {saving ? 'Enregistrement...' : 'Ajouter les corrections'}
             </Button>
           </Box>
+          
+          {/* Barre de recherche pour filtrer les étudiants */}
+          {students.length > 0 && (
+            <TextField
+              fullWidth
+              label="Rechercher un étudiant"
+              variant="outlined"
+              size="small"
+              value={searchTerm}
+              onChange={(e) => handleSearch(e.target.value)}
+              placeholder="Rechercher par nom"
+              slotProps={{
+                input: { 
+                  startAdornment: (
+                    <Box component="span" sx={{ color: 'action.active', mr: 1, display: 'flex' }}>
+                      <SearchIcon />
+                    </Box>
+                  ),
+                 }
+              }}
+              sx={{ mb: 3 }}
+            />
+          )}
+
           <Typography variant="overline" className="font-bold" sx={{ mb: 2, fontWeight: 'bold', color: '#d43100' }}>
                 Les notes peuvent être modifiées à tout moment. Une redirection a lieu après l'enregistrement.
           </Typography>
@@ -794,7 +848,7 @@ export default function MultipleCorrectionsFormAutre({
                 </TableRow>
               </TableHead>
               <TableBody>
-                {students.map((student, studentIndex) => (
+                {(searchTerm ? filteredStudents : students).map((student, studentIndex) => (
                   <React.Fragment key={studentIndex}>
                     {/* Ligne principale avec nom et note totale */}
                     <TableRow 

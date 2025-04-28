@@ -25,7 +25,8 @@ import {
   Card,
   CardContent,
   Tabs,
-  Tab
+  Tab,
+  InputAdornment
 } from '@mui/material';
 import Link from 'next/link';
 import GroupIcon from '@mui/icons-material/Group';
@@ -35,6 +36,7 @@ import HourglassEmptyIcon from '@mui/icons-material/HourglassEmpty';
 import TuneIcon from '@mui/icons-material/Tune';
 import CheckIcon from '@mui/icons-material/Check';
 import GroupAddIcon from '@mui/icons-material/GroupAdd';
+import SearchIcon from '@mui/icons-material/Search';
 
 
 
@@ -71,6 +73,7 @@ export default function MultipleCorrectionsAutrePage({ params }: { params: Promi
   const [studentsLoading, setStudentsLoading] = useState(true);
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [searchTerm, setSearchTerm] = useState(''); // Nouvel état pour le terme de recherche
   
   const [classes, setClasses] = useState<Class[]>([]);
   const [unassociatedClasses, setUnassociatedClasses] = useState<Class[]>([]);
@@ -168,17 +171,48 @@ export default function MultipleCorrectionsAutrePage({ params }: { params: Promi
   
   // Filtrer les étudiants lorsque les classes sélectionnées changent
   useEffect(() => {
-    if (selectedClassIds.length === 0) {
-      setFilteredStudents(students);
-    } else {
-      const filtered = students.filter(student => 
+    // Filtrer par classe et sous-classe d'abord
+    let filtered = students;
+    
+    // Filtrer par classe si des classes sont sélectionnées
+    if (selectedClassIds.length > 0) {
+      filtered = filtered.filter(student => 
         student.allClasses && student.allClasses.some(cls => 
           selectedClassIds.includes(cls.classId)
         )
       );
-      setFilteredStudents(filtered);
+      
+      // Si une sous-classe spécifique est sélectionnée
+      if (selectedSubClass !== 'all') {
+        // Extraire les composants de la clé composite "classId:subClassValue"
+        const [selectedClassIdStr, selectedSubClassValue] = selectedSubClass.split(':');
+        const selectedClassIdNum = parseInt(selectedClassIdStr);
+        
+        filtered = filtered.filter(student => 
+          student.allClasses && student.allClasses.some(cls => 
+            cls.classId === selectedClassIdNum && 
+            cls.sub_class?.toString() === selectedSubClassValue
+          )
+        );
+      }
     }
-  }, [selectedClassIds, students]);
+    
+    // Filtrer par terme de recherche si présent
+    if (searchTerm.trim() !== '') {
+      const normalizedSearch = searchTerm.trim().toLowerCase();
+      filtered = filtered.filter(student => 
+        `${student.first_name} ${student.last_name}`.toLowerCase().includes(normalizedSearch) ||
+        `${student.last_name} ${student.first_name}`.toLowerCase().includes(normalizedSearch)
+      );
+    }
+    
+    // Trier les étudiants par nom, prénom
+    const sortedStudents = [...filtered].sort((a, b) => 
+      `${a.last_name} ${a.first_name}`.localeCompare(`${b.last_name} ${b.first_name}`)
+    );
+    
+    setFilteredStudents(sortedStudents);
+  }, [selectedClassIds, selectedSubClass, students, searchTerm]);
   
   // Pour charger les sous-classes lorsque les classes sont sélectionnées
   useEffect(() => {
@@ -693,6 +727,31 @@ export default function MultipleCorrectionsAutrePage({ params }: { params: Promi
                   </FormControl>
                 </div>
               )}
+              
+              {/* Barre de recherche pour filtrer les étudiants */}
+              <div className="mb-4">
+                <TextField
+                  fullWidth
+                  label="Rechercher un étudiant"
+                  placeholder="Rechercher par nom"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  variant="outlined"
+                  size="small"
+                  InputProps={{
+                    startAdornment: (
+                      <InputAdornment position="start">
+                        <SearchIcon />
+                      </InputAdornment>
+                    ),
+                  }}
+                />
+                <FormHelperText>
+                  {searchTerm.trim() !== '' 
+                    ? `${filteredStudents.length} résultat(s) pour "${searchTerm}"`
+                    : "Recherchez un étudiant par nom ou prénom"}
+                </FormHelperText>
+              </div>
               
               {/* Bouton pour sélectionner tous les étudiants du groupe */}
               {selectedSubClass !== 'all' && availableSubClasses.length > 0 && (

@@ -24,6 +24,7 @@ import MaleIcon from '@mui/icons-material/Male';
 import FemaleIcon from '@mui/icons-material/Female';
 import NeutralIcon from '@mui/icons-material/RemoveCircleOutline';
 import WarningIcon from '@mui/icons-material/Warning';
+import LockIcon from '@mui/icons-material/Lock';
 import GradientBackground from '@/components/ui/GradientBackground';
 import PatternBackground from '@/components/ui/PatternBackground';
 import { Student, Class } from './types';
@@ -35,9 +36,10 @@ interface StudentHeaderProps {
   student: Student;
   classes: Class[];
   onEditClick: () => void;
+  onPasswordClick?: () => void; // Nouveau prop pour le gestionnaire de mot de passe
 }
 
-export default function StudentHeader({ student, classes, onEditClick }: StudentHeaderProps) {
+export default function StudentHeader({ student, classes, onEditClick, onPasswordClick }: StudentHeaderProps) {
   const theme = useTheme();
   const router = useRouter();
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -227,6 +229,23 @@ export default function StudentHeader({ student, classes, onEditClick }: Student
                 
                 <Box sx={{ mt: { xs: 2, md: 0 }, display: 'flex', gap: 1 }}>
                   <EmailCorrectionPage student={student} />
+                  {onPasswordClick && (
+                    <Button
+                      variant="contained"
+                      startIcon={<LockIcon />}
+                      onClick={onPasswordClick}
+                      sx={{ 
+                        bgcolor: 'rgba(255,255,255,0.15)',
+                        color: theme.palette.info.main,
+                        '&:hover': { 
+                          bgcolor: theme.palette.info.main,
+                          color: 'white'
+                        }
+                      }}
+                    >
+                      Mot de passe
+                    </Button>
+                  )}
                   <Button
                     variant="contained"
                     startIcon={<EditIcon />}

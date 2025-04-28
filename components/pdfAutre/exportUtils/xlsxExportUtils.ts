@@ -373,7 +373,21 @@ export const createExcelWorksheet = (
       // Ajouter les en-têtes
       headerRow1.getCell(colIndex).value = activity;
       headerRow1.getCell(colIndex + 1).value = activity;
-      headerRow2.getCell(colIndex).value = `Points par partie`;
+      
+      // Obtenir l'activité à partir de son nom pour récupérer les noms des parties
+      const activityObj = Array.from(corrections).find(c => {
+        const act = getActivityById(c.activity_id);
+        return act && act.name === activity;
+      }) ? getActivityById(Array.from(corrections).find(c => {
+        const act = getActivityById(c.activity_id);
+        return act && act.name === activity;
+      })?.activity_id || 0) : undefined;
+      
+      headerRow2.getCell(colIndex).value = activityObj && 
+        Array.isArray(activityObj.parts_names) && 
+        activityObj.parts_names.length > 0
+          ? `Points par partie (${activityObj.parts_names.join(', ')})`
+          : `Points par partie`;
       headerRow2.getCell(colIndex + 1).value = 'Note';
       
       // Fusionner les cellules du titre de l'activité
@@ -444,16 +458,66 @@ export const createExcelWorksheet = (
     ];
   } else {
     // Format détaillé standard pour corrections_autres
-    worksheet.columns = [
+    
+    // Analyser toutes les activités pour identifier toutes les parties possibles
+    // et créer une colonne pour chaque partie
+    const activitiesInCorrections = new Set<number>();
+    corrections.forEach(c => activitiesInCorrections.add(c.activity_id));
+    
+    // Collecter tous les noms de parties uniques et leur position
+    // Map de position => nom de partie
+    const partsPositionMap = new Map<number, string>();
+    // Identifier le nombre maximum de parties dans une activité
+    let maxPartsCount = 0;
+    
+    activitiesInCorrections.forEach(activityId => {
+      const activity = getActivityById(activityId);
+      if (activity && Array.isArray(activity.parts_names) && activity.parts_names.length > 0) {
+        // Mettre à jour le nombre maximum de parties
+        maxPartsCount = Math.max(maxPartsCount, activity.parts_names.length);
+        
+        // Associer chaque position à un nom de partie
+        activity.parts_names.forEach((name, index) => {
+          if (!partsPositionMap.has(index)) {
+            partsPositionMap.set(index, name);
+          } else if (partsPositionMap.get(index) !== name) {
+            // Si différentes activités ont des noms différents pour la même position,
+            // utiliser un format combiné ou le plus fréquent
+            const existingName = partsPositionMap.get(index);
+            partsPositionMap.set(index, existingName + ' / ' + name);
+          }
+        });
+      }
+    });
+    
+    // Créer les colonnes standards
+    const standardColumns = [
       { header: 'Étudiant', key: 'student', width: 30 },
       { header: 'Classe', key: 'class', width: 20 },
-      { header: 'Activité', key: 'activity', width: 30 },
-      { header: 'Points par partie', key: 'points', width: 30 },
+      { header: 'Activité', key: 'activity', width: 30 }
+    ];
+    
+    // Ajouter une colonne pour chaque partie
+    const partColumns = [];
+    
+    for (let i = 0; i < maxPartsCount; i++) {
+      partColumns.push({
+        header: partsPositionMap.get(i) || `Partie ${i+1}`,
+        key: `part_${i}`,
+        width: 15
+      });
+    }
+    
+    // Ajouter les colonnes finales
+    const finalColumns = [
       { header: 'Note', key: 'grade', width: 15 },
       { header: 'Statut', key: 'status', width: 15 }
     ];
     
-    // --- Ajout du tri par nom d'étudiant pour la vue détaillée ---
+    // Combinaison de toutes les colonnes
+    worksheet.columns = [...standardColumns, ...partColumns, ...finalColumns];
+    
+    // --- Tri par nom d'étudiant ---
     corrections.sort((a: CorrectionAutreEnriched, b: CorrectionAutreEnriched) => {
       const studentA = getStudentById(a.student_id) as Student | undefined;
       const studentB = getStudentById(b.student_id) as Student | undefined;
@@ -465,6 +529,7 @@ export const createExcelWorksheet = (
       return nameA.localeCompare(nameB, 'fr', { sensitivity: 'base' });
     });
 
+    console.log('Corrections triées:', corrections);
     // Ajouter les données des corrections (maintenant triées)
     corrections.forEach(c => {
       const activity = getActivityById(c.activity_id);
@@ -488,19 +553,18 @@ export const createExcelWorksheet = (
         statusDisplay = 'DÉSACTIVÉ';
       }
       
-      // Formater les points
-      let pointsDisplay = isPlaceholder ? 'N/A' : 'N/A';
-      if (!isPlaceholder && Array.isArray(c.points_earned) && c.points_earned.length > 0) {
-        pointsDisplay = '[' + c.points_earned.join(' ; ') + ']';
-      }
-      
       // Formater la note
       let gradeDisplay;
+      let totalPoints = 20;
+      if (activity && Array.isArray(activity.points)) {
+        totalPoints = activity.points.reduce((sum, p) => sum + p, 0);
+      }
       if (isPlaceholder) {
         gradeDisplay = 'N/A';
       } else if (c.grade !== undefined) {
         if (statusDisplay === 'ACTIVE') {
-          gradeDisplay = `${formatGrade(c.grade)} / 20`;
+          // Remplacer '.' par ',' dans la note et afficher le barème réel
+          gradeDisplay = `${formatGrade(c.grade).replace('.', ',')} / ${String(totalPoints).replace('.', ',')}`;
         } else {
           gradeDisplay = statusDisplay;
         }
@@ -508,18 +572,46 @@ export const createExcelWorksheet = (
         gradeDisplay = 'NON NOTÉ';
       }
       
-      const row = worksheet.addRow({
+      // Préparer les données de base de la ligne
+      const rowData: any = {
         student: student ? `${student.first_name} ${student.last_name}` : 'N/A',
         class: className,
         activity: activity?.name || `Activité ${c.activity_id}`,
-        points: pointsDisplay,
         grade: gradeDisplay,
         status: statusDisplay
-      });
+      };
+      
+      // Ajouter les points pour chaque partie
+      if (!isPlaceholder && Array.isArray(c.points_earned)) {
+        c.points_earned.forEach((point: number, index: number) => {
+          // Formater le point avec virgule au lieu de point décimal
+          const formattedPoint = String(point).replace('.', ',');
+          rowData[`part_${index}`] = formattedPoint;
+        });
+      }
+      
+      // Pour les parties sans point, mettre 'N/A' ou le statut approprié
+      for (let i = 0; i < maxPartsCount; i++) {
+        if (rowData[`part_${i}`] === undefined) {
+          if (statusDisplay !== 'ACTIVE') {
+            rowData[`part_${i}`] = statusDisplay;
+          } else {
+            rowData[`part_${i}`] = 'N/A';
+          }
+        }
+      }
+      
+      const row = worksheet.addRow(rowData);
       
       // Appliquer des styles aux cellules
       applyExcelCellStyle(row.getCell('grade'), gradeDisplay);
       applyExcelCellStyle(row.getCell('status'), statusDisplay);
+      
+      // Appliquer des styles aux cellules de points
+      for (let i = 0; i < maxPartsCount; i++) {
+        const cell = row.getCell(`part_${i}`);
+        applyExcelCellStyle(cell, rowData[`part_${i}`]);
+      }
     });
   }
   

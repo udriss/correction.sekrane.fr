@@ -20,12 +20,12 @@ export const generatePDF = async (
     // Configurer l'en-tête du document
     doc.setFont('helvetica');
     doc.setFontSize(16);
-    doc.text('Récapitulatif des notes — Corrections avec barème dynamique', 20, 20);
+    doc.text('Récapitulatif des notes', 20, 20);
     
     // Informations de filtrage
     doc.setFontSize(12);
     doc.text(`Date d'export : ${new Date().toLocaleDateString('fr-FR', { year: 'numeric', month: 'long', day: 'numeric' })}`, 20, 30);
-    doc.text(`Activité : ${filterActivity === 'all' ? 'Toutes' : uniqueActivities.find((a) => a.id === filterActivity)?.name}`, 20, 40);
+    doc.text(`Activité : ${filterActivity === 'all' ? 'toutes' : uniqueActivities.find((a) => a.id === filterActivity)?.name}`, 20, 40);
     
     // Position de départ pour le contenu du PDF
     let yPosition = 50;
@@ -38,8 +38,28 @@ export const generatePDF = async (
     doc.setFillColor(240, 240, 240); // Gris clair
     doc.rect(0, doc.internal.pageSize.height - 15, doc.internal.pageSize.width, 15, 'F');
 
+    doc.addPage();
+    
     // Générer le contenu selon l'organisation choisie
+    let isFirstGroup = true;
     Object.entries(groupedData).forEach(([key, value]: [string, any]) => {
+      // Ajouter une nouvelle page pour chaque groupe sauf le premier
+      if (!isFirstGroup) {
+        doc.addPage();
+        
+        // Ajouter un rectangle décoratif en haut de la nouvelle page
+        doc.setFillColor(66, 135, 245);
+        doc.rect(0, 0, doc.internal.pageSize.width, 12, 'F');
+        
+        // Ajouter un rectangle décoratif en bas pour le pied de page
+        doc.setFillColor(240, 240, 240);
+        doc.rect(0, doc.internal.pageSize.height - 15, doc.internal.pageSize.width, 15, 'F');
+        
+        yPosition = 50; // Réinitialiser la position Y pour la nouvelle page
+      } else {
+        isFirstGroup = false;
+      }
+      
       doc.setFontSize(16);
       doc.setFont('helvetica', 'bold');
       doc.text(key, 20, yPosition);
@@ -415,7 +435,7 @@ export const generatePDF = async (
       doc.text(pageInfo, doc.internal.pageSize.width / 2, doc.internal.pageSize.height - 7, { align: 'center' });
       
       // Petit texte d'information
-      doc.setFontSize(8);
+      doc.setFontSize(5);
       doc.setTextColor(100, 100, 100);
       doc.text('Document construit automatiquement — correction.sekrane.fr', 100, doc.internal.pageSize.height - 7, { align: 'right' });
     }

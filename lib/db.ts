@@ -339,6 +339,24 @@ export async function initializeDatabase() {
       );
     }
 
+    // Création de la table pour stocker les mots de passe des étudiants
+    await query(`
+      CREATE TABLE IF NOT EXISTS student_pass (
+        student_id INT NOT NULL,
+        password VARCHAR(255) NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        PRIMARY KEY (student_id),
+        FOREIGN KEY (student_id) REFERENCES students(id) ON DELETE CASCADE
+      );
+
+      -- Ajout d'un index pour accélérer les recherches
+      CREATE INDEX idx_student_pass_student_id ON student_pass(student_id);
+      )
+    `);
+
+
+
     // Create settings table for application configuration
     await query(`
       CREATE TABLE IF NOT EXISTS app_settings (

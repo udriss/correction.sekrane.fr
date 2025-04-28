@@ -30,7 +30,7 @@ const StudentsTutorial: React.FC<StudentsTutorialProps> = ({ show, onClose }) =>
         </IconButton>
       </Box>
       
-      <Typography variant="body1" paragraph>
+      <Typography variant="body1" >
         Cette page vous permet de gérer tous les étudiants de votre établissement :
       </Typography>
       

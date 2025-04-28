@@ -13,11 +13,13 @@ import {
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import SchoolIcon from '@mui/icons-material/School';
 import UploadIcon from '@mui/icons-material/Upload';
+import LockIcon from '@mui/icons-material/Lock';
 import Link from 'next/link';
 import LoadingSpinner from '@/components/LoadingSpinner';
 import ClassStudentsManager from '@/components/classes/ClassStudentsManager';
 import GradientBackground from '@/components/ui/GradientBackground';
 import PatternBackground from '@/components/ui/PatternBackground';
+import StudentPasswordManager from '@/components/students/StudentPasswordManager';
 
 interface Class {
   id: number;
@@ -197,6 +199,45 @@ export default function ClassStudentsPage({ params }: { params: Promise<{ id: st
         showBatchFormInitially={importCSVMode}
         onBatchFormClosed={() => setImportCSVMode(false)}
       />
+
+      {/* Modal de gestion des mots de passe - nous le définissons ici mais il sera contrôlé par le ClassStudentsManager */}
+      <ClassPasswordManagerWrapper classId={classId} className={classData?.name || ''} />
     </Container>
+  );
+}
+
+// Composant wrapper pour gérer l'état du modal de mots de passe
+function ClassPasswordManagerWrapper({ classId, className }: { classId: number, className: string }) {
+  const [passwordManagerOpen, setPasswordManagerOpen] = useState(false);
+  const [selectedStudents, setSelectedStudents] = useState<any[]>([]);
+
+  // Exposer les méthodes pour contrôler le modal des mots de passe
+  // Cette fonction sera accessible via une référence globale
+  React.useEffect(() => {
+    if (typeof window !== 'undefined') {
+      // @ts-ignore - Créer une référence globale pour permettre l'ouverture du modal depuis le ClassStudentsManager
+      window.openClassPasswordManager = (students: any[]) => {
+        setSelectedStudents(students);
+        setPasswordManagerOpen(true);
+      };
+    }
+    
+    return () => {
+      if (typeof window !== 'undefined') {
+        // @ts-ignore - Nettoyer la référence à la fermeture du composant
+        delete window.openClassPasswordManager;
+      }
+    };
+  }, []);
+
+  return (
+    <StudentPasswordManager
+      open={passwordManagerOpen}
+      onClose={() => setPasswordManagerOpen(false)}
+      students={selectedStudents}
+      context="multiple"
+      classId={classId}
+      title={`Gestion des mots de passe - ${className}`}
+    />
   );
 }

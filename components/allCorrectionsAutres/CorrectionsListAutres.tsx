@@ -38,7 +38,7 @@ export default function CorrectionsListAutres({
   highlightedIds = [],
   recentFilter = false,
   refreshCorrections,
-  isLoading = false,
+  isLoading,
   getStudentById
 }: CorrectionsListAutresProps) {
   const { batchDeleteMode, selectedCorrections, setSelectedCorrections, deletingCorrections } = useBatchDelete();
@@ -61,15 +61,6 @@ export default function CorrectionsListAutres({
     
     loadShareCodes();
   }, [filteredCorrections]);
-
-  // Gestion de la sélection des corrections pour la suppression par lot
-  const handleCorrectionSelect = (correctionId: string) => {
-    const newSelected = localSelected.includes(correctionId) 
-      ? localSelected.filter(id => id !== correctionId)
-      : [...localSelected, correctionId];
-    setLocalSelected(newSelected);
-    setSelectedCorrections(newSelected);
-  };
 
   // Handle changing the status of a correction to a specific value
   const handleChangeStatus = async (correctionId: number, newStatus: string): Promise<void> => {
@@ -105,55 +96,82 @@ export default function CorrectionsListAutres({
     );
   }
 
-  // Si aucune correction n'est trouvée
-  if (!filteredCorrections || filteredCorrections.length === 0) {
-    return (
-      <Alert 
-        severity="info" 
-        sx={{ 
-          mt: 2,
-          display: 'flex',
-          alignItems: 'center',
-          '& .MuiAlert-message': { flex: 1 }
-        }}
-        action={
-          activeFilters.length > 0 ? (
-            <Button color="inherit" size="small" onClick={handleClearAllFilters}>
-              Effacer les filtres
-            </Button>
-          ) : undefined
-        }
-      >
-        Aucune correction trouvée
-        {activeFilters.length > 0 && " avec les filtres actuels"}
-      </Alert>
-    );
-  }
-
   return (
-    <Grid container spacing={2}>
-      {filteredCorrections.map((correction) => {
-        const isHighlighted = highlightedIds.includes(correction.id.toString());
+    <>
 
-        return (
-          <Grid 
-            size={{ xs: 12, md: 6, lg: 4 }}
-            key={correction.id}
-          >
-            <CorrectionCardAutre 
-              correction={correction}
-              highlighted={isHighlighted}
-              getGradeColor={getGradeColor}
-              showClass={true}
-              showStudent={true}
-              showActivity={true}
-              onChangeStatus={handleChangeStatus}
-              preloadedShareCode={shareCodesMap.get(correction.id.toString())}
-              studentSubClass={getStudentById && correction.student_id ? getStudentById(correction.student_id)?.sub_class : null}
-            />
-          </Grid>
-        );
-      })}
-    </Grid>
+      {/* Message "Aucune correction disponible" uniquement s'il n'y a pas de chargement ET filteredCorrections indispo */}
+      {isLoading === false && (!filteredCorrections) && (
+        <Alert 
+          severity="info" 
+          sx={{ 
+            mt: 2,
+            display: 'flex',
+            alignItems: 'center',
+            '& .MuiAlert-message': { flex: 1 }
+          }}
+          action={
+            activeFilters.length > 0 ? (
+              <Button color="inherit" size="small" onClick={handleClearAllFilters}>
+                Effacer les filtres
+              </Button>
+            ) : undefined
+          }
+        >
+          Aucune correction disponible
+          {activeFilters.length > 0 && " avec les filtres actuels"}
+        </Alert>
+      )}
+
+      {/* Message "Aucune correction trouvée" uniquement s'il n'y a pas de chargement ET que la liste est vide */}
+      {isLoading === false && (filteredCorrections.length === 0) && (
+        <Alert 
+          severity="info" 
+          sx={{ 
+            mt: 2,
+            display: 'flex',
+            alignItems: 'center',
+            '& .MuiAlert-message': { flex: 1 }
+          }}
+          action={
+            activeFilters.length > 0 ? (
+              <Button color="inherit" size="small" onClick={handleClearAllFilters}>
+                Effacer les filtres
+              </Button>
+            ) : undefined
+          }
+        >
+          Aucune correction trouvée
+          {activeFilters.length > 0 && " avec les filtres actuels"}
+        </Alert>
+      )}
+      
+      {/* Liste des corrections */}
+      {filteredCorrections && filteredCorrections.length > 0 && (
+        <Grid container spacing={2}>
+          {filteredCorrections.map((correction) => {
+            const isHighlighted = highlightedIds.includes(correction.id.toString());
+
+            return (
+              <Grid 
+                size={{ xs: 12, md: 6, lg: 4 }}
+                key={correction.id}
+              >
+                <CorrectionCardAutre 
+                  correction={correction}
+                  highlighted={isHighlighted}
+                  getGradeColor={getGradeColor}
+                  showClass={true}
+                  showStudent={true}
+                  showActivity={true}
+                  onChangeStatus={handleChangeStatus}
+                  preloadedShareCode={shareCodesMap.get(correction.id.toString())}
+                  studentSubClass={getStudentById && correction.student_id ? getStudentById(correction.student_id)?.sub_class : null}
+                />
+              </Grid>
+            );
+          })}
+        </Grid>
+      )}
+    </>
   );
 }

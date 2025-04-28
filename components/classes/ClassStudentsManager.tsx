@@ -48,6 +48,7 @@ import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
 import EmailIcon from '@mui/icons-material/Email';
+import LockIcon from '@mui/icons-material/Lock';
 import StudentEditDialog from '@/components/students/StudentEditDialog';
 import AlertDialog from '@/components/AlertDialog';
 import WarningIcon from '@mui/icons-material/Warning';
@@ -1052,7 +1053,7 @@ export default function ClassStudentsManager({
                       <Table size="small">
                         <TableHead>
                           <TableRow>
-                          <TableCell>Nom</TableCell>
+                          <TableCell>Nom*</TableCell>
                           <TableCell>Prénom*</TableCell>
                           <TableCell>
                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
@@ -1078,8 +1079,8 @@ export default function ClassStudentsManager({
                                 <TextField
                                   size="small"
                                   fullWidth
-                                  value={student.first_name}
-                                  onChange={(e) => handleBatchStudentFieldChange(index, 'first_name', e.target.value)}
+                                  value={student.last_name}
+                                  onChange={(e) => handleBatchStudentFieldChange(index, 'last_name', e.target.value)}
                                   required
                                 />
                               </TableCell>
@@ -1087,8 +1088,8 @@ export default function ClassStudentsManager({
                                 <TextField
                                   size="small"
                                   fullWidth
-                                  value={student.last_name}
-                                  onChange={(e) => handleBatchStudentFieldChange(index, 'last_name', e.target.value)}
+                                  value={student.first_name}
+                                  onChange={(e) => handleBatchStudentFieldChange(index, 'first_name', e.target.value)}
                                 />
                               </TableCell>
                               <TableCell align="center">
@@ -1706,6 +1707,16 @@ export default function ClassStudentsManager({
                             color="primary"
                           >
                             <EditIcon fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
+                        <Tooltip title="Gérer le mot de passe">
+                          <IconButton 
+                            size="small" 
+                            color="secondary"
+                            component={student?.id ? Link : 'button'}
+                            href={student?.id ? `/students/${student.id}/password` : undefined}
+                          >
+                            <LockIcon fontSize="small" />
                           </IconButton>
                         </Tooltip>
                         <Tooltip title="Supprimer">

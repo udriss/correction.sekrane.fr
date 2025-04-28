@@ -18,6 +18,7 @@ import GradeIcon from '@mui/icons-material/Grade';
 import TrendingUpIcon from '@mui/icons-material/TrendingUp';
 import SchoolIcon from '@mui/icons-material/School';
 import PersonIcon from '@mui/icons-material/Person';
+import LockIcon from '@mui/icons-material/Lock';
 
 import LoadingSpinner from '@/components/LoadingSpinner';
 import dayjs from 'dayjs';
@@ -34,6 +35,7 @@ import StudentEvolution from '@/components/students/[id]/StudentEvolution';
 import StudentClasses from '@/components/students/[id]/StudentClasses';
 import StudentEditDialogForDetail from '@/components/students/StudentEditDialogForDetail';
 import ErrorDisplay from '@/components/ui/ErrorDisplay';
+import StudentPasswordManager from '@/components/students/StudentPasswordManager';
 
 dayjs.locale('fr');
 
@@ -57,6 +59,7 @@ export default function StudentDetailPage() {
   const [availableSubgroups, setAvailableSubgroups] = useState<string[]>([]);
   const [loadingSubgroups, setLoadingSubgroups] = useState(false);
   const [errorDetails, setErrorDetails] = useState<any>(null);
+  const [passwordManagerOpen, setPasswordManagerOpen] = useState(false); // État pour le gestionnaire de mots de passe
   
 
   useEffect(() => {
@@ -381,7 +384,8 @@ export default function StudentDetailPage() {
         <StudentHeader 
           student={student} 
           classes={classes} 
-          onEditClick={handleOpenEditDialog} 
+          onEditClick={handleOpenEditDialog}
+          onPasswordClick={() => setPasswordManagerOpen(true)}
         />
         
         {stats && <StudentStatsDisplay stats={stats} />}
@@ -448,6 +452,18 @@ export default function StudentDetailPage() {
         onSelectedClassesChange={handleSelectedClassesChange}
         fetchClassSubgroups={fetchClassSubgroups}
       />
+
+      {/* Gestionnaire de mots de passe */}
+      {student && (
+        <StudentPasswordManager
+          open={passwordManagerOpen}
+          onClose={() => setPasswordManagerOpen(false)}
+          students={[student]}
+          context="single"
+          studentId={student.id}
+          title={`Gestion du mot de passe - ${student.first_name} ${student.last_name}`}
+        />
+      )}
     </Container>
   );
 }

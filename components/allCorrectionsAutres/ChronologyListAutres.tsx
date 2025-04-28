@@ -38,7 +38,7 @@ export default function ChronologyListAutres({
   highlightedIds = [],
   recentFilter = false,
   refreshCorrections,
-  isLoading = false,
+  isLoading,
   getStudentById
 }: ChronologyListAutresProps) {
   const { enqueueSnackbar } = useSnackbar();
@@ -91,7 +91,8 @@ export default function ChronologyListAutres({
     );
   }
 
-  if (!filteredCorrections || filteredCorrections.length === 0) {
+  // Message "Aucune correction trouvée" uniquement s'il n'y a pas de chargement ET que la liste est vide
+  if (!isLoading && (!filteredCorrections || filteredCorrections.length === 0)) {
     return (
       <Alert 
         severity="info" 
@@ -130,6 +131,30 @@ export default function ChronologyListAutres({
 
 
   return (
+    <>
+          {/* Message "Aucune correction trouvée" uniquement s'il n'y a pas de chargement ET que la liste est vide */}
+          {!isLoading && (!filteredCorrections || filteredCorrections.length === 0) && (
+            <Alert 
+              severity="info" 
+              sx={{ 
+                mt: 2,
+                display: 'flex',
+                alignItems: 'center',
+                '& .MuiAlert-message': { flex: 1 }
+              }}
+              action={
+                activeFilters.length > 0 ? (
+                  <Button color="inherit" size="small" onClick={handleClearAllFilters}>
+                    Effacer les filtres
+                  </Button>
+                ) : undefined
+              }
+            >
+              Aucune correction trouvée
+              {activeFilters.length > 0 && " avec les filtres actuels"}
+            </Alert>
+          )}
+
     <Box>
       {Object.entries(groupedCorrections)
         .sort(([dateA], [dateB]) => {
@@ -167,5 +192,6 @@ export default function ChronologyListAutres({
           </Box>
         ))}
     </Box>
+    </>
   );
 }

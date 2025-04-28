@@ -721,7 +721,7 @@ const GradingSectionAutres: React.FC<GradingSectionAutresProps> = ({
                 onChangeCommitted={() => handleSliderCommit(index)}
                 min={0}
                 max={totalPoints[index]}
-                step={0.5}
+                step={0.25}
                 valueLabelDisplay="auto"
                 marks
                 disabled={neverSubmitted || isUpdating || saving}

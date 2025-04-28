@@ -22,7 +22,7 @@
  * - ExportPDFComponentAllCorrectionsAutresContainer.tsx - Conteneur qui orchestre tous les composants
  */
 
-// Types communs pour les exports PDF des corrections avec barème dynamique
+// Types communs pour les exports PDF
 import { Student } from '@/lib/types';
 import { CorrectionAutreEnriched, ActivityAutre } from '@/lib/types';
 

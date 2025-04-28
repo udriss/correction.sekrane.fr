@@ -47,7 +47,7 @@ export default function StudentsListAutres({
   highlightedIds = [],
   recentFilter = false,
   refreshCorrections,
-  isLoading = false,
+  isLoading = true,
   getStudentById
 }: StudentsListAutresProps) {
   const { enqueueSnackbar } = useSnackbar();
@@ -135,31 +135,31 @@ export default function StudentsListAutres({
     );
   }
 
-  if (!filteredCorrections || filteredCorrections.length === 0) {
-    return (
-      <Alert 
-        severity="info" 
-        sx={{ 
-          mt: 2,
-          display: 'flex',
-          alignItems: 'center',
-          '& .MuiAlert-message': { flex: 1 }
-        }}
-        action={
-          activeFilters.length > 0 ? (
-            <Button color="inherit" size="small" onClick={handleClearAllFilters}>
-              Effacer les filtres
-            </Button>
-          ) : undefined
-        }
-      >
-        Aucune correction trouvée
-        {activeFilters.length > 0 && " avec les filtres actuels"}
-      </Alert>
-    );
-  }
 
   return (
+    <>
+      {/* Message "Aucune correction trouvée" uniquement s'il n'y a pas de chargement ET que la liste est vide */}
+      {!isLoading && (!filteredCorrections || filteredCorrections.length === 0) && (
+        <Alert 
+          severity="info" 
+          sx={{ 
+            mt: 2,
+            display: 'flex',
+            alignItems: 'center',
+            '& .MuiAlert-message': { flex: 1 }
+          }}
+          action={
+            activeFilters.length > 0 ? (
+              <Button color="inherit" size="small" onClick={handleClearAllFilters}>
+                Effacer les filtres
+              </Button>
+            ) : undefined
+          }
+        >
+          Aucune correction trouvée
+          {activeFilters.length > 0 && " avec les filtres actuels"}
+        </Alert>
+      )}
     <Box>
       {studentGroups.map(({ studentName, studentId, corrections, averageGrade, totalCorrections, className }) => (
         <Accordion key={`${studentId}-${studentName}`} defaultExpanded={studentGroups.length === 1}>
@@ -205,5 +205,6 @@ export default function StudentsListAutres({
         </Accordion>
       ))}
     </Box>
+    </>
   );
 }

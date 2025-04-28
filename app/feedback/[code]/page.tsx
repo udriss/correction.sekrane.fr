@@ -18,7 +18,8 @@ import {
   AccordionDetails,
   Grid,
   useMediaQuery,
-  useTheme 
+  useTheme,
+  alpha
 } from '@mui/material';
 import { useRouter } from 'next/navigation';
 import { parseContentItems } from '@/lib/services/correctionService';
@@ -117,8 +118,11 @@ export default function FeedbackViewer({ params }: { params: Promise<{ code: str
     if (Number.isInteger(numValue)) {
       return numValue.toString();
     } else {
-      // Format avec une décimale et remplace le point par une virgule
-      return numValue.toFixed(1).replace('.', ',');
+      // Vérifier si la note a des centièmes
+      const hasCentesimal = (numValue * 100) % 10 !== 0;
+      
+      // Format avec une ou deux décimales selon le cas, et remplace le point par une virgule
+      return (hasCentesimal ? numValue.toFixed(2) : numValue.toFixed(1)).replace('.', ',');
     }
   };
 
@@ -744,7 +748,7 @@ export default function FeedbackViewer({ params }: { params: Promise<{ code: str
                                         <Typography variant="body2">
                                           <strong>Note finale :</strong>
                                         </Typography>
-                                        <Typography variant="body2" sx={{ fontWeight: 'bold', color: 'success.dark' }}>{formatGrade(finalGrade)}/20</Typography>
+                                        <Typography variant="body2" sx={{ fontWeight: 'bold', color: 'success.dark' }}>{formatGrade(finalGrade)} / 20</Typography>
                                       </Box>
                                       <Typography variant="caption" sx={{ color: 'text.secondary', mt: 0.5 }}>
                                         <InfoIcon sx={{ fontSize: 16, verticalAlign: 'text-bottom', mr: 0.5 }} />
@@ -841,7 +845,7 @@ export default function FeedbackViewer({ params }: { params: Promise<{ code: str
                         }}>
                           {isNeverSubmitted ? 
                             "Travail non rendu" : 
-                            formatGradeWithNonRendu(hasPenalty ? finalGrade : correction.grade)
+                            formatGradeWithNonRendu(hasPenalty ? finalGrade : finalGrade)
                           }
                         </Typography>
                         <Typography variant="subtitle1">
@@ -935,13 +939,15 @@ export default function FeedbackViewer({ params }: { params: Promise<{ code: str
                     <style jsx global>{`
                       .exercise-title {
                         margin-top: 1.5rem;
-                        margin-bottom: 1rem;
+                        text-align: center;
+                        margin-bottom: 2rem;
                         padding: 0.75rem 1rem;
                         font-weight: bold;
                         font-size: 1.1rem;
-                        background: linear-gradient(90deg, ${theme.palette.primary.main}20, transparent);
-                        border-left: 4px solid ${theme.palette.primary.main};
-                        border-radius: 0.25rem;
+                        background: linear-gradient(90deg, ${alpha(theme.palette.primary.light,.2)}, ${alpha(theme.palette.secondary.light,.2)});
+                        border: 1px solid black;
+                        box-shadow: 0px 0px 15px 0px #898989;
+                        border-radius: 1rem;
                         page-break-before: auto;
                         page-break-after: avoid;
                       }
@@ -993,7 +999,7 @@ export default function FeedbackViewer({ params }: { params: Promise<{ code: str
                           marginBottom: '5px'
                         },
                         '& > div': {
-                          marginBottom: '5px'
+                          marginBottom: '15px'
                         }
                       }}
                       className="correction-content prose prose-sm md:prose-base"

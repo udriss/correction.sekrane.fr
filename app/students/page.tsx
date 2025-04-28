@@ -24,6 +24,8 @@ import RecentActorsIcon from '@mui/icons-material/RecentActors';
 import { Student, Class } from '@/lib/types';
 import MenuBookIcon from '@mui/icons-material/MenuBook';
 import BrowserNotSupportedIcon from '@mui/icons-material/BrowserNotSupported';
+import LockIcon from '@mui/icons-material/Lock';
+import StudentPasswordManager from '@/components/students/StudentPasswordManager';
 
 // Types additionnels spécifiques à cette page
 export interface StudentStats {
@@ -52,6 +54,7 @@ export default function StudentsPage() {
   const [showTutorial, setShowTutorial] = useState(false);
   const [lastUpdate, setLastUpdate] = useState<number>(Date.now());
   const [errorDetails, setErrorDetails] = useState<any>(null);
+  const [passwordManagerOpen, setPasswordManagerOpen] = useState(false); // État pour le gestionnaire de mots de passe
 
   // Fonction pour charger les données
   const fetchData = async () => {
@@ -203,6 +206,24 @@ export default function StudentsPage() {
               </Box>
               
               <div className="flex gap-2">
+                <Tooltip title="Gérer les mots de passe">
+                  <IconButton 
+                    color="info" 
+                    onClick={() => setPasswordManagerOpen(true)}
+                    sx={{
+                      color: 'secondary.light',
+                      bgcolor: 'rgba(0, 0, 0, 0.3)',
+                      backdropFilter: 'blur(10px)',
+                      '&:hover': {
+                        bgcolor: 'rgba(0, 0, 0, 0.48)',
+                        color: 'secondary',
+                      },
+                      mr: 1
+                    }}
+                  >
+                    <LockIcon />
+                  </IconButton>
+                </Tooltip>
                 <Tooltip title="Afficher le guide">
                   <IconButton 
                     color="info" 
@@ -318,6 +339,15 @@ export default function StudentsPage() {
         loading={loading}
         onStudentUpdate={handleDataUpdate}
         onError={setError}
+      />
+
+      {/* Gestionnaire de mots de passe */}
+      <StudentPasswordManager
+        open={passwordManagerOpen}
+        onClose={() => setPasswordManagerOpen(false)}
+        students={students}
+        context="all"
+        title="Gestion des mots de passe - Tous les étudiants"
       />
     </Container>
   );

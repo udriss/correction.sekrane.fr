@@ -10,9 +10,9 @@ export async function GET(request: NextRequest) {
   const customUser = await getUser(request);
   const userId = customUser?.id || session?.user?.id;
   
-  if (!userId) {
-    return NextResponse.json({ error: 'Non autorisé' }, { status: 401 });
-  }
+  // if (!userId) {
+  //   return NextResponse.json({ error: 'Non autorisé' }, { status: 401 });
+  // }
 
   try {
     const categories = await query<any[]>(`

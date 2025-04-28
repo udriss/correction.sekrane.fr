@@ -26,6 +26,7 @@ import CheckIcon from '@mui/icons-material/Check';
 import CloseIcon from '@mui/icons-material/Close';
 import EmailIcon from '@mui/icons-material/Email';
 import WarningIcon from '@mui/icons-material/Warning';
+import LockIcon from '@mui/icons-material/Lock';
 import { alpha } from '@mui/material/styles';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -44,6 +45,7 @@ import StudentEditDialog from '@/components/students/StudentEditDialog';
 import BulkEmailDialog from '@/components/students/BulkEmailDialog';
 import AlertDialog from '@/components/AlertDialog';
 import dayjs from 'dayjs';
+import StudentPasswordManager from '@/components/students/StudentPasswordManager';
 
 // Définition des interfaces nécessaires
 interface TabPanelProps {
@@ -148,6 +150,10 @@ export default function ClassAutreDetailPage({ params }: { params: Promise<{ id:
     const [studentToDelete, setStudentToDelete] = useState<number | null>(null);
     const [deleteProcessing, setDeleteProcessing] = useState(false);
     const [relatedCorrections, setRelatedCorrections] = useState<any[]>([]);
+    
+    // État pour le gestionnaire de mots de passe
+    const [passwordManagerOpen, setPasswordManagerOpen] = useState(false);
+    const [selectedStudents, setSelectedStudents] = useState<Student[]>([]);
   
   // Fonction pour gérer le changement d'onglet
   const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
@@ -1172,6 +1178,19 @@ const handleDeleteClass = async () => {
           >
             Envoyer les corrections
           </Button>
+          {students.length > 0 && (
+              <Button
+                variant="contained"
+                color="info"
+                startIcon={<LockIcon />}
+                onClick={() => {
+                  setSelectedStudents(students);
+                  setPasswordManagerOpen(true);
+                }}
+              >
+                Gérer les mots de passe
+              </Button>
+            )}
         </Box>
         
         <Grid container spacing={2}>
@@ -1760,6 +1779,8 @@ const handleDeleteClass = async () => {
             >
               Ajouter des corrections
             </Button>
+            
+
           </Box>
           
           {filteredCorrections.length === 0 ? (
@@ -2058,25 +2079,25 @@ const handleDeleteClass = async () => {
               }}>
                 {relatedCorrections.map((correction, index) => (
                   <ListItem key={correction.id || index} divider={index < relatedCorrections.length - 1}>
-                    <ListItemText
-                      primary={correction.activity_name || 'Activité sans nom'}
-                      secondary={
-                        <React.Fragment>
-                          <Typography component="span" variant="body2" color="text.primary">
-                            {correction.class_name || 'Sans classe'}
-                          </Typography>
-                          {' — '}
-                          {correction.final_grade !== null && correction.final_grade !== undefined 
-                            ? `Note: ${correction.final_grade}`
-                            : correction.grade !== null && correction.grade !== undefined
-                            ? `Note: ${correction.grade}`
-                            : 'Non noté'}
-                          {correction.submission_date && 
-                            ` - Soumis le ${dayjs(correction.submission_date).format('DD/MM/YYYY')}`}
-                        </React.Fragment>
-                      }
-                    />
-                  </ListItem>
+                  <ListItemText
+                    primary={correction.activity_name || 'Activité sans nom'}
+                    secondary={
+                      <React.Fragment>
+                        <Typography component="span" variant="body2" color="text.primary">
+                          {correction.class_name || 'Sans classe'}
+                        </Typography>
+                        {' — '}
+                        {correction.final_grade !== null && correction.final_grade !== undefined 
+                          ? `Note: ${correction.final_grade}`
+                          : correction.grade !== null && correction.grade !== undefined
+                          ? `Note: ${correction.grade}`
+                          : 'Non noté'}
+                        {correction.submission_date && 
+                          ` - Soumis le ${dayjs(correction.submission_date).format('DD/MM/YYYY')}`}
+                      </React.Fragment>
+                    }
+                  />
+                </ListItem>
                 ))}
               </List>
             ) : (
@@ -2108,6 +2129,16 @@ const handleDeleteClass = async () => {
         onCancel={handleCloseDeleteDialog}
         icon={<WarningIcon />}
       />
+
+      {/* Gestionnaire de mots de passe */}
+      <StudentPasswordManager
+        open={passwordManagerOpen}
+        onClose={() => setPasswordManagerOpen(false)}
+        students={selectedStudents}
+        context="multiple"
+        title={`Gestion des mots de passe - ${classData?.name || 'Classe'}`}
+      />
     </Container>
   );
 }
+

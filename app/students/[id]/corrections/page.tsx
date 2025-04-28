@@ -18,13 +18,14 @@ import {
   Alert,
   Grid,
   alpha,
+  TextField,
+  CircularProgress
 } from '@mui/material';
 import GradientBackground from '@/components/ui/GradientBackground';
 import PatternBackground from '@/components/ui/PatternBackground';
 import ErrorDisplay from '@/components/ui/ErrorDisplay';
 import Link from 'next/link';
 import LoadingSpinner from '@/components/LoadingSpinner';
-
 
 // Icons
 import PersonIcon from '@mui/icons-material/Person';
@@ -37,6 +38,8 @@ import EqualizerIcon from '@mui/icons-material/Equalizer';
 import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
 import ScienceIcon from '@mui/icons-material/Science';
 import MenuBookIcon from '@mui/icons-material/MenuBook';
+import LockIcon from '@mui/icons-material/Lock';
+import KeyIcon from '@mui/icons-material/Key';
 
 // Types
 interface Student {
@@ -100,6 +103,7 @@ interface StudentStats {
 
 export default function StudentCorrectionsPage() {
   const params = useParams();
+  const router = useRouter();
   const studentId = params?.id;
   
   const [student, setStudent] = useState<Student | null>(null);
@@ -109,15 +113,82 @@ export default function StudentCorrectionsPage() {
   const [error, setError] = useState<Error | string | null>(null);
   const [shareUrl, setShareUrl] = useState<string>('');
   
+  // États pour la gestion de l'authentification par mot de passe
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
+  const [password, setPassword] = useState<string>('');
+  const [authLoading, setAuthLoading] = useState<boolean>(false);
+  const [authError, setAuthError] = useState<string | null>(null);
+  const [accessToken, setAccessToken] = useState<string | null>(null);
+  
   // États pour la gestion de l'édition d'étudiant
   const [editError, setEditError] = useState<string | null>(null);
-
   const [errorDetails, setErrorDetails] = useState<any>(null);
 
   // Gérer la récupération du share code et rediriger vers la page de feedback
   const [shareUrls, setShareUrls] = useState<Map<number, string>>(new Map());
   const [loadingShareCodes, setLoadingShareCodes] = useState<Map<number, boolean>>(new Map());
   const [shareCodeErrors, setShareCodeErrors] = useState<Map<number, string>>(new Map());
+
+  // Fonction pour vérifier le mot de passe
+  const handlePasswordVerification = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!studentId || !password.trim()) {
+      setAuthError("Veuillez entrer un mot de passe");
+      return;
+    }
+
+    setAuthLoading(true);
+    setAuthError(null);
+
+    try {
+      const response = await fetch(`/api/students/${studentId}/verify-password`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ password }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        setAuthError(data.error || "Erreur lors de la vérification du mot de passe");
+        return;
+      }
+
+      if (data.authenticated) {
+        // Stocker le token et marquer comme authentifié
+        setAccessToken(data.accessToken);
+        setIsAuthenticated(true);
+        // Stocker le token dans sessionStorage pour persistance
+        sessionStorage.setItem(`student_auth_${studentId}`, data.accessToken);
+        // Charger les données de l'étudiant
+        fetchStudentData(data.accessToken);
+      } else {
+        setAuthError("Mot de passe incorrect");
+      }
+    } catch (err) {
+      console.error("Erreur lors de la vérification du mot de passe:", err);
+      setAuthError("Une erreur est survenue lors de la vérification du mot de passe");
+    } finally {
+      setAuthLoading(false);
+    }
+  };
+
+  // Vérifier l'authentification au chargement de la page
+  useEffect(() => {
+    if (!studentId) return;
+    
+    // Vérifier si un token existe déjà dans sessionStorage
+    const savedToken = sessionStorage.getItem(`student_auth_${studentId}`);
+    if (savedToken) {
+      setAccessToken(savedToken);
+      setIsAuthenticated(true);
+      fetchStudentData(savedToken);
+    } else {
+      setLoading(false);
+    }
+  }, [studentId]);
 
   // Fonction pour récupérer le code de partage d'une correction
   const getShareUrl = async (correctionId: number) => {
@@ -179,162 +250,170 @@ export default function StudentCorrectionsPage() {
     }
   };
 
-  useEffect(() => {
-    const fetchData = async () => {
-      if (!studentId) return;
+  // Fonction pour récupérer les données de l'étudiant
+  const fetchStudentData = async (token: string) => {
+    if (!studentId) return;
+    
+    setLoading(true);
+    setError(null);
+    
+    try {
+      // Récupérer les informations de l'étudiant
+      const studentResponse = await fetch(`/api/studentsPublic/${studentId}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      if (!studentResponse.ok) {
+        const errorData = await studentResponse.json().catch(() => ({ error: 'Étudiant non trouvé' }));
+        // Créer une instance d'Error et y attacher les détails
+        const error = new Error('Erreur lors du chargement des données de l\'étudiant');
+        (error as any).details = errorData.details || {};
+        setError(error.message);
+        setErrorDetails({
+          message: typeof error === 'string' ? error : error.message,
+          status: errorData.status || 500,
+          statusText: errorData.statusText || '',
+          details: errorData.error || 'Une erreur est survenue lors du chargement des données'
+        });
+        setLoading(false);
+        return;
+      }
       
-      setLoading(true);
-      setError(null);
+      const studentData = await studentResponse.json();
       
-      try {
-        // Récupérer les informations de l'étudiant
-        const studentResponse = await fetch(`/api/studentsPublic/${studentId}`);
-        if (!studentResponse.ok) {
-          const errorData = await studentResponse.json().catch(() => ({ error: 'Étudiant non trouvé' }));
-          // Créer une instance d'Error et y attacher les détails
-          const error = new Error('Erreur lors du chargement des données de l\'étudiant');
-          (error as any).details = errorData.details || {};
-          setError(error.message);
-          setErrorDetails({
-            message: typeof error === 'string' ? error : error.message,
-            status: errorData.status || 500,
-            statusText: errorData.statusText || '',
-            details: errorData.error || 'Une erreur est survenue lors du chargement des données'
-          });
-          setLoading(false);
-          return;
+      // Récupérer toutes les classes de l'étudiant
+      const studentClassesResponse = await fetch(`/api/studentsPublic/${studentId}/classes`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
         }
+      });
+      if (studentClassesResponse.ok) {
+        const studentClassesData = await studentClassesResponse.json();
         
-        const studentData = await studentResponse.json();
-        
-        // Récupérer toutes les classes de l'étudiant
-        const studentClassesResponse = await fetch(`/api/studentsPublic/${studentId}/classes`);
-        if (studentClassesResponse.ok) {
-          const studentClassesData = await studentClassesResponse.json();
-          
-          // Formater les données des classes pour correspondre à l'interface Student.allClasses
-          const formattedClasses = studentClassesData.map((classItem: any) => {
-            // Gérer les deux formats possibles de réponse de l'API
-            if (classItem.class) {
-              // Format où chaque élément a une propriété 'class'
-              return {
-                classId: classItem.class.id,
-                className: classItem.class.name,
-                sub_class: classItem.sub_class
-              };
-            } else {
-              // Format où chaque élément est directement un objet de classe
-              return {
-                classId: classItem.id || classItem.class_id,
-                className: classItem.name || classItem.class_name,
-                sub_class: classItem.sub_class || classItem.subclass
-              };
-            }
-          });
-          
-          // Mettre à jour les données de l'étudiant avec les classes
-          studentData.allClasses = formattedClasses;
-        }
-        
-        setStudent(studentData);
-        
-
-        // Récupérer les corrections de l'étudiant
-        const correctionsResponse = await fetch(`/api/studentsPublic/${studentId}/corrections`);
-        if (!correctionsResponse.ok) {
-          const errorData = await correctionsResponse.json().catch(() => ({ error: 'Erreur lors du chargement des corrections' }));
-          // Créer une instance d'Error et y attacher les détails
-          const error = new Error('Erreur lors du chargement des corrections : ' + errorData.error || 'Erreur lors du chargement des corrections');
-          (error as any).details = errorData.details || {};
-          setError(error.message);
-          setErrorDetails({
-            status: correctionsResponse.status,
-            statusText: correctionsResponse.statusText,
-            ...errorData.details || {}
-          });
-          setLoading(false);
-          return;
-        }
-        const correctionsData = await correctionsResponse.json();
-        // Enrichir les corrections avec le pourcentage de score et les points max
-        const enrichedCorrections = correctionsData.map((correction: any) => {
-          // S'assurer que les valeurs numériques sont traitées comme des nombres
-          const grade = typeof correction.grade === 'string' ? parseFloat(correction.grade) : correction.grade;
-          
-          // Calculer le total des points maximum à partir du tableau points
-          const maxPoints = correction.points ? 
-            correction.points.reduce((sum: number, p: number) => sum + (typeof p === 'number' ? p : parseFloat(String(p))), 0) : 
-            20; // Fallback à 20 si aucun point n'est défini
-          
-          const scorePercentage = maxPoints > 0 ? (grade / maxPoints) * 100 : 0;
-          
-          return {
-            ...correction,
-            grade: grade,
-            max_points: maxPoints,
-            score_percentage: scorePercentage
-          };
+        // Formater les données des classes pour correspondre à l'interface Student.allClasses
+        const formattedClasses = studentClassesData.map((classItem: any) => {
+          // Gérer les deux formats possibles de réponse de l'API
+          if (classItem.class) {
+            // Format où chaque élément a une propriété 'class'
+            return {
+              classId: classItem.class.id,
+              className: classItem.class.name,
+              sub_class: classItem.sub_class
+            };
+          } else {
+            // Format où chaque élément est directement un objet de classe
+            return {
+              classId: classItem.id || classItem.class_id,
+              className: classItem.name || classItem.class_name,
+              sub_class: classItem.sub_class || classItem.subclass
+            };
+          }
         });
         
-        // Trier par date de soumission décroissante
-        const sortedCorrections = enrichedCorrections.sort((a: Correction, b: Correction) => 
-          new Date(b.submission_date).getTime() - new Date(a.submission_date).getTime()
-        );
+        // Mettre à jour les données de l'étudiant avec les classes
+        studentData.allClasses = formattedClasses;
+      }
+      
+      setStudent(studentData);
+      
+      // Récupérer les corrections de l'étudiant
+      const correctionsResponse = await fetch(`/api/studentsPublic/${studentId}/corrections`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      if (!correctionsResponse.ok) {
+        const errorData = await correctionsResponse.json().catch(() => ({ error: 'Erreur lors du chargement des corrections' }));
+        // Créer une instance d'Error et y attacher les détails
+        const error = new Error('Erreur lors du chargement des corrections : ' + errorData.error || 'Erreur lors du chargement des corrections');
+        (error as any).details = errorData.details || {};
+        setError(error.message);
+        setErrorDetails({
+          status: correctionsResponse.status,
+          statusText: correctionsResponse.statusText,
+          ...errorData.details || {}
+        });
+        setLoading(false);
+        return;
+      }
+      const correctionsData = await correctionsResponse.json();
+      // Enrichir les corrections avec le pourcentage de score et les points max
+      const enrichedCorrections = correctionsData.map((correction: any) => {
+        // S'assurer que les valeurs numériques sont traitées comme des nombres
+        const grade = typeof correction.grade === 'string' ? parseFloat(correction.grade) : correction.grade;
         
-        setCorrections(sortedCorrections);
+        // Calculer le total des points maximum à partir du tableau points
+        const maxPoints = correction.points ? 
+          correction.points.reduce((sum: number, p: number) => sum + (typeof p === 'number' ? p : parseFloat(String(p))), 0) : 
+          20; // Fallback à 20 si aucun point n'est défini
+        
+        const scorePercentage = maxPoints > 0 ? (grade / maxPoints) * 100 : 0;
+        
+        return {
+          ...correction,
+          grade: grade,
+          max_points: maxPoints,
+          score_percentage: scorePercentage
+        };
+      });
+      
+      // Trier par date de soumission décroissante
+      const sortedCorrections = enrichedCorrections.sort((a: Correction, b: Correction) => 
+        new Date(b.submission_date).getTime() - new Date(a.submission_date).getTime()
+      );
+      
+      setCorrections(sortedCorrections);
 
+      // Récupérer les statistiques de l'étudiant
+      const statsResponse = await fetch(`/api/studentsPublic/${studentId}/stats`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      if (!statsResponse.ok) {
+        // On ne bloque pas le chargement pour les stats, on continue
+        console.warn('Impossible de charger les statistiques de l\'étudiant');
+      } else {
+        const statsData = await statsResponse.json();
 
-        // Récupérer les statistiques de l'étudiant
-        const statsResponse = await fetch(`/api/studentsPublic/${studentId}/stats`);
-        if (!statsResponse.ok) {
-          // On ne bloque pas le chargement pour les stats, on continue
-          console.warn('Impossible de charger les statistiques de l\'étudiant');
-        } else {
-          const statsData = await statsResponse.json();
-
-
-          // Calculer la tendance des notes
-          if (statsData.recent_corrections && statsData.recent_corrections.length >= 2) {
-            const sortedCorrections = [...statsData.recent_corrections].sort(
-              (a, b) => new Date(b.submission_date).getTime() - new Date(a.submission_date).getTime()
-            );
+        // Calculer la tendance des notes
+        if (statsData.recent_corrections && statsData.recent_corrections.length >= 2) {
+          const sortedCorrections = [...statsData.recent_corrections].sort(
+            (a, b) => new Date(b.submission_date).getTime() - new Date(a.submission_date).getTime()
+          );
+          
+          if (sortedCorrections.length >= 2) {
+            const latestGrade = sortedCorrections[0].grade;
+            const previousGrade = sortedCorrections[1].grade;
             
-            if (sortedCorrections.length >= 2) {
-              const latestGrade = sortedCorrections[0].grade;
-              const previousGrade = sortedCorrections[1].grade;
-              
-              if (latestGrade > previousGrade) {
-                statsData.grade_trend = 'up';
-              } else if (latestGrade < previousGrade) {
-                statsData.grade_trend = 'down';
-              } else {
-                statsData.grade_trend = 'stable';
-              }
+            if (latestGrade > previousGrade) {
+              statsData.grade_trend = 'up';
+            } else if (latestGrade < previousGrade) {
+              statsData.grade_trend = 'down';
+            } else {
+              statsData.grade_trend = 'stable';
             }
           }
-          
-          setStats(statsData);
         }
         
-        // Générer l'URL de partage
-        const baseUrl = window.location.origin;
-        setShareUrl(`${baseUrl}/shared/students/${studentId}/corrections`);
-
-
-      } catch (err) {
-        console.error('Erreur:', err);
-        if (err instanceof Error) {
-          setError(err.message || 'Une erreur est survenue lors du chargement des données');
-        } else {
-          setError('Une erreur est survenue lors du chargement des données');
-        }
-      } finally {
-        setLoading(false);
+        setStats(statsData);
       }
-    };
-    
-    fetchData();
-  }, [studentId]);
+      
+      // Générer l'URL de partage
+      const baseUrl = window.location.origin;
+      setShareUrl(`${baseUrl}/shared/students/${studentId}/corrections`);
+    } catch (err) {
+      console.error('Erreur:', err);
+      if (err instanceof Error) {
+        setError(err.message || 'Une erreur est survenue lors du chargement des données');
+      } else {
+        setError('Une erreur est survenue lors du chargement des données');
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
   
   // Fonction pour formater la date
   const formatDate2 = (dateString: string) => {
@@ -348,22 +427,22 @@ export default function StudentCorrectionsPage() {
     return new Date(dateString).toLocaleDateString('fr-FR', options);
   };
 
-    // Fonction pour formater la date
-    const formatDate = (dateString?: string | Date) => {
-      if (!dateString) return 'Non spécifiée';
-      
-      const date = typeof dateString === 'string' 
-        ? new Date(dateString) 
-        : dateString;
-      
-      const options: Intl.DateTimeFormatOptions = { 
-        year: 'numeric', 
-        month: 'short', 
-        day: 'numeric',
-      };
-      return date.toLocaleDateString('fr-FR', options);
+  // Fonction pour formater la date
+  const formatDate = (dateString?: string | Date) => {
+    if (!dateString) return 'Non spécifiée';
+    
+    const date = typeof dateString === 'string' 
+      ? new Date(dateString) 
+      : dateString;
+    
+    const options: Intl.DateTimeFormatOptions = { 
+      year: 'numeric', 
+      month: 'short', 
+      day: 'numeric',
     };
-  
+    return date.toLocaleDateString('fr-FR', options);
+  };
+
   // Fonction pour obtenir la couleur selon la note
   const getGradeColor = (percentage: number) => {
     if (percentage >= 80) return 'success';
@@ -372,18 +451,106 @@ export default function StudentCorrectionsPage() {
     if (percentage >= 40) return 'warning';
     return 'error';
   };
-  
 
-
-
+  // Si l'utilisateur n'est pas authentifié, afficher le formulaire de connexion
+  if (!isAuthenticated) {
+    return (
+      <Container maxWidth="sm" className="py-16">
+        <Paper
+          elevation={4}
+          sx={{
+            p: 4,
+            borderRadius: 2,
+            textAlign: 'center',
+            position: 'relative',
+            overflow: 'hidden'
+          }}
+        >
+          
+          <GradientBackground variant="primary" sx={{ position: 'absolute', inset: 0, zIndex: 0 }} >
+          <PatternBackground pattern="dots" opacity={0.1} sx={{ position: 'absolute', inset: 0, zIndex: 0 }} >
+          
+          <Box position="relative" zIndex={1}>
+            <Box 
+              sx={{ 
+                width: 70,
+                height: 70,
+                borderRadius: '50%',
+                backgroundColor: (theme) => alpha(theme.palette.primary.main, 0.1),
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                margin: '0 auto 16px'
+              }}
+            >
+              <LockIcon sx={{ fontSize: 40, color: 'primary.main' }} />
+            </Box>
+            
+            <Typography variant="h4" fontWeight="bold" gutterBottom>
+              Accès protégé
+            </Typography>
+            
+            <Typography variant="body1" color="text.secondary" paragraph sx={{ mb: 4 }}>
+              Veuillez entrer le mot de passe pour accéder aux corrections de cet étudiant.
+            </Typography>
+            
+            {authError && (
+              <Alert severity="error" sx={{ mb: 3 }}>
+                {authError}
+              </Alert>
+            )}
+            
+            <form onSubmit={handlePasswordVerification}>
+              <TextField
+                fullWidth
+                type="password"
+                label="Mot de passe"
+                variant="outlined"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                InputProps={{
+                  startAdornment: <KeyIcon sx={{ mr: 1, color: 'text.secondary' }} />,
+                }}
+                sx={{ mb: 3 }}
+                required
+                autoFocus
+              />
+              
+              <Button
+                type="submit"
+                variant="contained"
+                size="large"
+                fullWidth
+                disabled={authLoading}
+                startIcon={authLoading ? <CircularProgress size={20} color="inherit" /> : null}
+              >
+                {authLoading ? 'Vérification...' : 'Accéder aux corrections'}
+              </Button>
+            </form>
+            
+            <Button
+              variant="text"
+              size="small"
+              component={Link}
+              href="/students"
+              sx={{ mt: 3 }}
+            >
+              Retour à la liste des étudiants
+            </Button>
+          </Box>
+          </PatternBackground>
+        </GradientBackground>
+        </Paper>
+      </Container>
+    );
+  }
 
   if (loading) {
     return (
       <Container>
         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', maxWidth: '400px', mx: 'auto', mt: 8 }}>
-        <LoadingSpinner size="lg" text="Chargement des corrections" />
-          </Box>
-        
+          <LoadingSpinner size="lg" text="Chargement des corrections" />
+        </Box>
       </Container>
     );
   }
@@ -416,6 +583,7 @@ export default function StudentCorrectionsPage() {
       </Container>
     );
   }
+  
   return (
     <Container maxWidth="lg" className="py-8">
       {/* Header avec info étudiant */}

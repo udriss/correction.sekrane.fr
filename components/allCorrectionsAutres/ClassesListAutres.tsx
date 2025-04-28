@@ -42,7 +42,7 @@ export default function ClassesListAutres({
   getGradeColor,
   highlightedIds = [],
   refreshCorrections,
-  isLoading = false,
+  isLoading,
   getStudentById
 }: ClassesListAutresProps) {
   const { enqueueSnackbar } = useSnackbar();
@@ -123,31 +123,30 @@ export default function ClassesListAutres({
     );
   }
 
-  if (!filteredCorrections || filteredCorrections.length === 0) {
-    return (
-      <Alert 
-        severity="info" 
-        sx={{ 
-          mt: 2,
-          display: 'flex',
-          alignItems: 'center',
-          '& .MuiAlert-message': { flex: 1 }
-        }}
-        action={
-          activeFilters.length > 0 ? (
-            <Button color="inherit" size="small" onClick={handleClearAllFilters}>
-              Effacer les filtres
-            </Button>
-          ) : undefined
-        }
-      >
-        Aucune correction trouvée
-        {activeFilters.length > 0 && " avec les filtres actuels"}
-      </Alert>
-    );
-  }
-
   return (
+    <>
+      {/* Message "Aucune correction trouvée" uniquement s'il n'y a pas de chargement ET que la liste est vide */}
+      {!isLoading && (!filteredCorrections || filteredCorrections.length === 0) && (
+        <Alert 
+          severity="info" 
+          sx={{ 
+            mt: 2,
+            display: 'flex',
+            alignItems: 'center',
+            '& .MuiAlert-message': { flex: 1 }
+          }}
+          action={
+            activeFilters.length > 0 ? (
+              <Button color="inherit" size="small" onClick={handleClearAllFilters}>
+                Effacer les filtres
+              </Button>
+            ) : undefined
+          }
+        >
+          Aucune correction trouvée
+          {activeFilters.length > 0 && " avec les filtres actuels"}
+        </Alert>
+      )}
     <Box>
       {classGroups.map(({ className, corrections, averageGrade, totalCorrections }) => (
         <Accordion key={className} defaultExpanded={classGroups.length === 1}>
@@ -189,5 +188,6 @@ export default function ClassesListAutres({
         </Accordion>
       ))}
     </Box>
+    </>
   );
 }

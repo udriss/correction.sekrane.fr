@@ -44,6 +44,7 @@ import { useEditor } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import TipTapEditor from '@/components/editor/TipTapEditor';
 import { Timeline, TimelineItem, TimelineSeparator, TimelineConnector, TimelineContent, TimelineDot } from '@mui/lab';
+import StudentPasswordManager from '@/components/students/StudentPasswordManager';
 
 // Définir les types de messages
 const MESSAGE_TYPES = {
@@ -75,6 +76,9 @@ export default function EmailCorrectionPage({ student }: EmailCorrectionPageProp
   const [correctionsUrl, setCorrectionsUrl] = useState<string>('');
   const [showHTML, setShowHTML] = useState(false);
   const [sendingStatuses, setSendingStatuses] = useState<SendingStatus[]>([]);
+  const [studentPassword, setStudentPassword] = useState<string | null>(null);
+  const [isLoadingPassword, setIsLoadingPassword] = useState<boolean>(false);
+  const [showPasswordManagerDialog, setShowPasswordManagerDialog] = useState<boolean>(false);
 
   // Editor pour le message personnalisé
   const editor = useEditor({
@@ -131,6 +135,12 @@ export default function EmailCorrectionPage({ student }: EmailCorrectionPageProp
   <p>Ci-dessous se trouve le lien permettant d'accéder à l'ensemble de tes corrections :</p>
   
   <p><a href="${url}">${url}</a></p>
+
+  <div style="margin: 15px 0; padding: 15px; border-left: 4px solid #FFD700; background-color: #FFFDF0;">
+    <p style="margin-top: 0; font-weight: bold;">💡 À propos de votre accès :</p>
+    <p>Votre code d'accès personnel est : <strong style="font-size: 1.2em; font-family: monospace; background-color: #f0f0f0; padding: 3px 8px; border-radius: 4px; display: inline-block;">${studentPassword || 'En cours de génération...'}</strong></p>
+    <p>Conservez-le précieusement pour accéder à vos corrections à tout moment.</p>
+  </div>
 
   <p><strong>Points importants à retenir :</strong></p>
   <ul>
@@ -270,6 +280,59 @@ export default function EmailCorrectionPage({ student }: EmailCorrectionPageProp
     }
   };
 
+  // Fonction pour récupérer le mot de passe de l'étudiant
+  const fetchStudentPassword = async (forceCheck = false) => {
+    if (!student || !student.id) return;
+    
+    // Si le mot de passe a déjà été récupéré avec succès, ne pas le récupérer à nouveau
+    // sauf si forceCheck est true
+    if (studentPassword && !forceCheck) return;
+    
+    setIsLoadingPassword(true);
+    setError(''); // Réinitialiser les erreurs avant chaque tentative
+    
+    try {
+      // Récupérer le mot de passe via l'API GET
+      const response = await fetch(`/api/students/${student.id}/password?includeValue=true`);
+      
+      if (!response.ok) {
+        throw new Error('Erreur lors de la récupération du mot de passe');
+      }
+      
+      const data = await response.json();
+      
+      if (data.hasPassword && data.passwordValue) {
+        // Si l'étudiant a déjà un mot de passe, l'utiliser
+        setStudentPassword(data.passwordValue);
+        // S'assurer que le dialogue est fermé
+        setShowPasswordManagerDialog(false);
+      } else {
+        // Si l'étudiant n'a pas de mot de passe, ouvrir le gestionnaire de mots de passe
+        // mais seulement si le dialogue d'email est ouvert
+        if (open) {
+          setShowPasswordManagerDialog(true);
+          setStudentPassword(null);
+        }
+      }
+    } catch (err) {
+      console.error('Erreur lors de la récupération du mot de passe:', err);
+      const errorMessage = err instanceof Error ? err.message : 'Erreur lors de la récupération du mot de passe';
+      setError(errorMessage);
+      // Ne pas afficher le gestionnaire de mots de passe en cas d'erreur
+      // pour éviter une boucle infinie
+      setShowPasswordManagerDialog(false);
+    } finally {
+      setIsLoadingPassword(false);
+    }
+  };
+
+  // Récupérer le mot de passe quand le dialogue s'ouvre
+  useEffect(() => {
+    if (open && student && student.id) {
+      fetchStudentPassword();
+    }
+  }, [open, student]);
+
   return (
     <>
       <Tooltip title="Envoyer les corrections par email">
@@ -284,7 +347,7 @@ export default function EmailCorrectionPage({ student }: EmailCorrectionPageProp
 
       <Dialog open={open} onClose={handleClose} maxWidth="md" fullWidth>
         <DialogTitle>
-          Envoyer un lien vers les corrections
+          Envoyer un lien vers la correction d'un étudiant
           <Tabs 
             value={messageType} 
             onChange={handleTabChange}
@@ -398,35 +461,6 @@ export default function EmailCorrectionPage({ student }: EmailCorrectionPageProp
           )}
         </DialogContent>
 
-        {/* Dialog pour afficher le HTML */}
-        <Dialog
-          open={showHTML}
-          onClose={() => setShowHTML(false)}
-          maxWidth="md"
-          fullWidth
-        >
-          <DialogTitle>Code HTML</DialogTitle>
-          <DialogContent>
-            <TextField
-              multiline
-              fullWidth
-              rows={10}
-              value={editor?.getHTML() || ''}
-              slotProps={{
-                input: {
-                  readOnly: true,
-                  style: { fontFamily: 'monospace' }
-                }
-              }}
-            />
-          </DialogContent>
-          <DialogActions>
-            <Button onClick={() => setShowHTML(false)}>
-              Fermer
-            </Button>
-          </DialogActions>
-        </Dialog>
-
         <DialogActions>
           <Button onClick={handleClose} color="inherit">Annuler</Button>
           <Button 
@@ -440,6 +474,54 @@ export default function EmailCorrectionPage({ student }: EmailCorrectionPageProp
           </Button>
         </DialogActions>
       </Dialog>
+
+      {/* Dialog pour afficher le HTML */}
+      <Dialog
+        open={showHTML}
+        onClose={() => setShowHTML(false)}
+        maxWidth="md"
+        fullWidth
+      >
+        <DialogTitle>Code HTML</DialogTitle>
+        <DialogContent>
+          <TextField
+            multiline
+            fullWidth
+            rows={10}
+            value={editor?.getHTML() || ''}
+            slotProps={{
+              input: {
+                readOnly: true,
+                style: { fontFamily: 'monospace' }
+              }
+            }}
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setShowHTML(false)}>
+            Fermer
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Ajouter le gestionnaire de mots de passe */}
+      {showPasswordManagerDialog && (
+        <StudentPasswordManager
+          open={showPasswordManagerDialog}
+          onClose={() => {
+            setShowPasswordManagerDialog(false);
+            // Après fermeture du dialogue, on essaie de récupérer à nouveau le mot de passe
+            // mais uniquement si le mot de passe est toujours null
+            if (!studentPassword) {
+              fetchStudentPassword(true);
+            }
+          }}
+          students={student ? [student] : []}
+          context="single"
+          studentId={student?.id}
+          title="Définir un mot de passe pour l'étudiant"
+        />
+      )}
     </>
   );
 }

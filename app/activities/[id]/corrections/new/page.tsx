@@ -18,7 +18,9 @@ import {
   SelectChangeEvent,
   FormHelperText,
   Tabs,
-  Tab
+  Tab,
+  TextField,
+  InputAdornment
 } from '@mui/material';
 import Link from 'next/link';
 import AssignmentIcon from '@mui/icons-material/Assignment';
@@ -29,6 +31,7 @@ import SaveIcon from '@mui/icons-material/Save';
 import HomeIcon from '@mui/icons-material/Home';
 import HourglassEmptyIcon from '@mui/icons-material/HourglassEmpty';
 import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline';
+import SearchIcon from '@mui/icons-material/Search';
 import {Student} from '@/lib/types';
 import CheckIcon from '@mui/icons-material/Check';
 import CloseIcon from '@mui/icons-material/Close';
@@ -53,7 +56,8 @@ export default function NewCorrectionAutrePage({ params }: { params: Promise<{ i
   const [error, setError] = useState('');
   const router = useRouter();
   const [classId, setClassId] = useState<number | null>(null);
-  
+  const [searchTerm, setSearchTerm] = useState(''); // Nouvel état pour le terme de recherche
+
   // Correction du typage pour inclure la propriété nbre_subclasses
   interface ClassWithSubclasses {
     id: number;
@@ -187,29 +191,42 @@ export default function NewCorrectionAutrePage({ params }: { params: Promise<{ i
     return classTabValue === 0 ? activityClasses : unassociatedClasses;
   };
 
-  // Effet pour filtrer les étudiants en fonction de la classe et sous-classe sélectionnées
+  // Effet pour filtrer les étudiants en fonction de la classe, sous-classe et terme de recherche
   useEffect(() => {
+    let studentsToFilter = originalStudents;
+    
+    // Filtrer par classe si une classe est sélectionnée
     if (classId) {
-      // Filtrer les étudiants par classe sélectionnée puis par sous-classe si applicable
-      const studentsInClass = originalStudents.filter(student => 
+      studentsToFilter = studentsToFilter.filter(student => 
         student.allClasses && student.allClasses.some(cls => cls.classId === classId)
       );
       
+      // Filtrer par sous-classe si applicable
       if (selectedSubClass) {
-        const studentsInSubClass = studentsInClass.filter(student => 
+        studentsToFilter = studentsToFilter.filter(student => 
           student.allClasses && student.allClasses.some(cls => 
             cls.classId === classId && cls.sub_class?.toString() === selectedSubClass
           )
         );
-        setFilteredStudents(studentsInSubClass);
-      } else {
-        setFilteredStudents(studentsInClass);
       }
-    } else {
-      // Si aucune classe n'est sélectionnée, montrer tous les étudiants disponibles
-      setFilteredStudents(students);
     }
-  }, [classId, selectedSubClass, originalStudents, students]);
+    
+    // Filtrer par terme de recherche si présent
+    if (searchTerm.trim() !== '') {
+      const normalizedSearch = searchTerm.trim().toLowerCase();
+      studentsToFilter = studentsToFilter.filter(student => 
+        `${student.first_name} ${student.last_name}`.toLowerCase().includes(normalizedSearch) ||
+        `${student.last_name} ${student.first_name}`.toLowerCase().includes(normalizedSearch)
+      );
+    }
+    
+    // Trier les étudiants par nom, prénom
+    const sortedStudents = [...studentsToFilter].sort((a, b) => 
+      `${a.last_name} ${a.first_name}`.localeCompare(`${b.last_name} ${b.first_name}`)
+    );
+    
+    setFilteredStudents(sortedStudents);
+  }, [classId, selectedSubClass, originalStudents, searchTerm]);
 
   const handleStudentChange = (event: SelectChangeEvent<number>) => {
     setStudentId(event.target.value as number);
@@ -574,6 +591,32 @@ export default function NewCorrectionAutrePage({ params }: { params: Promise<{ i
                   </FormControl>
                 </div>
               )}
+              
+              <div className="mb-4">
+                <TextField
+                  fullWidth
+                  label="Rechercher un étudiant"
+                  placeholder="Rechercher par nom"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  variant="outlined"
+                  size="small"
+                  slotProps={{
+                    input: { 
+                      startAdornment: (
+                        <InputAdornment position="start">
+                          <SearchIcon />
+                        </InputAdornment>
+                      ),
+                     }
+                  }}
+                />
+                <FormHelperText>
+                  {searchTerm.trim() !== '' 
+                    ? `${filteredStudents.length} résultat(s) pour "${searchTerm}"`
+                    : "Recherchez un étudiant par nom ou prénom"}
+                </FormHelperText>
+              </div>
               
               <div className="mb-6">
                 <FormControl fullWidth>

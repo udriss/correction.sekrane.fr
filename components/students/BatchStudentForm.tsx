@@ -426,8 +426,8 @@ const BatchStudentForm: React.FC<BatchStudentFormProps> = ({
                     <TableHead>
                       <TableRow>
                         <TableCell width="40px"></TableCell>
+                        <TableCell>Nom*</TableCell>
                         <TableCell>Prénom*</TableCell>
-                        <TableCell>Nom</TableCell>
                         <TableCell>Email</TableCell>
                         <TableCell>Genre*</TableCell>
                         {classData?.nbre_subclasses && classData?.nbre_subclasses > 0 && (
@@ -458,8 +458,8 @@ const BatchStudentForm: React.FC<BatchStudentFormProps> = ({
                             <TextField
                               size="small"
                               fullWidth
-                              value={student.first_name}
-                              onChange={(e) => handleBatchStudentFieldChange(index, 'first_name', e.target.value)}
+                              value={student.last_name}
+                              onChange={(e) => handleBatchStudentFieldChange(index, 'last_name', e.target.value)}
                               required
                             />
                           </TableCell>
@@ -467,8 +467,8 @@ const BatchStudentForm: React.FC<BatchStudentFormProps> = ({
                             <TextField
                               size="small"
                               fullWidth
-                              value={student.last_name}
-                              onChange={(e) => handleBatchStudentFieldChange(index, 'last_name', e.target.value)}
+                              value={student.first_name}
+                              onChange={(e) => handleBatchStudentFieldChange(index, 'first_name', e.target.value)}
                             />
                           </TableCell>
                           <TableCell>

@@ -30,18 +30,6 @@ export default function StudentsLayout({
     if (pathname === '/students') {
       currentPageLabel = 'Tous les étudiants';
     }
-    // Page de nouvel étudiant
-    else if (pathname === '/students/new') {
-      currentPageLabel = 'Nouvel étudiant';
-    }
-    // Page d'importation d'étudiants
-    else if (pathname === '/students/import') {
-      currentPageLabel = 'Importer des étudiants';
-    }
-    // Page de statistiques des étudiants
-    else if (pathname === '/students/analytics') {
-      currentPageLabel = 'Statistiques';
-    }
     // Page de détail d'un étudiant
     else if (pathname.match(/^\/students\/\d+$/)) {
       const studentId = pathname.split('/').pop();
