@@ -338,7 +338,7 @@ export default function ClassAutreDetailPage({ params }: { params: Promise<{ id:
         }
         const studentsData = await studentsResponse.json();
         setStudents(studentsData);
-        
+
         // Récupérer les activités associées à la classe
         const activitiesResponse = await fetch(`/api/classes/${classId}/activities`);
         if (!activitiesResponse.ok) {
@@ -2135,8 +2135,9 @@ const handleDeleteClass = async () => {
         open={passwordManagerOpen}
         onClose={() => setPasswordManagerOpen(false)}
         students={selectedStudents}
-        context="multiple"
-        title={`Gestion des mots de passe - ${classData?.name || 'Classe'}`}
+        context="class"
+        classId={parseInt(classId)}
+        title={`Gestion des mots de passe - ${classData?.name || 'Classe inconnue'}`}
       />
     </Container>
   );

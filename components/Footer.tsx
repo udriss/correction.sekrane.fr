@@ -98,7 +98,7 @@ export default function Footer() {
                 <Tooltip title="Code source">
                   <IconButton 
                     component="a" 
-                    href="https://github.com/yourusername/correction.sekrane.fr" 
+                    href="https://github.com/udriss/" 
                     target="_blank"
                     size="small" 
                     sx={{ color: 'white' }}

@@ -94,7 +94,7 @@ export const EditFragmentDialog: React.FC<EditFragmentDialogProps> = ({
     
     // Si aucune modification, afficher un message et ne pas envoyer la mise à jour
     if (!hasChanges) {
-      console.log('Aucune modification détectée');
+      
       return;
     }
    

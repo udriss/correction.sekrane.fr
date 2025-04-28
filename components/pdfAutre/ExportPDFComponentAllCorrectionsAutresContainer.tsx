@@ -164,9 +164,9 @@ const ExportPDFComponentAllCorrectionsAutresContainer: React.FC<ExportPDFCompone
               filteredCorrections.some(c => c.student_id === student.id)
             );
 
-          console.log('studentsToUse', studentsToUse);
-          console.log('includeAllStudents', includeAllStudents);
-          console.log('allStudents', allStudents);
+          
+          
+          
         const groupedData = allCorrectionsAutreDataProcessingService.organizeAllCorrectionsData({
           corrections: filteredCorrections,
           includeAllStudents,

@@ -529,7 +529,7 @@ export const createExcelWorksheet = (
       return nameA.localeCompare(nameB, 'fr', { sensitivity: 'base' });
     });
 
-    console.log('Corrections triées:', corrections);
+    
     // Ajouter les données des corrections (maintenant triées)
     corrections.forEach(c => {
       const activity = getActivityById(c.activity_id);

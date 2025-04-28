@@ -162,7 +162,7 @@ export async function PUT(
 
     // Parse the JSON body to get fragmentData
     const fragmentData = await request.json();
-    console.log('Fragment data:', fragmentData);
+    
     
     // Get user from both auth systems
     const session = await getServerSession(authOptions);
@@ -265,14 +265,14 @@ export async function PUT(
       // Add new associations
       if (Array.isArray(categories) && categories.length > 0) {
         // Log pour le debug
-        console.log('Catégories à insérer:', categories);
+        
         
         // Traiter uniquement le format d'objets avec id et name
         const categoryValues = categories
           .filter(category => typeof category === 'object' && category !== null && 'id' in category)
           .map(category => [fragmentId, Number(category.id)]);
         
-        console.log('Valeurs formatées pour insertion:', categoryValues);
+        
         
         if (categoryValues.length > 0) {
           try {
@@ -292,7 +292,7 @@ export async function PUT(
               });
             }
             
-            console.log('Catégories déjà associées:', Array.from(existingCategoryIds));
+            
             
             // 2. Filtrer pour ne garder que les associations qui n'existent pas déjà
             const newCategoryValues = categoryValues.filter(([_, categoryId]) => 
@@ -315,7 +315,7 @@ export async function PUT(
             });
             
             if (categoriesToRemove.length > 0) {
-              console.log('Catégories à supprimer:', categoriesToRemove);
+              
               // Supprimer chaque association individuellement pour éviter les problèmes de typage
               for (const categoryId of categoriesToRemove) {
                 await connection.query(
@@ -327,15 +327,15 @@ export async function PUT(
             
             // 4. Insérer uniquement les nouvelles associations
             if (newCategoryValues.length > 0) {
-              console.log('Nouvelles catégories à insérer:', newCategoryValues);
+              
               
               // Utiliser la méthode d'insertion multiple avec des valeurs explicites
               const insertQuery = `INSERT INTO fragments_categories (fragment_id, category_id) VALUES ?`;
               await connection.query(insertQuery, [newCategoryValues]);
               
-              console.log('Insertion réussie dans fragments_categories');
+              
             } else {
-              console.log('Aucune nouvelle catégorie à insérer, toutes existent déjà');
+              
             }
           } catch (sqlError) {
             console.error('Erreur lors de la gestion des catégories:', sqlError);
@@ -367,10 +367,10 @@ export async function PUT(
                       'INSERT INTO fragments_categories (fragment_id, category_id) VALUES (?, ?)',
                       [fragId, catId]
                     );
-                    console.log(`Insertion individuelle réussie pour fragment_id=${fragId}, category_id=${catId}`);
+                    
                     existingCategoryIds.add(catId); // Mettre à jour la liste des existants
                   } else {
-                    console.log(`Association déjà existante pour fragment_id=${fragId}, category_id=${catId}`);
+                    
                   }
                 } catch (innerError) {
                   console.error(`Échec d'insertion pour fragment_id=${fragId}, category_id=${catId}:`, innerError);
@@ -393,7 +393,7 @@ export async function PUT(
               });
               
               if (categoriesToRemove.length > 0) {
-                console.log('Catégories à supprimer (méthode alternative):', categoriesToRemove);
+                
                 
                 // Supprimer chaque association individuellement
                 for (const catId of categoriesToRemove) {
@@ -402,7 +402,7 @@ export async function PUT(
                       'DELETE FROM fragments_categories WHERE fragment_id = ? AND category_id = ?',
                       [fragmentId, catId]
                     );
-                    console.log(`Suppression réussie pour fragment_id=${fragmentId}, category_id=${catId}`);
+                    
                   } catch (deleteError) {
                     console.error(`Échec de suppression pour fragment_id=${fragmentId}, category_id=${catId}:`, deleteError);
                   }
@@ -414,7 +414,7 @@ export async function PUT(
             }
           }
         } else {
-          console.log('Aucune catégorie à insérer, suppression des associations existantes');
+          
           
           // Si aucune catégorie n'est fournie, supprimer toutes les associations
           await connection.query(
@@ -423,7 +423,7 @@ export async function PUT(
           );
         }
       } else {
-        console.log('Aucune catégorie à insérer, suppression des associations existantes');
+        
         
         // Si aucune catégorie n'est fournie, supprimer toutes les associations
         await connection.query(

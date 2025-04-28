@@ -421,7 +421,7 @@ export async function cleanupIdleConnections(maxIdleTimeSeconds = 30): Promise<n
         try {
           await query(`KILL ${conn.Id}`);
           killedCount++;
-          console.log(`Connexion dormante fermée: ID=${conn.Id}, Temps inactif=${conn.Time}s`);
+          
         } catch (err) {
           console.error(`Erreur lors de la fermeture de la connexion ${conn.Id}:`, err);
         }

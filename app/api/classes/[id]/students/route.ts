@@ -53,6 +53,8 @@ export async function GET(
         s.last_name, s.first_name
     `, [classId]);
 
+
+    
     return NextResponse.json(students);
   } catch (error) {
     console.error('Error fetching students for class:', error);

@@ -206,7 +206,7 @@ const cleanSleepConnections = async (minIdleTime = 30) => {
       }, 5000); // Rafraîchir toutes les 5 secondes
       
       // Ajouter un message informant l'utilisateur que la mise à jour automatique est active
-      console.log('Mise à jour automatique activée - toutes les sections sont rafraîchies, y compris les détails des connexions');
+      
     }
     
     return () => {

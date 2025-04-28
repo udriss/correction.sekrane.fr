@@ -151,7 +151,7 @@ export function DbCleanupProvider({ children }: { children: ReactNode }) {
         let cleanupInterval: NodeJS.Timeout | null = null;
         
         if (enabled) {
-          console.log('Auto-nettoyage (navigateur) activé - nettoyage des connexions dormantes toutes les 60 secondes');
+          
           cleanupInterval = setInterval(async () => {
             try {
               const response = await fetch('/api/admin/db-status/cleanup-sleep', {
@@ -165,7 +165,7 @@ export function DbCleanupProvider({ children }: { children: ReactNode }) {
               if (response.ok) {
                 const data = await response.json();
                 if (data.killedCount > 0) {
-                  console.log(`Auto-nettoyage: ${data.killedCount} connexion(s) dormante(s) fermée(s)`);
+                  
                 }
               }
             } catch (error) {

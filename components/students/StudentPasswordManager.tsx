@@ -67,6 +67,9 @@ export default function StudentPasswordManager({
   classId,
   title = 'Gestion des mots de passe étudiants'
 }: StudentPasswordManagerProps) {
+
+
+
   const [filteredStudents, setFilteredStudents] = useState<Student[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -105,68 +108,121 @@ export default function StudentPasswordManager({
   // État pour suivre la progression en temps réel pour la génération de mots de passe en lot
   const [batchProgress, setBatchProgress] = useState(0);
   
+  // État pour stocker les infos de la classe en mode single
+  const [classInfo, setClassInfo] = useState<{ id: number, name: string, nbre_subclasses: number | null } | null>(null);
+
+
+  // Charger les infos de la classe si on est en mode single avec un classId
+  useEffect(() => {
+    const fetchClassInfo = async () => {
+      if (context === 'class' && classId) {
+        try {
+          const response = await fetch(`/api/classes/${classId}`);
+          if (response.ok) {
+            const data = await response.json();
+            setClassInfo(data);
+            // Si nbre_subclasses est défini, générer les sous-classes disponibles
+            if (data.nbre_subclasses) {
+              const subClasses = Array.from(
+                { length: data.nbre_subclasses },
+                (_, i) => (i + 1).toString()
+              );
+              setAvailableSubClasses(subClasses);
+            }
+            // Sélectionner automatiquement la classe
+            setSelectedClassFilter(classId);
+          }
+        } catch (error) {
+          console.error("Erreur lors du chargement des informations de la classe:", error);
+        }
+      }
+    };
+
+    if (open) {
+      fetchClassInfo();
+    }
+  }, [context, classId, open]);
+
   // Fonction pour filtrer et trier les étudiants en fonction du contexte
   useEffect(() => {
     let filtered = [...students];
     
-    // Extraire les classes uniques des étudiants pour les filtres
-    const classesSet = new Set<string>();
-    const classesMap = new Map<number, string>();
-    
-    students.forEach(student => {
-      // Collecter les classes de l'étudiant
-      if (student.allClasses && student.allClasses.length > 0) {
-        student.allClasses.forEach(cls => {
-          if (cls.classId && cls.className) {
-            classesMap.set(cls.classId, cls.className);
-          }
-        });
-      } else if (student.classId && student.className) {
-        classesMap.set(student.classId, student.className);
-      }
-    });
-    
-    // Convertir la Map en tableau pour le filtre de classes
-    const classesArray = Array.from(classesMap).map(([id, name]) => ({ id, name }));
-    setAvailableClasses(classesArray);
-    
+    // Extraire les classes uniques des étudiants pour les filtres si nous ne sommes pas en mode classe spécifique
+    if (context !== 'class' || !classId) {
+      const classesMap = new Map<number, string>();
+      
+      students.forEach(student => {
+        // Collecter les classes de l'étudiant
+        if (student.allClasses && student.allClasses.length > 0) {
+          student.allClasses.forEach(cls => {
+            if (cls.classId && cls.className) {
+              classesMap.set(cls.classId, cls.className);
+            }
+          });
+        } else if (student.classId && student.className) {
+          classesMap.set(student.classId, student.className);
+        }
+      });
+
+      // Convertir la Map en tableau pour le filtre de classes
+      const classesArray = Array.from(classesMap).map(([id, name]) => ({ id, name }));
+      setAvailableClasses(classesArray);
+    }
+
     // Filtrer par contexte
     if (context === 'single' && studentId) {
       filtered = filtered.filter(student => student.id === studentId);
     } else if (context === 'class' && classId) {
-      filtered = filtered.filter(student => 
-        student.allClasses?.some(cls => cls.classId === classId) || 
-        student.classId === classId
-      );
+      filtered = students
+      // On sélectionne automatiquement la classe en cas de contexte de classe spécifique
+      if (selectedClassFilter === 'all') {
+        setSelectedClassFilter(classId);
+      }
     }
     
     // Appliquer le filtre de classe
     if (selectedClassFilter !== 'all') {
-      filtered = filtered.filter(student => 
-        student.allClasses?.some(cls => cls.classId === selectedClassFilter) || 
-        student.classId === selectedClassFilter
+      if (context === 'class' && classId) {
+        filtered = students
+      } else {
+        filtered = filtered.filter(student => 
+          student.allClasses?.some(cls => cls.classId === selectedClassFilter) || 
+          student.classId === selectedClassFilter      
       );
+    }
       
-      // Extraire les sous-classes disponibles pour cette classe
-      const subClasses = new Set<string>();
-      filtered.forEach(student => {
-        const classInfo = student.allClasses?.find(cls => cls.classId === selectedClassFilter);
-        if (classInfo?.sub_class) {
-          subClasses.add(classInfo.sub_class.toString());
-        } else if (student.classId === selectedClassFilter && student.sub_class) {
-          subClasses.add(student.sub_class.toString());
-        }
-      });
-      
-      setAvailableSubClasses(Array.from(subClasses).sort());
+      // On n'extrait pas les sous-classes disponibles ici quand on a déjà les infos de classe
+      // avec le nombre de sous-classes défini via l'API
+      if (!classInfo || classInfo.nbre_subclasses === null) {
+        // Extraire les sous-classes disponibles pour cette classe
+        const subClasses = new Set<string>();
+        filtered.forEach(student => {
+          const classInfo = student.allClasses?.find(cls => cls.classId === selectedClassFilter);
+          if (classInfo?.sub_class) {
+            subClasses.add(classInfo.sub_class.toString());
+          } else if (student.classId === selectedClassFilter && student.sub_class) {
+            subClasses.add(student.sub_class.toString());
+          }
+        });
+        
+        setAvailableSubClasses(Array.from(subClasses).sort());
+      }
     } else {
-      setAvailableSubClasses([]);
+      // Si aucune classe n'est sélectionnée, on réinitialise les sous-classes
+      if (!classInfo || classInfo.nbre_subclasses === null) {
+        setAvailableSubClasses([]);
+      }
       setSelectedSubClassFilter('all');
     }
     
     // Appliquer le filtre de sous-classe
     if (selectedSubClassFilter !== 'all') {
       filtered = filtered.filter(student => {
+        if (context === 'class' && classId) {
+          // Vérifier si l'étudiant a une sous-classe
+          return student.sub_class?.toString() === selectedSubClassFilter || selectedSubClassFilter === 'all';
+        }
+        // Vérifier si l'étudiant a une sous-classe
         // Cas des étudiants avec allClasses
         if (student.allClasses && student.allClasses.length > 0) {
           const classInfo = student.allClasses.find(
@@ -177,7 +233,7 @@ export default function StudentPasswordManager({
         }
         
         // Cas des étudiants avec classId direct
-        return (selectedClassFilter === 'all' || student.classId === selectedClassFilter) && 
+        return (selectedSubClassFilter === 'all' || student.classId === selectedClassFilter) && 
                student.sub_class?.toString() === selectedSubClassFilter;
       });
     }
@@ -203,7 +259,7 @@ export default function StudentPasswordManager({
     // Réinitialiser la sélection quand le filtre change
     setSelectedStudentIds(new Set());
     setSelectAll(false);
-  }, [students, context, studentId, classId, searchTerm, selectedClassFilter, selectedSubClassFilter]);
+  }, [students, context, studentId, classId, searchTerm, selectedClassFilter, selectedSubClassFilter, classInfo]);
   
   // Charger l'état des mots de passe pour tous les étudiants filtrés
   useEffect(() => {
@@ -379,7 +435,7 @@ export default function StudentPasswordManager({
   
   // Générer un mot de passe aléatoire
   const generateRandomPassword = (length = 6) => {
-    const charset = "abcde12345";
+    const charset = "abcde01234";
     let password = "";
     for (let i = 0; i < length; i++) {
       const randomIndex = Math.floor(Math.random() * charset.length);
@@ -519,13 +575,15 @@ export default function StudentPasswordManager({
         <DialogTitle id="password-manager-title">
           <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
             <LockIcon sx={{ mr: 1 }} />
-            <Typography variant="h6" component="div">
+            <Typography variant="h6" component="span">
               {title}
             </Typography>
           </Box>
-          <Typography variant="subtitle2" color="text.secondary">
-            Gérez les mots de passe des étudiants pour leur permettre d'accéder à leurs corrections
-          </Typography>
+          <Box sx={{ mt: 1 }}>
+            <Typography variant="subtitle2" component="div" color="text.secondary">
+              Gérez les mots de passe des étudiants pour leur permettre d'accéder à leurs corrections
+            </Typography>
+          </Box>
         </DialogTitle>
         
         <DialogContent dividers>
@@ -574,12 +632,14 @@ export default function StudentPasswordManager({
               placeholder="Nom, prénom ou email"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              InputProps={{
-                startAdornment: (
-                  <InputAdornment position="start">
-                    <SearchIcon />
-                  </InputAdornment>
-                ),
+              slotProps={{
+                input: {
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <SearchIcon />
+                    </InputAdornment>
+                  ),
+                }
               }}
               size="small"
               sx={{ minWidth: { sm: '250px' } }}
@@ -592,7 +652,8 @@ export default function StudentPasswordManager({
               <CardContent sx={{ p: 2, "&:last-child": { pb: 2 } }}>
                 <Typography variant="subtitle2" sx={{ mb: 2 }}>Filtres avancés</Typography>
                 <Grid container spacing={2}>
-                  {availableClasses.length > 0 && (
+                  {/* Filtre de classe */}
+                  {availableClasses.length > 0 && context !== 'class' && (
                     <Grid size={{ xs: 12, sm: 6 }}>
                       <FormControl fullWidth size="small">
                         <InputLabel id="class-filter-label">Classe</InputLabel>
@@ -613,7 +674,31 @@ export default function StudentPasswordManager({
                     </Grid>
                   )}
                   
-                  {availableSubClasses.length > 0 && (
+                  {/* En mode classe unique, on affiche le nom de la classe comme information */}
+                  {context === 'class' && classInfo && (
+                    <Grid size={{ xs: 12, sm: 6 }}>
+                      <Box sx={{ 
+                        p: 1, 
+                        pb: 0.5, 
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        gap: 1 
+                      }}>
+                        <Typography variant="body2" color="text.secondary">
+                          Classe :
+                        </Typography>
+                        <Chip 
+                          label={classInfo.name} 
+                          color="primary" 
+                          size="small" 
+                          variant="outlined" 
+                        />
+                      </Box>
+                    </Grid>
+                  )}
+                  
+                  {/* Filtre de sous-classe (groupe) */}
+                  {(availableSubClasses.length > 0 || (classInfo && classInfo.nbre_subclasses && classInfo.nbre_subclasses > 0)) && (
                     <Grid size={{ xs: 12, sm: 6 }}>
                       <FormControl fullWidth size="small">
                         <InputLabel id="subclass-filter-label">Groupe</InputLabel>
@@ -667,14 +752,16 @@ export default function StudentPasswordManager({
                     onChange={e => setBatchPassword(e.target.value)}
                     size="small"
                     sx={{ mb: 2 }}
-                    InputProps={{
-                      endAdornment: (
-                        <InputAdornment position="end">
-                          <IconButton onClick={() => setShowPassword(!showPassword)} edge="end">
-                            {showPassword ? <VisibilityOffIcon /> : <VisibilityIcon />}
-                          </IconButton>
-                        </InputAdornment>
-                      ),
+                    slotProps={{
+                      input: {
+                        endAdornment: (
+                          <InputAdornment position="end">
+                            <IconButton onClick={() => setShowPassword(!showPassword)} edge="end">
+                              {showPassword ? <VisibilityOffIcon /> : <VisibilityIcon />}
+                            </IconButton>
+                          </InputAdornment>
+                        ),
+                      }
                     }}
                   />
                 )}
@@ -752,7 +839,7 @@ export default function StudentPasswordManager({
                       />
                     </Box>
                     <Typography variant="caption" sx={{ display: 'block', mt: 0.5, textAlign: 'center' }}>
-                      Veuillez patienter pendant que les mots de passe sont générés...
+                      Veuillez patienter pendant que les mots de passe sont ajoutés...
                     </Typography>
                   </Box>
                 )}
@@ -852,24 +939,28 @@ export default function StudentPasswordManager({
                       </TableCell>
                       <TableCell align="right">
                         <Tooltip title="Modifier le mot de passe">
-                          <IconButton 
-                            color="primary" 
-                            onClick={() => handleEditPassword(student)}
-                            disabled={loading}
-                          >
-                            <EditIcon />
-                          </IconButton>
+                          <span>
+                            <IconButton 
+                              color="primary" 
+                              onClick={() => handleEditPassword(student)}
+                              disabled={loading}
+                            >
+                              <EditIcon />
+                            </IconButton>
+                          </span>
                         </Tooltip>
                         
                         {studentsWithPassword[student.id] && (
                           <Tooltip title="Supprimer le mot de passe">
-                            <IconButton 
-                              color="error" 
-                              onClick={() => handleDeletePassword(student)}
-                              disabled={loading}
-                            >
-                              <DeleteIcon />
-                            </IconButton>
+                            <span>
+                              <IconButton 
+                                color="error" 
+                                onClick={() => handleDeletePassword(student)}
+                                disabled={loading}
+                              >
+                                <DeleteIcon />
+                              </IconButton>
+                            </span>
                           </Tooltip>
                         )}
                       </TableCell>
@@ -906,7 +997,7 @@ export default function StudentPasswordManager({
                     : 'Définir un mot de passe'}
                 </Typography>
               </Box>
-              <Typography variant="subtitle2" color="text.secondary">
+              <Typography variant="subtitle2" component="div" color="text.secondary">
                 {selectedStudent.first_name} {selectedStudent.last_name}
               </Typography>
             </DialogTitle>
@@ -962,24 +1053,26 @@ export default function StudentPasswordManager({
                       onDelete={() => setShowPassword(!showPassword)}
                     />
                     <Tooltip title="Copier le mot de passe">
-                      <Button
-                        variant="outlined"
-                        color="primary"
-                        size="small"
-                        startIcon={<ContentCopyIcon />}
-                        onClick={() => {
-                          if (currentPassword) {
-                            navigator.clipboard.writeText(currentPassword);
-                            // Afficher une notification ou un message de succès temporaire
-                            setSuccess("Mot de passe copié dans le presse-papiers");
-                            setTimeout(() => {
-                              setSuccess(null);
-                            }, 2000);
-                          }
-                        }}
-                      >
-                        Copier
-                      </Button>
+                      <span>
+                        <Button
+                          variant="outlined"
+                          color="primary"
+                          size="small"
+                          startIcon={<ContentCopyIcon />}
+                          onClick={() => {
+                            if (currentPassword) {
+                              navigator.clipboard.writeText(currentPassword);
+                              // Afficher une notification ou un message de succès temporaire
+                              setSuccess("Mot de passe copié dans le presse-papiers");
+                              setTimeout(() => {
+                                setSuccess(null);
+                              }, 2000);
+                            }
+                          }}
+                        >
+                          Copier
+                        </Button>
+                      </span>
                     </Tooltip>
                   </Box>
                 </Box>
@@ -995,14 +1088,16 @@ export default function StudentPasswordManager({
                 value={newPassword}
                 onChange={(e) => setNewPassword(e.target.value)}
                 disabled={loading || Boolean(success)}
-                InputProps={{
-                  endAdornment: (
-                    <InputAdornment position="end">
-                      <IconButton onClick={() => setShowPassword(!showPassword)} edge="end">
-                        {showPassword ? <VisibilityOffIcon /> : <VisibilityIcon />}
-                      </IconButton>
-                    </InputAdornment>
-                  ),
+                slotProps={{
+                  input: {
+                    endAdornment: (
+                      <InputAdornment position="end">
+                        <IconButton onClick={() => setShowPassword(!showPassword)} edge="end">
+                          {showPassword ? <VisibilityOffIcon /> : <VisibilityIcon />}
+                        </IconButton>
+                      </InputAdornment>
+                    ),
+                  }
                 }}
               />
               

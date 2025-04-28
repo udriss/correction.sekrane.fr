@@ -165,9 +165,9 @@ function organizeGroupBySubArrangement(
   }
 
   const result: Record<string, Partial<CorrectionAutreEnriched>[] | any[]> = {};
-  console.log('Organizing corrections by sub-arrangement:', subArrangement);
-  console.log('Corrections:', groupCorrections);
-  console.log('Students:', students);
+  
+  
+  
   switch (subArrangement) {
     case 'activity':
       // Regrouper les corrections par activité
@@ -1124,8 +1124,8 @@ export async function generateQRCodePDF({
 
     if (skipGrouping && groupedData) {
       organizedData = groupedData;
-      console.log('Utilisation des données organisées fournies');
-      console.log(organizedData);
+      
+      
     } else {
       organizedData = organizeBySubArrangement(
         sortedCorrections,

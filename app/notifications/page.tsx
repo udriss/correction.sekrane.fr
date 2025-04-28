@@ -481,13 +481,15 @@ export default function NotificationsPage() {
                       <Box>
                         {!notification.readOk && (
                           <Tooltip title="Marquer comme lu">
-                            <IconButton 
-                              onClick={() => markAsRead(notification.id)}
-                              sx={{ mr: 1 }}
-                              size="small"
-                            >
-                              <DoneAllIcon fontSize="small" />
-                            </IconButton>
+                            <span>
+                              <IconButton 
+                                onClick={() => markAsRead(notification.id)}
+                                sx={{ mr: 1 }}
+                                size="small"
+                              >
+                                <DoneAllIcon fontSize="small" />
+                              </IconButton>
+                            </span>
                           </Tooltip>
                         )}
                         <Tooltip title="Voir le feedback">
