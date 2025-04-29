@@ -66,43 +66,39 @@ export async function GET(
           a.parts_names,
           CONCAT(s.first_name, ' ', LEFT(s.last_name, 1), '.') as student_name,
           IFNULL(c.grade, 
-                  (SELECT SUM(CAST(JSON_VALUE(points_earned, '$[*]') AS DECIMAL(10,2))) 
-                  FROM JSON_TABLE(
-                    c.points_earned,
-                    '$[*]' COLUMNS (
-                      point DECIMAL(10,2) PATH '$'
-                    )
-                  ) as points_table)
+                 (SELECT SUM(point) FROM JSON_TABLE(
+                   c.points_earned,
+                   '$[*]' COLUMNS (
+                     point DECIMAL(10,2) PATH '$'
+                   )
+                 ) as points_table)
           ) as grade,
           IFNULL(c.penalty, 0) as penalty,
           IFNULL(c.final_grade, 
                 CASE 
                   WHEN IFNULL(c.grade, 
-                              (SELECT SUM(CAST(JSON_VALUE(points_earned, '$[*]') AS DECIMAL(10,2))) 
-                                FROM JSON_TABLE(
-                                  c.points_earned,
-                                  '$[*]' COLUMNS (
-                                    point DECIMAL(10,2) PATH '$'
-                                  )
-                                ) as points_table)
+                             (SELECT SUM(point) FROM JSON_TABLE(
+                               c.points_earned,
+                               '$[*]' COLUMNS (
+                                 point DECIMAL(10,2) PATH '$'
+                               )
+                             ) as points_table)
                   ) < 5 
                     THEN IFNULL(c.grade, 
-                                (SELECT SUM(CAST(JSON_VALUE(points_earned, '$[*]') AS DECIMAL(10,2))) 
-                                  FROM JSON_TABLE(
-                                    c.points_earned,
-                                    '$[*]' COLUMNS (
-                                      point DECIMAL(10,2) PATH '$'
-                                    )
-                                  ) as points_table)
+                               (SELECT SUM(point) FROM JSON_TABLE(
+                                 c.points_earned,
+                                 '$[*]' COLUMNS (
+                                   point DECIMAL(10,2) PATH '$'
+                                 )
+                               ) as points_table)
                     )
                   ELSE GREATEST((IFNULL(c.grade, 
-                                        (SELECT SUM(CAST(JSON_VALUE(points_earned, '$[*]') AS DECIMAL(10,2))) 
-                                        FROM JSON_TABLE(
-                                          c.points_earned,
-                                          '$[*]' COLUMNS (
-                                            point DECIMAL(10,2) PATH '$'
-                                          )
-                                        ) as points_table)
+                                       (SELECT SUM(point) FROM JSON_TABLE(
+                                         c.points_earned,
+                                         '$[*]' COLUMNS (
+                                           point DECIMAL(10,2) PATH '$'
+                                         )
+                                       ) as points_table)
                                 ) - IFNULL(c.penalty, 0)), 5)
                 END
           ) as final_grade,

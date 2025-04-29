@@ -415,10 +415,12 @@ export default function FeedbackViewer({ params }: { params: Promise<{ code: str
       (Array.isArray(correction.points_earned) && 
       correction.points_earned.reduce((sum: number, p: number) => sum + (typeof p === 'number' ? p : parseFloat(String(p || '0'))), 0) === 20))
   );
+
+  const isAbsent = correction.status === 'ABSENT';
   
   // Format pour afficher "- -" au lieu des valeurs numériques pour les travaux non rendus
   const formatGradeWithNonRendu = (value: number | string | null | undefined) => {
-    if (isNeverSubmitted) return "- -";
+    if (isNeverSubmitted || isAbsent) return "- -";
     return formatGrade(value);
   };
   
@@ -883,6 +885,34 @@ export default function FeedbackViewer({ params }: { params: Promise<{ code: str
                       
                       <Typography variant="body2">
                         Pour un barème total de {maxPoints} points, cela donne une note finale de <strong>{(maxPoints * 0.25).toFixed(1).replace('.', ',')}</strong> points.
+                      </Typography>
+                    </Box>
+                  </Paper>
+                )}
+
+                {isAbsent && (
+                  <Paper 
+                    elevation={0} 
+                    sx={{ 
+                      p: 2, 
+                      mb: 2, 
+                      border: '1px dashed',
+                      borderColor: 'warning.light',
+                      bgcolor: 'warning.50',
+                      borderRadius: 2
+                    }}
+                  >
+                    <Typography variant="subtitle2" sx={{ fontWeight: 'bold', color: 'warning.dark', mb: 1 }}>
+                      Absence à l'évaluation
+                    </Typography>
+                    
+                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                      <Typography variant="body2">
+                        Élève absent lors de cette évaluation. Cette absence a été enregistrée et ne compte pas dans le calcul de la moyenne.
+                      </Typography>
+                      
+                      <Typography variant="body2">
+                        Aucune note n'est attribuée pour cette évaluation.
                       </Typography>
                     </Box>
                   </Paper>
