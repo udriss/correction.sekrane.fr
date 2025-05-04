@@ -200,7 +200,8 @@ export async function PATCH(
     }
 
     const data = await request.json();
-    const { name, academic_year } = data;
+    console.log(data)
+    const { name, academic_year, nbre_subclasses } = data;
 
     if (!name || !name.trim()) {
       return NextResponse.json({ error: 'Name is required' }, { status: 400 });
@@ -227,6 +228,12 @@ export async function PATCH(
     if (academic_year) {
       updateFields.push('academic_year = ?');
       updateParams.push(academic_year);
+    }
+
+    // Ajouter nbre_subclasses si fourni
+    if (typeof nbre_subclasses !== 'undefined') {
+      updateFields.push('nbre_subclasses = ?');
+      updateParams.push(nbre_subclasses === null ? null : Number(nbre_subclasses));
     }
 
     // Ajouter updated_at

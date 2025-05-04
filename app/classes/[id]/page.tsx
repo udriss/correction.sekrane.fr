@@ -46,6 +46,7 @@ import BulkEmailDialog from '@/components/students/BulkEmailDialog';
 import AlertDialog from '@/components/AlertDialog';
 import dayjs from 'dayjs';
 import StudentPasswordManager from '@/components/students/StudentPasswordManager';
+import ClassHeader from '@/components/classes/ClassHeader';
 
 // Définition des interfaces nécessaires
 interface TabPanelProps {
@@ -95,7 +96,7 @@ export default function ClassAutreDetailPage({ params }: { params: Promise<{ id:
     
     // État pour le dialogue de modification de la classe
     const [editClassDialogOpen, setEditClassDialogOpen] = useState(false);
-    const [editingClass, setEditingClass] = useState<{name: string, academic_year: string} | null>(null);
+    const [editingClass, setEditingClass] = useState<{name: string, academic_year: string, nbre_subclasses?: number | null, description?: string | null} | null>(null);
     
     const [associateModalOpen, setAssociateModalOpen] = useState(false);
     const [createCorrectionsModalOpen, setCreateCorrectionsModalOpen] = useState(false);
@@ -852,7 +853,8 @@ const handleEditClassOpen = () => {
   if (classData) {
     setEditingClass({
       name: classData.name,
-      academic_year: classData.academic_year || ''
+      academic_year: classData.academic_year || '',
+      description: classData.description || ''
     });
     setEditClassDialogOpen(true);
   }
@@ -876,7 +878,9 @@ const handleEditClassSave = async () => {
       },
       body: JSON.stringify({
         name: editingClass.name,
-        academic_year: editingClass.academic_year
+        academic_year: editingClass.academic_year,
+        nbre_subclasses: editingClass.nbre_subclasses,
+        description: editingClass.description ?? null
       }),
     });
     
@@ -1086,191 +1090,19 @@ const handleDeleteClass = async () => {
   
   return (
     <Container maxWidth="lg" sx={{ py: 4 }}>
-      {/* En-tête avec informations de la classe */}
-      <Paper elevation={3} sx={{ borderRadius: 3, overflow: 'hidden', mb: 4 }}>
-        <GradientBackground variant="primary">
-          <PatternBackground
-            pattern="dots"
-            opacity={0.05}
-            sx={{ p: 4, borderRadius: 0 }}
-          >
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: 2 }}>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                <Box
-                  sx={{
-                    background: (theme) => `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.secondary.main} 100%)`,
-                    p: 1.5,
-                    borderRadius: '50%',
-                    display: 'flex',
-                    boxShadow: '0 4px 20px rgba(0,0,0,0.2)'
-                  }}
-                >
-                  <SchoolIcon sx={{ fontSize: 50, color: (theme) => theme.palette.text.primary }} />
-                </Box>
-                
-                <Box>
-                  <Typography variant="h4" fontWeight={700} color="text.primary">
-                    {classData?.name || 'Classe'}
-                  </Typography>
-                  <Typography variant="subtitle1" color="text.secondary" sx={{ opacity: 0.9 }}>
-                    Année scolaire: {classData?.academic_year || '-'} | {students.length} étudiants
-                  </Typography>
-                </Box>
-              </Box>
-              
-              <Box sx={{ display: 'flex', gap: 1 }}>
-                <Button
-                  variant="contained"
-                  color="primary"
-                  sx={{ alignSelf: 'flex-start',
-                    fontWeight: 700,
-                   }}
-                  startIcon={<EditIcon />}
-                  onClick={handleEditClassOpen}
-                >
-                  Modifier
-                </Button>
-                
-                <Button
-                  variant="contained"
-                  color="error"
-                  sx={{ alignSelf: 'flex-start',
-                    fontWeight: 700,
-                   }}
-                  startIcon={<DeleteIcon />}
-                  onClick={handleOpenDeleteClassDialog}
-                >
-                  Supprimer
-                </Button>
-                
-                <Button
-                  sx={{ alignSelf: 'flex-start',
-                    fontWeight: 700,
-                   }}
-                  variant="contained"
-                  color="secondary"
-                  startIcon={<PeopleAltIcon />}
-                  component={Link}
-                  href={`/classes/${classId}/students`}
-                >
-                  Gérer les étudiants
-                </Button>
-              </Box>
-            </Box>
-          </PatternBackground>
-        </GradientBackground>
-      </Paper>
-      
-      {/* Statistiques de la classe */}
-      <Paper sx={{ p: 3, mb: 4, borderRadius: 2 }}>
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-          <Typography variant="h6" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <BarChartIcon color="primary" />
-            Statistiques de la classe
-          </Typography>
-          
-          <Button
-            variant="outlined"
-            color="primary"
-            startIcon={<EmailIcon />}
-            onClick={() => setBulkEmailDialogOpen(true)}
-            disabled={students.length === 0}
-          >
-            Envoyer les corrections
-          </Button>
-          {students.length > 0 && (
-              <Button
-                variant="contained"
-                color="info"
-                startIcon={<LockIcon />}
-                onClick={() => {
-                  setSelectedStudents(students);
-                  setPasswordManagerOpen(true);
-                }}
-              >
-                Gérer les mots de passe
-              </Button>
-            )}
-        </Box>
-        
-        <Grid container spacing={2}>
-          <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-            <Paper sx={{ 
-              p: 2, 
-              textAlign: 'center', 
-              height: '100%',
-              bgcolor: (theme) => alpha(theme.palette.myBoxes.primary, 0.5),
-              backdropFilter: 'blur(5px)',
-              borderRadius: 2,
-            }}>
-              <Typography variant="overline" color="text.secondary">Total</Typography>
-              <Typography variant="h3" fontWeight="bold" color="text.primary">
-                {classStats.totalCorrections}
-              </Typography>
-              <Typography variant="overline" color="text.secondary">
-                corrections
-              </Typography>
-            </Paper>
-          </Grid>
-          
-          <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-            <Paper sx={{ 
-              p: 2, 
-              textAlign: 'center', 
-              height: '100%',
-              bgcolor: (theme) => alpha(theme.palette.myBoxes.primary, 0.5),
-              backdropFilter: 'blur(5px)',
-              borderRadius: 2,
-            }}>
-              <Typography variant="overline" color="text.secondary">Moyenne</Typography>
-              <Typography variant="h3" fontWeight="bold" color="text.primary">
-                {classStats.totalCorrections > 0 
-                  ? classStats.averageGrade.toFixed(1) 
-                  : '-'}
-              </Typography>
-              <Typography variant="overline" color="text.secondary">sur 20</Typography>
-            </Paper>
-          </Grid>
-          
-          <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-            <Paper sx={{ 
-              p: 2, 
-              textAlign: 'center', 
-              height: '100%',
-              bgcolor: (theme) => alpha(theme.palette.myBoxes.primary, 0.5),
-              backdropFilter: 'blur(5px)',
-              borderRadius: 2,
-            }}>
-              <Typography variant="overline" color="text.secondary">Étudiants</Typography>
-              <Typography variant="h3" fontWeight="bold" color="text.primary">
-                {classStats.studentsCovered} / {students.length}
-              </Typography>
-              <Typography variant="overline" color="text.secondary">
-                avec corrections
-              </Typography>
-            </Paper>
-          </Grid>
-          
-          <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-            <Paper sx={{ 
-              p: 2, 
-              textAlign: 'center', 
-              height: '100%',
-              bgcolor: (theme) => alpha(theme.palette.myBoxes.primary, 0.5),
-              backdropFilter: 'blur(5px)',
-              borderRadius: 2,
-            }}>
-              <Typography variant="overline" color="text.secondary">Activités</Typography>
-              <Typography variant="h3" fontWeight="bold" color="text.primary">
-                {classStats.activitiesCovered} / {activities.length}
-              </Typography>
-              <Typography variant="overline" color="text.secondary">
-                avec corrections
-              </Typography>
-            </Paper>
-          </Grid>
-        </Grid>
-      </Paper>
+      {/* En-tête avec informations de la classe + Statistiques */}
+      <ClassHeader
+        classId={classId}
+        classData={classData}
+        students={students}
+        activities={activities}
+        classStats={classStats}
+        handleEditClassOpen={handleEditClassOpen}
+        handleOpenDeleteClassDialog={handleOpenDeleteClassDialog}
+        setBulkEmailDialogOpen={setBulkEmailDialogOpen}
+        setSelectedStudents={setSelectedStudents}
+        setPasswordManagerOpen={setPasswordManagerOpen}
+      />
       
       {/* Onglets pour les différentes sections */}
       <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 1 }}>
@@ -1959,6 +1791,29 @@ const handleDeleteClass = async () => {
               placeholder="Ex: 2024-2025"
               required
               helperText="Format: AAAA-AAAA ou AAAA"
+            />
+            <TextField
+              fullWidth
+              label="Nombre de sous-groupes (optionnel)"
+              type="number"
+              inputProps={{ min: 0 }}
+              value={editingClass?.nbre_subclasses ?? classData?.nbre_subclasses ?? ''}
+              onChange={e => {
+                const val = e.target.value === '' ? null : Math.max(0, parseInt(e.target.value));
+                setEditingClass(prev => prev ? { ...prev, nbre_subclasses: val } : { name: '', academic_year: '', nbre_subclasses: val });
+              }}
+              variant="outlined"
+              helperText="Laisser vide ou 0 pour désactiver les sous-groupes"
+            />
+            <TextField
+              fullWidth
+              label="Description (optionnel)"
+              value={editingClass?.description || ''}
+              onChange={e => setEditingClass(prev => prev ? { ...prev, description: e.target.value } : null)}
+              variant="outlined"
+              multiline
+              minRows={2}
+              maxRows={6}
             />
           </Box>
         </DialogContent>

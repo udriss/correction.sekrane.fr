@@ -1,5 +1,4 @@
 
-export { ClassHeader } from './ClassHeader';
 export { ClassStats } from './ClassStats';
 export { ClassTabs } from './ClassTabs';
 export { ActivitiesList } from './ActivitiesList';

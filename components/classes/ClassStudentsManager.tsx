@@ -28,6 +28,8 @@ import {
   List,
   ListItem,
   ListItemText,
+  Checkbox,
+  LinearProgress,
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import EditIcon from '@mui/icons-material/Edit';
@@ -127,6 +129,13 @@ export default function ClassStudentsManager({
   const [savingBatch, setSavingBatch] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isDragging, setIsDragging] = useState<boolean>(false);
+  
+  // Sélection en lot
+  const [selectedStudentIds, setSelectedStudentIds] = useState<number[]>([]);
+  const [batchDeleteDialogOpen, setBatchDeleteDialogOpen] = useState(false);
+  const [batchDeleteProgress, setBatchDeleteProgress] = useState({ current: 0, total: 0, running: false });
+  const [batchDeleteImpacts, setBatchDeleteImpacts] = useState<Record<number, any[]>>({});
+  const [batchDeleteErrors, setBatchDeleteErrors] = useState<{id: number, error: string}[]>([]);
   
   // États pour l'affichage/masquage des colonnes
   const [showEmailColumn, setShowEmailColumn] = useState(false);
@@ -283,6 +292,32 @@ export default function ClassStudentsManager({
     setActiveTab(initialActiveTab);
   }, [initialActiveTab]);
   
+    // Tri des étudiants
+    const sortedStudents = useMemo(() => {
+      // Copie pour ne pas modifier l'original
+      const sortableStudents = [...students];
+      
+      return sortableStudents.sort((a, b) => {
+        const aValue = a[orderBy] || '';
+        const bValue = b[orderBy] || '';
+        
+        // Pour les comparaisons de chaînes de caractères
+        if (typeof aValue === 'string' && typeof bValue === 'string') {
+          return order === 'asc' 
+            ? aValue.localeCompare(bValue) 
+            : bValue.localeCompare(aValue);
+        }
+        
+        // Pour les comparaisons numériques
+        if (typeof aValue === 'number' && typeof bValue === 'number') {
+          return order === 'asc' ? aValue - bValue : bValue - aValue;
+        }
+        
+        // Fallback
+        return 0;
+      });
+    }, [students, orderBy, order]);
+
   const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
     setActiveTab(newValue);
   };
@@ -729,31 +764,7 @@ export default function ClassStudentsManager({
     }
   };
 
-  // Tri des étudiants
-  const sortedStudents = useMemo(() => {
-    // Copie pour ne pas modifier l'original
-    const sortableStudents = [...students];
-    
-    return sortableStudents.sort((a, b) => {
-      const aValue = a[orderBy] || '';
-      const bValue = b[orderBy] || '';
-      
-      // Pour les comparaisons de chaînes de caractères
-      if (typeof aValue === 'string' && typeof bValue === 'string') {
-        return order === 'asc' 
-          ? aValue.localeCompare(bValue) 
-          : bValue.localeCompare(aValue);
-      }
-      
-      // Pour les comparaisons numériques
-      if (typeof aValue === 'number' && typeof bValue === 'number') {
-        return order === 'asc' ? aValue - bValue : bValue - aValue;
-      }
-      
-      // Fallback
-      return 0;
-    });
-  }, [students, orderBy, order]);
+
 
   if (loading) {
     return (
@@ -932,6 +943,77 @@ export default function ClassStudentsManager({
   };
 
 
+
+  // Sélection individuelle
+  const handleSelectStudent = (id: number) => {
+    setSelectedStudentIds(prev => prev.includes(id) ? prev.filter(sid => sid !== id) : [...prev, id]);
+  };
+  // Sélection/désélection tout
+  const handleSelectAll = (checked: boolean) => {
+    setSelectedStudentIds(checked ? filteredStudents.map(s => s.id!) : []);
+  };
+
+  // Lancer la suppression en lot
+  const handleOpenBatchDeleteDialog = async () => {
+    // Récupérer l'impact pour chaque étudiant (corrections associées)
+    const impacts: Record<number, any[]> = {};
+    for (const id of selectedStudentIds) {
+      try {
+        const res = await fetch(`/api/students/${id}/corrections`);
+        impacts[id] = res.ok ? await res.json() : [];
+      } catch { impacts[id] = []; }
+    }
+    setBatchDeleteImpacts(impacts);
+    setBatchDeleteDialogOpen(true);
+  };
+
+  // Suppression en lot
+  const handleBatchDelete = async () => {
+    setBatchDeleteProgress({ current: 0, total: selectedStudentIds.length, running: true });
+    setBatchDeleteErrors([]);
+    let current = 0;
+    for (let i = 0; i < selectedStudentIds.length; i++) {
+      const studentId = selectedStudentIds[i];
+      try {
+        const response = await fetch(`/api/students/${studentId}`, {
+          method: 'DELETE',
+        });
+        if (!response.ok) {
+          let msg = 'Erreur inconnue';
+          try {
+            const data = await response.json();
+            msg = data.error || msg;
+          } catch {}
+          setBatchDeleteErrors(prev => [...prev, { id: studentId, error: msg }]);
+        }
+      } catch (e) {
+        setBatchDeleteErrors(prev => [
+          ...prev,
+          {
+            id: studentId,
+            error:
+              typeof e === 'object' && e && 'message' in e
+                ? (e as any).message
+                : 'Erreur réseau',
+          },
+        ]);
+      }
+      current++;
+      // Utiliser une seule mise à jour d'état par itération pour éviter l'effet saccadé
+      setBatchDeleteProgress(prev => {
+        if (prev.current !== current) {
+          return { ...prev, current };
+        }
+        return prev;
+      });
+      // Attendre un court instant pour lisser l'animation (optionnel, à ajuster si besoin)
+      await new Promise(res => setTimeout(res, 120));
+    }
+    setBatchDeleteProgress({ current: 0, total: 0, running: false });
+    setBatchDeleteDialogOpen(false);
+    setSelectedStudentIds([]);
+    fetchStudents();
+  };
 
   return (
     <div>
@@ -1474,6 +1556,17 @@ export default function ClassStudentsManager({
             Ajouter des étudiants
           </Button>
         )}
+        {selectedStudentIds.length > 0 && (
+          <Button
+            variant="contained"
+            color="error"
+            startIcon={<DeleteIcon />}
+            onClick={handleOpenBatchDeleteDialog}
+            sx={{ ml: 2 }}
+          >
+            Supprimer la sélection ({selectedStudentIds.length})
+          </Button>
+        )}
       </Box>
 
       {/* Students list */}
@@ -1482,6 +1575,14 @@ export default function ClassStudentsManager({
           <Table sx={{ minWidth: 650 }}>
             <TableHead>
               <TableRow>
+                <TableCell padding="checkbox">
+                  <Checkbox
+                    indeterminate={selectedStudentIds.length > 0 && selectedStudentIds.length < filteredStudents.length}
+                    checked={filteredStudents.length > 0 && selectedStudentIds.length === filteredStudents.length}
+                    onChange={e => handleSelectAll(e.target.checked)}
+                    inputProps={{ 'aria-label': 'Sélectionner tous les étudiants' }}
+                  />
+                </TableCell>
                 <TableCell>
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                     <TableSortLabel
@@ -1544,6 +1645,13 @@ export default function ClassStudentsManager({
             <TableBody>
               {filteredStudents.map((student) => (
                 <TableRow key={student.id}>
+                  <TableCell padding="checkbox">
+                    <Checkbox
+                      checked={selectedStudentIds.includes(student.id!)}
+                      onChange={() => handleSelectStudent(student.id!)}
+                      inputProps={{ 'aria-label': `Sélectionner ${student.first_name} ${student.last_name}` }}
+                    />
+                  </TableCell>
                   <TableCell>
                     {student.isEditing ? (
                       <TextField
@@ -1770,6 +1878,66 @@ export default function ClassStudentsManager({
         isProcessing={deleteProcessing}
         onConfirm={handleDeleteStudent}
         onCancel={handleCloseDeleteDialog}
+        icon={<WarningIcon />}
+      />
+
+      {/* Dialog de suppression en lot */}
+      <AlertDialog
+        open={batchDeleteDialogOpen}
+        title="Suppression en lot des étudiants"
+        content={
+          <Box>
+            <Typography variant="body1" gutterBottom>
+              Êtes-vous sûr de vouloir supprimer <strong>{selectedStudentIds.length}</strong> étudiant(s) ?
+            </Typography>
+            <List sx={{ maxHeight: 200, overflow: 'auto', mb: 2 }}>
+              {selectedStudentIds.map(id => {
+                const student = students.find(s => s.id === id);
+                const impact = batchDeleteImpacts[id] || [];
+                return (
+                  <ListItem key={id} divider>
+                    <ListItemText
+                      primary={`${student?.first_name} ${student?.last_name}`}
+                      secondary={impact.length > 0 ? `${impact.length} correction(s) associée(s)` : 'Aucune correction associée'}
+                    />
+                  </ListItem>
+                );
+              })}
+            </List>
+            {batchDeleteProgress.running && (
+              <Box sx={{ my: 2 }}>
+                <LinearProgress variant="determinate" value={batchDeleteProgress.total ? (batchDeleteProgress.current / batchDeleteProgress.total) * 100 : 0} />
+                <Typography variant="body2" sx={{ mt: 1 }}>
+                  Suppression {batchDeleteProgress.current} / {batchDeleteProgress.total}
+                </Typography>
+              </Box>
+            )}
+            {batchDeleteErrors.length > 0 && (
+              <Alert severity="error" sx={{ mt: 2 }}>
+                {batchDeleteErrors.length} erreur(s) lors de la suppression :
+                <ul style={{ margin: 0, paddingLeft: 16 }}>
+                  {batchDeleteErrors.map(err => {
+                    const student = students.find(s => s.id === err.id);
+                    return (
+                      <li key={err.id}>
+                        {student ? `${student.first_name} ${student.last_name}` : `ID ${err.id}`} : {err.error}
+                      </li>
+                    );
+                  })}
+                </ul>
+              </Alert>
+            )}
+            <Typography variant="body2" color="error" sx={{ mt: 2 }}>
+              Cette action est irréversible et supprimera toutes les données associées à ces étudiants.
+            </Typography>
+          </Box>
+        }
+        confirmText="Supprimer définitivement"
+        confirmColor="error"
+        cancelText="Annuler"
+        isProcessing={batchDeleteProgress.running}
+        onConfirm={handleBatchDelete}
+        onCancel={() => setBatchDeleteDialogOpen(false)}
         icon={<WarningIcon />}
       />
     </Paper>
