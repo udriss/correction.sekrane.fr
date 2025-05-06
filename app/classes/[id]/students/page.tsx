@@ -20,6 +20,8 @@ import ClassStudentsManager from '@/components/classes/ClassStudentsManager';
 import GradientBackground from '@/components/ui/GradientBackground';
 import PatternBackground from '@/components/ui/PatternBackground';
 import StudentPasswordManager from '@/components/students/StudentPasswordManager';
+import StudentsCsvImport from '@/components/students/StudentsCsvImport';
+import Dialog from '@mui/material/Dialog';
 
 interface Class {
   id: number;
@@ -191,13 +193,26 @@ export default function ClassStudentsPage({ params }: { params: Promise<{ id: st
         </GradientBackground>
       </Paper>
 
+      {/* Modale d'import CSV */}
+      <Dialog open={importCSVMode} onClose={() => setImportCSVMode(false)} maxWidth="md" fullWidth>
+        <StudentsCsvImport
+          onClose={() => setImportCSVMode(false)}
+          onError={(msg) => setError(msg)}
+          onSuccess={() => {
+            setImportCSVMode(false);
+            // Optionnel: rafraîchir la liste d'étudiants si besoin
+            // window.location.reload();
+          }}
+        />
+      </Dialog>
+
       {/* Use the ClassStudentsManager component */}
       <ClassStudentsManager 
         classId={classId} 
         classData={classData}
-        initialActiveTab={importCSVMode ? 1 : 0}
-        showBatchFormInitially={importCSVMode}
-        onBatchFormClosed={() => setImportCSVMode(false)}
+        initialActiveTab={0}
+        showBatchFormInitially={false}
+        onBatchFormClosed={() => {}}
       />
 
       {/* Modal de gestion des mots de passe - nous le définissons ici mais il sera contrôlé par le ClassStudentsManager */}

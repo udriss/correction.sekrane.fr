@@ -3,7 +3,7 @@
 
 import React, { useEffect, useState } from 'react';
 import {
-  Container, Paper, Typography, Box, FormControl, InputLabel, Select, MenuItem, Button, TextField, IconButton, Grid, Chip, Divider, Alert
+  Container, Paper, Typography, Box, FormControl, InputLabel, Select, MenuItem, Button, TextField, IconButton, Grid, Chip, Divider, Alert, Snackbar
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import RemoveIcon from '@mui/icons-material/Remove';
@@ -34,6 +34,20 @@ interface Student {
   sub_class?: string | number | null;
 }
 
+// Définition de la structure de l'état sauvegardé
+interface SavedState {
+  selectedClassId: number | '';
+  selectedSubgroup: string;
+  exercises: string[];
+  manualStudents: Student[];
+  selectedStudentIndexes: number[];
+  drawResult: { student: Student; exercise: string }[];
+  lastUpdated: number; // timestamp pour la fraîcheur des données
+}
+
+// Clé pour le localStorage
+const STORAGE_KEY = 'tirage_page_state';
+
 export default function TiragePage() {
   // Étape 1 : sélection classe/sous-groupe
   const [classes, setClasses] = useState<Classe[]>([]);
@@ -56,11 +70,93 @@ export default function TiragePage() {
 
   // Nouvel état pour la sélection fine des élèves
   const [selectedStudentIndexes, setSelectedStudentIndexes] = useState<number[]>([]);
+  
+  // États pour les notifications
+  const [snackbarOpen, setSnackbarOpen] = useState(false);
+  const [notificationMessage, setNotificationMessage] = useState<string>("État sauvegardé");
+  
+  // Référence pour suivre si on est en train de charger des données
+  const loadingRef = React.useRef(false);
+  
+  // Référence pour le timeout de sauvegarde
+  const saveTimeoutRef = React.useRef<NodeJS.Timeout | null>(null);
 
   const theme = useTheme();
+  
+  // Fonction pour sauvegarder l'état dans le localStorage
+  const saveState = () => {
+    try {
+      // Ne pas sauvegarder si nous sommes en train de charger des données
+      if (loadingRef.current) return;
 
-  // Récupérer la liste des classes au chargement
+      if (typeof window !== 'undefined') {
+        const stateToSave: SavedState = {
+          selectedClassId,
+          selectedSubgroup,
+          exercises,
+          manualStudents,
+          selectedStudentIndexes,
+          drawResult,
+          lastUpdated: Date.now()
+        };
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(stateToSave));
+        
+        // Définir le message de sauvegarde
+        setNotificationMessage("État sauvegardé");
+        setSnackbarOpen(true);
+      }
+    } catch (error) {
+      console.error('Erreur lors de la sauvegarde de l\'état:', error);
+    }
+  };
+
+  // Fonction pour restaurer l'état depuis le localStorage
+  const loadState = () => {
+    try {
+      if (typeof window !== 'undefined') {
+        // Marquer que nous sommes en train de charger des données
+        loadingRef.current = true;
+        
+        const savedState = localStorage.getItem(STORAGE_KEY);
+        if (savedState) {
+          const parsedState: SavedState = JSON.parse(savedState);
+          
+          // Restaurer l'état seulement si les données sont présentes
+          if (parsedState.selectedClassId) setSelectedClassId(parsedState.selectedClassId);
+          if (parsedState.selectedSubgroup) setSelectedSubgroup(parsedState.selectedSubgroup);
+          if (parsedState.exercises) setExercises(parsedState.exercises);
+          if (parsedState.manualStudents) setManualStudents(parsedState.manualStudents);
+          if (parsedState.selectedStudentIndexes) setSelectedStudentIndexes(parsedState.selectedStudentIndexes);
+          if (parsedState.drawResult) setDrawResult(parsedState.drawResult);
+          
+          // Afficher une notification de chargement
+          setNotificationMessage("État chargé");
+          setSnackbarOpen(true);
+          
+          // Gardons le verrou de chargement actif pendant un certain temps
+          // pour éviter que les effets ne déclenchent une sauvegarde immédiate
+          setTimeout(() => {
+            loadingRef.current = false;
+          }, 1000); // 1 seconde devrait être suffisante
+          
+          return true; // Indique que l'état a été restauré avec succès
+        }
+        
+        // Pas d'état sauvegardé, on peut quand même libérer le verrou
+        loadingRef.current = false;
+      }
+      return false; // Aucun état à restaurer
+    } catch (error) {
+      console.error('Erreur lors de la restauration de l\'état:', error);
+      loadingRef.current = false;
+      return false;
+    }
+  };
+
+  // Récupérer la liste des classes au chargement et essayer de restaurer l'état
   useEffect(() => {
+    const stateRestored = loadState();
+    
     setLoading(true);
     fetch('/api/classes')
       .then(async res => {
@@ -80,8 +176,33 @@ export default function TiragePage() {
       })
       .catch((err) => setError(err))
       .finally(() => setLoading(false));
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Sauvegarder l'état lorsque les données importantes changent
+  useEffect(() => {
+    // Nettoyer tout timeout existant
+    if (saveTimeoutRef.current) {
+      clearTimeout(saveTimeoutRef.current);
+    }
+    
+    // Ne pas sauvegarder immédiatement pour éviter les sauvegardes multiples rapprochées
+    // et laisser le temps à loadingRef.current d'être correctement mis à jour
+    saveTimeoutRef.current = setTimeout(() => {
+      // Sauvegarder uniquement si nous avons des données à sauvegarder
+      // et si nous ne sommes pas en train de charger
+      if (!loadingRef.current && (selectedClassId || exercises.length > 0 || manualStudents.length > 0 || drawResult.length > 0)) {
+        saveState();
+      }
+      saveTimeoutRef.current = null;
+    }, 500);
+    
+    // Nettoyage lors du démontage du composant
+    return () => {
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current);
+      }
+    };
+  }, [selectedClassId, selectedSubgroup, exercises, manualStudents, selectedStudentIndexes, drawResult]);
 
   // Récupérer les sous-groupes et étudiants quand une classe est sélectionnée
   useEffect(() => {
@@ -113,23 +234,70 @@ export default function TiragePage() {
 
   // Mettre à jour la sélection des élèves à chaque changement de filteredStudents ou manualStudents
   useEffect(() => {
-    const newIndexes = Array.from({ length: filteredStudents.length + manualStudents.length }, (_, i) => i);
-    if (
-      selectedStudentIndexes.length !== newIndexes.length ||
-      !selectedStudentIndexes.every((v, i) => v === newIndexes[i])
-    ) {
-      setSelectedStudentIndexes(newIndexes);
+    // Ne pas réinitialiser selectedStudentIndexes si on vient de restaurer les données
+    if (selectedStudentIndexes.length === 0) {
+      const newIndexes = Array.from({ length: filteredStudents.length + manualStudents.length }, (_, i) => i);
+      if (
+        selectedStudentIndexes.length !== newIndexes.length ||
+        !selectedStudentIndexes.every((v, i) => v === newIndexes[i])
+      ) {
+        setSelectedStudentIndexes(newIndexes);
+      }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filteredStudents, manualStudents]);
 
-  
+  // Réinitialiser les résultats du tirage lorsque la sélection d'étudiants change
+  useEffect(() => {
+    // Vider les résultats précédents si la sélection d'étudiants a changé
+    if (drawResult.length > 0) {
+      // Vérifier si tous les étudiants du tirage sont encore dans la sélection actuelle
+      const allStudentsIds = allStudents.map(s => s.id).filter(Boolean);
+      const drawResultStudentIds = drawResult.map(item => item.student.id).filter(Boolean);
+      
+      // Si certains étudiants du résultat ne sont plus dans la sélection, vider le résultat
+      const shouldClearResults = drawResultStudentIds.some(id => id && !allStudentsIds.includes(id));
+      
+      if (shouldClearResults) {
+        setDrawResult([]);
+      }
+    }
+  }, [selectedStudentIndexes, allStudents, drawResult]);
+
+  // Fonction pour effacer les données sauvegardées
+  const clearSavedData = () => {
+    try {
+      localStorage.removeItem(STORAGE_KEY);
+      // Réinitialiser les états
+      setSelectedClassId('');
+      setSelectedSubgroup('');
+      setStudents([]); // Réinitialiser la liste des étudiants
+      setExercises([]);
+      setManualStudents([]);
+      setSelectedStudentIndexes([]);
+      setDrawResult([]);
+      setSubgroups([]); // Réinitialiser les sous-groupes aussi
+      
+      // Afficher une notification de suppression
+      setNotificationMessage("Données effacées");
+      setSnackbarOpen(true);
+    } catch (error) {
+      console.error('Erreur lors de la suppression des données:', error);
+    }
+  };
 
   // Handler pour (dé)sélectionner un élève
   const handleToggleStudent = (idx: number) => {
     setSelectedStudentIndexes(prev =>
       prev.includes(idx) ? prev.filter(i => i !== idx) : [...prev, idx]
     );
+  };
+  
+  // Handler pour la suppression d'un étudiant de la sélection (via l'icône X du Chip)
+  const handleDeleteStudent = (idx: number, event: React.MouseEvent) => {
+    // Empêcher la propagation de l'événement pour éviter que onClick soit aussi déclenché
+    event.stopPropagation();
+    handleToggleStudent(idx);
   };
 
   // Ajout d'un exercice (un par un)
@@ -228,9 +396,6 @@ export default function TiragePage() {
             <ShuffleIcon sx={{ fontSize: 40, verticalAlign: 'middle', mr: 1, color: theme.palette.secondary.dark }} />
             Tirage au sort d'exercices
           </Typography>
-          <Typography variant="subtitle1" sx={{ mb: 3, color: theme.palette.text.secondary, fontWeight: 500 }}>
-            Sélectionnez une classe, ajoutez vos exercices, puis attribuez-les aléatoirement à vos étudiants. Personnalisez la sélection pour une analyse fine et un tirage équitable.
-          </Typography>
           <Divider sx={{ my: 3, borderColor: theme.palette.secondary.light }} />
           <Typography variant="h6" gutterBottom>1. Sélection de la classe</Typography>
           <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', mb: 2, alignItems: 'center' }}>
@@ -260,6 +425,8 @@ export default function TiragePage() {
                   label="Groupe"
                   onChange={e => {
                     setSelectedSubgroup(e.target.value);
+                    // Réinitialiser la sélection d'étudiants lors du changement de groupe
+                    setSelectedStudentIndexes([]);
                     setDrawResult([]);
                   }}
                 >
@@ -377,6 +544,32 @@ export default function TiragePage() {
           ))}
           <Divider sx={{ my: 2 }} />
           <Typography variant="h6" gutterBottom>4. Tirage au sort</Typography>
+          {/* Sélection fine des élèves */}
+          {allStudentsRaw.length > 0 && (
+            <Box sx={{ mb: 2 }}>
+              {selectedStudentIndexes.length > 0 && (
+                <Typography variant="subtitle1" sx={{ mb: 1, fontWeight: 500 }}>
+                  Désélectionner des élèves si besoin :
+                </Typography>
+              )}
+              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+                {allStudentsRaw.map((student, idx) => (
+                  <Chip
+                    key={idx}
+                    label={`${student.first_name} ${student.last_name}`.trim() || 'Sans nom'}
+                    color={selectedStudentIndexes.includes(idx) ? 'primary' : 'default'}
+                    variant={selectedStudentIndexes.includes(idx) ? 'filled' : 'outlined'}
+                    onClick={() => handleToggleStudent(idx)}
+                    onDelete={selectedStudentIndexes.includes(idx) ? (event) => handleDeleteStudent(idx, event) : undefined}
+                    deleteIcon={selectedStudentIndexes.includes(idx) ? <CloseIcon /> : undefined}
+                    sx={{ mb: 1, opacity: selectedStudentIndexes.includes(idx) ? 1 : 0.5, cursor: 'pointer' }}
+                    clickable
+                  />
+                ))}
+              </Box>
+            </Box>
+          )}
+          <Box sx={{ display: 'flex', justifyContent: 'end', mb: 2 }}>
           <Button
             variant="contained"
             color="primary"
@@ -386,33 +579,14 @@ export default function TiragePage() {
           >
             Lancer le tirage
           </Button>
-          {error && <Alert severity="error" sx={{ mt: 2 }}>{error}</Alert>}
-          {/* Sélection fine des élèves */}
-          <Box sx={{ mb: 2 }}>
-            <Typography variant="subtitle1" sx={{ mb: 1, fontWeight: 500 }}>
-              Désélectionner des élèves si besoin :
-            </Typography>
-            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
-              {allStudentsRaw.map((student, idx) => (
-                <Chip
-                  key={idx}
-                  label={`${student.first_name} ${student.last_name}`.trim() || 'Sans nom'}
-                  color={selectedStudentIndexes.includes(idx) ? 'primary' : 'default'}
-                  variant={selectedStudentIndexes.includes(idx) ? 'filled' : 'outlined'}
-                  onClick={() => handleToggleStudent(idx)}
-                  onDelete={selectedStudentIndexes.includes(idx) ? () => handleToggleStudent(idx) : undefined}
-                  sx={{ mb: 1, opacity: selectedStudentIndexes.includes(idx) ? 1 : 0.5, cursor: 'pointer' }}
-                  clickable
-                />
-              ))}
-            </Box>
           </Box>
+          {error && <Alert severity="error" sx={{ mt: 2 }}>{error}</Alert>}
         </Box>
       </Paper>
       <Divider sx={{ my: 2 }} />
         {drawResult.length > 0 && (
           <Paper elevation={3} sx={{ mt: 4, mb: 2, p: 3, borderRadius: 3, background: (theme) => theme.palette.background.paper, boxShadow: 4 }}>
-            <Typography variant="subtitle1" gutterBottom>Résultat du tirage :</Typography>
+            <Typography variant="h6" gutterBottom>Résultat du tirage</Typography>
             <Grid container spacing={1}>
               {drawResult.map((item, idx) => (
                 <Grid size={{ xs: 12, sm: 6, md: 4 }} key={idx}>
@@ -442,6 +616,37 @@ export default function TiragePage() {
             </Grid>
           </Paper>
         )}
+        <Snackbar
+          open={snackbarOpen}
+          autoHideDuration={3000}
+          onClose={() => setSnackbarOpen(false)}
+          message={notificationMessage}
+          anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+          sx={{
+            '& .MuiPaper-root': {
+              minWidth: 'auto',
+              maxWidth: 'fit-content',
+              px: 2,
+              py: 1,
+              borderRadius: 2,
+              fontWeight: 500
+            }
+          }}
+        />
+        <Box sx={{ mt: 4, display: 'flex', justifyContent: 'center' }}>
+          <Button 
+            variant="outlined" 
+            color="error" 
+            startIcon={<RemoveIcon />} 
+            onClick={clearSavedData}
+            sx={{ mb: 2, fontWeight: 600, 
+              textTransform: 'none',
+              borderRadius: 2, boxShadow: 2, 
+            }}
+          >
+            Effacer les données sauvegardées
+          </Button>
+        </Box>
     </Container>
   );
 }

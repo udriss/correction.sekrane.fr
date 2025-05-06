@@ -158,16 +158,14 @@ export default function ClassStudentsManager({
   // Contenu du dialog de confirmation de suppression
   const deleteDialogContent = useMemo(() => {
     const student = students.find(s => s.id === studentToDelete);
-    
     return (
       <Box>
         <Typography variant="body1" gutterBottom>
-          Êtes-vous sûr de vouloir supprimer l'étudiant <strong>{student?.first_name} {student?.last_name}</strong> de cette classe ?
+          Êtes-vous sûr de vouloir supprimer l'étudiant <strong>{student?.first_name} {student?.last_name}</strong> ?
         </Typography>
-        <Typography variant="body1" gutterBottom sx={{ mt: 2 }}>
-          Cette action est irréversible et supprimera uniquement l'association entre l'étudiant et cette classe.
+        <Typography variant="body2" sx={{ mt: 1 }}>
+          Cette action est <strong>irréversible</strong> et supprimera <strong>l'étudiant, toutes ses corrections et toutes ses associations à toutes les classes</strong>.
         </Typography>
-        
         {relatedCorrections.length > 0 ? (
           <List sx={{ 
             bgcolor: 'background.paper', 
@@ -183,7 +181,7 @@ export default function ClassStudentsManager({
                 <ListItemText
                   primary={correction.activity_name || 'Activité sans nom'}
                   secondary={
-                    <React.Fragment>
+                    <>
                       <Typography component="span" variant="body2" color="text.primary">
                         {correction.class_name || 'Sans classe'}
                       </Typography>
@@ -191,31 +189,21 @@ export default function ClassStudentsManager({
                       {correction.final_grade !== null && correction.final_grade !== undefined 
                         ? `Note : ${correction.final_grade}`
                         : correction.grade !== null && correction.grade !== undefined
-                        ? `Note : ${correction.grade}`
-                        : 'Non noté'}
+                          ? `Note : ${correction.grade}`
+                          : 'Non noté'}
                       {correction.submission_date && 
                         ` - soumis le ${dayjs(correction.submission_date).format('DD/MM/YYYY')}`}
-                    </React.Fragment>
+                    </>
                   }
                 />
               </ListItem>
             ))}
           </List>
         ) : (
-          <Typography variant="body2" sx={{ 
-            py: 2, 
-            px: 3, 
-            bgcolor: 'background.paper',
-            borderRadius: 1,
-            border: '1px solid',
-            borderColor: 'divider',
-            fontStyle: 'italic',
-            my: 2
-          }}>
+          <Typography variant="body2" sx={{ mt: 2, mb: 1, fontStyle: 'italic' }}>
             Aucune correction associée trouvée
           </Typography>
         )}
-
         <Typography variant="body2" color="error" sx={{ mt: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
           <WarningIcon fontSize="small" />
           Toutes les données associées à cet étudiant seront définitivement supprimées.

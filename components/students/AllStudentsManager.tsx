@@ -60,7 +60,12 @@ import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
 import EmailIcon from '@mui/icons-material/Email';
 import FileDownloadIcon from '@mui/icons-material/FileDownload';
 import FileUploadIcon from '@mui/icons-material/FileUpload';
-
+import AlertDialog from '@/components/AlertDialog';
+import WarningIcon from '@mui/icons-material/Warning';
+import List from '@mui/material/List';
+import ListItem from '@mui/material/ListItem';
+import ListItemText from '@mui/material/ListItemText';
+import dayjs from 'dayjs';
 
 interface AllStudentsManagerProps {
   students: Student[];
@@ -106,6 +111,10 @@ const AllStudentsManagerNEW: React.FC<AllStudentsManagerProps> = ({
   const [availableSubgroups, setAvailableSubgroups] = useState<string[]>([]);
   const [loadingSubgroups, setLoadingSubgroups] = useState(false);
   const [editError, setEditError] = useState<string | null>(null);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [studentToDelete, setStudentToDelete] = useState<Student | null>(null);
+  const [deleteProcessing, setDeleteProcessing] = useState(false);
+  const [deleteCorrections, setDeleteCorrections] = useState<any[]>([]);
   
   // State for batch form
   const [showBatchForm, setShowBatchForm] = useState(false);
@@ -292,55 +301,66 @@ const AllStudentsManagerNEW: React.FC<AllStudentsManagerProps> = ({
   };
 
   // Delete handlers
-  const handleDeleteClick = (studentId: number) => {
-    setConfirmingDelete(studentId);
+  const handleDeleteClick = async (student: Student) => {
+    setStudentToDelete(student);
+    setDeleteProcessing(true);
+    setDeleteCorrections([]);
+    setDeleteDialogOpen(true);
+    try {
+      // Charger les corrections associées à l'étudiant
+      const res = await fetch(`/api/students/${student.id}/corrections`);
+      if (res.ok) {
+        const corrections = await res.json();
+        setDeleteCorrections(Array.isArray(corrections) ? corrections : []);
+      } else {
+        setDeleteCorrections([]);
+      }
+    } catch (e) {
+      setDeleteCorrections([]);
+    } finally {
+      setDeleteProcessing(false);
+    }
   };
 
   const handleCancelDelete = () => {
-    setConfirmingDelete(null);
+    setDeleteDialogOpen(false);
+    setStudentToDelete(null);
+    setDeleteCorrections([]);
   };
 
-  const handleConfirmDelete = async (studentId: number) => {
+  const handleConfirmDelete = async () => {
+    if (!studentToDelete) return;
+    setDeleteProcessing(true);
     try {
-      const response = await fetch(`/api/students/${studentId}`, {
+      const response = await fetch(`/api/students/${studentToDelete.id}`, {
         method: 'DELETE',
       });
-
-      // Lire la réponse
       const data = await response.json();
-
+      setDeleteDialogOpen(false);
+      setStudentToDelete(null);
+      setDeleteCorrections([]);
       if (!response.ok) {
-        // Afficher l'erreur dans le modal
         setResultModal({
           open: true,
-          message: data.error || 'Erreur lors de la suppression de l\'étudiant',
+          message: data.error || "Erreur lors de la suppression de l'étudiant",
           success: false
         });
-        setConfirmingDelete(null);
         return;
       }
-
-      // Afficher le message de succès dans le modal
       setResultModal({
         open: true,
-        message: data.message || 'L\'étudiant a été supprimé avec succès',
+        message: data.message || "L'étudiant a été supprimé avec succès",
         success: true
       });
-      
-      // Une fois le modal affiché, on peut mettre à jour la liste
       onStudentUpdate();
-      setConfirmingDelete(null);
     } catch (err) {
-      console.error('Error:', err);
-      
-      // Afficher l'erreur dans le modal
       setResultModal({
         open: true,
-        message: err instanceof Error ? err.message : 'Erreur lors de la suppression de l\'étudiant',
+        message: err instanceof Error ? err.message : "Erreur lors de la suppression de l'étudiant",
         success: false
       });
-      
-      setConfirmingDelete(null);
+    } finally {
+      setDeleteProcessing(false);
     }
   };
 
@@ -1190,40 +1210,15 @@ const AllStudentsManagerNEW: React.FC<AllStudentsManagerProps> = ({
                                   )}
                                   </IconButton>
                             </Tooltip>
-
-                            
-                            {confirmingDelete === student.id ? (
-                              <>
-                                <Tooltip title="Confirmer la suppression">
-                                  <IconButton
-                                    size="small"
-                                    color="success"
-                                    onClick={() => handleConfirmDelete(student.id!)}
-                                  >
-                                    <CheckIcon fontSize="small" />
-                                  </IconButton>
-                                </Tooltip>
-                                <Tooltip title="Annuler">
-                                  <IconButton
-                                    size="small"
-                                    color="inherit"
-                                    onClick={handleCancelDelete}
-                                  >
-                                    <CloseIcon fontSize="small" />
-                                  </IconButton>
-                                </Tooltip>
-                              </>
-                            ) : (
-                              <Tooltip title="Effacer étudiant">
-                                <IconButton
-                                  size="small"
-                                  color="error"
-                                  onClick={() => handleDeleteClick(student.id!)}
-                                >
-                                  <DeleteIcon fontSize="small" />
-                                </IconButton>
-                              </Tooltip>
-                            )}
+                            <Tooltip title="Effacer étudiant">
+                              <IconButton
+                                size="small"
+                                color="error"
+                                onClick={() => handleDeleteClick(student)}
+                              >
+                                <DeleteIcon fontSize="small" />
+                              </IconButton>
+                            </Tooltip>
                           </Box>
                         </TableCell>
                       </TableRow>
@@ -1277,6 +1272,68 @@ const AllStudentsManagerNEW: React.FC<AllStudentsManagerProps> = ({
 
       {/* Result modal */}
       <ResultModal />
+
+      {/* AlertDialog pour suppression */}
+      <AlertDialog
+        open={deleteDialogOpen}
+        title="Confirmation de suppression"
+        content={
+          <Box>
+            <Typography variant="body1" gutterBottom>
+              Êtes-vous sûr de vouloir supprimer l'étudiant <strong>{studentToDelete?.first_name} {studentToDelete?.last_name}</strong> ?
+            </Typography>
+            {deleteCorrections.length > 0 ? (
+              <List sx={{ 
+                bgcolor: 'background.paper', 
+                borderRadius: 1,
+                border: '1px solid',
+                borderColor: 'divider',
+                my: 2,
+                maxHeight: '300px',
+                overflow: 'auto'
+              }}>
+                {deleteCorrections.map((correction, index) => (
+                  <ListItem key={correction.id || index} divider={index < deleteCorrections.length - 1}>
+                    <ListItemText
+                      primary={correction.activity_name || 'Activité sans nom'}
+                      secondary={
+                        <>
+                          <Typography component="span" variant="body2" color="text.primary">
+                            {correction.class_name || 'Sans classe'}
+                          </Typography>
+                          {' — '}
+                          {correction.final_grade !== null && correction.final_grade !== undefined 
+                            ? `Note : ${correction.final_grade}`
+                            : correction.grade !== null && correction.grade !== undefined
+                              ? `Note : ${correction.grade}`
+                              : 'Non noté'}
+                          {correction.submission_date && 
+                            ` - soumis le ${dayjs(correction.submission_date).format('DD/MM/YYYY')}`}
+                        </>
+                      }
+                    />
+                  </ListItem>
+                ))}
+              </List>
+            ) : (
+              <Typography variant="body2" sx={{ mt: 2, mb: 1, fontStyle: 'italic' }}>
+                Aucune correction associée trouvée
+              </Typography>
+            )}
+            <Typography variant="body2" color="error" sx={{ mt: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
+              <WarningIcon fontSize="small" />
+              Toutes les données associées à cet étudiant seront définitivement supprimées.
+            </Typography>
+          </Box>
+        }
+        confirmText="Supprimer définitivement"
+        confirmColor="error"
+        cancelText="Annuler"
+        isProcessing={deleteProcessing}
+        onConfirm={handleConfirmDelete}
+        onCancel={handleCancelDelete}
+        icon={<WarningIcon />}
+      />
     </Paper>
   );
 };
