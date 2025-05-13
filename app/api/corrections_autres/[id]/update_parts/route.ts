@@ -51,16 +51,29 @@ export async function PUT(
       return NextResponse.json({ error: 'Activité associée non trouvée' }, { status: 404 });
     }
 
-    // Calculer la note globale en utilisant la fonction de calcul existante
+    // Synchroniser les points_earned avec les nouvelles parties de l'activité
+    const updatedPointsEarned = [...points_earned];
+
+    // Ajouter des zéros pour les nouvelles parties
+    while (updatedPointsEarned.length < activity.points.length) {
+      updatedPointsEarned.push(0);
+    }
+
+    // Supprimer les points excédentaires si des parties ont été supprimées
+    while (updatedPointsEarned.length > activity.points.length) {
+      updatedPointsEarned.pop();
+    }
+
+    // Calculer la note globale en utilisant les points synchronisés
     const { grade, final_grade } = calculateGrade(
       activity.points,
-      points_earned,
+      updatedPointsEarned,
       correction.penalty
     );
 
-    // Mettre à jour la correction avec les nouvelles valeurs
+    // Mettre à jour la correction avec les nouvelles valeurs synchronisées
     const success = await updateCorrectionAutre(correctionId, {
-      points_earned,
+      points_earned: updatedPointsEarned,
       grade,
       final_grade
     });

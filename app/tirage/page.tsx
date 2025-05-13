@@ -8,6 +8,8 @@ import {
 import AddIcon from '@mui/icons-material/Add';
 import RemoveIcon from '@mui/icons-material/Remove';
 import ShuffleIcon from '@mui/icons-material/Shuffle';
+import AddCircleOutlineIcon from '@mui/icons-material/AddCircleOutline';
+import RemoveCircleOutlineIcon from '@mui/icons-material/RemoveCircleOutline';
 import ErrorDisplay from '@/components/ui/ErrorDisplay';
 import Dialog from '@mui/material/Dialog';
 import DialogTitle from '@mui/material/DialogTitle';
@@ -32,13 +34,28 @@ interface Student {
   first_name: string;
   last_name: string;
   sub_class?: string | number | null;
+  class_id?: number;  // ID de la classe à laquelle l'étudiant appartient
+}
+
+// Structure pour les sous-groupes
+interface Subgroup {
+  id: string;
+  classId: number;
+  className: string;
+  name: string;
+}
+
+// Structure des exercices avec poids
+interface Exercise {
+  name: string;
+  weight: number;
 }
 
 // Définition de la structure de l'état sauvegardé
 interface SavedState {
-  selectedClassId: number | '';
-  selectedSubgroup: string;
-  exercises: string[];
+  selectedClassIds: number[];
+  selectedSubgroups: string[];
+  exercises: Exercise[];
   manualStudents: Student[];
   selectedStudentIndexes: number[];
   drawResult: { student: Student; exercise: string }[];
@@ -51,16 +68,16 @@ const STORAGE_KEY = 'tirage_page_state';
 export default function TiragePage() {
   // Étape 1 : sélection classe/sous-groupe
   const [classes, setClasses] = useState<Classe[]>([]);
-  const [selectedClassId, setSelectedClassId] = useState<number | ''>('');
-  const [subgroups, setSubgroups] = useState<string[]>([]);
-  const [selectedSubgroup, setSelectedSubgroup] = useState<string>('');
+  const [selectedClassIds, setSelectedClassIds] = useState<number[]>([]);
+  const [availableSubgroups, setAvailableSubgroups] = useState<Subgroup[]>([]);
+  const [selectedSubgroups, setSelectedSubgroups] = useState<string[]>([]);
   const [students, setStudents] = useState<Student[]>([]);
   const [manualStudents, setManualStudents] = useState<Student[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<any>(null);
 
   // Étape 2 : gestion des exercices
-  const [exercises, setExercises] = useState<string[]>([]);
+  const [exercises, setExercises] = useState<Exercise[]>([]);
   const [exerciseInput, setExerciseInput] = useState('');
   const [exerciseBatchCount, setExerciseBatchCount] = useState(1);
 
@@ -91,8 +108,8 @@ export default function TiragePage() {
 
       if (typeof window !== 'undefined') {
         const stateToSave: SavedState = {
-          selectedClassId,
-          selectedSubgroup,
+          selectedClassIds,
+          selectedSubgroups,
           exercises,
           manualStudents,
           selectedStudentIndexes,
@@ -122,8 +139,8 @@ export default function TiragePage() {
           const parsedState: SavedState = JSON.parse(savedState);
           
           // Restaurer l'état seulement si les données sont présentes
-          if (parsedState.selectedClassId) setSelectedClassId(parsedState.selectedClassId);
-          if (parsedState.selectedSubgroup) setSelectedSubgroup(parsedState.selectedSubgroup);
+          if (parsedState.selectedClassIds) setSelectedClassIds(parsedState.selectedClassIds);
+          if (parsedState.selectedSubgroups) setSelectedSubgroups(parsedState.selectedSubgroups);
           if (parsedState.exercises) setExercises(parsedState.exercises);
           if (parsedState.manualStudents) setManualStudents(parsedState.manualStudents);
           if (parsedState.selectedStudentIndexes) setSelectedStudentIndexes(parsedState.selectedStudentIndexes);
@@ -190,7 +207,7 @@ export default function TiragePage() {
     saveTimeoutRef.current = setTimeout(() => {
       // Sauvegarder uniquement si nous avons des données à sauvegarder
       // et si nous ne sommes pas en train de charger
-      if (!loadingRef.current && (selectedClassId || exercises.length > 0 || manualStudents.length > 0 || drawResult.length > 0)) {
+      if (!loadingRef.current && (selectedClassIds.length > 0 || exercises.length > 0 || manualStudents.length > 0 || drawResult.length > 0)) {
         saveState();
       }
       saveTimeoutRef.current = null;
@@ -202,32 +219,76 @@ export default function TiragePage() {
         clearTimeout(saveTimeoutRef.current);
       }
     };
-  }, [selectedClassId, selectedSubgroup, exercises, manualStudents, selectedStudentIndexes, drawResult]);
+  }, [selectedClassIds, selectedSubgroups, exercises, manualStudents, selectedStudentIndexes, drawResult]);
 
-  // Récupérer les sous-groupes et étudiants quand une classe est sélectionnée
+  // Récupérer les sous-groupes et étudiants quand des classes sont sélectionnées
   useEffect(() => {
-    if (!selectedClassId) return;
+    if (selectedClassIds.length === 0) {
+      setAvailableSubgroups([]);
+      setStudents([]);
+      return;
+    }
+    
     setLoading(true);
-    fetch(`/api/classes/${selectedClassId}`)
-      .then(res => res.json())
-      .then(data => {
-        if (data.nbre_subclasses && data.nbre_subclasses > 0) {
-          setSubgroups(Array.from({ length: data.nbre_subclasses }, (_, i) => (i + 1).toString()));
-        } else {
-          setSubgroups([]);
-        }
+    
+    // Créer un tableau pour stocker les promesses de chargement
+    const subgroupPromises = selectedClassIds.map(classId => 
+      fetch(`/api/classes/${classId}`)
+        .then(res => res.json())
+        .then(data => {
+          if (data.nbre_subclasses && data.nbre_subclasses > 0) {
+            return Array.from({ length: data.nbre_subclasses }, (_, i) => ({
+              id: `${classId}-${i + 1}`,
+              classId: classId,
+              className: classes.find(c => c.id === classId)?.name || `Classe ${classId}`,
+              name: (i + 1).toString()
+            }));
+          }
+          return [];
+        })
+        .catch(() => {
+          setError('Erreur lors du chargement des sous-groupes');
+          return [];
+        })
+    );
+    
+    // Créer un tableau pour stocker les promesses de chargement des étudiants
+    const studentPromises = selectedClassIds.map(classId => 
+      fetch(`/api/classes/${classId}/students`)
+        .then(res => res.json())
+        .then(data => data.map((student: Student) => ({...student, class_id: classId})))
+        .catch(() => {
+          setError('Erreur lors du chargement des étudiants');
+          return [];
+        })
+    );
+    
+    // Attendre que toutes les promesses soient résolues
+    Promise.all([
+      Promise.all(subgroupPromises),
+      Promise.all(studentPromises)
+    ])
+      .then(([subgroupsArrays, studentsArrays]) => {
+        // Fusionner tous les sous-groupes
+        const allSubgroups = subgroupsArrays.flat();
+        setAvailableSubgroups(allSubgroups);
+        
+        // Fusionner tous les étudiants
+        const allStudents = studentsArrays.flat();
+        setStudents(allStudents);
       })
-      .catch(() => setError('Erreur lors du chargement des sous-groupes'));
-    fetch(`/api/classes/${selectedClassId}/students`)
-      .then(res => res.json())
-      .then(data => setStudents(data))
-      .catch(() => setError('Erreur lors du chargement des étudiants'))
       .finally(() => setLoading(false));
-  }, [selectedClassId]);
+  }, [selectedClassIds, classes]);
 
-  // Filtrer les étudiants par sous-groupe si sélectionné
-  const filteredStudents = selectedSubgroup
-    ? students.filter(s => s.sub_class?.toString() === selectedSubgroup)
+  // Filtrer les étudiants par sous-groupe(s) si sélectionné(s)
+  const filteredStudents = selectedSubgroups.length > 0
+    ? students.filter(s => {
+        // Format des IDs de sous-groupes: "classId-subgroupNumber"
+        const studentSubgroupId = s.class_id && s.sub_class 
+          ? `${s.class_id}-${s.sub_class}` 
+          : null;
+        return studentSubgroupId && selectedSubgroups.includes(studentSubgroupId);
+      })
     : students;
   const allStudentsRaw = [...filteredStudents, ...manualStudents];
   const allStudents = selectedStudentIndexes.map(i => allStudentsRaw[i]).filter(Boolean);
@@ -269,14 +330,14 @@ export default function TiragePage() {
     try {
       localStorage.removeItem(STORAGE_KEY);
       // Réinitialiser les états
-      setSelectedClassId('');
-      setSelectedSubgroup('');
+      setSelectedClassIds([]);
+      setSelectedSubgroups([]);
       setStudents([]); // Réinitialiser la liste des étudiants
       setExercises([]);
       setManualStudents([]);
       setSelectedStudentIndexes([]);
       setDrawResult([]);
-      setSubgroups([]); // Réinitialiser les sous-groupes aussi
+      setAvailableSubgroups([]); // Réinitialiser les sous-groupes aussi
       
       // Afficher une notification de suppression
       setNotificationMessage("Données effacées");
@@ -303,19 +364,46 @@ export default function TiragePage() {
   // Ajout d'un exercice (un par un)
   const handleAddExercise = () => {
     if (exerciseInput.trim()) {
-      setExercises(prev => [...prev, exerciseInput.trim()]);
+      setExercises(prev => [...prev, { name: exerciseInput.trim(), weight: 1 }]);
       setExerciseInput('');
     }
   };
   // Ajout en lot
   const handleBatchAddExercises = () => {
     const base = exercises.length + 1;
-    const newExercises = Array.from({ length: exerciseBatchCount }, (_, i) => `Exercice ${base + i}`);
+    const newExercises = Array.from({ length: exerciseBatchCount }, (_, i) => ({
+      name: `Exercice ${base + i}`,
+      weight: 1
+    }));
     setExercises(prev => [...prev, ...newExercises]);
   };
   // Suppression d'un exercice
   const handleRemoveExercise = (idx: number) => {
     setExercises(prev => prev.filter((_, i) => i !== idx));
+  };
+  
+  // Augmenter le poids d'un exercice
+  const handleIncreaseWeight = (idx: number) => {
+    setExercises(prev => prev.map((exercise, i) => 
+      i === idx ? { ...exercise, weight: exercise.weight + 1 } : exercise
+    ));
+  };
+
+  // Diminuer le poids d'un exercice
+  const handleDecreaseWeight = (idx: number) => {
+    setExercises(prev => prev.map((exercise, i) => 
+      i === idx && exercise.weight > 1 ? { ...exercise, weight: exercise.weight - 1 } : exercise
+    ));
+  };
+
+  // Modifier directement le poids d'un exercice
+  const handleWeightChange = (idx: number, value: string) => {
+    const numValue = parseInt(value, 10);
+    if (!isNaN(numValue) && numValue >= 1) {
+      setExercises(prev => prev.map((exercise, i) =>
+        i === idx ? { ...exercise, weight: numValue } : exercise
+      ));
+    }
   };
 
   // Ajout manuel d'un étudiant
@@ -334,21 +422,141 @@ export default function TiragePage() {
   // Tirage au sort
   const handleDraw = () => {
     if (allStudents.length === 0 || exercises.length === 0) return;
+    
+    // Créer une liste d'exercices uniques (noms d'exercice distincts)
+    const uniqueExerciseNames = Array.from(new Set(exercises.map(ex => ex.name)));
+    
+    // Vérifier si nous avons assez d'exercices uniques pour tous les étudiants
+    const hasEnoughUniqueExercises = uniqueExerciseNames.length >= allStudents.length;
+    
+    // Tableau d'exercices avec poids appliqués
+    // Le poids multiplie le nombre de fois qu'un exercice apparaît dans ce tableau
+    // Ce qui augmente sa probabilité d'être tiré
+    const weightedExercises: { name: string, originalIndex: number }[] = [];
+    
+    exercises.forEach((ex, idx) => {
+      for (let i = 0; i < ex.weight; i++) {
+        weightedExercises.push({ 
+          name: ex.name,
+          originalIndex: idx
+        });
+      }
+    });
+    
+    // Mélanger les étudiants pour une répartition équitable
+    const shuffledStudents = [...allStudents].sort(() => Math.random() - 0.5);
     let result: { student: Student; exercise: string }[] = [];
-    if (exercises.length >= allStudents.length) {
-      // Tirage sans replacement
-      const shuffledExercises = [...exercises].sort(() => Math.random() - 0.5);
-      result = allStudents.map((student, i) => ({ student, exercise: shuffledExercises[i] }));
+    
+    // Cas où nous avons assez d'exercices uniques pour tous les étudiants
+    if (hasEnoughUniqueExercises) {
+      // Au lieu d'utiliser uniquement les noms uniques, on va créer un pool d'exercices pondéré
+      // en respectant les poids relatifs de chaque exercice
+      const weightedPool: string[] = [];
+      
+      // Pour chaque exercice unique
+      uniqueExerciseNames.forEach(name => {
+        // Trouver tous les exercices avec ce nom (peut-être dupliqués dans la liste originale)
+        const matchingExercises = exercises.filter(ex => ex.name === name);
+        
+        // Calculer le poids total pour cet exercice (somme des poids de tous les exercices avec ce nom)
+        const totalWeight = matchingExercises.reduce((sum, ex) => sum + ex.weight, 0);
+        
+        // Ajouter l'exercice au pool un nombre de fois proportionnel à son poids
+        // Nous utilisons une normalization pour éviter d'avoir des tableaux trop grands
+        const normalizedWeight = Math.max(1, Math.round(totalWeight * 10 / exercises.reduce((sum, ex) => sum + ex.weight, 0)));
+        
+        // Ajouter l'exercice au pool normalisé
+        for (let i = 0; i < normalizedWeight; i++) {
+          weightedPool.push(name);
+        }
+      });
+      
+      // Mélanger le pool pondéré
+      const shuffledPool = [...weightedPool].sort(() => Math.random() - 0.5);
+      
+      // Créer un tableau pour suivre quels exercices ont été assignés
+      const assignedExercises = new Set<string>();
+      
+      // Assigner un exercice unique à chaque étudiant
+      result = shuffledStudents.map((student) => {
+        // Si tous les exercices uniques ont été assignés, réinitialiser
+        if (assignedExercises.size >= uniqueExerciseNames.length) {
+          assignedExercises.clear();
+        }
+        
+        // Trouver le premier exercice non assigné dans le pool mélangé
+        let selectedExercise: string | undefined;
+        
+        // Chercher parmi les exercices du pool en respectant leur ordre
+        for (const exercise of shuffledPool) {
+          if (!assignedExercises.has(exercise)) {
+            selectedExercise = exercise;
+            break;
+          }
+        }
+        
+        // Si on n'a pas trouvé d'exercice non assigné (cas improbable), prendre le premier du pool
+        if (!selectedExercise) {
+          selectedExercise = shuffledPool[0];
+        }
+        
+        // Marquer cet exercice comme assigné
+        assignedExercises.add(selectedExercise);
+        
+        return {
+          student,
+          exercise: selectedExercise
+        };
+      });
     } else {
-      // Plus d'étudiants que d'exercices : attribution la plus diversifiée possible
-      const shuffledStudents = [...allStudents].sort(() => Math.random() - 0.5);
-      let exerciseIdx = 0;
-      result = shuffledStudents.map((student, i) => {
-        const exercise = exercises[exerciseIdx];
-        exerciseIdx = (exerciseIdx + 1) % exercises.length;
-        return { student, exercise };
+      // Cas où il y a plus d'étudiants que d'exercices uniques disponibles
+      
+      // Structure pour suivre les exercices restants et leurs poids
+      const remainingExercises = [...exercises.map(ex => ({ ...ex }))];
+      
+      // Créer un registre des exercices disponibles par nom
+      // pour savoir quels exercices uniques sont encore disponibles
+      const availableUniqueExercises = new Set(uniqueExerciseNames);
+      
+      // Pour chaque étudiant
+      result = shuffledStudents.map(student => {
+        // Si tous les exercices ont été utilisés, réinitialiser la disponibilité
+        if (availableUniqueExercises.size === 0) {
+          uniqueExerciseNames.forEach(name => availableUniqueExercises.add(name));
+          
+          // Réinitialiser aussi les poids aux valeurs originales
+          for (let i = 0; i < remainingExercises.length; i++) {
+            remainingExercises[i].weight = exercises[i].weight;
+          }
+        }
+        
+        // Tableau temporaire pour le tirage pondéré (uniquement avec les exercices disponibles)
+        const weightedPool: string[] = [];
+        
+        // Pour chaque exercice restant, on l'ajoute proportionnellement à son poids
+        // mais seulement s'il est dans le set des exercices disponibles
+        remainingExercises.forEach(ex => {
+          if (availableUniqueExercises.has(ex.name)) {
+            for (let i = 0; i < ex.weight; i++) {
+              weightedPool.push(ex.name);
+            }
+          }
+        });
+        
+        // Choisir un exercice au hasard du pool pondéré
+        const randomIndex = Math.floor(Math.random() * weightedPool.length);
+        const selectedExercise = weightedPool[randomIndex];
+        
+        // Retirer l'exercice sélectionné des disponibles tant qu'il reste d'autres options
+        availableUniqueExercises.delete(selectedExercise);
+        
+        return {
+          student,
+          exercise: selectedExercise
+        };
       });
     }
+    
     setDrawResult(result);
   };
 
@@ -397,42 +605,61 @@ export default function TiragePage() {
             Tirage au sort d'exercices
           </Typography>
           <Divider sx={{ my: 3, borderColor: theme.palette.secondary.light }} />
-          <Typography variant="h6" gutterBottom>1. Sélection de la classe</Typography>
+          <Typography variant="h6" gutterBottom sx={{my: 2}}>1. Sélection des classes et groupes</Typography>
           <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', mb: 2, alignItems: 'center' }}>
-            <FormControl sx={{ minWidth: 200 }} size="small">
-              <InputLabel>Classe</InputLabel>
+            <FormControl sx={{ minWidth: 250, flexGrow: 1 }} size="small">
+              <InputLabel>Classes</InputLabel>
               <Select
-                value={selectedClassId}
-                label="Classe"
+                multiple
+                value={selectedClassIds}
+                label="Classes"
+                renderValue={(selected) => 
+                  selected.map(id => classes.find(c => c.id === id)?.name || `Classe ${id}`).join(', ')
+                }
                 onChange={e => {
-                  setSelectedClassId(Number(e.target.value));
-                  setSelectedSubgroup('');
-                  setManualStudents([]);
+                  const newClassIds = e.target.value as number[];
+                  setSelectedClassIds(newClassIds);
+                  // Filtrer les sous-groupes pour ne garder que ceux des classes encore sélectionnées
+                  setSelectedSubgroups(prev => prev.filter(sg => {
+                    const classId = Number(sg.split('-')[0]);
+                    return newClassIds.includes(classId);
+                  }));
                   setDrawResult([]);
                 }}
               >
-                <MenuItem value="">Sélectionner</MenuItem>
                 {classes.map(cls => (
-                  <MenuItem key={cls.id} value={cls.id}>{cls.name} ({cls.academic_year})</MenuItem>
+                  <MenuItem key={cls.id} value={cls.id}>
+                    {cls.name} ({cls.academic_year})
+                  </MenuItem>
                 ))}
               </Select>
             </FormControl>
-            {subgroups.length > 0 && (
-              <FormControl sx={{ minWidth: 180 }} size="small">
-                <InputLabel>Groupe</InputLabel>
+            {availableSubgroups.length > 0 && (
+              <FormControl sx={{ minWidth: 250, flexGrow: 1 }} size="small">
+                <InputLabel>Groupes</InputLabel>
                 <Select
-                  value={selectedSubgroup}
-                  label="Groupe"
+                  multiple
+                  value={selectedSubgroups}
+                  label="Groupes"
+                  renderValue={(selected) => 
+                    selected.length <= 2 
+                    ? selected.map(id => {
+                        const subgroup = availableSubgroups.find(sg => sg.id === id);
+                        return subgroup ? `${subgroup.className} - Groupe ${subgroup.name}` : id;
+                      }).join(', ')
+                    : `${selected.length} groupes sélectionnés`
+                  }
                   onChange={e => {
-                    setSelectedSubgroup(e.target.value);
+                    setSelectedSubgroups(e.target.value as string[]);
                     // Réinitialiser la sélection d'étudiants lors du changement de groupe
                     setSelectedStudentIndexes([]);
                     setDrawResult([]);
                   }}
                 >
-                  <MenuItem value="">Tous</MenuItem>
-                  {subgroups.map(sg => (
-                    <MenuItem key={sg} value={sg}>Groupe {sg}</MenuItem>
+                  {availableSubgroups.map(sg => (
+                    <MenuItem key={sg.id} value={sg.id}>
+                      {sg.className} - Groupe {sg.name}
+                    </MenuItem>
                   ))}
                 </Select>
               </FormControl>
@@ -481,47 +708,7 @@ export default function TiragePage() {
             </DialogActions>
           </Dialog>
           <Divider sx={{ my: 2 }} />
-          <Typography variant="h6" gutterBottom>2. Ajouter des exercices</Typography>
-          <Box sx={{ display: 'flex', gap: 2, alignItems: 'center', mb: 2 }}>
-            <TextField
-              label="Nom de l'exercice"
-              value={exerciseInput}
-              onChange={e => setExerciseInput(e.target.value)}
-              size="small"
-              onKeyDown={e => { if (e.key === 'Enter') handleAddExercise(); }}
-            />
-            <IconButton color="primary" onClick={handleAddExercise}><AddIcon /></IconButton>
-            <TextField
-              label="Ajouter en lot"
-              type="number"
-              size="small"
-              value={exerciseBatchCount}
-              onChange={e => setExerciseBatchCount(Number(e.target.value))}
-              sx={{ width: 100 }}
-              inputProps={{ min: 1 }}
-            />
-            <Button variant="outlined" onClick={handleBatchAddExercises}>Ajouter {exerciseBatchCount}</Button>
-          </Box>
-          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mb: 2 }}>
-            {exercises.map((ex, idx) => (
-              <Box key={idx} sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
-                <TextField
-                  value={ex}
-                  size="small"
-                  onChange={e => {
-                    const newVal = e.target.value;
-                    setExercises(prev => prev.map((v, i) => i === idx ? newVal : v));
-                  }}
-                  sx={{ minWidth: 120 }}
-                />
-                <IconButton onClick={() => handleRemoveExercise(idx)} color="error" size="small">
-                  <RemoveIcon />
-                </IconButton>
-              </Box>
-            ))}
-          </Box>
-          <Divider sx={{ my: 2 }} />
-          <Typography variant="h6" gutterBottom>3. Ajouter des étudiants manuellement</Typography>
+          <Typography variant="h6" gutterBottom sx={{my: 2}}>2. Ajouter des étudiants manuellement</Typography>
           <Button variant="outlined" startIcon={<AddIcon />} onClick={handleAddManualStudent} sx={{ mb: 2 }}>
             Ajouter un étudiant
           </Button>
@@ -543,7 +730,112 @@ export default function TiragePage() {
             </Box>
           ))}
           <Divider sx={{ my: 2 }} />
-          <Typography variant="h6" gutterBottom>4. Tirage au sort</Typography>
+          <Typography variant="h6" gutterBottom sx={{my: 2}}>3. Ajouter des exercices</Typography>
+          <Box sx={{ display: 'flex', gap: 2, alignItems: 'center', mb: 2, justifyContent: 'space-between' }}>
+            <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+            <TextField
+              label="Nom de l'exercice"
+              value={exerciseInput}
+              onChange={e => setExerciseInput(e.target.value)}
+              size="small"
+              onKeyDown={e => { if (e.key === 'Enter') handleAddExercise(); }}
+            />
+            <IconButton color="success"  onClick={handleAddExercise}><AddIcon /></IconButton>
+              </Box>
+            <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+            <TextField
+              label="Ajouter en lot"
+              type="number"
+              size="small"
+              value={exerciseBatchCount}
+              onChange={e => setExerciseBatchCount(Number(e.target.value))}
+              sx={{ width: 100 }}
+              slotProps={{
+                input: { 
+                  inputProps: { min: 1, type: 'number', step: 1 },
+                  }
+              }}
+            />
+            <Button variant="outlined" onClick={handleBatchAddExercises}>Ajouter {exerciseBatchCount}</Button>
+              </Box>
+          </Box>
+          <Box sx={{ display: 'flex', flexWrap: 'wrap', flexDirection: 'column', gap: 1, mb: 2 }}>
+            {exercises.map((ex, idx) => (
+              <Box key={idx} sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+                <TextField
+                  value={ex.name}
+                  size="small"
+                  onChange={e => {
+                    const newVal = e.target.value;
+                    setExercises(prev => prev.map((v, i) => i === idx ? { ...v, name: newVal } : v));
+                  }}
+                  sx={{ minWidth: 120 }}
+                />
+                <Box sx={{ 
+                  display: 'flex', 
+                  flexDirection: 'row', 
+                  alignItems: 'center',
+                  border: '1px solid',
+                  borderColor: 'divider',
+                  borderRadius: 1,
+                  px: 0.5,
+                  mx: 0.5
+                }}>
+                  <IconButton 
+                    onClick={() => handleIncreaseWeight(idx)} 
+                    color="primary" 
+                    size="small">
+                    <AddCircleOutlineIcon fontSize="small" />
+                  </IconButton>
+                  {/*<Typography 
+                    variant="body2" 
+                    sx={{ 
+                      fontWeight: 'bold', 
+                      textAlign: 'center',
+                      minWidth: '1.5rem'
+                    }}>
+                    {ex.weight}
+                  </Typography> */}
+                <TextField
+                  value={ex.weight}
+                  size="small"
+                  onChange={e => handleWeightChange(idx, e.target.value)}
+                  sx={{ 
+                    width: 60,
+                    "& input": {
+                      textAlign: "center",
+                      // Remove spinner arrows
+                      "&::-webkit-outer-spin-button, &::-webkit-inner-spin-button": {
+                        WebkitAppearance: "none",
+                        margin: 0
+                      },
+                      "&[type=number]": {
+                        MozAppearance: "textfield" // Firefox
+                      }
+                    }
+                  }}
+                  slotProps={{
+                    input: { 
+                      inputProps: { min: 1, type: 'number', step: 1 },
+                    }
+                  }}
+                />
+                  <IconButton 
+                    onClick={() => handleDecreaseWeight(idx)} 
+                    color="primary" 
+                    size="small" 
+                    disabled={ex.weight <= 1}>
+                    <RemoveCircleOutlineIcon fontSize="small" />
+                  </IconButton>
+                </Box>
+                <IconButton onClick={() => handleRemoveExercise(idx)} color="error" size="small">
+                  <RemoveIcon />
+                </IconButton>
+              </Box>
+            ))}
+          </Box>
+          <Divider sx={{ my: 2 }} />
+          <Typography variant="h6" gutterBottom sx={{my: 2}}>4. Tirage au sort</Typography>
           {/* Sélection fine des élèves */}
           {allStudentsRaw.length > 0 && (
             <Box sx={{ mb: 2 }}>

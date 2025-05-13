@@ -127,9 +127,9 @@ export default function CorrectionsAutresProvider({ children, initialFilters, in
       console.error('Error fetching corrections:', error);
       setErrorString('Erreur lors du chargement des corrections');
       enqueueSnackbar('Erreur lors du chargement des corrections', { variant: 'error' });
-    } finally {
-      // setIsLoading(false); // Désactivation de l'état de chargement une fois terminé
+      setIsLoading(false); // Désactiver l'état de chargement en cas d'erreur
     }
+    // Ne pas désactiver l'état de chargement ici, il sera désactivé dans le useMemo après filtrage
   }, [enqueueSnackbar]);
 
   const fetchMetaData = useCallback(async () => {
@@ -159,10 +159,10 @@ export default function CorrectionsAutresProvider({ children, initialFilters, in
       console.error('Error fetching metadata:', error);
       setErrorString('Erreur lors du chargement des données');
       enqueueSnackbar('Erreur lors du chargement des données', { variant: 'error' });
-    } finally {
-      //setIsLoading(false); // Désactivation de l'état de chargement une fois terminé
+      setIsLoading(false); // Désactiver l'état de chargement en cas d'erreur
     }
-  }, [enqueueSnackbar]);
+    // Ne pas désactiver l'état de chargement ici, il sera désactivé dans le useMemo après filtrage
+  }, [enqueueSnackbar, fetchCorrections]);
 
   const refreshCorrections = useCallback(async () => {
     await fetchCorrections();
@@ -208,8 +208,11 @@ export default function CorrectionsAutresProvider({ children, initialFilters, in
 
   // Corrections filtrées avec tous les filtres appliqués
   const filteredCorrections = useMemo(() => {
-    setIsLoading(true); // Activation de l'état de chargement
-    return corrections.filter(correction => {
+    // Ne pas mettre isLoading à true à chaque recalcul
+    // setIsLoading est désormais géré dans les fonctions de chargement des données uniquement
+    
+    // Créer une variable pour stocker les résultats filtrés
+    let result = corrections.filter(correction => {
       // Filtre par recherche (dans le nom d'activité, étudiant ou classe)
       if (activeFilters.includes('search') && filters.search) {
         const searchLower = filters.search.toLowerCase();
@@ -234,8 +237,20 @@ export default function CorrectionsAutresProvider({ children, initialFilters, in
 
       // Filtrage par plusieurs IDs de correction
       if (activeFilters.includes('selectedCorrectionIds') && filters.selectedCorrectionIds) {
-        const ids = filters.selectedCorrectionIds.split(',').map(id => id.trim());
-        if (!ids.includes(correction.id?.toString())) return false;
+        const idsString = filters.selectedCorrectionIds.toString().trim();
+        
+        // Vérifier si la chaîne est vide
+        if (idsString === '') return true;
+        
+        // Si un seul ID sans virgule (cas qui posait problème)
+        if (!idsString.includes(',')) {
+          // Comparer directement l'ID de la correction avec la chaîne
+          if (correction.id?.toString() !== idsString) return false;
+        } else {
+          // Traiter comme une liste d'IDs séparés par des virgules
+          const ids = idsString.split(',').map(id => id.trim());
+          if (!ids.includes(correction.id?.toString())) return false;
+        }
       }
 
       // Filtre par classe
@@ -329,7 +344,10 @@ export default function CorrectionsAutresProvider({ children, initialFilters, in
       }
 
       return true;
-    }).sort((a, b) => {
+    });
+    
+    // Tri des résultats filtrés
+    result = result.sort((a, b) => {
       // Application du tri
       switch (sortOptions.field) {
         case 'submission_date':
@@ -400,6 +418,16 @@ export default function CorrectionsAutresProvider({ children, initialFilters, in
           return 0;
       }
     });
+    
+    // Désactiver l'état de chargement une fois que nous avons obtenu des résultats
+    // utiliser requestAnimationFrame pour s'assurer qu'il s'exécute après le rendu
+    if (corrections.length > 0) {
+      requestAnimationFrame(() => {
+        setIsLoading(false);
+      });
+    }
+    
+    return result;
   }, [corrections, metaData, filters, activeFilters, sortOptions]);
 
   // Gérer l'état de chargement uniquement lors du fetch

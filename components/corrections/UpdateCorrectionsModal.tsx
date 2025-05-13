@@ -37,6 +37,8 @@ interface UpdateCorrectionsModalProps {
   updateSuccess: boolean;
   updateError: string | null;
   students: Student[];
+  // L'activité complète ou la propriété contenant le barème total
+  activityTotalPoints?: number;
 }
 
 const UpdateCorrectionsModal: React.FC<UpdateCorrectionsModalProps> = ({
@@ -50,7 +52,8 @@ const UpdateCorrectionsModal: React.FC<UpdateCorrectionsModalProps> = ({
   onUpdateCorrections,
   updateSuccess,
   updateError,
-  students
+  students,
+  activityTotalPoints = 20 // Valeur par défaut de 20 si non fourni
 }) => {
   // État local pour gérer les sélections
   const [selectAll, setSelectAll] = useState(true);
@@ -209,7 +212,7 @@ const UpdateCorrectionsModal: React.FC<UpdateCorrectionsModalProps> = ({
                     </ListItemIcon>
                     <ListItemText
                       primary={getStudentInfo(correction)}
-                      secondary={`Note: ${correction.final_grade !== null ? correction.final_grade : 'Non noté'} / 20`}
+                      secondary={`Note: ${correction.final_grade !== null ? correction.final_grade : 'Non noté'} / ${activityTotalPoints}`}
                     />
                   </ListItem>
                 ))}

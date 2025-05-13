@@ -1191,7 +1191,7 @@ export default function ClassStudentsManager({
                                       onChange={(e) => handleBatchStudentFieldChange(
                                         index, 
                                         'sub_class', 
-                                        e.target.value === '' ? null : Number(e.target.value)
+                                        e.target.value.toString() === '' ? null : Number(e.target.value)
                                       )}
                                     >
                                       <MenuItem value="">
@@ -1452,7 +1452,7 @@ export default function ClassStudentsManager({
                                       onChange={(e) => handleBatchStudentFieldChange(
                                         index, 
                                         'sub_class', 
-                                        e.target.value === '' ? null : Number(e.target.value)
+                                        e.target.value.toString() === '' ? null : Number(e.target.value)
                                       )}
                                       disabled={student.markedForDeletion}
                                       sx={{ opacity: student.markedForDeletion ? 0.7 : 1 }}
@@ -1731,11 +1731,11 @@ export default function ClassStudentsManager({
                       {student.isEditing ? (
                         <FormControl fullWidth size="small">
                           <Select
-                            value={student.editData?.sub_class === null ? '' : student.editData?.sub_class}
+                            value={student.editData?.sub_class === null ? '' : String(student.editData?.sub_class)}
                             onChange={(e) => handleEditFieldChange(
                               student.id, 
                               'sub_class', 
-                              e.target.value === '' ? null : Number(e.target.value)
+                              e.target.value === '' ? null : parseInt(e.target.value, 10)
                             )}
                           >
                             <MenuItem value="">

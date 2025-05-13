@@ -73,6 +73,54 @@ function TabPanel({ children, value, index, ...other }: TabPanelProps) {
     </div>
   );
 }
+
+// Fonction utilitaire pour normaliser une note selon le barème de l'activité
+const normalizeGrade = (grade: number | string | null | undefined, activity: ActivityAutre | undefined): number => {
+  // Si la note est null ou undefined, retourner 0
+  if (grade === null || grade === undefined) {
+    return 0;
+  }
+  
+  // Convertir la note en nombre si elle est de type string
+  let numericalGrade: number;
+  if (typeof grade === 'string') {
+    numericalGrade = parseFloat(grade);
+    if (isNaN(numericalGrade)) {
+      return 0;
+    }
+  } else {
+    numericalGrade = grade;
+    if (isNaN(numericalGrade)) {
+      return 0;
+    }
+  }
+  
+  // Si l'activité n'est pas définie ou n'a pas de tableau de points, considérer que c'est déjà sur 20
+  if (!activity || !activity.points || !Array.isArray(activity.points) || activity.points.length === 0) {
+    return numericalGrade;
+  }
+  
+  // Calculer le barème total de l'activité (somme des points)
+  const totalPoints = activity.points.reduce((sum, p) => sum + p, 0);
+  
+  // Si le barème est 0 ou non défini, retourner la note telle quelle
+  if (totalPoints <= 0) {
+    return numericalGrade;
+  }
+  
+  // Normaliser la note sur 20
+  return (numericalGrade / totalPoints) * 20;
+};
+
+// Fonction pour obtenir le barème total d'une activité
+const getTotalPoints = (activity: ActivityAutre | undefined): number => {
+  if (!activity || !activity.points || !Array.isArray(activity.points)) {
+    return 0;
+  }
+  
+  return activity.points.reduce((sum, p) => sum + p, 0);
+};
+
 export default function ClassAutreDetailPage({ params }: { params: Promise<{ id: string }> }) {
     // Unwrap the params Promise using React.use()
     const unwrappedParams = React.use(params);
@@ -579,19 +627,18 @@ export default function ClassAutreDetailPage({ params }: { params: Promise<{ id:
       };
     }
     
-    // Calculer les statistiques de base
-    const validGrades = corrections.filter(c => c.grade !== null && c.grade !== undefined);
-    const totalGrade = validGrades.reduce((sum, c) => {
-      // Convertir les grades de type string en nombre
-      const gradeValue = typeof c.grade === 'string' 
-        ? parseFloat(c.grade) 
-        : (c.grade || 0);
-      
-      // Utiliser 0 si la conversion échoue (NaN)
-      return sum + (isNaN(gradeValue) ? 0 : gradeValue);
-    }, 0);
+    // Calculer les statistiques de base avec les notes normalisées
+    const validCorrections = corrections.filter(c => c.grade !== null && c.grade !== undefined);
+    let totalNormalizedGrade = 0;
     
-    const averageGrade = validGrades.length > 0 ? totalGrade / validGrades.length : 0;
+    // Pour chaque correction, trouver l'activité correspondante et normaliser la note
+    validCorrections.forEach(correction => {
+      const activity = activities.find(a => a.id === correction.activity_id);
+      const normalizedGrade = normalizeGrade(correction.grade, activity);
+      totalNormalizedGrade += normalizedGrade;
+    });
+    
+    const averageGrade = validCorrections.length > 0 ? totalNormalizedGrade / validCorrections.length : 0;
     
     // Compter les étudiants et activités uniques
     const uniqueStudents = new Set(corrections.map(c => c.student_id));
@@ -603,7 +650,7 @@ export default function ClassAutreDetailPage({ params }: { params: Promise<{ id:
       studentsCovered: uniqueStudents.size,
       activitiesCovered: uniqueActivities.size,
     };
-  }, [corrections]);
+  }, [corrections, activities]);
   
 
   
@@ -630,20 +677,20 @@ export default function ClassAutreDetailPage({ params }: { params: Promise<{ id:
       return Array.from(studentGroups.entries()).map(([studentId, studentCorrections]) => {
         const firstCorrection = studentCorrections[0];
         
-        // Calculer la moyenne des notes pour cet étudiant
-        const validGrades = studentCorrections
-          .filter(c => c.grade !== null && c.grade !== undefined)
-          .map(c => {
-            // Convertir les grades de type string en nombre
-            if (typeof c.grade === 'string') {
-              const parsedGrade = parseFloat(c.grade);
-              return isNaN(parsedGrade) ? 0 : parsedGrade;
-            }
-            return c.grade as number;
-          });
+        // Calculer la moyenne des notes normalisées pour cet étudiant
+        let totalNormalizedGrade = 0;
+        const validCorrections = studentCorrections.filter(c => c.grade !== null && c.grade !== undefined);
+        
+        validCorrections.forEach(correction => {
+          // Trouver l'activité correspondante
+          const activity = activities.find(a => a.id === correction.activity_id);
+          // Normaliser la note sur 20 selon le barème de l'activité
+          const normalizedGrade = normalizeGrade(correction.grade, activity);
+          totalNormalizedGrade += normalizedGrade;
+        });
           
-        const averageGrade = validGrades.length > 0
-          ? validGrades.reduce((sum, grade) => sum + grade, 0) / validGrades.length
+        const averageGrade = validCorrections.length > 0
+          ? totalNormalizedGrade / validCorrections.length
           : 0;
         
         return {
@@ -669,19 +716,22 @@ export default function ClassAutreDetailPage({ params }: { params: Promise<{ id:
         const firstCorrection = activityCorrections[0];
         
         // Calculer la moyenne des notes pour cette activité
-        const validGrades = activityCorrections
-          .filter(c => c.grade !== null && c.grade !== undefined)
-          .map(c => {
-            // Convertir les grades de type string en nombre
-            if (typeof c.grade === 'string') {
-              const parsedGrade = parseFloat(c.grade);
-              return isNaN(parsedGrade) ? 0 : parsedGrade;
-            }
-            return c.grade as number;
-          });
+        // Comme toutes les corrections concernent la même activité, nous pouvons simplement utiliser la première
+        // pour récupérer l'activité correspondante
+        // const activityId = activityCorrections[0].activity_id;
+        const activity = activities.find(a => a.id === activityId);
+        
+        // Calculer les notes normalisées
+        let totalNormalizedGrade = 0;
+        const validCorrections = activityCorrections.filter(c => c.grade !== null && c.grade !== undefined);
+        
+        validCorrections.forEach(correction => {
+          const normalizedGrade = normalizeGrade(correction.grade, activity);
+          totalNormalizedGrade += normalizedGrade;
+        });
           
-        const averageGrade = validGrades.length > 0
-          ? validGrades.reduce((sum, grade) => sum + grade, 0) / validGrades.length
+        const averageGrade = validCorrections.length > 0
+          ? totalNormalizedGrade / validCorrections.length
           : 0;
         
         return {
@@ -716,8 +766,9 @@ export default function ClassAutreDetailPage({ params }: { params: Promise<{ id:
     }));
   }, [activities]);
   
-  // Déterminer la couleur selon la note
+  // Déterminer la couleur selon la note normalisée sur 20
   const getGradeColor = (grade: number): "success" | "info" | "primary" | "warning" | "error" => {
+    // On conserve les mêmes seuils car les notes sont désormais toutes normalisées sur 20
     if (grade >= 16) return 'success';
     if (grade >= 12) return 'info';
     if (grade >= 10) return 'primary';
@@ -1147,20 +1198,24 @@ const handleDeleteClass = async () => {
               const activityCorrections = corrections.filter(c => c.activity_id === activity.id);
               const totalStudentsWithCorrections = new Set(activityCorrections.map(c => c.student_id)).size;
               
-              // Calculer la note moyenne pour cette activité
-              const validGrades = activityCorrections
-                .filter(c => c.grade !== null && c.grade !== undefined)
-                .map(c => {
-                  // Convertir les grades de type string en nombre
-                  if (typeof c.grade === 'string') {
-                    const parsedGrade = parseFloat(c.grade);
-                    return isNaN(parsedGrade) ? 0 : parsedGrade;
-                  }
-                  return c.grade as number;
-                });
+              // Calculer la note moyenne pour cette activité en utilisant le barème original (non normalisé)
+              const validCorrections = activityCorrections.filter(c => c.grade !== null && c.grade !== undefined);
+              let totalGrade = 0;
+              
+              validCorrections.forEach(correction => {
+                // Convertir la note en nombre
+                let grade;
+                if (typeof correction.grade === 'string') {
+                  grade = parseFloat(correction.grade);
+                  if (isNaN(grade)) grade = 0;
+                } else {
+                  grade = correction.grade as number;
+                }
+                totalGrade += grade;
+              });
                 
-              const averageGrade = validGrades.length > 0
-                ? validGrades.reduce((sum, grade) => sum + grade, 0) / validGrades.length
+              const averageGrade = validCorrections.length > 0
+                ? totalGrade / validCorrections.length
                 : null;
               
               return (
@@ -1208,8 +1263,8 @@ const handleDeleteClass = async () => {
                               Note moyenne:
                             </Typography>
                             <Chip 
-                              label={`${averageGrade.toFixed(1)}/20`}
-                              color={getGradeColor(averageGrade)}
+                              label={`${averageGrade.toFixed(1)}/${activity.points ? activity.points.reduce((sum, p) => sum + p, 0) : 20}`}
+                              color={getGradeColor(normalizeGrade(averageGrade, activity))}
                               size="small"
                             />
                           </Box>
@@ -1289,20 +1344,20 @@ const handleDeleteClass = async () => {
                   // Trouver les corrections pour cet étudiant
                   const studentCorrections = corrections.filter(c => c.student_id === student.id);
                   
-                  // Calculer la moyenne des notes pour cet étudiant
-                  const validGrades = studentCorrections
-                    .filter(c => c.grade !== null && c.grade !== undefined)
-                    .map(c => {
-                      // Convertir les grades de type string en nombre
-                      if (typeof c.grade === 'string') {
-                        const parsedGrade = parseFloat(c.grade);
-                        return isNaN(parsedGrade) ? 0 : parsedGrade;
-                      }
-                      return c.grade as number;
-                    });
+                  // Calculer la moyenne des notes normalisées pour cet étudiant
+                  const validCorrections = studentCorrections.filter(c => c.grade !== null && c.grade !== undefined);
+                  let totalNormalizedGrade = 0;
+                  
+                  validCorrections.forEach(correction => {
+                    // Trouver l'activité correspondante pour utiliser son barème
+                    const activity = activities.find(a => a.id === correction.activity_id);
+                    // Normaliser la note en utilisant le barème de l'activité
+                    const normalizedGrade = normalizeGrade(correction.grade, activity);
+                    totalNormalizedGrade += normalizedGrade;
+                  });
                     
-                  const averageGrade = validGrades.length > 0
-                    ? validGrades.reduce((sum, grade) => sum + grade, 0) / validGrades.length
+                  const averageGrade = validCorrections.length > 0
+                    ? totalNormalizedGrade / validCorrections.length
                     : 0;
                   
                   return (
@@ -1411,6 +1466,7 @@ const handleDeleteClass = async () => {
                             label={`${averageGrade.toFixed(1)}/20`}
                             color={getGradeColor(averageGrade)}
                             size="small"
+                            title="Note moyennée et normalisée sur 20"
                           />
                         ) : (
                           <Typography variant="body2" color="text.secondary">
@@ -1516,35 +1572,35 @@ const handleDeleteClass = async () => {
             {filteredCorrections.length > 0 && (
               <Chip
                 label={`Moyenne: ${(() => {
-                  const validGrades = filteredCorrections
-                    .filter(c => c.grade !== null && c.grade !== undefined)
-                    .map(c => {
-                      if (typeof c.grade === 'string') {
-                        const parsedGrade = parseFloat(c.grade);
-                        return isNaN(parsedGrade) ? 0 : parsedGrade;
-                      }
-                      return c.grade as number;
-                    });
+                  const validCorrections = filteredCorrections.filter(c => c.grade !== null && c.grade !== undefined);
+                  let totalNormalizedGrade = 0;
                   
-                  if (validGrades.length === 0) return '0.0';
+                  // Pour chaque correction, trouver l'activité correspondante et normaliser la note
+                  validCorrections.forEach(correction => {
+                    const activity = activities.find(a => a.id === correction.activity_id);
+                    const normalizedGrade = normalizeGrade(correction.grade, activity);
+                    totalNormalizedGrade += normalizedGrade;
+                  });
                   
-                  const avg = validGrades.reduce((sum, grade) => sum + grade, 0) / validGrades.length;
+                  if (validCorrections.length === 0) return '0.0';
+                  
+                  const avg = totalNormalizedGrade / validCorrections.length;
                   return avg.toFixed(1);
                 })()} / 20`}
                 color={(() => {
-                  const validGrades = filteredCorrections
-                    .filter(c => c.grade !== null && c.grade !== undefined)
-                    .map(c => {
-                      if (typeof c.grade === 'string') {
-                        const parsedGrade = parseFloat(c.grade);
-                        return isNaN(parsedGrade) ? 0 : parsedGrade;
-                      }
-                      return c.grade as number;
-                    });
+                  const validCorrections = filteredCorrections.filter(c => c.grade !== null && c.grade !== undefined);
+                  let totalNormalizedGrade = 0;
                   
-                  if (validGrades.length === 0) return 'default';
+                  // Pour chaque correction, trouver l'activité correspondante et normaliser la note
+                  validCorrections.forEach(correction => {
+                    const activity = activities.find(a => a.id === correction.activity_id);
+                    const normalizedGrade = normalizeGrade(correction.grade, activity);
+                    totalNormalizedGrade += normalizedGrade;
+                  });
                   
-                  const avg = validGrades.reduce((sum, grade) => sum + grade, 0) / validGrades.length;
+                  if (validCorrections.length === 0) return 'default';
+                  
+                  const avg = totalNormalizedGrade / validCorrections.length;
                   return getGradeColor(avg);
                 })()}
                 size="medium"
@@ -1642,6 +1698,7 @@ const handleDeleteClass = async () => {
                         label={`${group.averageGrade.toFixed(1)} / 20`}
                         color={getGradeColor(group.averageGrade)}
                         size="small"
+                        title="Note moyennée et normalisée sur 20"
                       />
                     </Box>
                   </Box>
@@ -1655,13 +1712,28 @@ const handleDeleteClass = async () => {
                           <Grid size={{ xs: 12, sm: 6, md: 4 }} key={correction.id}>
                             <CorrectionCardAutre
                               correction={correction}
-                              getGradeColor={getGradeColor}
+                              getGradeColor={(grade) => {
+                                // On utilise la note normalisée pour déterminer la couleur
+                                const activity = activities.find(a => a.id === correction.activity_id);
+                                const normalizedGrade = normalizeGrade(grade, activity);
+                                
+                                if (normalizedGrade >= 16) return 'success';
+                                if (normalizedGrade >= 14) return 'primary';
+                                if (normalizedGrade >= 10) return 'info';
+                                if (normalizedGrade >= 8) return 'warning';
+                                return 'error';
+                              }}
                               showStudent={groupBy === 'activity'}
                               showActivity={groupBy === 'student'}
                               showClass={false}
                               onChangeStatus={handleChangeStatus}
                               standalone={false}
                               preloadedShareCode={correction.id ? shareCodesMap.get(correction.id.toString()) : undefined}
+                              additionalProps={{ 
+                                activity: activities.find(a => a.id === correction.activity_id),
+                                normalizeGrade: normalizeGrade,
+                                showNormalizedGrade: true
+                              }}
                             />
                           </Grid>
                         );

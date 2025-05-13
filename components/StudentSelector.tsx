@@ -22,7 +22,10 @@ const StudentSelector: React.FC<StudentSelectorProps> = ({
       <InputLabel>{label}</InputLabel>
       <Select
         value={value || ''}
-        onChange={(e) => onChange(e.target.value === '' ? null : Number(e.target.value))}
+        onChange={(e) => {
+          const val = e.target.value as string | number;
+          onChange(val === '' ? null : Number(val));
+        }}
         label={label}
       >
         <MenuItem value="">

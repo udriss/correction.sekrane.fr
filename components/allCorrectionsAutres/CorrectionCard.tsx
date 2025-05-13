@@ -46,6 +46,11 @@ interface CorrectionCardProps {
   onToggleActive?: (correctionId: number, newActiveState: boolean) => Promise<void>;
   onChangeStatus?: (correctionId: number, newStatus: string) => Promise<void>;
   standalone?: boolean; // Nouveau prop pour indiquer si le composant est utilisé de manière autonome
+  additionalProps?: {
+    activity?: any;
+    normalizeGrade?: (grade: number | string | null | undefined, activity?: any) => number;
+    showNormalizedGrade?: boolean;
+  };
 }
 
 const CorrectionCardAutre: React.FC<CorrectionCardProps> = ({
@@ -58,9 +63,9 @@ const CorrectionCardAutre: React.FC<CorrectionCardProps> = ({
   showStudent = true,
   showActivity = true,
   studentSubClass = null,
-  onToggleActive,
   onChangeStatus,
-  standalone = false
+  standalone = false,
+  additionalProps
 }) => {
 
   // Utiliser le hook optionnel qui fonctionne même sans provider
@@ -252,9 +257,11 @@ const CorrectionCardAutre: React.FC<CorrectionCardProps> = ({
   };
 
 
-  // Calcul du total de points possibles (somme des éléments du tableau points)
-  // Si l'activité associée à la correction a une propriété points_total, utilisez-la
-  const totalPossiblePoints = grade > 0 ? grade / (correction.score_percentage || 1) * 100 : 0;
+  // Calcul du total de points possibles
+  // Utiliser le barème de l'activité si disponible via additionalProps
+  const totalPossiblePoints = additionalProps?.activity?.points 
+    ? additionalProps.activity.points.reduce((sum: number, p: number) => sum + p, 0) 
+    : (grade > 0 ? grade / (correction.score_percentage || 1) * 100 : 0);
   
   return (
     <Paper
@@ -439,11 +446,19 @@ const CorrectionCardAutre: React.FC<CorrectionCardProps> = ({
           p: 1, borderRadius: 2, 
           color: 'white' }}>
           <Typography variant="h5" component="div" fontWeight="bold">
-            {typeof gradeWithPenalty === 'number' ? gradeWithPenalty.toFixed(1) : '0.0'}
+            {typeof gradeWithPenalty === 'number' ? gradeWithPenalty.toFixed(1) : '-.-'}
           </Typography>
           <Typography variant="body2" sx={{ ml: 1, opacity: 0.9 }}>
             / {totalPossiblePoints > 0 ? totalPossiblePoints.toFixed(1) : '-'}
           </Typography>
+
+          {additionalProps && additionalProps.showNormalizedGrade && additionalProps.normalizeGrade && additionalProps.activity && (
+            <Tooltip title="Note normalisée sur 20">
+              <Typography variant="body2" sx={{ ml: 1, borderLeft: '1px solid rgba(255,255,255,0.3)', pl: 1 }}>
+                {additionalProps.normalizeGrade(gradeWithPenalty, additionalProps.activity).toFixed(1)}/20
+              </Typography>
+            </Tooltip>
+          )}
         </Box>
       </Box>
       

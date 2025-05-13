@@ -84,8 +84,8 @@ export default function CorrectionsListAutres({
     return <ErrorDisplay error={error} />;
   }
 
-  // Afficher un spinner pendant le chargement
-  if (isLoading) {
+  // Afficher un spinner pendant le chargement uniquement s'il n'y a pas déjà des corrections filtrées
+  if (isLoading && (!filteredCorrections || filteredCorrections.length === 0)) {
     return (
       <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', py: 4 }}>
         <CircularProgress sx={{ mb: 2 }} />

@@ -359,33 +359,38 @@ export default function ActivityAutreDetail({ params }: { params: Promise<{ id: 
       setIsEditing(false);
       enqueueSnackbar('Activité mise à jour avec succès', { variant: 'success' });
       
-      // Comparaison des parties pour trouver les différences qui affectent les points
+      // Comparaison des parties pour trouver les différences qui affectent les noms ou les points
+      // Cela permet de détecter correctement les changements dans les parties de l'activité
       const added: { name: string; points: number }[] = [];
       const removed: { index: number; name: string; points: number }[] = [];
       
-      // Détecter les parties supprimées ou dont les points ont changé
+      // Détecter les parties supprimées ou dont les points/noms ont changé
       oldParts.forEach((oldPart, index) => {
-        // Chercher une partie avec les mêmes points dans les nouvelles parties
-        const foundWithSamePoints = parts.find(newPart => newPart.points === oldPart.points);
-        if (!foundWithSamePoints) {
-          // Si on ne trouve pas de partie avec les mêmes points, cette partie est considérée comme supprimée
-          // du point de vue des corrections (qui ne s'intéressent qu'aux points)
+        // Chercher une partie avec le même nom ET les mêmes points dans les nouvelles parties
+        const foundMatchingPart = parts.find(newPart => 
+          newPart.name === oldPart.name && newPart.points === oldPart.points
+        );
+        if (!foundMatchingPart) {
+          // Si on ne trouve pas de partie correspondante exacte, cette partie est considérée comme supprimée
+          // ou modifiée du point de vue des corrections
           removed.push({ index, ...oldPart });
         }
       });
       
-      // Détecter les parties ajoutées ou dont les points ont changé
+      // Détecter les parties ajoutées ou dont les points/noms ont changé
       parts.forEach((newPart) => {
-        // Chercher une partie avec les mêmes points dans les anciennes parties
-        const foundWithSamePoints = oldParts.find(oldPart => oldPart.points === newPart.points);
-        if (!foundWithSamePoints) {
-          // Si on ne trouve pas de partie avec les mêmes points, cette partie est considérée comme ajoutée
-          // du point de vue des corrections
+        // Chercher une partie avec le même nom ET les mêmes points dans les anciennes parties
+        const foundMatchingPart = oldParts.find(oldPart => 
+          oldPart.name === newPart.name && oldPart.points === newPart.points
+        );
+        if (!foundMatchingPart) {
+          // Si on ne trouve pas de partie correspondante exacte, cette partie est considérée comme ajoutée
+          // ou modifiée du point de vue des corrections
           added.push(newPart);
         }
       });
       
-      // Si les points ont changé, afficher le modal pour mettre à jour les corrections
+      // Si les parties (nom ou points) ont changé, afficher le modal pour mettre à jour les corrections
       if (added.length > 0 || removed.length > 0) {
         // Vérifier s'il y a des corrections associées
         if (corrections.length > 0) {
@@ -583,7 +588,7 @@ export default function ActivityAutreDetail({ params }: { params: Promise<{ id: 
           Barème ({totalPoints} points au total)
         </Typography>
         
-        <Box sx={{ display: 'flex', flexDirection: 'row', gap: 1 }}>
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
           {activity.parts_names.map((name, index) => (
             <Chip
               key={index}
@@ -981,11 +986,26 @@ export default function ActivityAutreDetail({ params }: { params: Promise<{ id: 
                             />
                           )}
                         </Typography>
-                        <Typography variant="h6" color={correction.status === 'ACTIVE' ? "primary" : "text.disabled"}>
-                          {correction.status === 'ACTIVE' 
-                            ? (correction.final_grade ? `${correction.final_grade} / 20` : 'Non noté')
-                            : "NaN"}
-                        </Typography>
+                        <Box sx={{ display: 'flex', alignItems: 'center', flexWrap: 'nowrap' }}>
+                          <Typography variant="h6" color={correction.status === 'ACTIVE' ? "primary" : "text.disabled"}>
+                            {correction.status === 'ACTIVE' 
+                              ? (correction.final_grade 
+                                  ? (() => {
+                                      const value = parseFloat(String(correction.final_grade));
+                                      return `${isNaN(value) ? correction.final_grade : value.toFixed(1)} / ${activity.points?.reduce((sum, p) => sum + p, 0) || 0}`;
+                                    })()
+                                  : 'Non noté')
+                              : "NaN"}
+                          </Typography>
+                          {correction.status === 'ACTIVE' && correction.final_grade && (
+                            <Chip
+                              size="small"
+                              label={`${((parseFloat(correction.final_grade.toString()) / (activity.points?.reduce((sum, p) => sum + p, 0) || 1)) * 20).toFixed(1)}/20`}
+                              color="secondary"
+                              sx={{ ml: 1, fontSize: '0.7rem', height: 20 }}
+                            />
+                          )}
+                        </Box>
                       </Box>
                       
                       <Box sx={{ mt: 1, display: 'flex', flexDirection: 'column', gap: 1 }}>
@@ -1037,15 +1057,15 @@ export default function ActivityAutreDetail({ params }: { params: Promise<{ id: 
               
               <Box sx={{ mb: 4 }}>
                 <Typography variant="body1" >
-                  Nombre de corrections: <strong>{corrections.length}</strong>
+                  Nombre de corrections : <strong>{corrections.length}</strong>
                 </Typography>
                 
                 <Typography variant="body1" >
-                  Nombre de corrections actives: <strong>{corrections.filter(c => c.status === 'ACTIVE').length}</strong>
+                  Nombre de corrections actives : <strong>{corrections.filter(c => c.status === 'ACTIVE').length}</strong>
                 </Typography>
                 
                 <Typography variant="body1" >
-                  Note moyenne: <strong>
+                  Note moyenne : <strong>
                     {corrections.filter(c => c.status === 'ACTIVE').length > 0
                       ? (corrections.filter(c => c.status === 'ACTIVE').reduce((sum, c) => {
                           // Convertir final_grade en nombre pour s'assurer que la somme fonctionne correctement
@@ -1055,9 +1075,20 @@ export default function ActivityAutreDetail({ params }: { params: Promise<{ id: 
                           
                           return sum + (isNaN(grade) ? 0 : grade);
                         }, 0) / 
-                         corrections.filter(c => c.status === 'ACTIVE').length).toFixed(2)
+                         corrections.filter(c => c.status === 'ACTIVE').length).toFixed(1)
                       : 'N/A'}
                   </strong>
+                  {corrections.filter(c => c.status === 'ACTIVE').length > 0 && 
+                    <Chip
+                      size="small"
+                      label={`${((corrections.filter(c => c.status === 'ACTIVE').reduce((sum, c) => {
+                        const grade = typeof c.final_grade === 'string' ? parseFloat(c.final_grade) : (c.final_grade || 0);
+                        return sum + (isNaN(grade) ? 0 : grade);
+                      }, 0) / corrections.filter(c => c.status === 'ACTIVE').length / (activity.points?.reduce((sum, p) => sum + p, 0) || 1)) * 20).toFixed(1)} / 20`}
+                      color="secondary"
+                      sx={{ ml: 1, fontSize: '0.7rem', height: 20 }}
+                    />
+                  }
                 </Typography>
               </Box>
               
@@ -1084,7 +1115,7 @@ export default function ActivityAutreDetail({ params }: { params: Promise<{ id: 
                     <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
                       <Typography variant="body2">{name}</Typography>
                       <Typography variant="body2">
-                        {avgPoints.toFixed(2)} / {maxPoints} pts ({percentage.toFixed(1)}%)
+                        {avgPoints.toFixed(1)} / {maxPoints} pts ({percentage.toFixed(1)}%)
                       </Typography>
                     </Box>
                     <Box
@@ -1158,6 +1189,7 @@ export default function ActivityAutreDetail({ params }: { params: Promise<{ id: 
         updateSuccess={updateCorrectionsSuccess}
         updateError={updateCorrectionsError}
         students={students}
+        activityTotalPoints={totalPoints}
       />
     </Container>
   );

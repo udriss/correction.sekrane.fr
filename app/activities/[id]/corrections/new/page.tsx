@@ -355,7 +355,7 @@ export default function NewCorrectionAutrePage({ params }: { params: Promise<{ i
       addRecentCorrection(data.id);
       
       // Rediriger vers la page de la correction individuelle ou une vue filtrée
-      router.push(`/corrections?activity=${activityId}&highlight=${data.id}`);
+      router.push(`/corrections?activityId=${activityId}&highlight=${data.id}&selectedCorrectionIds=${data.id}`);
     } catch (err) {
       console.error('Erreur:', err);
       // Afficher le message d'erreur contextualisé

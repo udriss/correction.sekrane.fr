@@ -20,7 +20,6 @@ import {
   Typography,
   Alert,
   Divider,
-  Chip,
   Stepper,
   Step,
   StepLabel,
@@ -36,9 +35,7 @@ import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
-import VisibilityIcon from '@mui/icons-material/Visibility';
 import GradientBackground from '@/components/ui/GradientBackground';
-import H1Title from '@/components/ui/H1Title';
 import { parseCSVContent } from '@/lib/utils/parse-csv';
 import UploadFileIcon from '@mui/icons-material/UploadFile';
 import DeleteIcon from '@mui/icons-material/Delete';
@@ -500,7 +497,7 @@ const BatchStudentForm: React.FC<BatchStudentFormProps> = ({
                                   onChange={(e) => handleBatchStudentFieldChange(
                                     index, 
                                     'sub_class', 
-                                    e.target.value === '' ? null : Number(e.target.value)
+                                    e.target.value.toString() === '' ? null : Number(e.target.value)
                                   )}
                                 >
                                   <MenuItem value="">
@@ -847,7 +844,7 @@ const BatchStudentForm: React.FC<BatchStudentFormProps> = ({
                                   onChange={(e) => handleStudentFieldChange(
                                     index, 
                                     'sub_class', 
-                                    e.target.value === '' ? null : Number(e.target.value)
+                                    e.target.value.toString() === '' || Number(e.target.value) === 0 ? null : Number(e.target.value)
                                   )}
                                   disabled={student.markedForDeletion}
                                   sx={{

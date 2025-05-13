@@ -359,7 +359,7 @@ export default function InlineCorrectionsForm({
                     <FormControl fullWidth size="small">
                       <InputLabel>Étudiant</InputLabel>
                       <Select
-                        value={studentGrade.student_id || ''}
+                        value={studentGrade.student_id === null ? '' : studentGrade.student_id.toString()}
                         onChange={(e) => handleStudentChange(
                           index, 
                           e.target.value === '' ? null : Number(e.target.value)

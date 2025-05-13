@@ -373,7 +373,7 @@ const StudentSelector: React.FC<StudentSelectorProps> = ({
       <InputLabel>Étudiant</InputLabel>
       <Select
         value={value || ''}
-        onChange={(e) => onChange(e.target.value === '' ? null : Number(e.target.value))}
+        onChange={(e) => onChange(String(e.target.value) === '' ? null : Number(e.target.value))}
         label="Étudiant"
       >
         <MenuItem value="">

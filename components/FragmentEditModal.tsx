@@ -244,7 +244,7 @@ const FragmentEditModal: React.FC<FragmentEditModalProps> = ({
               <Select
                 labelId="activity-label"
                 value={activityId || ''}
-                onChange={(e) => setActivityId(e.target.value === '' ? null : Number(e.target.value))}
+                onChange={(e) => setActivityId(String(e.target.value) === '' ? null : Number(e.target.value))}
                 label="Activité (optionnel)"
                 disabled={defaultActivityId !== null || loading}
               >
