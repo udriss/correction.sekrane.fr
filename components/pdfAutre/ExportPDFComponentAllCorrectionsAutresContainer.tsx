@@ -1,6 +1,6 @@
 // ExportPDFComponentAllCorrectionsAutresContainer.tsx - Composant principal pour l'export des corrections
 import React, { useState, useEffect } from 'react';
-import { Box, Alert } from '@mui/material';
+import { Box, Alert, FormControl, InputLabel, Select, MenuItem } from '@mui/material';
 import { useSnackbar } from 'notistack';
 import ErrorDisplay from '@/components/ui/ErrorDisplay';
 import CorrectionsPreview from './CorrectionsPreview';
@@ -24,24 +24,22 @@ interface ExportPDFComponentAllCorrectionsAutresContainerProps {
   corrections: CorrectionAutreEnriched[];
   activities: ActivityAutre[];
   students: Student[];
-  filterActivity: number | 'all';
-  setFilterActivity: (value: number | 'all') => void;
   uniqueActivities: { id: number; name: string }[];
   getActivityById: (activityId: number) => ActivityAutre | undefined;
   getStudentById: (studentId: number | null) => Student | undefined;
   getAllClasses: () => Promise<any[]>;
+  filterClasses?: number[] | 'all'; // Ajout du filtre de classes optionnel
 }
 
 const ExportPDFComponentAllCorrectionsAutresContainer: React.FC<ExportPDFComponentAllCorrectionsAutresContainerProps> = ({
   corrections,
   activities,
   students,
-  filterActivity,
-  setFilterActivity,
   uniqueActivities,
   getActivityById,
   getStudentById,
-  getAllClasses
+  getAllClasses,
+  filterClasses = 'all',
 }) => {
   // États pour les options d'export
   const [arrangement, setArrangement] = useState<ArrangementType>('class');
@@ -50,11 +48,13 @@ const ExportPDFComponentAllCorrectionsAutresContainer: React.FC<ExportPDFCompone
   const [viewType, setViewType] = useState<ViewType>('detailed');
   const [activeTab, setActiveTab] = useState<number>(0);
   const [includeAllStudents, setIncludeAllStudents] = useState<boolean>(false);
+  const [filterActivity, setFilterActivity] = useState<number[] | 'all'>('all');
   const [allStudents, setAllStudents] = useState<any[]>([]);
   const [classesMap, setClassesMap] = useState<Map<number | null, any>>(new Map());
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<Error | string | null>(null);
   const [errorDetails, setErrorDetails] = useState<any | null>(null);
+  const [filterClassesState, setFilterClassesState] = useState<'all' | number[]>(filterClasses);
 
   const { enqueueSnackbar } = useSnackbar();
 
@@ -112,14 +112,35 @@ const ExportPDFComponentAllCorrectionsAutresContainer: React.FC<ExportPDFCompone
     loadAllStudents();
   }, []);
 
-  // Filtrer les corrections en fonction de l'activité sélectionnée
+  // Filtrer les corrections en fonction de l'activité ET de la classe sélectionnée
   const filteredCorrections = React.useMemo(() => {
     let result = [...corrections];
-    if (filterActivity !== 'all') {
-      result = result.filter(c => c.activity_id === filterActivity);
+    if (filterActivity !== 'all' && Array.isArray(filterActivity)) {
+      result = result.filter(c => filterActivity.includes(c.activity_id));
+    }
+    if (filterClassesState !== 'all' && Array.isArray(filterClassesState)) {
+      result = result.filter(c => c.class_id !== null && filterClassesState.includes(c.class_id));
     }
     return result;
-  }, [corrections, filterActivity]);
+  }, [corrections, filterActivity, filterClassesState]);
+
+  // Calculer dynamiquement les classes disponibles à partir des corrections filtrées
+  const availableClassesForExport = React.useMemo(() => {
+    const classIds = new Set<number>();
+    corrections.forEach(c => {
+      if (c.class_id !== null && c.class_id !== undefined) {
+        classIds.add(c.class_id);
+      }
+    });
+    // On construit une liste d'objets {id, name} pour toutes les classes présentes dans les corrections
+    const classesFromCorrections = Array.from(classIds).map(id => ({ id, name: classesMap.get(id)?.name || `Classe ${id}` }));
+    return classesFromCorrections;
+  }, [corrections, classesMap]);
+
+  // Synchroniser le filtre local et le prop parent
+  useEffect(() => {
+    setFilterClassesState(filterClasses);
+  }, [filterClasses]);
 
   // Fonction pour gérer le changement d'onglet
   const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
@@ -154,23 +175,18 @@ const ExportPDFComponentAllCorrectionsAutresContainer: React.FC<ExportPDFCompone
   const handleExport = async () => {
     try {
       setLoading(true);
-
       // Si l'onglet QR Codes est actif, générer le PDF de QR codes
       if (activeTab === 0) {
-        // Obtenir les données organisées
         const studentsToUse = includeAllStudents && allStudents.length > 0
           ? allStudents
           : allStudents.filter(student =>
               filteredCorrections.some(c => c.student_id === student.id)
             );
-
-          
-          
-          
         const groupedData = allCorrectionsAutreDataProcessingService.organizeAllCorrectionsData({
           corrections: filteredCorrections,
           includeAllStudents,
           filterActivity,
+          filterClasses: filterClassesState,
           arrangement,
           subArrangement,
           uniqueActivities,
@@ -178,20 +194,14 @@ const ExportPDFComponentAllCorrectionsAutresContainer: React.FC<ExportPDFCompone
           getActivityById,
           getStudentById: (studentId) => {
             if (studentId === null) return undefined;
-            
             if (includeAllStudents && allStudents.length > 0) {
               const student = allStudents.find(s => s.id === studentId);
               if (student) return student;
             }
-            
             return getStudentById(studentId);
           },
           classesMap
         });
-
-        // Déterminer includeDetails à partir de viewType
-        const includeDetails = viewType === 'detailed';
-        // Générer le PDF des QR codes
         await qrCodesPDFUtils(
           filteredCorrections,
           uniqueActivities,
@@ -208,21 +218,21 @@ const ExportPDFComponentAllCorrectionsAutresContainer: React.FC<ExportPDFCompone
           setError,
           setErrorDetails,
           groupedData,
-          includeDetails // <-- Ajout ici
+          viewType === 'detailed'
         );
-        
         return;
       }
-      
       // Sinon, procéder avec l'export normal des notes
       const studentsToUse = includeAllStudents && allStudents.length > 0
         ? allStudents
         : students;
-      
+      // Les corrections sont déjà filtrées par classe dans filteredCorrections
+      // On passe 'all' à exportToXLSX pour éviter tout double filtrage
       const groupedData = allCorrectionsAutreDataProcessingService.organizeAllCorrectionsData({
         corrections: filteredCorrections,
         includeAllStudents,
         filterActivity,
+        filterClasses: filterClassesState, // utilisé pour PDF/CSV, mais filtrage déjà fait pour XLSX
         arrangement,
         subArrangement,
         uniqueActivities,
@@ -230,18 +240,14 @@ const ExportPDFComponentAllCorrectionsAutresContainer: React.FC<ExportPDFCompone
         getActivityById,
         getStudentById: (studentId) => {
           if (studentId === null) return undefined;
-          
           if (includeAllStudents && allStudents.length > 0) {
             const student = allStudents.find(s => s.id === studentId);
             if (student) return student;
           }
-          
           return getStudentById(studentId);
         },
         classesMap
       });
-
-      // Exporter selon le format sélectionné
       switch (exportFormat) {
         case 'pdf':
           await generatePDF(
@@ -262,29 +268,23 @@ const ExportPDFComponentAllCorrectionsAutresContainer: React.FC<ExportPDFCompone
             getStudentById,
             getActivityById,
             classesMap,
-            enqueueSnackbar
+            enqueueSnackbar,
+            filterClassesState // transmettre la vraie sélection utilisateur
           );
           break;
         case 'csv':
-          // Export CSV - Créer un fichier par groupe
           Object.entries(groupedData).forEach(([key, value]: [string, any]) => {
-            // Déterminer les données à exporter
             let csvContent = "";
             let fileName = "";
-            
-            // Si pas de sous-arrangement, exporter un fichier unique
             if (value.corrections) {
               fileName = `Notes_${arrangement}_${key.replace(/\s+/g, '_')}_${new Date().toISOString().slice(0, 10)}.csv`;
-              
               if (viewType === 'simplified' && (arrangement === 'class' || arrangement === 'subclass')) {
-                // Format simplifié pour l'arrangement par classe
                 csvContent = generateSimplifiedCSV(
                   value.corrections,
                   getStudentById,
                   getActivityById
                 );
               } else {
-                // Format détaillé standard
                 csvContent = generateDetailedCSV(
                   value.corrections,
                   getStudentById,
@@ -292,29 +292,20 @@ const ExportPDFComponentAllCorrectionsAutresContainer: React.FC<ExportPDFCompone
                   classesMap
                 );
               }
-              
-              // Déclencher le téléchargement
               downloadCSV(csvContent, fileName);
-            } 
-            // Sinon exporter un fichier pour chaque sous-groupe
-            else if (value.items) {
+            } else if (value.items) {
               Object.entries(value.items).forEach(([subKey, subValue]: [string, any]) => {
                 const safeKey = key.replace(/\s+/g, '_');
                 const safeSubKey = subKey.replace(/\s+/g, '_');
-                
                 fileName = `Notes_${arrangement}_${subArrangement}_${safeKey}_${safeSubKey}_${new Date().toISOString().slice(0, 10)}.csv`;
-                
-                // Vérifier si subValue a des corrections
                 if (subValue.corrections && subValue.corrections.length > 0) {
                   if (viewType === 'simplified' && (arrangement === 'class' || arrangement === 'subclass')) {
-                    // Format simplifié pour l'arrangement par classe
                     csvContent = generateSimplifiedCSV(
                       subValue.corrections,
                       getStudentById,
                       getActivityById
                     );
                   } else {
-                    // Format détaillé standard
                     csvContent = generateDetailedCSV(
                       subValue.corrections,
                       getStudentById,
@@ -322,30 +313,27 @@ const ExportPDFComponentAllCorrectionsAutresContainer: React.FC<ExportPDFCompone
                       classesMap
                     );
                   }
-                  
-                  // Déclencher le téléchargement
                   downloadCSV(csvContent, fileName);
                 }
               });
             }
           });
-          
-          // Afficher message de succès
           enqueueSnackbar(`Fichier(s) CSV généré(s) avec succès`, { variant: 'success' });
           break;
+        default:
+          throw new Error('Format d\'export inconnu');
       }
     } catch (error) {
       console.error('Erreur lors de l\'export:', error);
-      setError(`Erreur lors de l'export en format ${exportFormat.toUpperCase()}`);
+      setError('Erreur lors de l\'export');
       setErrorDetails(error);
     } finally {
       setLoading(false);
     }
   };
 
-  // Liste des sous-arrangements disponibles
-  const availableSubArrangements = getAvailableSubArrangements();
-
+  // Correction : s'assurer que getStudentById retourne bien Student | undefined
+  // Correction : la fonction du composant retourne bien du JSX
   return (
     <Box sx={{ width: '100%' }}>
       {/* Afficher les erreurs si nécessaire */}
@@ -356,6 +344,39 @@ const ExportPDFComponentAllCorrectionsAutresContainer: React.FC<ExportPDFCompone
           onRefresh={() => window.location.reload()}
         />
       )}
+
+      {/* Sélecteur multi-classes pour l'export, visible partout */}
+      <FormControl size="small" sx={{ minWidth: 220, mb: 2 }}>
+        <InputLabel id="class-filter-export-label">Filtrer par classe</InputLabel>
+        <Select
+          labelId="class-filter-export-label"
+          multiple
+          value={filterClassesState === 'all' ? [] : filterClassesState}
+          onChange={e => {
+            const value = e.target.value as (number | string)[];
+            const valueAsNumbers = value.map(Number).filter(v => !isNaN(v));
+            setFilterClassesState(valueAsNumbers.length === 0 ? 'all' : valueAsNumbers);
+          }}
+          renderValue={selected =>
+            selected.length === 0
+              ? 'Toutes les classes'
+              : availableClassesForExport
+                  .filter(cls => selected.includes(cls.id))
+                  .map(cls => cls.name)
+                  .join(', ')
+          }
+          label="Filtrer par classe"
+        >
+          <MenuItem value="all" disabled={filterClassesState === 'all'}>
+            <em>Toutes les classes</em>
+          </MenuItem>
+          {availableClassesForExport.map(cls => (
+            <MenuItem key={cls.id} value={cls.id}>
+              {cls.name}
+            </MenuItem>
+          ))}
+        </Select>
+      </FormControl>
 
       {/* Panneau d'options d'export */}
       <ExportOptionsPanel 
@@ -376,7 +397,7 @@ const ExportPDFComponentAllCorrectionsAutresContainer: React.FC<ExportPDFCompone
         setIncludeAllStudents={setIncludeAllStudents}
         handleExport={handleExport}
         disabled={loading || filteredCorrections.length === 0}
-        availableSubArrangements={availableSubArrangements}
+        availableSubArrangements={getAvailableSubArrangements()}
       />
 
       {/* Aperçu des corrections */}

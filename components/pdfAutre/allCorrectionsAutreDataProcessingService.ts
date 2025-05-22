@@ -10,7 +10,8 @@ import { Student, CorrectionAutreEnriched, ActivityAutre } from '@/lib/types';
 interface OrganizeAllCorrectionsDataParams {
   corrections: CorrectionAutreEnriched[];
   includeAllStudents: boolean;
-  filterActivity: number | 'all';
+  filterActivity: number[] | 'all';
+  filterClasses?: number[] | 'all'; // Ajout du filtre de classes optionnel
   arrangement: ArrangementType;
   subArrangement: SubArrangementType;
   uniqueActivities: { id: number | string; name: string }[];
@@ -52,6 +53,7 @@ const organizeAllCorrectionsData = ({
   corrections,
   includeAllStudents,
   filterActivity,
+  filterClasses = 'all',
   arrangement,
   subArrangement,
   uniqueActivities,
@@ -81,12 +83,20 @@ const organizeAllCorrectionsData = ({
   // Trier les étudiants par ordre alphabétique
   const sortedStudents = sortStudentsByName(students);
 
+  // Appliquer le filtre multi-classes si nécessaire
+  let filteredStudents = sortedStudents;
+  if (filterClasses !== 'all' && Array.isArray(filterClasses)) {
+    filteredStudents = sortedStudents.filter(student =>
+      student.allClasses && student.allClasses.some(cls => filterClasses.includes(cls.classId))
+    );
+  }
+
   // Créer une carte des étudiants par classe pour une organisation plus efficace
   // Structure: { classId: Student[] }
   const studentsByClass: Record<string, Student[]> = {};
   
   // Organiser les étudiants par classe en utilisant l'attribut allClasses
-  sortedStudents.forEach(student => {
+  filteredStudents.forEach(student => {
     if (student.allClasses && student.allClasses.length > 0) {
       // Si l'étudiant a des classes attribuées, l'ajouter à chacune de ses classes
       student.allClasses.forEach(classInfo => {
@@ -157,7 +167,12 @@ const organizeAllCorrectionsData = ({
             // Ajouter toutes les corrections de cet étudiant
             studentCorrections.forEach(correction => {
               // Filtrer par activité si nécessaire
-              if (filterActivity === 'all' || correction.activity_id === filterActivity) {
+              if (
+                filterActivity === 'all' ||
+                (Array.isArray(filterActivity)
+                  ? filterActivity.includes(correction.activity_id)
+                  : correction.activity_id === filterActivity)
+              ) {
                 result[classKey].items[studentKey].corrections.push(correction);
               }
             });
@@ -166,7 +181,7 @@ const organizeAllCorrectionsData = ({
             // Pour chaque activité pertinente (filtrée ou toutes)
             const activities = filterActivity === 'all' 
               ? uniqueActivities 
-              : uniqueActivities.filter(a => a.id === filterActivity);
+              : Array.isArray(filterActivity) ? uniqueActivities.filter(a => filterActivity.includes(Number(a.id))) : uniqueActivities.filter(a => Number(a.id) === filterActivity);
             
             activities.forEach(activityInfo => {
               const activity = getActivityById(Number(activityInfo.id));
@@ -246,7 +261,7 @@ const organizeAllCorrectionsData = ({
               // Pour chaque activité pertinente (toutes ou filtrée)
               const activities = filterActivity === 'all' 
                 ? uniqueActivities 
-                : uniqueActivities.filter(a => a.id === filterActivity);
+                : Array.isArray(filterActivity) ? uniqueActivities.filter(a => filterActivity.includes(Number(a.id))) : uniqueActivities.filter(a => a.id === filterActivity);
                 
               activities.forEach(activityInfo => {
                 // Pour chaque étudiant dans ce sous-groupe
@@ -259,7 +274,7 @@ const organizeAllCorrectionsData = ({
                   // Chercher si l'étudiant a une correction pour cette activité
                   const correction = studentCorrections.find(c => 
                     c.activity_id === Number(activityInfo.id) && 
-                    (filterActivity === 'all' || c.activity_id === filterActivity)
+                    (filterActivity === 'all' || (Array.isArray(filterActivity) ? filterActivity.includes(c.activity_id) : c.activity_id === filterActivity))
                   );
                   
                   if (correction) {
@@ -318,7 +333,12 @@ const organizeAllCorrectionsData = ({
             // pour tous les étudiants de cette classe
             studentCorrections.forEach(correction => {
               // Filtrer par activité si nécessaire
-              if (filterActivity === 'all' || correction.activity_id === filterActivity) {
+              if (
+                filterActivity === 'all' ||
+                (Array.isArray(filterActivity)
+                  ? filterActivity.includes(correction.activity_id)
+                  : correction.activity_id === filterActivity)
+              ) {
                 // Enrichir la correction avec les informations d'activité et de classe
                 const activity = getActivityById(correction.activity_id);
                 
@@ -408,7 +428,7 @@ const organizeAllCorrectionsData = ({
             // Pour chaque activité pertinente (filtrée ou toutes)
             const activities = filterActivity === 'all' 
               ? uniqueActivities 
-              : uniqueActivities.filter(a => a.id === filterActivity);
+              : Array.isArray(filterActivity) ? uniqueActivities.filter(a => filterActivity.includes(Number(a.id))) : uniqueActivities.filter(a => a.id === filterActivity);
             
             activities.forEach(activityInfo => {
               const activity = getActivityById(Number(activityInfo.id));
@@ -463,23 +483,19 @@ const organizeAllCorrectionsData = ({
           else if (subArrangement === 'class') {
             // Déterminer les classes auxquelles cet étudiant appartient
             const studentClassIds = new Set<number | null>();
-            
             studentCorrections.forEach(correction => {
               studentClassIds.add(correction.class_id);
             });
-            
             // Si l'étudiant n'a pas de corrections ou pas de classe attribuée
             if (studentClassIds.size === 0) {
               studentClassIds.add(null); // Ajouter une entrée "Sans classe"
             }
-            
             // Pour chaque classe de cet étudiant
             studentClassIds.forEach(classId => {
               const className = classId !== null 
                 ? (classesMap.get(classId)?.name || `Classe ${classId}`) 
                 : 'Classe non attribuée';
               const classKey = className;
-              
               if (!result[studentKey].items[classKey]) {
                 result[studentKey].items[classKey] = {
                   info: { 
@@ -489,17 +505,40 @@ const organizeAllCorrectionsData = ({
                   corrections: []
                 };
               }
-              
               // Ajouter les corrections de cette classe
               studentCorrections.forEach(correction => {
                 // Vérifier si la correction appartient à cette classe et correspond au filtre d'activité
-                if (correction.class_id === classId && 
-                    (filterActivity === 'all' || correction.activity_id === filterActivity)) {
+                if (
+                  correction.class_id === classId && 
+                  (filterActivity === 'all' || (Array.isArray(filterActivity) ? filterActivity.includes(correction.activity_id) : correction.activity_id === filterActivity))
+                ) {
                   result[studentKey].items[classKey].corrections.push(correction);
                 }
               });
+              // Si includeAllStudents est activé et qu'il n'y a pas de correction pour cette classe
+              if (includeAllStudents && result[studentKey].items[classKey].corrections.length === 0) {
+                // Pour chaque activité pertinente (filtrée ou toutes)
+                const activitiesToProcess = filterActivity === 'all'
+                  ? uniqueActivities
+                  : Array.isArray(filterActivity)
+                    ? uniqueActivities.filter(a => filterActivity.includes(Number(a.id)))
+                    : uniqueActivities.filter(a => a.id === filterActivity);
+                activitiesToProcess.forEach(activityInfo => {
+                  const activity = getActivityById(Number(activityInfo.id));
+                  const pointsCount = activity?.points?.length || 0;
+                  const emptyCorrection = createEmptyCorrectionAutre(
+                    student.id,
+                    Number(activityInfo.id),
+                    classId,
+                    `${student.last_name} ${student.first_name}`,
+                    activity?.name || `Activité ${activityInfo.id}`,
+                    className,
+                    pointsCount
+                  );
+                  result[studentKey].items[classKey].corrections.push(emptyCorrection);
+                });
+              }
             });
-            
             // Trier les corrections par nom d'étudiant dans chaque classe
             Object.keys(result[studentKey].items).forEach(itemKey => {
               if (result[studentKey].items[itemKey].corrections) {
@@ -518,7 +557,7 @@ const organizeAllCorrectionsData = ({
             // Pour chaque activité pertinente (filtrée ou toutes)
             const activitiesToProcess = filterActivity === 'all'
               ? uniqueActivities
-              : uniqueActivities.filter(a => a.id === filterActivity);
+              : uniqueActivities.filter(a => filterActivity.includes(a.id as number));
             
             activitiesToProcess.forEach(activityInfo => {
               const activityId = Number(activityInfo.id);
@@ -660,7 +699,7 @@ const organizeAllCorrectionsData = ({
               
               // Ajouter les corrections qui correspondent au filtre d'activité
               studentCorrections.forEach(correction => {
-                if (filterActivity === 'all' || correction.activity_id === filterActivity) {
+                if (filterActivity === 'all' || (Array.isArray(filterActivity) ? filterActivity.includes(correction.activity_id) : correction.activity_id === filterActivity)) {
                   result[groupName].items[studentKey].corrections.push(correction);
                 }
               });
@@ -670,7 +709,7 @@ const organizeAllCorrectionsData = ({
                 // Déterminer les activités à traiter
                 const activitiesToProcess = filterActivity === 'all'
                   ? uniqueActivities
-                  : uniqueActivities.filter(a => a.id === filterActivity);
+                  : uniqueActivities.filter(a => Array.isArray(filterActivity) && filterActivity.includes(Number(a.id)));
                 
                 activitiesToProcess.forEach(activityInfo => {
                   const activityId = Number(activityInfo.id);
@@ -689,10 +728,10 @@ const organizeAllCorrectionsData = ({
                   // Créer un placeholder pour cette activité
                   const emptyCorrection = createEmptyCorrectionAutre(
                     student.id,
-                    activityId,
+                    Number(activityInfo.id),
                     classId,
                     `${student.last_name} ${student.first_name}`,
-                    activity?.name || `Activité ${activityId}`,
+                    activity?.name || `Activité ${activityInfo.id}`,
                     className,
                     pointsCount
                   );
@@ -713,7 +752,7 @@ const organizeAllCorrectionsData = ({
             // Déterminer les activités à traiter
             const activitiesToProcess = filterActivity === 'all'
               ? uniqueActivities
-              : uniqueActivities.filter(a => a.id === filterActivity);
+              : Array.isArray(filterActivity) ? uniqueActivities.filter(a => filterActivity.includes(Number(a.id))) : uniqueActivities.filter(a => a.id === filterActivity);
 
             activitiesToProcess.forEach(activityInfo => {
               const activityId = Number(activityInfo.id);
@@ -819,7 +858,7 @@ const organizeAllCorrectionsData = ({
                 // Filtrer les corrections par activité et classe
                 studentCorrections.forEach(correction => {
                   if (correction.class_id === classId && 
-                      (filterActivity === 'all' || correction.activity_id === filterActivity)) {
+                      (filterActivity === 'all' || (Array.isArray(filterActivity) ? filterActivity.includes(correction.activity_id) : correction.activity_id === filterActivity))) {
                     result[groupName].items[className].corrections.push(correction);
                   }
                 });
@@ -829,7 +868,7 @@ const organizeAllCorrectionsData = ({
                   // Déterminer les activités à traiter
                   const activitiesToProcess = filterActivity === 'all'
                     ? uniqueActivities
-                    : uniqueActivities.filter(a => a.id === filterActivity);
+                    : uniqueActivities.filter(a => filterActivity.includes(a.id as number));
                   
                   activitiesToProcess.forEach(activityInfo => {
                     const activityId = Number(activityInfo.id);
@@ -880,7 +919,7 @@ const organizeAllCorrectionsData = ({
               
               // Ajouter les corrections qui correspondent au filtre d'activité
               studentCorrections.forEach(correction => {
-                if (filterActivity === 'all' || correction.activity_id === filterActivity) {
+                if (filterActivity === 'all' || (Array.isArray(filterActivity) ? filterActivity.includes(correction.activity_id) : correction.activity_id === filterActivity)) {
                   // Enrichir la correction avec les informations d'activité et de classe
                   const activity = getActivityById(correction.activity_id);
                   const classId = correction.class_id;
@@ -906,7 +945,9 @@ const organizeAllCorrectionsData = ({
               // Déterminer toutes les activités à traiter (filtrées ou toutes)
               const activitiesToProcess = filterActivity === 'all'
                 ? uniqueActivities
-                : uniqueActivities.filter(a => a.id === filterActivity);
+                : Array.isArray(filterActivity)
+                  ? uniqueActivities.filter(a => filterActivity.includes(Number(a.id)))
+                  : [];
               
               // Pour chaque activité
               activitiesToProcess.forEach(activityInfo => {
@@ -982,7 +1023,7 @@ const organizeAllCorrectionsData = ({
       // Pour l'arrangement par activité
       const activities = filterActivity === 'all' 
         ? uniqueActivities 
-        : uniqueActivities.filter(a => a.id === filterActivity);
+        : Array.isArray(filterActivity) ? uniqueActivities.filter(a => filterActivity.includes(Number(a.id))) : uniqueActivities.filter(a => a.id === filterActivity);
       
       activities.forEach(activityInfo => {
         const activity = getActivityById(Number(activityInfo.id));

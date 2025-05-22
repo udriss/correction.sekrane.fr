@@ -32,8 +32,8 @@ interface Activity {
 interface ExportOptionsPanelProps {
   activeTab: number;
   handleTabChange: (event: React.SyntheticEvent, newValue: number) => void;
-  filterActivity: number | 'all';
-  setFilterActivity: (value: number | 'all') => void;
+  filterActivity: number[] | 'all';
+  setFilterActivity: (value: number[] | 'all') => void;
   uniqueActivities: Activity[];
   arrangement: ArrangementType;
   setArrangement: (value: ArrangementType) => void;
@@ -81,15 +81,33 @@ const ExportOptionsPanel: React.FC<ExportOptionsPanelProps> = ({
       
       <Box sx={{ mt: 3 }}>
         <FormControl fullWidth sx={{ mb: 2 }}>
-          <InputLabel>Activité</InputLabel>
+          <InputLabel>Activité(s)</InputLabel>
           <Select
-            value={filterActivity}
-            onChange={(e) => setFilterActivity(e.target.value as number | 'all')}
-            label="Activité"
+            multiple
+            value={filterActivity === 'all' ? [] : filterActivity}
+            onChange={(e) => {
+              const value = e.target.value;
+              if (value.length === 0) {
+                setFilterActivity('all');
+              } else {
+                setFilterActivity(value as number[]);
+              }
+            }}
+            label="Activité(s)"
+            renderValue={(selected) => {
+              if (filterActivity === 'all' || (Array.isArray(selected) && selected.length === 0)) {
+                return 'Toutes les activités';
+              }
+              return uniqueActivities
+                .filter((a) => (selected as (number | string)[]).includes(a.id))
+                .map((a) => a.name)
+                .join(', ');
+            }}
           >
-            <MenuItem value="all">Toutes les activités</MenuItem>
+            <MenuItem value="all" onClick={() => setFilterActivity('all')}>Toutes les activités</MenuItem>
             {uniqueActivities.map((activity: Activity) => (
               <MenuItem key={activity.id} value={activity.id}>
+                <Checkbox checked={filterActivity === 'all' ? false : (filterActivity as number[]).includes(activity.id as number)} />
                 {activity.name}
               </MenuItem>
             ))}

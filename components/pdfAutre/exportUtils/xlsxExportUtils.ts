@@ -89,10 +89,23 @@ export const createExcelWorksheet = (
   subArrangement: SubArrangementType,
   getStudentById: (studentId: number | null) => Student | undefined,
   getActivityById: (activityId: number) => ActivityAutre | undefined,
-  classesMap: Map<number | null, any>
+  classesMap: Map<number | null, any>,
+  filterClasses: number[] | 'all' = 'all'
 ) => {
-  // Create a mutable copy to sort
-  const corrections = [...correctionsInput];
+  // Correction : n'appliquer le filtre que si nécessaire (éviter double filtrage)
+  let corrections = [...correctionsInput];
+  if (filterClasses !== 'all') {
+    // Vérifier si correctionsInput contient des classes hors filtre
+    const hasUnfiltered = corrections.some(c => !filterClasses.includes(c.class_id));
+    if (hasUnfiltered) {
+      corrections = corrections.filter(c => filterClasses.includes(c.class_id));
+    }
+  }
+  // Debug : log si aucun résultat
+  if (corrections.length === 0) {
+    // eslint-disable-next-line no-console
+    console.warn('[XLSX Export] Aucun résultat à exporter après filtrage multi-classes.');
+  }
 
   if (viewType === 'simplified' && (arrangement === 'class' || arrangement === 'subclass')) {
     // Format simplifié pour l'arrangement par classe
@@ -144,7 +157,7 @@ export const createExcelWorksheet = (
         switch (c.status) {
           case 'ACTIVE':
             displayValue = c.grade !== undefined ? 
-            `${formatGrade(c.grade)} / 20`
+            `${formatGrade(c.grade)}`
              : 'NON NOTÉ';
             break;
           case 'NON_NOTE':
@@ -161,13 +174,13 @@ export const createExcelWorksheet = (
             break;
           default:
             displayValue = c.grade !== undefined ? 
-            `${formatGrade(c.grade)} / 20`
+            `${formatGrade(c.grade)}`
              : 'NON NOTÉ';
         }
       } else if (c.active === 0) {
         displayValue = 'DÉSACTIVÉ';
       } else if (c.grade !== undefined) {
-        displayValue = `${c.grade}/20`;
+        displayValue = `${c.grade}`;
       }
       
       studentMap[studentKey][activityKey] = displayValue;
@@ -291,7 +304,7 @@ export const createExcelWorksheet = (
         switch (c.status) {
           case 'ACTIVE':
             gradeDisplay = c.grade !== undefined ? 
-              `${formatGrade(c.grade)} / 20` : 'NON NOTÉ';
+              `${formatGrade(c.grade)}` : 'NON NOTÉ';
             pointsDisplay = Array.isArray(c.points_earned) ? 
               '[' + c.points_earned.join(' ; ') + ']' : 'N/A';
             break;
@@ -313,7 +326,7 @@ export const createExcelWorksheet = (
             break;
           default:
             gradeDisplay = c.grade !== undefined ? 
-              `${formatGrade(c.grade)} / 20` : 'NON NOTÉ';
+              `${formatGrade(c.grade)}` : 'NON NOTÉ';
             pointsDisplay = Array.isArray(c.points_earned) ? 
               '[' + c.points_earned.join(' ; ') + ']' : 'N/A';
         }
@@ -322,7 +335,7 @@ export const createExcelWorksheet = (
         pointsDisplay = 'DÉSACTIVÉ';
       } else {
         gradeDisplay = c.grade !== undefined ? 
-          `${formatGrade(c.grade)} / 20` : 'NON NOTÉ';
+          `${formatGrade(c.grade)}` : 'NON NOTÉ';
         pointsDisplay = Array.isArray(c.points_earned) ? 
           '[' + c.points_earned.join(' ; ') + ']' : 'N/A';
       }
@@ -564,7 +577,7 @@ export const createExcelWorksheet = (
       } else if (c.grade !== undefined) {
         if (statusDisplay === 'ACTIVE') {
           // Remplacer '.' par ',' dans la note et afficher le barème réel
-          gradeDisplay = `${formatGrade(c.grade).replace('.', ',')} / ${String(totalPoints).replace('.', ',')}`;
+          gradeDisplay = `${formatGrade(c.grade).replace('.', ',')}`;
         } else {
           gradeDisplay = statusDisplay;
         }

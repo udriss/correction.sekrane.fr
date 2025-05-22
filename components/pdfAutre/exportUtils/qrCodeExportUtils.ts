@@ -9,7 +9,7 @@ type QRCodeArrangementType = 'student' | 'class' | 'subclass' | 'activity';
 export const qrCodesPDFUtils = async (
   corrections: CorrectionAutreEnriched[],
   uniqueActivities: { id: number | string; name: string }[],
-  filterActivity: number | 'all',
+  filterActivity: number[] | 'all',
   includeAllStudents: boolean,
   allStudents: any[],
   students: Student[],
@@ -46,8 +46,10 @@ export const qrCodesPDFUtils = async (
     
     // Générer le titre du PDF
     const activityName = filterActivity !== 'all'
-      ? uniqueActivities.find((a) => a.id === filterActivity)?.name
-      : 'Toutes les activités';
+      ? Array.isArray(filterActivity)
+        ? uniqueActivities.filter((a) => filterActivity.includes(Number(a.id))).map(a => a.name).join(', ')
+        : uniqueActivities.find((a) => a.id === filterActivity)?.name
+      : 'toutes';
     
     // Préparer les données d'étudiants à utiliser
     const studentsToUse = includeAllStudents && allStudents.length > 0

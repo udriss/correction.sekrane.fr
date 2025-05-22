@@ -12,7 +12,8 @@ export const exportToXLSX = async (
   getStudentById: (studentId: number | null) => Student | undefined,
   getActivityById: (activityId: number) => ActivityAutre | undefined,
   classesMap: Map<number | null, any>,
-  enqueueSnackbar: (message: string, options: any) => void
+  enqueueSnackbar: (message: string, options: any) => void,
+  filterClasses: number[] | 'all' = 'all' // Ajout du filtre multi-classes
 ) => {
   try {
     // Importer la bibliothèque ExcelJS dynamiquement
@@ -42,7 +43,8 @@ export const exportToXLSX = async (
           subArrangement,
           getStudentById,
           getActivityById,
-          classesMap
+          classesMap,
+          filterClasses // propagation du filtre
         );
       } 
       // Sinon générer une feuille pour chaque sous-arrangement
@@ -59,7 +61,8 @@ export const exportToXLSX = async (
             subArrangement,
             getStudentById,
             getActivityById,
-            classesMap
+            classesMap,
+            filterClasses // propagation du filtre
           );
         });
       }

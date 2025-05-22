@@ -5,8 +5,8 @@ import { formatGrade, getDisplayValues } from './formatUtils';
 // Fonction pour générer le PDF
 export const generatePDF = async (
   groupedData: any,
-  filterActivity: number | 'all',
-  uniqueActivities: { id: number; name: string }[],
+  filterActivity: number[] | 'all',
+  uniqueActivities: { id: number | string; name: string }[],
   getActivityById: (activityId: number) => ActivityAutre | undefined,
   getStudentById: (studentId: number | null) => Student | undefined,
   enqueueSnackbar: (message: string, options: any) => void
@@ -25,7 +25,7 @@ export const generatePDF = async (
     // Informations de filtrage
     doc.setFontSize(12);
     doc.text(`Date d'export : ${new Date().toLocaleDateString('fr-FR', { year: 'numeric', month: 'long', day: 'numeric' })}`, 20, 30);
-    doc.text(`Activité : ${filterActivity === 'all' ? 'toutes' : uniqueActivities.find((a) => a.id === filterActivity)?.name}`, 20, 40);
+    doc.text(`Activité : ${filterActivity === 'all' ? 'toutes' : Array.isArray(filterActivity) ? uniqueActivities.filter((a) => filterActivity.includes(Number(a.id))).map(a => a.name).join(', ') : uniqueActivities.find((a) => a.id === filterActivity)?.name}`, 20, 40);
     
     // Position de départ pour le contenu du PDF
     let yPosition = 50;

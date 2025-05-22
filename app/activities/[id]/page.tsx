@@ -1153,8 +1153,6 @@ export default function ActivityAutreDetail({ params }: { params: Promise<{ id: 
                 corrections={filteredCorrections}
                 activities={activities}
                 students={students}
-                filterActivity={activity?.id || 0}
-                setFilterActivity={() => {}} // Non modifiable dans ce contexte
                 uniqueActivities={[{ id: activity?.id || 0, name: activity?.name || 'Activité' }]}
                 getActivityById={(activityId: number) => activities.find(a => a.id === activityId)}
                 getStudentById={(studentId: number | null) => studentId === null ? undefined : students.find(s => s.id === studentId)}

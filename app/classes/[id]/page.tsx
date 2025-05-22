@@ -1759,8 +1759,6 @@ const handleDeleteClass = async () => {
               corrections={filteredCorrections}
               activities={activities}
               students={students}
-              filterActivity={'all'} // On autorise toutes les activités dans ce contexte
-              setFilterActivity={setFilterActivity}
               uniqueActivities={uniqueActivities}
               getActivityById={(activityId: number) => activities.find(a => a.id === activityId)}
               getStudentById={(studentId: number | null) => studentId === null ? undefined : students.find(s => s.id === studentId)}

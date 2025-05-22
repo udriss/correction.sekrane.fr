@@ -892,8 +892,6 @@ function CorrectionsContent() {
               corrections={adaptCorrections}
               activities={metaData.activities}
               students={metaData.students}
-              filterActivity={filterActivity}
-              setFilterActivity={setFilterActivity}
               uniqueActivities={metaData.activities.map(a => ({ id: a.id, name: a.name }))}
               getActivityById={getActivityById}
               getStudentById={getStudentById}
