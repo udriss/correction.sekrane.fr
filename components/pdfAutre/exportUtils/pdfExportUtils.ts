@@ -9,7 +9,8 @@ export const generatePDF = async (
   uniqueActivities: { id: number | string; name: string }[],
   getActivityById: (activityId: number) => ActivityAutre | undefined,
   getStudentById: (studentId: number | null) => Student | undefined,
-  enqueueSnackbar: (message: string, options: any) => void
+  enqueueSnackbar: (message: string, options: any) => void,
+  filterClasses: number[] | 'all' = 'all' // Ajout du paramètre pour filtrer les classes
 ) => {
   try {
     // Importer les modules nécessaires
@@ -39,6 +40,12 @@ export const generatePDF = async (
     doc.rect(0, doc.internal.pageSize.height - 15, doc.internal.pageSize.width, 15, 'F');
 
     doc.addPage();
+    
+    // Filtrage des corrections selon les classes sélectionnées
+    const filterCorrectionsByClass = (corrections: any[]) => {
+      if (filterClasses === 'all') return corrections;
+      return corrections.filter(c => filterClasses.includes(c.class_id));
+    };
     
     // Générer le contenu selon l'organisation choisie
     let isFirstGroup = true;
@@ -73,8 +80,12 @@ export const generatePDF = async (
       
       if (value.corrections) {
         // Cas 1: Corrections disponibles directement au niveau principal
+        // Filtrer les corrections selon les classes sélectionnées
+        const filteredCorrections = filterCorrectionsByClass(value.corrections);
+        if (filteredCorrections.length === 0) return; // Ne pas afficher de tableau vide
+        
         // Tableau pour ce groupe
-        const tableData = value.corrections.map((c: any) => {
+        const tableData = filteredCorrections.map((c: any) => {
           const activity = getActivityById(c.activity_id);
           const student = getStudentById(c.student_id);
           
@@ -270,7 +281,11 @@ export const generatePDF = async (
               return nameA.localeCompare(nameB, 'fr', { sensitivity: 'base' });
             });
 
-            const tableData = subValue.corrections.map((c: any) => {
+            // Filtrer les corrections selon les classes sélectionnées
+            const filteredCorrections = filterCorrectionsByClass(subValue.corrections);
+            if (filteredCorrections.length === 0) return; // Ne pas afficher de tableau vide
+            
+            const tableData = filteredCorrections.map((c: any) => {
               const activity = getActivityById(c.activity_id);
               const student = getStudentById(c.student_id);
               

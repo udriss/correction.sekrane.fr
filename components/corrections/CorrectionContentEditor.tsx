@@ -10,6 +10,7 @@ interface CorrectionContentEditorProps {
   removeItem: (index: number) => void;
   addNewParagraph: () => void;
   addNewImage: (imageUrl: string) => void;
+  addNewAudio: (audioUrl: string) => void;
   activityId: number;
   correctionId: string;
 }
@@ -21,6 +22,7 @@ const CorrectionContentEditor: React.FC<CorrectionContentEditorProps> = ({
   removeItem,
   addNewParagraph,
   addNewImage,
+  addNewAudio,
   activityId,
   correctionId
 }) => {

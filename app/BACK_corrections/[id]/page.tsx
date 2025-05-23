@@ -974,36 +974,12 @@ export default function CorrectionDetail({ params }: { params: Promise<{ id: str
                     borderColor: alpha(theme.palette.primary.main, 0.2),
                     boxShadow: `0 4px 20px ${alpha(theme.palette.primary.main, 0.08)}`
                   }}>
-                    <CorrectionContentEditor
-                      contentItems={contentItems}
-                      moveItem={moveItem}
-                      updateItem={updateItem}
-                      removeItem={removeItem}
-                      addNewParagraph={addNewParagraph}
-                      addNewImage={addNewImage}
-                      activityId={correction.activity_id}
-                      correctionId={correctionId}
-                    />
+
                   </Card>
                   
                   {/* Action buttons component */}
                   <Box sx={{ mt: 2 }}>
-                    <ActionButtons
-                      addNewParagraph={addNewParagraph}
-                      addNewImage={addNewImage}
-                      handleUndo={handleUndo}
-                      handleSaveCorrection={handleSaveCorrection}
-                      updatePreview={updatePreview}
-                      handleCopyToClipboard={handleCopyToClipboard}
-                      setShareModalOpen={setShareModalOpen}
-                      saving={saving}
-                      historyLength={history.length}
-                      activityId={correction.activity_id}
-                      correctionId={correctionId}
-                      autoSaveActive={autoSaveActive}
-                      setAutoSaveActive={setAutoSaveActive}
-                      lastAutoSave={lastAutoSave}
-                    />
+
                   </Box>
                   
                   {/* Remplacer l'ancien affichage d'erreur par ErrorDisplay */}

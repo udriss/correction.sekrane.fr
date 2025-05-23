@@ -110,7 +110,7 @@ export const createExcelWorksheet = (
   if (viewType === 'simplified' && (arrangement === 'class' || arrangement === 'subclass')) {
     // Format simplifié pour l'arrangement par classe
     // Regrouper les étudiants (lignes) et les activités (colonnes)
-    const studentMap: Record<string, Record<string, any>> = {};
+    const studentMap: Record<string, { last_name: string, first_name: string, grades: Record<string, any> }> = {};
     const activitySet = new Set<string>();
     const activityStatusMap: Record<string, string> = {}; // Pour stocker les statuts des activités
     
@@ -129,36 +129,27 @@ export const createExcelWorksheet = (
     corrections.forEach(c => {
       const student = getStudentById(c.student_id);
       const activity = getActivityById(c.activity_id);
-      
       if (!student) return;
-      
       const studentKey = `${student.last_name} ${student.first_name}`;
       const activityKey = activity?.name || `Activité ${c.activity_id}`;
-      
       activitySet.add(activityKey);
       if (!studentMap[studentKey]) {
-        studentMap[studentKey] = {};
+        studentMap[studentKey] = { last_name: student.last_name, first_name: student.first_name, grades: {} };
       }
-      
       // Stocker le statut de l'activité pour cet étudiant
       if (c.status) {
         activityStatusMap[`${studentKey}-${activityKey}`] = c.status;
       }
-      
       // Vérifier si c'est une correction fictive avec status NON_NOTE
       const isPlaceholder = (c.placeholder && c.status === 'NON_NOTE');
-      
       // Déterminer la valeur à afficher
       let displayValue = 'NON NOTÉ XLSX';
-      
       if (isPlaceholder) {
         displayValue = 'N/A XLSX';
       } else if (c.status) {
         switch (c.status) {
           case 'ACTIVE':
-            displayValue = c.grade !== undefined ? 
-            `${formatGrade(c.grade)}`
-             : 'NON NOTÉ';
+            displayValue = c.grade !== undefined ? `${formatGrade(c.grade)}` : 'NON NOTÉ';
             break;
           case 'NON_NOTE':
             displayValue = 'NON NOTÉ';
@@ -173,51 +164,43 @@ export const createExcelWorksheet = (
             displayValue = 'DÉSACTIVÉ';
             break;
           default:
-            displayValue = c.grade !== undefined ? 
-            `${formatGrade(c.grade)}`
-             : 'NON NOTÉ';
+            displayValue = c.grade !== undefined ? `${formatGrade(c.grade)}` : 'NON NOTÉ';
         }
       } else if (c.active === 0) {
         displayValue = 'DÉSACTIVÉ';
       } else if (c.grade !== undefined) {
         displayValue = `${c.grade}`;
       }
-      
-      studentMap[studentKey][activityKey] = displayValue;
+      studentMap[studentKey].grades[activityKey] = displayValue;
     });
-    
     // Convertir les activités en tableau pour les colonnes
     const activityArray = Array.from(activitySet);
-    
     // Définir les colonnes avec les en-têtes
     worksheet.columns = [
-      { header: 'Étudiant', key: 'student', width: 30 },
+      { header: 'Nom', key: 'last_name', width: 20 },
+      { header: 'Prénom', key: 'first_name', width: 20 },
       ...activityArray.map(activity => ({
         header: activity,
         key: activity,
         width: 15
       }))
     ];
-    
     // Ajouter les données
     // --- Tri des entrées de la map par nom d'étudiant --- 
-    const sortedStudentEntries = Object.entries(studentMap).sort(([studentNameA], [studentNameB]) => {
-      return studentNameA.localeCompare(studentNameB, 'fr', { sensitivity: 'base' });
+    const sortedStudentEntries = Object.values(studentMap).sort((a, b) => {
+      const nameA = `${a.last_name} ${a.first_name}`;
+      const nameB = `${b.last_name} ${b.first_name}`;
+      return nameA.localeCompare(nameB, 'fr', { sensitivity: 'base' });
     });
-
-    // Iterate over the sorted entries
-    sortedStudentEntries.forEach(([studentName, grades]) => {
-      const rowData: any = { student: studentName };
-      
+    sortedStudentEntries.forEach(({ last_name, first_name, grades }) => {
+      const rowData: any = { last_name, first_name };
       activityArray.forEach(activity => {
-        // Déterminer la valeur à afficher en fonction du statut
-        const status = activityStatusMap[`${studentName}-${activity}`];
         let displayValue;
-        
         if (grades[activity] !== undefined) {
           displayValue = grades[activity];
         } else {
-          // Utiliser le statut de l'activité pour cet étudiant si disponible
+          // Gestion fine des statuts manquants
+          const status = activityStatusMap[`${last_name} ${first_name}-${activity}`];
           switch (status) {
             case 'NON_NOTE':
               displayValue = 'NON NOTÉ';
@@ -235,24 +218,20 @@ export const createExcelWorksheet = (
               displayValue = 'NON ÉVALUÉ';
           }
         }
-        
         rowData[activity] = displayValue;
       });
-
       const row = worksheet.addRow(rowData);
-      
-      // Appliquer des styles aux cellules de notes (commençant à l'index 1 car la première colonne est l'étudiant)
       activityArray.forEach((activity, index) => {
         const cellValue = rowData[activity];
         if (cellValue) {
-          const cell = row.getCell(index + 2); // +2 car 1 est l'index de l'étudiant et les index Excel commencent à 1
+          const cell = row.getCell(index + 3); // +3 car 1=Nom, 2=Prénom
           applyExcelCellStyle(cell, cellValue);
         }
       });
     });
     
   } else if (arrangement === 'class' && subArrangement === 'none' || arrangement === 'subclass' && subArrangement === 'none') {
-    // Format spécial pour vue détaillée avec arrangement par classe ou sous-classe sans sous-arrangement
+    // Format détaillé avec parties, note, statut, etc.
     // Regrouper les étudiants (lignes) et les activités (colonnes)
     const studentMap: Record<string, Record<string, any>> = {};
     const activitySet = new Set<string>();
@@ -350,7 +329,10 @@ export const createExcelWorksheet = (
     
     // Définir la première colonne (Étudiant)
     worksheet.columns = [
-      { header: 'Étudiant', key: 'student', width: 30 }
+      { header: 'Nom', key: 'last_name', width: 20 },
+      { header: 'Prénom', key: 'first_name', width: 20 },
+      { header: 'Classe', key: 'class', width: 20 },
+      { header: 'Activité', key: 'activity', width: 30 }
     ];
     
     // Ajouter les données
@@ -462,13 +444,6 @@ export const createExcelWorksheet = (
       });
     });
     
-    // Définir la largeur des colonnes (si nécessaire)
-    worksheet.getColumn(1).width = 30; // Étudiant
-    
-    // Geler les deux premières lignes et la première colonne
-    worksheet.views = [
-      { state: 'frozen', xSplit: 1, ySplit: 2, activeCell: 'B3' }
-    ];
   } else {
     // Format détaillé standard pour corrections_autres
     
@@ -505,7 +480,8 @@ export const createExcelWorksheet = (
     
     // Créer les colonnes standards
     const standardColumns = [
-      { header: 'Étudiant', key: 'student', width: 30 },
+      { header: 'Nom', key: 'last_name', width: 20 },
+      { header: 'Prénom', key: 'first_name', width: 20 },
       { header: 'Classe', key: 'class', width: 20 },
       { header: 'Activité', key: 'activity', width: 30 }
     ];
@@ -587,7 +563,8 @@ export const createExcelWorksheet = (
       
       // Préparer les données de base de la ligne
       const rowData: any = {
-        student: student ? `${student.first_name} ${student.last_name}` : 'N/A',
+        last_name: student ? student.last_name : 'N/A',
+        first_name: student ? student.first_name : 'N/A',
         class: className,
         activity: activity?.name || `Activité ${c.activity_id}`,
         grade: gradeDisplay,

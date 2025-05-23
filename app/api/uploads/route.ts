@@ -79,8 +79,18 @@ export async function POST(request: NextRequest) {
     // Write the file
     await fs.writeFile(filePath, buffer);
     
-    // Build the public URL
-    const publicUrl = `/uploads/${activityId}/${uniqueFileName}`;
+    // Build the public URL based on environment
+    // En développement, on peut utiliser le dossier public directement
+    // En production, on doit passer par l'API
+    let publicUrl;
+    
+    if (process.env.NODE_ENV === 'development') {
+      // En mode développement, utiliser le dossier public
+      publicUrl = `/uploads/${activityId}/${uniqueFileName}`;
+    } else {
+      // En production, utiliser l'API media
+      publicUrl = `/api/media/${activityId}/${uniqueFileName}`;
+    }
     
     return NextResponse.json({ 
       success: true, 

@@ -30,10 +30,21 @@ export const exportToXLSX = async (
     workbook.properties.date1904 = false;
     
     // Générer des feuilles pour chaque section principale
+    const usedSheetNames = new Set<string>();
     Object.entries(groupedData).forEach(([key, value]: [string, any]) => {
+      // Génère un nom de feuille unique (max 31 caractères)
+      let baseSheetName = key.substring(0, 31);
+      let sheetName = baseSheetName;
+      let counter = 1;
+      while (usedSheetNames.has(sheetName)) {
+        // Ajoute un suffixe numérique pour garantir l'unicité
+        const suffix = `_${counter}`;
+        sheetName = baseSheetName.substring(0, 31 - suffix.length) + suffix;
+        counter++;
+      }
+      usedSheetNames.add(sheetName);
       // Si pas de sous-arrangement, générer une seule feuille
       if (value.corrections) {
-        const sheetName = key.substring(0, 31); // Excel limite les noms de feuille à 31 caractères
         const worksheet = workbook.addWorksheet(sheetName);
         createExcelWorksheet(
           worksheet, 
@@ -49,10 +60,27 @@ export const exportToXLSX = async (
       } 
       // Sinon générer une feuille pour chaque sous-arrangement
       else if (value.items) {
-        // Créer une feuille pour chaque sous-section
         Object.entries(value.items).forEach(([subKey, subValue]: [string, any]) => {
-          const sheetName = `${key.substring(0, 15)}-${subKey.substring(0, 15)}`;
-          const worksheet = workbook.addWorksheet(sheetName.substring(0, 31));
+          let baseSubSheetName;
+          if (arrangement === 'subclass') {
+            // Récupérer le nom de la classe principale si possible
+            let className = key;
+            let subclassName = subKey;
+            // Ajout du type de sous-arrangement (ex: 'student', 'activity', etc.)
+            let subArrLabel = subArrangement ? String(subArrangement) : '';
+            baseSubSheetName = `${className} - ${subclassName} - ${subArrLabel}`.substring(0, 31);
+          } else {
+            baseSubSheetName = `${key.substring(0, 15)}-${subKey.substring(0, 15)}`;
+          }
+          let subSheetName = baseSubSheetName.substring(0, 31);
+          let subCounter = 1;
+          while (usedSheetNames.has(subSheetName)) {
+            const suffix = `_${subCounter}`;
+            subSheetName = baseSubSheetName.substring(0, 31 - suffix.length) + suffix;
+            subCounter++;
+          }
+          usedSheetNames.add(subSheetName);
+          const worksheet = workbook.addWorksheet(subSheetName);
           createExcelWorksheet(
             worksheet, 
             subValue.corrections, 
