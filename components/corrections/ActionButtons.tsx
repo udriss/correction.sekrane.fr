@@ -9,12 +9,14 @@ import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 import AutorenewIcon from '@mui/icons-material/Autorenew';
 import ImageUploader from '@/app/components/ImageUploader';
+import AudioUploader from '@/app/components/AudioUploader';
 import { Typography } from '@mui/material';
 import * as shareService from '@/lib/services/shareService';
 
 interface ActionButtonsProps {
   addNewParagraph: () => void;
   addNewImage: (imageUrl: string) => void;
+  addNewAudio: (audioUrl: string) => void;
   handleUndo: () => void;
   handleSaveCorrection: () => void;
   updatePreview: () => void;
@@ -32,6 +34,7 @@ interface ActionButtonsProps {
 const ActionButtons: React.FC<ActionButtonsProps> = ({
   addNewParagraph,
   addNewImage,
+  addNewAudio,
   handleUndo,
   handleSaveCorrection,
   updatePreview,
@@ -106,6 +109,12 @@ const ActionButtons: React.FC<ActionButtonsProps> = ({
           activityId={activityId} 
           correctionId={correctionId}
           onImageUploaded={addNewImage} 
+        />
+        
+        <AudioUploader 
+          activityId={activityId} 
+          correctionId={correctionId}
+          onAudioUploaded={addNewAudio} 
         />
         <IconButton
           onClick={handleUndo}

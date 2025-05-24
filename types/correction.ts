@@ -1,4 +1,4 @@
-export type ContentItemType = 'text' | 'list' | 'listItem' | 'image';
+export type ContentItemType = 'text' | 'list' | 'listItem' | 'image' | 'audio';
 
 export interface ContentItem {
   id: string;

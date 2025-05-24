@@ -1,4 +1,5 @@
 import { ContentItem } from '@/types/correction';
+import { getMediaUrl } from '@/hooks/useMediaUrl';
 
 // Convertir le HTML en éléments du DOM pour l'analyse
 export const parseHtmlToItems = (html: string): ContentItem[] => {
@@ -66,6 +67,38 @@ export const parseHtmlToItems = (html: string): ContentItem[] => {
               parentId: itemId
             });
           });
+        } else if (element.tagName === 'DIV') {
+          // Vérifier si c'est un conteneur d'image
+          const imgElement = element.querySelector('img');
+          if (imgElement) {
+            items.push({
+              id: itemId,
+              type: 'image',
+              src: imgElement.getAttribute('src') || '',
+              alt: imgElement.getAttribute('alt') || '',
+              content: '',
+              parentId
+            });
+          } 
+          // Vérifier si c'est un conteneur d'audio
+          else {
+            const audioElement = element.querySelector('audio');
+            if (audioElement) {
+              const descriptionElement = element.querySelector('.audio-description');
+              items.push({
+                id: itemId,
+                type: 'audio',
+                src: audioElement.getAttribute('src') || '',
+                content: descriptionElement?.textContent || '',
+                parentId
+              });
+            } else {
+              // Si ce n'est ni image ni audio, traiter les enfants
+              Array.from(element.childNodes).forEach(child => {
+                parseNode(child, parentId);
+              });
+            }
+          }
         } else {
           Array.from(element.childNodes).forEach(child => {
             parseNode(child, parentId);
@@ -149,9 +182,137 @@ function generateHtmlForItem(item: ContentItem, allItems: ContentItem[]): string
       return `<p ${commonAttrs} ${updateMarker} class="text-item">${item.content || ''}</p>`;
       
     case 'image':
+      const imageUrl = getMediaUrl(item.src);
+      const isSvg = item.src && item.src.toLowerCase().includes('.svg');
+      
+      // Pour les SVG, nous ajoutons des styles spéciaux pour un meilleur support
+      const imageStyles = isSvg 
+        ? "max-width: 100%; margin: 0 auto; height: auto;"
+        : "max-width: 100%; margin: 0 auto;";
+      
+      // Générer un ID unique pour cette image pour la gestion d'erreur SVG
+      const imageId = `img-${item.id || Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+      
+      // Script inline pour gérer les erreurs SVG avec fallback
+      const svgErrorScript = isSvg ? `
+        <script>
+          (function() {
+            const img = document.getElementById('${imageId}');
+            if (img) {
+              const handleSvgError = function(imgElement, isRetry) {
+                console.error('Erreur de chargement SVG dans feedback:', imgElement.src);
+                console.error('SVG error details:', {
+                  src: imgElement.src,
+                  naturalWidth: imgElement.naturalWidth,
+                  naturalHeight: imgElement.naturalHeight,
+                  complete: imgElement.complete
+                });
+                
+                // Fonction pour afficher l'erreur
+                const showImageError = function(element) {
+                  const parent = element.parentElement;
+                  if (parent) {
+                    parent.innerHTML = '<div style="padding: 20px; border: 2px dashed #ccc; border-radius: 4px; text-align: center; color: #666; background-color: #f9f9f9; margin: 1.5rem auto;"><p>⚠️ Image non disponible</p><p style="font-size: 12px; margin: 5px 0 0 0;">Le fichier SVG n\\'a pas pu être chargé</p></div>';
+                  }
+                };
+                
+                // Pour les SVG, essayer le fallback data URL si pas déjà essayé
+                if (!isRetry && imgElement.src.toLowerCase().includes('.svg')) {
+                  fetch(imgElement.src)
+                    .then(function(response) {
+                      if (!response.ok) throw new Error('HTTP ' + response.status);
+                      return response.text();
+                    })
+                    .then(function(svgContent) {
+                      if (svgContent.includes('<svg')) {
+                        const svgDataUrl = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svgContent);
+                        imgElement.src = svgDataUrl;
+                        console.log('SVG loaded as data URL successfully in feedback');
+                        return;
+                      }
+                      throw new Error('Invalid SVG content');
+                    })
+                    .catch(function(fetchError) {
+                      console.error('SVG fetch failed in feedback:', fetchError);
+                      showImageError(imgElement);
+                    });
+                  return;
+                }
+                
+                // Sinon afficher l'erreur
+                showImageError(imgElement);
+              };
+              
+              // Gestionnaire d'erreur
+              img.addEventListener('error', function() {
+                handleSvgError(this, false);
+              });
+              
+              // Vérifier si l'image SVG est "chargée" mais sans dimensions
+              img.addEventListener('load', function() {
+                if (this.src.toLowerCase().includes('.svg') && this.naturalWidth === 0 && this.naturalHeight === 0) {
+                  console.log('SVG loaded but with zero dimensions, trying fallback');
+                  handleSvgError(this, false);
+                } else {
+                  console.log('Image loaded successfully in feedback:', this.src);
+                }
+              });
+            }
+          })();
+        </script>
+      ` : '';
+      
       // Centrer l'image avec un conteneur div
-      return `<div class="image-container" ${commonAttrs} ${updateMarker} style="text-align: center; margin: 1.5rem auto;">
-        <img src="${item.src}" alt="${item.alt || 'Image'}" style="max-width: 100%; margin: 0 auto;" />
+      return `<div class="image-container${isSvg ? ' svg-image' : ''}" ${commonAttrs} ${updateMarker} style="text-align: center; margin: 1.5rem auto;">
+        <img id="${imageId}" src="${imageUrl || item.src}" alt="${item.alt || 'Image uploadée'}" style="${imageStyles}" />
+      </div>${svgErrorScript}`;
+      
+    case 'audio':
+      // Lecteur audio compact avec style cohérent avec DraggableItem.tsx
+      return `<div class="audio-container" ${commonAttrs} ${updateMarker} style="margin: 1.5rem auto; max-width: 450px;">
+        <div style="
+          background-color: #fafafa;
+          border: 1px solid #e0e0e0;
+          border-radius: 8px;
+          padding: 12px;
+          box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+          transition: all 0.2s ease-in-out;
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          margin-bottom: ${item.content ? '12px' : '0'};
+        " 
+        onmouseover="this.style.boxShadow='0 4px 16px rgba(0,0,0,0.15)'" 
+        onmouseout="this.style.boxShadow='0 2px 8px rgba(0,0,0,0.1)'">
+          <div style="
+            background: linear-gradient(135deg, #1976d2 0%, #42a5f5 100%);
+            padding: 6.4px;
+            border-radius: 50%;
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 32px;
+            height: 32px;
+            flex-shrink: 0;
+          ">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M14,2H6A2,2 0 0,0 4,4V20A2,2 0 0,0 6,22H18A2,2 0 0,0 20,20V8L14,2M18,20H6V4H13V9H18V20Z" />
+            </svg>
+          </div>
+          <audio controls style="flex-grow: 1; height: 40px; min-width: 0;" src="${getMediaUrl(item.src) || item.src}">
+            Votre navigateur ne supporte pas l'élément audio.
+          </audio>
+        </div>
+        ${item.content ? `<div class="audio-description" style="
+          padding: 8px 12px;
+          border-left: 3px solid #1976d2;
+          background-color: #f5f5f5;
+          border-radius: 4px;
+          font-size: 0.875rem;
+          color: #333;
+          font-style: italic;
+        ">${item.content}</div>` : ''}
       </div>`;
       
     case 'list':
@@ -191,6 +352,8 @@ export function extractFormattedText(items: ContentItem[]): string {
       text += `${item.content || ''}\n\n`;
     } else if (item.type === 'image') {
       text += `[Image: ${item.alt || 'Image uploadée'}]\n\n`;
+    } else if (item.type === 'audio') {
+      text += `[Audio${item.content ? `: ${item.content}` : ''}]\n\n`;
     } else if (item.type === 'list') {
       // Trouver les enfants de cette liste
       const children = items.filter(child => child.parentId === item.id);

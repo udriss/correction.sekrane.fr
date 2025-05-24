@@ -43,6 +43,118 @@ import {CorrectionAutreEnriched} from '@/lib/types';
 // Initialiser la police Inter
 const inter = Inter({ subsets: ['latin'] });
 
+
+
+// Composant pour gérer l'affichage des SVG avec fallback
+const SVGImageHandler: React.FC<{ htmlContent: string }> = ({ htmlContent }) => {
+  const containerRef = React.useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!containerRef.current) return;
+
+    // Fonction pour gérer les erreurs d'images
+    const handleImageError = (imgElement: HTMLImageElement, isRetry = false) => {
+      const imageUrl = imgElement.src;
+      
+      console.error('Erreur de chargement de l\'image dans le feedback:', imageUrl);
+      console.error('Image error details:', {
+        src: imgElement.src,
+        naturalWidth: imgElement.naturalWidth,
+        naturalHeight: imgElement.naturalHeight,
+        complete: imgElement.complete
+      });
+      
+      // Fonction pour afficher l'erreur
+      const showImageError = (element: HTMLImageElement) => {
+        const parent = element.parentElement;
+        if (parent) {
+          parent.innerHTML = `
+            <div style="
+              padding: 20px; 
+              border: 2px dashed #ccc; 
+              border-radius: 4px; 
+              text-align: center; 
+              color: #666;
+              background-color: #f9f9f9;
+              margin: 1.5rem auto;
+            ">
+              <p>⚠️ Image non disponible</p>
+              <p style="font-size: 12px; margin: 5px 0 0 0;">
+                Le fichier image n'a pas pu être chargé${imageUrl?.includes('.svg') ? ' (SVG)' : ''}
+              </p>
+            </div>
+          `;
+        }
+      };
+      
+      // Pour les SVG, on essaie une approche différente avant d'afficher l'erreur
+      if (imageUrl && imageUrl.toLowerCase().includes('.svg') && !isRetry) {
+        console.log('SVG detected in feedback, trying alternative loading method');
+        // Pour les SVG, on peut essayer de les charger comme data URL
+        fetch(imageUrl)
+          .then(response => {
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+            return response.text();
+          })
+          .then(svgContent => {
+            if (svgContent.includes('<svg')) {
+              // Remplace l'img par le SVG inline
+              const svgDataUrl = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svgContent)}`;
+              imgElement.src = svgDataUrl;
+              console.log('SVG loaded as data URL successfully in feedback');
+              return;
+            }
+            throw new Error('Invalid SVG content');
+          })
+          .catch((fetchError) => {
+            console.error('SVG fetch failed in feedback:', fetchError);
+            // Si même cette approche échoue, afficher l'erreur
+            showImageError(imgElement);
+          });
+        return;
+      }
+      
+      // Pour les autres types d'images ou les SVG qui ont déjà échoué en retry, affichage direct de l'erreur
+      showImageError(imgElement);
+    };
+
+    // Attacher les gestionnaires d'erreur à toutes les images
+    const images = containerRef.current.querySelectorAll('img');
+    images.forEach(img => {
+      // Gestionnaire pour les erreurs de chargement
+      const errorHandler = (e: Event) => {
+        handleImageError(e.target as HTMLImageElement);
+      };
+      
+      // Gestionnaire pour les chargements réussis (debug)
+      const loadHandler = (e: Event) => {
+        const target = e.target as HTMLImageElement;
+        console.log('Image loaded successfully in feedback:', target.src);
+      };
+      
+      img.addEventListener('error', errorHandler);
+      img.addEventListener('load', loadHandler);
+      
+      // Nettoyage
+      return () => {
+        img.removeEventListener('error', errorHandler);
+        img.removeEventListener('load', loadHandler);
+      };
+    });
+  }, [htmlContent]);
+
+  return (
+    <div 
+      ref={containerRef}
+      dangerouslySetInnerHTML={{ __html: htmlContent }}
+      style={{
+        maxWidth: 'none',
+      }}
+      className="correction-content prose prose-sm md:prose-base"
+    />
+  );
+};
+
 interface ContentData {
   items: any[];
   version: string;
@@ -997,43 +1109,7 @@ export default function FeedbackViewer({ params }: { params: Promise<{ code: str
                       }
                     `}</style>
 
-                    <Box 
-                      dangerouslySetInnerHTML={{ __html: processHtmlForExerciseTitles(renderedHtml) }}
-                      sx={{
-                        '& h1, & h2, & h3, & h4, & h5, & h6': {
-                          color: 'primary.800'
-                        },
-                        '& a': {
-                          color: 'primary.600'
-                        },
-                        maxWidth: 'none',
-                        '& img': {
-                          maxWidth: '100%',
-                          height: 'auto'
-                        },
-                        // Styles pour les fragments de correction
-                        '& > p': {
-                          position: 'relative',
-                          paddingLeft: '20px',
-                          marginBottom: '5px',
-                          '&::before': {
-                            content: '"•"',
-                            position: 'absolute',
-                            left: '5px',
-                            color: theme => theme.palette.primary.main,
-                            fontWeight: 'bold',
-                            fontSize: '18px'
-                          }
-                        },
-                        '& > *': {
-                          marginBottom: '5px'
-                        },
-                        '& > div': {
-                          marginBottom: '15px'
-                        }
-                      }}
-                      className="correction-content prose prose-sm md:prose-base"
-                    />
+                    <SVGImageHandler htmlContent={processHtmlForExerciseTitles(renderedHtml)} />
                   </AccordionDetails>
                 </Accordion>
 

@@ -1,14 +1,16 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Draggable } from '@hello-pangea/dnd';
 import { ContentItem } from '@/types/correction';
+import { useMediaUrl } from '@/hooks/useMediaUrl';
 // Import Material UI components
-import { IconButton, TextField, Paper, Typography, Box, Stack } from '@mui/material';
+import { IconButton, TextField, Paper, Typography, Box, Stack, Slider, Card, CardContent, CardMedia } from '@mui/material';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import SaveIcon from '@mui/icons-material/Save';
 import CancelIcon from '@mui/icons-material/Cancel';
 import DragIndicatorIcon from '@mui/icons-material/DragIndicator';
 import ArticleIcon from '@mui/icons-material/Article';
+import AudioFileIcon from '@mui/icons-material/AudioFile';
 
 interface DraggableItemProps {
   item: ContentItem;
@@ -27,6 +29,10 @@ const DraggableItem: React.FC<DraggableItemProps> = ({
 }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [editedContent, setEditedContent] = useState(item.content || '');
+  
+  // Utiliser le hook pour gérer l'URL de l'image selon l'environnement
+  const imageUrl = useMediaUrl(item.src);
+  const audioUrl = useMediaUrl(item.src);
   
   // Synchroniser l'état local lorsque l'item change
   useEffect(() => {
@@ -93,6 +99,12 @@ const DraggableItem: React.FC<DraggableItemProps> = ({
         const imgElement = previewItem.querySelector('img');
         if (imgElement) {
           imgElement.setAttribute('alt', newContent);
+        }
+      } else if (item.type === 'audio') {
+        // Pour les éléments audio, on met à jour la description
+        const descriptionElement = previewItem.querySelector('.audio-description');
+        if (descriptionElement) {
+          descriptionElement.textContent = newContent;
         }
       }
       
@@ -220,10 +232,11 @@ const DraggableItem: React.FC<DraggableItemProps> = ({
                     onKeyDown={handleKeyDown}
                     sx={{ width: '100%', mt: 1, }}
                     multiline
-                    rows={item.type === 'image' ? 1 : 3}
+                    rows={item.type === 'image' || item.type === 'audio' ? 1 : 3}
                     autoFocus
                     variant="outlined"
                     size="small"
+                    placeholder={item.type === 'audio' ? 'Description de l\'audio (optionnel)' : ''}
                     onBlur={() => {
                       if (editedContent !== item.content) {
                         handleSave();
@@ -252,14 +265,14 @@ const DraggableItem: React.FC<DraggableItemProps> = ({
                         </Typography>
                       )}
                       
-                      <Box 
-                        onClick={() => setIsEditing(true)} 
-                        sx={{ cursor: 'text' }}
-                      >
-                        {item.type === 'image' && item.src ? (
-                          <Box sx={{ position: 'relative' }}>
+                      <Box>
+                        {item.type === 'image' && imageUrl ? (
+                          <Box 
+                            onClick={() => setIsEditing(true)} 
+                            sx={{ cursor: 'text', position: 'relative' }}
+                          >
                             <img 
-                              src={item.src}
+                              src={imageUrl}
                               alt={item.alt || 'Image uploadée'}
                               style={{ 
                                 maxWidth: '100%', 
@@ -267,19 +280,187 @@ const DraggableItem: React.FC<DraggableItemProps> = ({
                                 borderRadius: '4px',
                                 maxHeight: '200px'
                               }}
+                              onLoad={(e) => {
+                                // Log successful load for debugging
+                                console.log('Image loaded successfully:', imageUrl);
+                              }}
+                              onError={(e) => {
+                                console.error('Erreur de chargement de l\'image:', imageUrl);
+                                const target = e.currentTarget as HTMLImageElement;
+                                console.error('Image error details:', {
+                                  src: target.src,
+                                  naturalWidth: target.naturalWidth,
+                                  naturalHeight: target.naturalHeight,
+                                  complete: target.complete
+                                });
+                                
+                                // Fonction pour afficher l'erreur
+                                const showImageError = (imgElement: HTMLImageElement) => {
+                                  const parent = imgElement.parentElement;
+                                  if (parent) {
+                                    parent.innerHTML = `
+                                      <div style="
+                                        padding: 20px; 
+                                        border: 2px dashed #ccc; 
+                                        border-radius: 4px; 
+                                        text-align: center; 
+                                        color: #666;
+                                        background-color: #f9f9f9;
+                                      ">
+                                        <p>⚠️ Image non disponible</p>
+                                        <p style="font-size: 12px; margin: 5px 0 0 0;">
+                                          Le fichier image n'a pas pu être chargé${imageUrl?.includes('.svg') ? ' (SVG)' : ''}
+                                        </p>
+                                      </div>
+                                    `;
+                                  }
+                                };
+                                
+                                // Pour les SVG, on essaie une approche différente avant d'afficher l'erreur
+                                if (imageUrl && imageUrl.toLowerCase().includes('.svg')) {
+                                  console.log('SVG detected, trying alternative loading method');
+                                  // Pour les SVG, on peut essayer de les charger comme data URL
+                                  fetch(imageUrl)
+                                    .then(response => {
+                                      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                                      return response.text();
+                                    })
+                                    .then(svgContent => {
+                                      if (svgContent.includes('<svg')) {
+                                        // Remplace l'img par le SVG inline
+                                        const svgDataUrl = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svgContent)}`;
+                                        target.src = svgDataUrl;
+                                        console.log('SVG loaded as data URL successfully');
+                                        return;
+                                      }
+                                      throw new Error('Invalid SVG content');
+                                    })
+                                    .catch((fetchError) => {
+                                      console.error('SVG fetch failed:', fetchError);
+                                      // Si même cette approche échoue, afficher l'erreur
+                                      showImageError(target);
+                                    });
+                                  return;
+                                }
+                                
+                                // Pour les autres types d'images, affichage direct de l'erreur
+                                showImageError(target);
+                              }}
                             />
                           </Box>
+                        ) : item.type === 'audio' && audioUrl ? (
+                          <Card 
+                            sx={{ 
+                              maxWidth: 450, 
+                              bgcolor: 'background.paper',
+                              border: '1px solid',
+                              borderColor: 'divider',
+                              borderRadius: 2,
+                              boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+                              transition: 'all 0.2s ease-in-out',
+                              '&:hover': {
+                                boxShadow: '0 4px 16px rgba(0,0,0,0.15)',
+                              }
+                            }}
+                          >
+                            <CardContent sx={{ p: 2 }}>
+                              {/* Lecteur audio compact avec icône */}
+                              <Box sx={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'space-between',
+                                alignContent: 'center',
+                                bgcolor: 'grey.50',
+                                borderRadius: 2,
+                                p: 1.5,
+                                mb: item.content ? 1.5 : 0,
+                                border: '1px solid',
+                                borderColor: 'grey.200'
+                              }}>
+                                <Box sx={{
+                                  p: 0.8,
+                                  borderRadius: '50%',
+                                  bgcolor: 'primary.main',
+                                  color: 'white',
+                                  mr: 1.5,
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  minWidth: 32,
+                                  height: 32
+                                }}>
+                                  <AudioFileIcon fontSize="small" />
+                                </Box>
+                                
+                                <CardMedia
+                                  component="audio"
+                                  controls
+                                  src={audioUrl}
+                                  sx={{
+                                    flexGrow: 1,
+                                    height: 40,
+                                    '& audio': {
+                                      width: '100%',
+                                      outline: 'none',
+                                      borderRadius: 1,
+                                      '&::-webkit-media-controls-panel': {
+                                        backgroundColor: 'white',
+                                        borderRadius: '4px'
+                                      },
+                                      '&::-webkit-media-controls-play-button': {
+                                        backgroundColor: 'primary.main',
+                                        borderRadius: '50%'
+                                      }
+                                    }
+                                  }}
+                                />
+                              </Box>
+                              
+                              {/* Description stylisée */}
+                              {item.content && (
+                                <Box sx={{
+                                  bgcolor: 'grey.50',
+                                  borderRadius: 1,
+                                  p: 1.5,
+                                  borderLeft: '3px solid',
+                                  borderColor: 'primary.main'
+                                }}>
+                                  <Typography 
+                                    variant="caption" 
+                                    sx={{ 
+                                      display: 'block', 
+                                      color: 'text.secondary',
+                                      fontStyle: 'italic',
+                                      lineHeight: 1.4
+                                    }}
+                                  >
+                                    {item.content}
+                                  </Typography>
+                                </Box>
+                              )}
+                            </CardContent>
+                          </Card>
                         ) : item.type === 'list' ? (
-                          <Typography sx={{ fontWeight: 'bold' }}>
+                          <Typography 
+                            onClick={() => setIsEditing(true)} 
+                            sx={{ cursor: 'text', fontWeight: 'bold' }}
+                          >
                             {item.content}
                           </Typography>
                         ) : item.type === 'listItem' ? (
-                          <Box sx={{ display: 'flex', alignItems: 'flex-start' }}>
+                          <Box 
+                            onClick={() => setIsEditing(true)} 
+                            sx={{ cursor: 'text', display: 'flex', alignItems: 'flex-start' }}
+                          >
                             <Typography sx={{ mr: 1, fontSize: '1.25rem' }}>•</Typography>
                             <Typography>{item.content}</Typography>
                           </Box>
                         ) : (
-                          <Box dangerouslySetInnerHTML={{ __html: item.content || '' }} />
+                          <Box 
+                            onClick={() => setIsEditing(true)} 
+                            sx={{ cursor: 'text' }}
+                            dangerouslySetInnerHTML={{ __html: item.content || '' }} 
+                          />
                         )}
                       </Box>
                     </Box>

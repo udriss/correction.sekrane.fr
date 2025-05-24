@@ -718,6 +718,21 @@ export default function CorrectionAutreDetail({ params }: { params: Promise<{ id
     handleContentChange();
   };
 
+  // Add a new audio
+  const addNewAudio = (audioUrl: string) => {
+    saveToHistory();
+    const newItem = {
+      id: `audio-${Date.now()}`,
+      type: 'audio' as const,
+      src: audioUrl,
+      content: '',
+      isFromFragment: false
+    };
+    
+    setContentItems(prev => [...prev, newItem]);
+    handleContentChange();
+  };
+
   // Handle fragment addition
   const handleAddFragmentToCorrection = (fragment: any) => {
     saveToHistory();
@@ -949,6 +964,7 @@ export default function CorrectionAutreDetail({ params }: { params: Promise<{ id
                   <ActionButtons
                     addNewParagraph={addNewParagraph}
                     addNewImage={addNewImage}
+                    addNewAudio={addNewAudio}
                     handleUndo={handleUndo}
                     handleSaveCorrection={handleSaveCorrection}
                     updatePreview={updatePreview}
