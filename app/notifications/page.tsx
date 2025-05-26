@@ -31,6 +31,7 @@ import VisibilityIcon from '@mui/icons-material/Visibility';
 import DoneAllIcon from '@mui/icons-material/DoneAll';
 import MenuBookIcon from '@mui/icons-material/MenuBook';
 import RefreshIcon from '@mui/icons-material/Refresh';
+import AssignmentTurnedInIcon from '@mui/icons-material/AssignmentTurnedIn';
 import GradientBackground from '@/components/ui/GradientBackground';
 import PatternBackground from '@/components/ui/PatternBackground';
 import { FeedbackNotification } from '@/lib/services/notificationService';
@@ -427,85 +428,110 @@ export default function NotificationsPage() {
                 </Typography>
               </Box>
               <List>
-                {groupedNotifications[date].map((notification) => (
-                  <React.Fragment key={notification.id}>
-                    <ListItem
-                      sx={{ 
-                        px: 3,
-                        py: 2,
-                        borderLeft: '4px solid',
-                        borderColor: notification.readOk ? 'transparent' : 'primary.main',
-                        bgcolor: notification.readOk ? 'transparent' : alpha(theme.palette.primary.main, 0.03),
-                        '&:hover': {
-                          bgcolor: alpha(theme.palette.primary.main, 0.05),
-                        }
-                      }}
-                    >
-                      <ListItemAvatar>
-                        <Avatar sx={{ bgcolor: notification.readOk ? 'action.disabled' : 'primary.main' }}>
-                          <FeedbackIcon />
-                        </Avatar>
-                      </ListItemAvatar>
-                      <ListItemText
-                        primary={
-                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                            <Typography variant="body1" component="span" fontWeight="600">
-                              {notification.student_name}
-                            </Typography>
-                            <Typography variant="body2" component="span" color="text.secondary">
-                              a consulté son feedback
-                            </Typography>
-                            <Chip 
-                              size="small" 
-                              label={notification.final_grade + '/20'} 
-                              color={Number(notification.final_grade) >= 10 ? 'success' : 'error'}
-                              variant="outlined"
-                              sx={{ ml: 1 }}
-                            />
-                          </Box>
-                        }
-                        secondary={
-                          <Typography component="div" variant="body2" sx={{ mt: 1 }}>
-                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
-                              <MenuBookIcon fontSize="small" color="action" />
-                              <Typography variant="body2" component="span">
-                                {notification.activity_name}
+                {groupedNotifications[date].map((notification) => {
+                  // Determine notification type
+                  const isCorrectionVisit = notification.action_type === 'VIEW_STUDENT_CORRECTIONS';
+                  return (
+                    <React.Fragment key={notification.id}>
+                      <ListItem
+                        sx={{ 
+                          px: 3,
+                          py: 2,
+                          borderLeft: '4px solid',
+                          borderColor: notification.readOk ? 'transparent' : 'primary.main',
+                          bgcolor: notification.readOk ? 'transparent' : alpha(theme.palette.primary.main, 0.03),
+                          '&:hover': {
+                            bgcolor: alpha(theme.palette.primary.main, 0.05),
+                          }
+                        }}
+                      >
+                        <ListItemAvatar>
+                          <Avatar sx={{ bgcolor: notification.readOk ? 'action.disabled' : isCorrectionVisit ? 'secondary.main' : 'primary.main' }}>
+                            {isCorrectionVisit ? <AssignmentTurnedInIcon /> : <FeedbackIcon />}
+                          </Avatar>
+                        </ListItemAvatar>
+                        <ListItemText
+                          primary={
+                            isCorrectionVisit ? (
+                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                <Typography variant="body1" component="span" fontWeight="600">
+                                  {notification.student_name}
+                                </Typography>
+                                <Typography variant="body2" component="span" color="text.secondary">
+                                  a visité sa page de correction
+                                </Typography>
+                              </Box>
+                            ) : (
+                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                <Typography variant="body1" component="span" fontWeight="600">
+                                  {notification.student_name}
+                                </Typography>
+                                <Typography variant="body2" component="span" color="text.secondary">
+                                  a consulté son feedback
+                                </Typography>
+                                <Chip 
+                                  size="small" 
+                                  label={notification.final_grade + '/20'} 
+                                  color={Number(notification.final_grade) >= 10 ? 'success' : 'error'}
+                                  variant="outlined"
+                                  sx={{ ml: 1 }}
+                                />
+                              </Box>
+                            )
+                          }
+                          secondary={
+                            isCorrectionVisit ? (
+                              <Typography component="div" variant="body2" sx={{ mt: 1 }}>
+                                <Typography variant="caption" component="span" color="text.secondary" display="block">
+                                  {dayjs(notification.viewed_at).format('HH:mm:ss')}
+                                </Typography>
                               </Typography>
-                            </Box>
-                            <Typography variant="caption" component="span" color="text.secondary" display="block">
-                              {dayjs(notification.viewed_at).format('HH:mm:ss')}
-                            </Typography>
-                          </Typography>
-                        }
-                      />
-                      <Box>
-                        {!notification.readOk && (
-                          <Tooltip title="Marquer comme lu">
-                            <span>
+                            ) : (
+                              <Typography component="div" variant="body2" sx={{ mt: 1 }}>
+                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
+                                  <MenuBookIcon fontSize="small" color="action" />
+                                  <Typography variant="body2" component="span">
+                                    {notification.activity_name}
+                                  </Typography>
+                                </Box>
+                                <Typography variant="caption" component="span" color="text.secondary" display="block">
+                                  {dayjs(notification.viewed_at).format('HH:mm:ss')}
+                                </Typography>
+                              </Typography>
+                            )
+                          }
+                        />
+                        <Box>
+                          {!notification.readOk && (
+                            <Tooltip title="Marquer comme lu">
+                              <span>
+                                <IconButton 
+                                  onClick={() => markAsRead(notification.id)}
+                                  sx={{ mr: 1 }}
+                                  size="small"
+                                >
+                                  <DoneAllIcon fontSize="small" />
+                                </IconButton>
+                              </span>
+                            </Tooltip>
+                          )}
+                          {!isCorrectionVisit && (
+                            <Tooltip title="Voir le feedback">
                               <IconButton 
-                                onClick={() => markAsRead(notification.id)}
-                                sx={{ mr: 1 }}
+                                onClick={() => openFeedback(notification.share_code, notification.id)}
+                                color="primary"
                                 size="small"
                               >
-                                <DoneAllIcon fontSize="small" />
+                                <VisibilityIcon fontSize="small" />
                               </IconButton>
-                            </span>
-                          </Tooltip>
-                        )}
-                        <Tooltip title="Voir le feedback">
-                          <IconButton 
-                            onClick={() => openFeedback(notification.share_code, notification.id)}
-                            color="primary"
-                            size="small"
-                          >
-                            <VisibilityIcon fontSize="small" />
-                          </IconButton>
-                        </Tooltip>
-                      </Box>
-                    </ListItem>
-                    <Divider component="li" />
-                  </React.Fragment>
-                ))}
+                            </Tooltip>
+                          )}
+                        </Box>
+                      </ListItem>
+                      <Divider component="li" />
+                    </React.Fragment>
+                  );
+                })}
               </List>
             </Box>
           ))}

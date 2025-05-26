@@ -4,6 +4,7 @@ import { getServerSession } from "next-auth/next";
 import authOptions from "@/lib/auth";
 import { getUser } from '@/lib/auth';
 import { createLogEntry } from '@/lib/services/logsService';
+import { createFeedbackNotification } from '@/lib/services/notificationService';
 
 export async function GET(
   request: NextRequest,
@@ -65,7 +66,7 @@ export async function GET(
            cl.name AS class_name,
            s.first_name AS student_first_name,
            s.last_name AS student_last_name,
-           CONCAT(s.first_name, ' ', s.last_name) AS student_name
+           CONCAT(s.first_name, ' ', LEFT(s.last_name, 1), '.') as student_name
          FROM 
            corrections_autres c
          LEFT JOIN 
@@ -84,6 +85,52 @@ export async function GET(
       // Si aucune correction n'est trouvée, retourner un tableau vide
       if (!Array.isArray(corrections) || (corrections as any[]).length === 0) {
         return NextResponse.json([]);
+      }
+
+      // Log et notification pour la visite de la page corrections (hors admin)
+      if (userId !== 1) {
+        try {
+          const userAgent = request.headers.get('user-agent') || 'unknown';
+          const ipAddress = request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || 'unknown';
+          const referer = request.headers.get('referer') || 'direct';
+          const firstCorrection = Array.isArray(corrections) && corrections.length > 0 ? corrections[0] as any : null;
+          const logEntry = {
+            action_type: 'VIEW_STUDENT_CORRECTIONS',
+            description: `Consultation de la page corrections de l'étudiant #${studentId}`,
+            entity_type: 'student',
+            entity_id: studentId,
+            ip_address: ipAddress,
+            metadata: {
+              student_id: studentId,
+              student_name: firstCorrection ? firstCorrection.student_name : undefined,
+              browser: userAgent,
+              referer: referer,
+              timestamp: new Date().toISOString(),
+              correction_ids: Array.isArray(corrections) ? corrections.map((c: any) => c.id) : [],
+            }
+          };
+          // Insérer le log
+          const [logResult] = await connection.query(
+            `INSERT INTO system_logs (action_type, description, entity_type, entity_id, ip_address, metadata)
+             VALUES (?, ?, ?, ?, ?, ?)`,
+            [
+              logEntry.action_type,
+              logEntry.description,
+              logEntry.entity_type,
+              logEntry.entity_id,
+              logEntry.ip_address,
+              JSON.stringify(logEntry.metadata)
+            ]
+          );
+          const logId = (logResult as any).insertId;
+          // Créer la notification liée à ce log
+          if (logId) {
+            // Attention à bien importer la fonction !
+            await createFeedbackNotification(logId);
+          }
+        } catch (e) {
+          console.error('Erreur lors du log/notification de visite corrections', e);
+        }
       }
 
       // Formater les résultats pour le frontend avec une gestion plus robuste du content_data

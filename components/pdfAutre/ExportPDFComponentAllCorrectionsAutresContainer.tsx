@@ -171,6 +171,11 @@ const ExportPDFComponentAllCorrectionsAutresContainer: React.FC<ExportPDFCompone
     }
   }, [arrangement]);
 
+  console.log('ExportPDFComponentAllCorrectionsAutresContainer loaded');
+console.log('ExportPDFComponentAllCorrectionsAutresContainer props:', {
+  corrections: filteredCorrections,
+  activities: filterActivity,
+});
   // Fonction pour gérer l'export en fonction de l'onglet actif et du format sélectionné
   const handleExport = async () => {
     try {

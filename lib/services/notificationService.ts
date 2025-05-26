@@ -1,8 +1,10 @@
 import { withConnection } from '@/lib/db';
+import { RowDataPacket } from 'mysql2';
 
 export interface FeedbackNotification {
   id: number;
   log_id: number;
+  text: string;
   student_name: string;
   student_id: number;
   activity_name: string;
@@ -14,6 +16,8 @@ export interface FeedbackNotification {
   viewed_at: Date;
   readOk: boolean;
   metadata?: any;
+  action_type: string; // Ajout de cette propriété
+  points?: number;    // Ajout de cette propriété
 }
 
 /**
@@ -31,6 +35,7 @@ export async function getFeedbackNotifications(limit = 10, includeRead = false):
         `SELECT 
           n.id,
           n.log_id,
+          n.text,
           l.metadata->>'$.student_name' as student_name,
           JSON_EXTRACT(l.metadata, '$.student_id') as student_id,
           l.metadata->>'$.activity_name' as activity_name,
@@ -39,15 +44,17 @@ export async function getFeedbackNotifications(limit = 10, includeRead = false):
           l.metadata->>'$.grade' as grade,
           l.metadata->>'$.final_grade' as final_grade,
           l.metadata->>'$.share_code' as share_code,
+          l.metadata->>'$.points' as points,
           l.created_at as viewed_at,
           n.readOk,
-          l.metadata
+          l.metadata,
+          l.action_type
         FROM 
           feedback_notifications n
         JOIN 
           system_logs l ON n.log_id = l.id
         WHERE 
-          l.action_type = 'VIEW_FEEDBACK'
+          l.action_type IN ('VIEW_FEEDBACK', 'VIEW_STUDENT_CORRECTIONS')
           ${readFilter}
         ORDER BY 
           l.created_at DESC
@@ -70,32 +77,30 @@ export async function getFeedbackNotifications(limit = 10, includeRead = false):
  */
 export async function createFeedbackNotification(logId: number): Promise<number | null> {
   return withConnection(async (connection) => {
-    try {
-      // Vérifier si une notification existe déjà pour ce log
-      const [existingNotification] = await connection.query(
-        `SELECT id FROM feedback_notifications WHERE log_id = ?`,
-        [logId]
-      );
-      
-      if (Array.isArray(existingNotification) && existingNotification.length > 0) {
-        return (existingNotification[0] as any).id;
-      }
-      
-      // Créer une nouvelle notification
-      const [result] = await connection.query(
-        `INSERT INTO feedback_notifications (log_id, readOk) VALUES (?, FALSE)`,
-        [logId]
-      );
-      
-      if (!result || !(result as any).insertId) {
-        return null;
-      }
-      
-      return (result as any).insertId;
-    } catch (error) {
-      console.error('Error creating feedback notification:', error);
-      return null;
+    // Récupérer le log
+    const [logs] = await connection.query(
+      `SELECT * FROM system_logs WHERE id = ?`,
+      [logId]
+    );
+    if (!Array.isArray(logs) || logs.length === 0) return null;
+    const log = logs[0] as RowDataPacket & { action_type: string; metadata?: any; description?: string };
+
+    // Générer le texte de notification selon le type d'action
+    let notificationText = '';
+    if (log.action_type === 'VIEW_FEEDBACK') {
+      notificationText = `L'étudiant ${log.metadata?.student_name || ''} a consulté son feedback.`;
+    } else if (log.action_type === 'VIEW_STUDENT_CORRECTIONS') {
+      notificationText = `L'étudiant ${log.metadata?.student_name || ''} a visité sa page de correction.`;
+    } else {
+      notificationText = log.description || '';
     }
+
+    // Créer la notification
+    const [result] = await connection.query(
+      `INSERT INTO feedback_notifications (log_id, text, readOk) VALUES (?, ?, FALSE)`,
+      [logId, notificationText]
+    );
+    return (result as any).insertId || null;
   });
 }
 
@@ -147,7 +152,10 @@ export async function countUnreadNotifications(): Promise<number> {
   return withConnection(async (connection) => {
     try {
       const [result] = await connection.query(
-        `SELECT COUNT(*) as count FROM feedback_notifications WHERE readOk = FALSE`
+        `SELECT COUNT(*) as count FROM feedback_notifications n
+         JOIN system_logs l ON n.log_id = l.id
+         WHERE n.readOk = FALSE
+         AND l.action_type IN ('VIEW_FEEDBACK', 'VIEW_STUDENT_CORRECTIONS')`
       );
       
       if (!Array.isArray(result) || result.length === 0) {
@@ -170,7 +178,9 @@ export async function countTotalNotifications(): Promise<number> {
   return withConnection(async (connection) => {
     try {
       const [result] = await connection.query(
-        `SELECT COUNT(*) as total FROM feedback_notifications`
+        `SELECT COUNT(*) as total FROM feedback_notifications n
+         JOIN system_logs l ON n.log_id = l.id
+         WHERE l.action_type IN ('VIEW_FEEDBACK', 'VIEW_STUDENT_CORRECTIONS')`
       );
       
       if (!Array.isArray(result) || result.length === 0) {
@@ -194,11 +204,16 @@ export async function countBothNotifications(): Promise<[number, number]> {
     try {
       // Exécuter les deux requêtes dans la même connexion
       const [unreadResult] = await connection.query(
-        `SELECT COUNT(*) as count FROM feedback_notifications WHERE readOk = FALSE`
+        `SELECT COUNT(*) as count FROM feedback_notifications n
+         JOIN system_logs l ON n.log_id = l.id
+         WHERE n.readOk = FALSE
+         AND l.action_type IN ('VIEW_FEEDBACK', 'VIEW_STUDENT_CORRECTIONS')`
       );
       
       const [totalResult] = await connection.query(
-        `SELECT COUNT(*) as total FROM feedback_notifications`
+        `SELECT COUNT(*) as total FROM feedback_notifications n
+         JOIN system_logs l ON n.log_id = l.id
+         WHERE l.action_type IN ('VIEW_FEEDBACK', 'VIEW_STUDENT_CORRECTIONS')`
       );
       
       const unreadCount = Array.isArray(unreadResult) && unreadResult.length > 0 

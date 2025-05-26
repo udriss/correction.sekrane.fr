@@ -4,7 +4,7 @@ import { ArrangementType, SubArrangementType, ViewType } from '@/components/pdfA
 import { formatGrade } from './formatUtils';
 
 // Fonction pour appliquer des styles aux cellules Excel
-export const applyExcelCellStyle = (cell: any, cellValue: any) => {
+export const applyExcelCellStyle = (cell: any, cellValue: any, hasPenalty: boolean = false) => {
   if (!cell) return;
   
   // Déterminer le style en fonction de la valeur
@@ -43,6 +43,59 @@ export const applyExcelCellStyle = (cell: any, cellValue: any) => {
       const match = cellValue.match(/^(\d+(\.\d+)?)\//);
       if (match) {
         const grade = parseFloat(match[1]);
+        
+        // Style spécial pour les notes avec pénalité
+        if (hasPenalty) {
+          cell.font = { color: { argb: 'FFCC0000' }, bold: true }; // Rouge et gras
+          cell.fill = {
+            type: 'pattern',
+            pattern: 'solid',
+            fgColor: { argb: 'FFFFEEEE' } // Rouge très pâle
+          };
+        } else {
+          // Style normal basé sur la note
+          if (grade < 5) {
+            cell.fill = {
+              type: 'pattern',
+              pattern: 'solid',
+              fgColor: { argb: 'FFFFCCCC' } // Rouge clair
+            };
+          } else if (grade < 10) {
+            cell.fill = {
+              type: 'pattern',
+              pattern: 'solid',
+              fgColor: { argb: 'FFFFEECC' } // Orange clair
+            };
+          } else if (grade < 15) {
+            cell.fill = {
+              type: 'pattern',
+              pattern: 'solid',
+              fgColor: { argb: 'FFEEFFEE' } // Vert clair
+            };
+          } else {
+            cell.fill = {
+              type: 'pattern',
+              pattern: 'solid',
+              fgColor: { argb: 'FFCCFFCC' } // Vert clair
+            };
+            cell.font = { bold: true };
+          }
+        }
+      }
+    } else if (typeof cellValue === 'string' && /^\d+([.,]\d+)?$/.test(cellValue)) {
+      // Pour les notes sans format "X/20" (juste un nombre)
+      const grade = parseFloat(cellValue.replace(',', '.'));
+      
+      // Style spécial pour les notes avec pénalité
+      if (hasPenalty) {
+        cell.font = { color: { argb: 'FFCC0000' }, bold: true }; // Rouge et gras
+        cell.fill = {
+          type: 'pattern',
+          pattern: 'solid',
+          fgColor: { argb: 'FFFFEEEE' } // Rouge très pâle
+        };
+      } else {
+        // Style normal basé sur la note
         if (grade < 5) {
           cell.fill = {
             type: 'pattern',
@@ -113,6 +166,7 @@ export const createExcelWorksheet = (
     const studentMap: Record<string, { last_name: string, first_name: string, grades: Record<string, any> }> = {};
     const activitySet = new Set<string>();
     const activityStatusMap: Record<string, string> = {}; // Pour stocker les statuts des activités
+    const penaltyMap: Record<string, boolean> = {}; // Pour stocker si une correction a une pénalité
     
     // --- Tri des corrections initiales (optionnel mais peut aider à la cohérence si la map est utilisée ailleurs) ---
     corrections.sort((a: CorrectionAutreEnriched, b: CorrectionAutreEnriched) => {
@@ -140,6 +194,11 @@ export const createExcelWorksheet = (
       if (c.status) {
         activityStatusMap[`${studentKey}-${activityKey}`] = c.status;
       }
+      
+      // Stocker l'information de pénalité pour cet étudiant et cette activité
+      const hasPenalty = c.penalty !== undefined && c.penalty !== null && parseFloat(String(c.penalty)) > 0;
+      penaltyMap[`${studentKey}-${activityKey}`] = hasPenalty;
+      
       // Vérifier si c'est une correction fictive avec status NON_NOTE
       const isPlaceholder = (c.placeholder && c.status === 'NON_NOTE');
       // Déterminer la valeur à afficher
@@ -149,7 +208,7 @@ export const createExcelWorksheet = (
       } else if (c.status) {
         switch (c.status) {
           case 'ACTIVE':
-            displayValue = c.grade !== undefined ? `${formatGrade(c.grade)}` : 'NON NOTÉ';
+            displayValue = c.final_grade !== undefined ? `${formatGrade(c.final_grade)}` : 'NON NOTÉ';
             break;
           case 'NON_NOTE':
             displayValue = 'NON NOTÉ';
@@ -164,12 +223,12 @@ export const createExcelWorksheet = (
             displayValue = 'DÉSACTIVÉ';
             break;
           default:
-            displayValue = c.grade !== undefined ? `${formatGrade(c.grade)}` : 'NON NOTÉ';
+            displayValue = c.final_grade !== undefined ? `${formatGrade(c.final)}` : 'NON NOTÉ';
         }
       } else if (c.active === 0) {
         displayValue = 'DÉSACTIVÉ';
-      } else if (c.grade !== undefined) {
-        displayValue = `${c.grade}`;
+      } else if (c.final_grade !== undefined) {
+        displayValue = `${c.final_grade}`;
       }
       studentMap[studentKey].grades[activityKey] = displayValue;
     });
@@ -225,7 +284,8 @@ export const createExcelWorksheet = (
         const cellValue = rowData[activity];
         if (cellValue) {
           const cell = row.getCell(index + 3); // +3 car 1=Nom, 2=Prénom
-          applyExcelCellStyle(cell, cellValue);
+          const hasPenalty = penaltyMap[`${last_name} ${first_name}-${activity}`] || false;
+          applyExcelCellStyle(cell, cellValue, hasPenalty);
         }
       });
     });
@@ -236,6 +296,7 @@ export const createExcelWorksheet = (
     const studentMap: Record<string, Record<string, any>> = {};
     const activitySet = new Set<string>();
     const activityStatusMap: Record<string, string> = {}; // Pour stocker les statuts des activités
+    const penaltyMap: Record<string, boolean> = {}; // Pour stocker si une correction a une pénalité
     
     // --- Tri des corrections initiales ---
     corrections.sort((a: CorrectionAutreEnriched, b: CorrectionAutreEnriched) => {
@@ -269,6 +330,10 @@ export const createExcelWorksheet = (
         activityStatusMap[`${studentKey}-${activityKey}`] = c.status;
       }
       
+      // Stocker l'information de pénalité pour cet étudiant et cette activité
+      const hasPenalty = c.penalty !== undefined && c.penalty !== null && parseFloat(String(c.penalty)) > 0;
+      penaltyMap[`${studentKey}-${activityKey}`] = hasPenalty;
+      
       // Vérifier si c'est une correction fictive avec status NON_NOTE
       const isPlaceholder = (c.placeholder && c.status === 'NON_NOTE');
       
@@ -282,8 +347,8 @@ export const createExcelWorksheet = (
       } else if (c.status) {
         switch (c.status) {
           case 'ACTIVE':
-            gradeDisplay = c.grade !== undefined ? 
-              `${formatGrade(c.grade)}` : 'NON NOTÉ';
+            gradeDisplay = c.final_grade !== undefined ? 
+              `${formatGrade(c.final_grade)}` : 'NON NOTÉ';
             pointsDisplay = Array.isArray(c.points_earned) ? 
               '[' + c.points_earned.join(' ; ') + ']' : 'N/A';
             break;
@@ -304,8 +369,8 @@ export const createExcelWorksheet = (
             pointsDisplay = 'DÉSACTIVÉ';
             break;
           default:
-            gradeDisplay = c.grade !== undefined ? 
-              `${formatGrade(c.grade)}` : 'NON NOTÉ';
+            gradeDisplay = c.final_grade !== undefined ? 
+              `${formatGrade(c.final_grade)}` : 'NON NOTÉ';
             pointsDisplay = Array.isArray(c.points_earned) ? 
               '[' + c.points_earned.join(' ; ') + ']' : 'N/A';
         }
@@ -313,8 +378,8 @@ export const createExcelWorksheet = (
         gradeDisplay = 'DÉSACTIVÉ';
         pointsDisplay = 'DÉSACTIVÉ';
       } else {
-        gradeDisplay = c.grade !== undefined ? 
-          `${formatGrade(c.grade)}` : 'NON NOTÉ';
+        gradeDisplay = c.final_grade !== undefined ? 
+          `${formatGrade(c.final_grade)}` : 'NON NOTÉ';
         pointsDisplay = Array.isArray(c.points_earned) ? 
           '[' + c.points_earned.join(' ; ') + ']' : 'N/A';
       }
@@ -437,8 +502,11 @@ export const createExcelWorksheet = (
         const pointsCell = row.getCell(cellIndex);
         const gradeCell = row.getCell(cellIndex + 1);
         
-        applyExcelCellStyle(pointsCell, rowData[cellIndex - 1]);
-        applyExcelCellStyle(gradeCell, rowData[cellIndex]);
+        // Déterminer si cette correction a une pénalité
+        const hasPenalty = penaltyMap[`${studentName}-${activity}`] || false;
+        
+        applyExcelCellStyle(pointsCell, rowData[cellIndex - 1], false); // Les points ne sont pas affectés par le style de pénalité
+        applyExcelCellStyle(gradeCell, rowData[cellIndex], hasPenalty); // Mais la note l'est
         
         cellIndex += 2;
       });
@@ -550,10 +618,10 @@ export const createExcelWorksheet = (
       }
       if (isPlaceholder) {
         gradeDisplay = 'N/A';
-      } else if (c.grade !== undefined) {
+      } else if (c.final_grade !== undefined) {
         if (statusDisplay === 'ACTIVE') {
           // Remplacer '.' par ',' dans la note et afficher le barème réel
-          gradeDisplay = `${formatGrade(c.grade).replace('.', ',')}`;
+          gradeDisplay = `${formatGrade(c.final_grade).replace('.', ',')}`;
         } else {
           gradeDisplay = statusDisplay;
         }
@@ -593,14 +661,17 @@ export const createExcelWorksheet = (
       
       const row = worksheet.addRow(rowData);
       
-      // Appliquer des styles aux cellules
-      applyExcelCellStyle(row.getCell('grade'), gradeDisplay);
-      applyExcelCellStyle(row.getCell('status'), statusDisplay);
+      // Déterminer si cette correction a une pénalité
+      const hasPenalty = c.penalty !== undefined && c.penalty !== null && parseFloat(String(c.penalty)) > 0;
       
-      // Appliquer des styles aux cellules de points
+      // Appliquer des styles aux cellules
+      applyExcelCellStyle(row.getCell('grade'), gradeDisplay, hasPenalty);
+      applyExcelCellStyle(row.getCell('status'), statusDisplay, false);
+      
+      // Appliquer des styles aux cellules de points (pas affectées par le style de pénalité)
       for (let i = 0; i < maxPartsCount; i++) {
         const cell = row.getCell(`part_${i}`);
-        applyExcelCellStyle(cell, rowData[`part_${i}`]);
+        applyExcelCellStyle(cell, rowData[`part_${i}`], false);
       }
     });
   }

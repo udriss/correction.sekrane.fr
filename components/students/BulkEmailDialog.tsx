@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   Dialog, 
   DialogTitle,
@@ -22,14 +22,24 @@ import {
   OutlinedInput,
   SelectChangeEvent,
   LinearProgress,
-  Chip
+  Chip,
+  Fade,
+  Backdrop,
+  Paper as MuiPaper,
+  ButtonGroup,
+  Tooltip as MuiTooltip,
+  Divider
 } from '@mui/material';
 import { 
   EmailOutlined, 
   Send,
   CheckCircle,
   Warning,
-  FilterList
+  FilterList,
+  PlayArrow,
+  Pause,
+  Cancel,
+  SkipNext
 } from '@mui/icons-material';
 import { useEditor } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
@@ -57,6 +67,22 @@ interface BulkEmailDialogProps {
   students: Student[];
   classId: number;
   classSubgroups?: number;
+}
+
+// Add new interfaces for email preview and process control
+interface EmailPreview {
+  studentId: number;
+  studentName: string;
+  email: string;
+  subject: string;
+  htmlContent: string;
+  textContent: string;
+}
+
+interface SendingProcess {
+  status: 'idle' | 'previewing' | 'sending' | 'paused';
+  currentIndex: number;
+  countdownSeconds: number;
 }
 
 export default function BulkEmailDialog({ open, onClose, students, classId, classSubgroups = 0 }: BulkEmailDialogProps) {
@@ -264,18 +290,34 @@ export default function BulkEmailDialog({ open, onClose, students, classId, clas
     }
   };
 
-  // Fonction pour envoyer les emails
+  // Ajout des états et refs nécessaires pour le preview et le timer
+  const [showPreview, setShowPreview] = useState(false);
+  const [emailPreview, setEmailPreview] = useState<EmailPreview | null>(null);
+  const [sendingProcess, setSendingProcess] = useState<SendingProcess>({
+    status: 'idle',
+    currentIndex: -1,
+    countdownSeconds: 2
+  });
+  const [cancelledStudentIds, setCancelledStudentIds] = useState<number[]>([]);
+  const countdownIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const emailPreviewRef = useRef<EmailPreview | null>(null);
+  const [progressPercent, setProgressPercent] = useState(0);
+
+  useEffect(() => {
+    emailPreviewRef.current = emailPreview;
+  }, [emailPreview]);
+
+  // Fonction pour démarrer le processus d'envoi avec preview
   const handleSendEmails = async () => {
     if (selectedStudents.length === 0) {
       setError('Veuillez sélectionner au moins un étudiant');
       return;
     }
-
     setSending(true);
     setError(null);
     setSummary(null);
-    
-    // Initialiser les statuts d'envoi
+    setCancelledStudentIds([]);
+    await fetchStudentPasswords();
     const initialStatuses = selectedStudents.map(id => {
       const student = students.find(s => s.id === id);
       return {
@@ -284,160 +326,234 @@ export default function BulkEmailDialog({ open, onClose, students, classId, clas
         status: 'pending' as const
       };
     });
-    
     setSendingStatuses(initialStatuses);
-    
-    // Compteurs pour le résumé
-    let sentCount = 0;
-    let failedCount = 0;
-    
-    // Envoyer les emails un par un pour pouvoir suivre la progression
-    for (let i = 0; i < selectedStudents.length; i++) {
-      const studentId = selectedStudents[i];
-      const student = students.find(s => s.id === studentId);
-      
-      if (!student || !student.email) {
-        // Mettre à jour le statut avec une erreur
-        setSendingStatuses(prev => 
-          prev.map(s => 
-            s.studentId === studentId 
-              ? { ...s, status: 'error', error: 'Email manquant' } 
-              : s
-          )
-        );
-        failedCount++;
-        continue;
-      }
-      
-      // Mettre à jour le statut comme étant en cours
-      setSendingStatuses(prev => 
-        prev.map(s => 
-          s.studentId === studentId 
-            ? { ...s, status: 'processing' } 
-            : s
-        )
-      );
-      
-      try {
-        // Récupérer le mot de passe de l'étudiant
-        const password = typeof studentId === 'number' && studentPasswords[studentId] 
-          ? studentPasswords[studentId] 
-          : '';
-        
-        // Générer le message personnalisé pour cet étudiant
-        let messageToSend = messageType === MESSAGE_TYPES.PREDEFINED 
-          ? generateEmailContent(student.first_name || '', student.id || 0)
-          : {
-              text: customMessage.replace(/<[^>]*>/g, ''),
-              html: customMessage
-                .replace(/{{studentName}}/g, student.first_name || '')
-                .replace(/{{correctionUrl}}/g, `${window.location.origin}/students/${student.id}/corrections`)
-            };
-        
-        // Remplacer le placeholder du mot de passe si présent
-        if (password) {
-          // Remplacer dans le contenu HTML
-          messageToSend.html = messageToSend.html.replace(/{{mot_de_passe_accès}}/g, password);
-          // Remplacer dans le contenu texte
-          messageToSend.text = messageToSend.text.replace(/{{mot_de_passe_accès}}/g, password);
-        } else {
-          // Si l'étudiant n'a pas de mot de passe défini, afficher un message d'avertissement
-          messageToSend.html = messageToSend.html.replace(
-            /{{mot_de_passe_accès}}/g, 
-            `<span style="color: #FF9800; font-style: italic">Aucun mot de passe défini</span>`
-          );
-          messageToSend.text = messageToSend.text.replace(
-            /{{mot_de_passe_accès}}/g, 
-            "Aucun mot de passe défini"
-          );
-        }
+    setSendingProcess({ status: 'previewing', currentIndex: 0, countdownSeconds: 2 });
+  };
 
-        // Envoyer l'email
-        const response = await fetch('/api/students/send-corrections-email', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            email: student.email,
-            studentId: student.id,
-            studentName: `${student.first_name || ''} ${student.last_name || ''}`.trim(),
-            customMessage: messageToSend.text,
-            htmlMessage: messageToSend.html,
-            subject: emailSubject
-          }),
+  // Fonction pour générer le contenu d'email pour le preview (remplace generateActualEmailContent)
+  const getPreviewForIndex = (index: number): EmailPreview | null => {
+    const studentId = selectedStudents[index];
+    const student = students.find(s => s.id === studentId);
+    if (!student) return null;
+    const baseUrl = window.location.origin;
+    const url = `${baseUrl}/students/${student.id}/corrections`;
+    const password = studentPasswords[student.id || 0] || 'Aucun mot de passe défini';
+    let htmlContent = '';
+    let textContent = '';
+    if (messageType === MESSAGE_TYPES.PREDEFINED) {
+      const content = generateEmailContent(student.first_name || '', student.id || 0);
+      htmlContent = content.html.replace(/{{mot_de_passe_accès}}/g, password);
+      textContent = content.text.replace(/{{mot_de_passe_accès}}/g, password);
+    } else {
+      htmlContent = customMessage
+        .replace(/{{studentName}}/g, student.first_name || '')
+        .replace(/{{correctionUrl}}/g, url)
+        .replace(/{{mot_de_passe_accès}}/g, password);
+      textContent = htmlContent.replace(/<[^>]*>/g, '');
+    }
+    return {
+      studentId: student.id || 0,
+      studentName: `${student.first_name || ''} ${student.last_name || ''}`,
+      email: student.email || '',
+      subject: emailSubject,
+      htmlContent,
+      textContent
+    };
+  };
+
+  // Fonction pour lancer le timer de preview
+  const startCountdown = () => {
+    if (countdownIntervalRef.current) clearInterval(countdownIntervalRef.current);
+    setSendingProcess(prev => ({ ...prev, countdownSeconds: 2 }));
+    setProgressPercent(0);
+    
+    let elapsedTime = 0;
+    countdownIntervalRef.current = setInterval(() => {
+      elapsedTime += 100; // Incrément de 100ms pour une progression fluide
+      const newPercent = (elapsedTime / 2000) * 100; // 2000ms = 2s
+      
+      setProgressPercent(Math.min(newPercent, 100));
+      
+      setSendingProcess(prev => {
+        if (prev.status !== 'previewing') return prev;
+        
+        const newCountdown = Math.max(0, 2 - Math.floor(elapsedTime / 1000));
+        
+        if (elapsedTime >= 2000) {
+          clearInterval(countdownIntervalRef.current!);
+          if (emailPreviewRef.current) {
+            sendCurrentEmail();
+          }
+          return { ...prev, countdownSeconds: 0 };
+        }
+        
+        return { ...prev, countdownSeconds: newCountdown };
+      });
+    }, 100); // Intervalle de 100ms pour une progression fluide
+  };
+
+  // Fonction pour envoyer l'email courant
+  const sendCurrentEmail = async () => {
+    const currentEmailPreview = emailPreviewRef.current;
+    if (!currentEmailPreview) return;
+    const { studentId, email: studentEmail, subject, htmlContent, textContent } = currentEmailPreview;
+    setSendingProcess(prev => ({ ...prev, status: 'sending' }));
+    try {
+      const response = await fetch('/api/students/send-corrections-email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: studentEmail,
+          studentId: studentId,
+          studentName: currentEmailPreview.studentName,
+          customMessage: textContent,
+          htmlMessage: htmlContent,
+          subject: subject
+        }),
+      });
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Erreur lors de l\'envoi');
+      }
+      setSendingStatuses(prev => prev.map(s => s.studentId === studentId ? { ...s, status: 'success' } : s));
+    } catch (err) {
+      setSendingStatuses(prev => prev.map(s => s.studentId === studentId ? { ...s, status: 'error', error: err instanceof Error ? err.message : 'Erreur inconnue' } : s));
+    }
+    setTimeout(() => moveToNextStudent(), 400);
+  };
+
+  // Passe à l'étudiant suivant
+  const moveToNextStudent = () => {
+    setShowPreview(false);
+    setEmailPreview(null);
+    setProgressPercent(0);
+    if (countdownIntervalRef.current) clearInterval(countdownIntervalRef.current);
+    setSendingProcess(prev => {
+      let nextIndex = prev.currentIndex + 1;
+      while (nextIndex < selectedStudents.length && cancelledStudentIds.includes(selectedStudents[nextIndex])) {
+        nextIndex++;
+      }
+      if (nextIndex >= selectedStudents.length) {
+        finishSendingProcess();
+        return { ...prev, status: 'idle', currentIndex: -1, countdownSeconds: 2 };
+      }
+      return { status: 'previewing', currentIndex: nextIndex, countdownSeconds: 2 };
+    });
+  };
+
+  // Fin du process
+  const finishSendingProcess = () => {
+    if (countdownIntervalRef.current) clearInterval(countdownIntervalRef.current);
+    setSendingProcess({ status: 'idle', currentIndex: -1, countdownSeconds: 2 });
+    
+    // S'assurer que tous les étudiants restants sont marqués comme annulés s'ils n'ont pas été traités
+    setSendingStatuses(prev => prev.map(status => {
+      if (status.status === 'pending' || status.status === 'processing') {
+        return { ...status, status: 'error' as const, error: 'Non traité' };
+      }
+      return status;
+    }));
+    
+    // Calculer le résumé après la mise à jour des statuts
+    setTimeout(() => {
+      setSendingStatuses(current => {
+        const sent = current.filter(s => s.status === 'success').length;
+        const failed = current.filter(s => s.status === 'error').length;
+        const cancelled = cancelledStudentIds.length;
+        
+        // Log pour debug
+        console.log('Résumé envoi:', {
+          total: selectedStudents.length,
+          sent,
+          failed,
+          cancelled,
+          statuses: current.map(s => ({ id: s.studentId, status: s.status }))
         });
         
-        if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(errorData.message || 'Erreur lors de l\'envoi');
-        }
-        
-        // Mettre à jour le statut comme réussi
-        setSendingStatuses(prev => 
-          prev.map(s => 
-            s.studentId === studentId 
-              ? { ...s, status: 'success' } 
-              : s
-          )
-        );
-        
-        sentCount++;
-      } catch (err) {
-        console.error(`Erreur d'envoi pour l'étudiant ${studentId}:`, err);
-        
-        // Mettre à jour le statut avec l'erreur
-        setSendingStatuses(prev => 
-          prev.map(s => 
-            s.studentId === studentId 
-              ? { ...s, status: 'error', error: err instanceof Error ? err.message : 'Erreur inconnue' } 
-              : s
-          )
-        );
-        
-        failedCount++;
-      }
-      
-      // Petite pause pour éviter de surcharger le serveur
-      await new Promise(r => setTimeout(r, 500));
-    }
-    
-    // Mettre à jour le résumé
-    setSummary({
-      total: selectedStudents.length,
-      sent: sentCount,
-      failed: failedCount
-    });
+        setSummary({ total: selectedStudents.length, sent, failed });
+        return current;
+      });
+    }, 100);
     
     setSending(false);
   };
 
-  // Fonction pour générer un mot de passe par défaut
-  const generateDefaultPassword = (studentId: number): string => {
-    return `${studentId}-${Math.random().toString(36).substring(2, 8)}`;
+  // Pause/reprise
+  const togglePauseSending = () => {
+    setSendingProcess(prev => {
+      if (prev.status === 'paused') {
+        startCountdown();
+        return { ...prev, status: 'previewing' };
+      } else {
+        if (countdownIntervalRef.current) clearInterval(countdownIntervalRef.current);
+        return { ...prev, status: 'paused' };
+      }
+    });
   };
+
+  // Annuler l'envoi pour l'étudiant courant
+  const cancelCurrentEmail = () => {
+    if (sendingProcess.currentIndex < 0 || !emailPreview) return;
+    const studentId = emailPreview.studentId;
+    setCancelledStudentIds(prev => [...prev, studentId]);
+    setSendingStatuses(prev => prev.map(s => 
+      s.studentId === studentId 
+        ? { ...s, status: 'error' as const, error: 'Annulé par l\'utilisateur' } 
+        : s
+    ));
+    moveToNextStudent();
+  };
+
+  // Affichage du preview à chaque changement d'index
+  useEffect(() => {
+    if (sending && sendingProcess.status === 'previewing' && sendingProcess.currentIndex >= 0) {
+      const preview = getPreviewForIndex(sendingProcess.currentIndex);
+      if (preview) {
+        setEmailPreview(preview);
+        setShowPreview(true);
+        startCountdown();
+        setSendingStatuses(prev => prev.map(s => s.studentId === preview.studentId ? { ...s, status: 'processing' } : s));
+      } else {
+        moveToNextStudent();
+      }
+    }
+    // eslint-disable-next-line
+  }, [sendingProcess.currentIndex, sendingProcess.status, sending]);
+
+  // Nettoyage du timer à la fermeture ou à la fin
+  useEffect(() => {
+    return () => {
+      if (countdownIntervalRef.current) clearInterval(countdownIntervalRef.current);
+    };
+  }, []);
+
+  // Filtrer les étudiants selon le sous-groupe sélectionné
+  useEffect(() => {
+    if (selectedSubgroup === 'all') {
+      setFilteredStudents(students);
+    } else {
+      setFilteredStudents(
+        students.filter(student => 
+          student.sub_class?.toString() === selectedSubgroup
+        )
+      );
+    }
+  }, [selectedSubgroup, students]);
 
   // Fonction pour récupérer les mots de passe des étudiants sélectionnés
   const fetchStudentPasswords = async () => {
     if (selectedStudents.length === 0) return;
-    
     setIsLoadingPasswords(true);
     const passwordsObj: Record<number, string> = {};
     const studentsWithoutPasswordsList: Student[] = [];
-    
     try {
-      // Traiter chaque étudiant sélectionné séquentiellement
       for (const studentId of selectedStudents) {
         try {
-          // Récupérer le mot de passe via l'API GET
           const response = await fetch(`/api/students/${studentId}/password?includeValue=true`);
           const data = await response.json();
-          
           if (response.ok && data.hasPassword && data.passwordValue) {
-            // Si l'étudiant a déjà un mot de passe, l'utiliser
             passwordsObj[studentId] = data.passwordValue;
           } else {
-            // Si l'étudiant n'a pas de mot de passe, l'ajouter à la liste
             const student = students.find(s => s.id === studentId);
             if (student) {
               studentsWithoutPasswordsList.push(student);
@@ -447,11 +563,7 @@ export default function BulkEmailDialog({ open, onClose, students, classId, clas
           console.error(`Erreur lors de la récupération du mot de passe pour l'étudiant ${studentId}:`, err);
         }
       }
-      
-      // Mettre à jour l'état avec tous les mots de passe récupérés
       setStudentPasswords(passwordsObj);
-      
-      // Si des étudiants n'ont pas de mot de passe, ouvrir le gestionnaire
       if (studentsWithoutPasswordsList.length > 0) {
         setStudentsWithoutPassword(studentsWithoutPasswordsList);
         setShowPasswordManagerDialog(true);
@@ -464,15 +576,9 @@ export default function BulkEmailDialog({ open, onClose, students, classId, clas
     }
   };
 
-  // Récupérer les mots de passe lorsque les étudiants sont sélectionnés
-  useEffect(() => {
-    if (selectedStudents.length > 0 && open) {
-      fetchStudentPasswords();
-    }
-  }, [selectedStudents, open]);
-
   return (
     <>
+      {/* Main dialog content */}
       <Dialog
         open={open}
         onClose={!sending ? onClose : undefined}
@@ -507,6 +613,11 @@ export default function BulkEmailDialog({ open, onClose, students, classId, clas
               <Typography variant="subtitle2">
                 Envoi terminé : {summary.sent} emails envoyés, {summary.failed} échecs sur un total de {summary.total} étudiants
               </Typography>
+              {summary.sent + summary.failed !== summary.total && (
+                <Typography variant="caption" color="text.secondary" display="block">
+                  Note: {summary.total - summary.sent - summary.failed} étudiants non traités
+                </Typography>
+              )}
             </Alert>
           )}
           
@@ -857,6 +968,65 @@ export default function BulkEmailDialog({ open, onClose, students, classId, clas
           )}
         </DialogContent>
         
+        {/* Add preview alert bar when actively sending */}
+        {sending && sendingProcess.status !== 'idle' && (
+          <Box sx={{ 
+            width: '100%', 
+            position: 'relative',
+            mb: 2
+          }}>
+            <LinearProgress 
+              variant="determinate"
+              value={progressPercent}
+              color={sendingProcess.status === 'paused' ? 'warning' : 'primary'}
+              sx={{ 
+                height: 8,
+                borderRadius: 1
+              }}
+            />
+            
+            <Box sx={{ 
+              display: 'flex', 
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              mt: 1
+            }}>
+              <Typography variant="caption" color="text.secondary">
+                {sendingProcess.status === 'previewing' 
+                  ? `Envoi automatique dans ${sendingProcess.countdownSeconds}s...` 
+                  : sendingProcess.status === 'paused'
+                    ? 'Envoi en pause'
+                    : 'Envoi en cours...'}
+              </Typography>
+              
+              <ButtonGroup size="small" variant="outlined">
+                {sendingProcess.status === 'previewing' && (
+                  <MuiTooltip title="Envoyer maintenant">
+                    <Button onClick={sendCurrentEmail}>
+                      <SkipNext fontSize="small" />
+                    </Button>
+                  </MuiTooltip>
+                )}
+                
+                <MuiTooltip title={sendingProcess.status === 'paused' ? "Reprendre" : "Mettre en pause"}>
+                  <Button onClick={togglePauseSending}>
+                    {sendingProcess.status === 'paused' 
+                      ? <PlayArrow fontSize="small" />
+                      : <Pause fontSize="small" />
+                    }
+                  </Button>
+                </MuiTooltip>
+                
+                <MuiTooltip title="Annuler cet email">
+                  <Button onClick={cancelCurrentEmail} color="error">
+                    <Cancel fontSize="small" />
+                  </Button>
+                </MuiTooltip>
+              </ButtonGroup>
+            </Box>
+          </Box>
+        )}
+        
         <DialogActions>
           <Button 
             onClick={onClose} 
@@ -922,6 +1092,95 @@ export default function BulkEmailDialog({ open, onClose, students, classId, clas
             : `Définir des mots de passe pour ${studentsWithoutPassword.length} étudiants`}
         />
       )}
+
+      {/* Preview dialog */}
+      <Dialog
+        open={showPreview}
+        maxWidth="md"
+        fullWidth
+        BackdropComponent={Backdrop}
+        BackdropProps={{
+          timeout: 500,
+        }}
+      >
+        <DialogTitle>
+          <Box display="flex" justifyContent="space-between" alignItems="center">
+            <Typography variant="h6">
+              Aperçu de l'email ({emailPreview?.studentName})
+            </Typography>
+            <Chip 
+              label={`${sendingProcess.currentIndex + 1}/${selectedStudents.length}`}
+              color="primary" 
+              size="small"
+            />
+          </Box>
+        </DialogTitle>
+        <DialogContent>
+          {/* Progress bar pour le timer d'envoi automatique */}
+          <Box sx={{ width: '100%', mb: 2 }}>
+            <LinearProgress
+              variant="determinate"
+              value={progressPercent}
+              color={sendingProcess.status === 'paused' ? 'warning' : 'primary'}
+              sx={{ height: 8, borderRadius: 1 }}
+            />
+            <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5 }}>
+              {sendingProcess.status === 'previewing'
+                ? `Envoi automatique dans ${sendingProcess.countdownSeconds}s...`
+                : sendingProcess.status === 'paused'
+                  ? 'Envoi en pause'
+                  : 'Envoi en cours...'}
+            </Typography>
+          </Box>
+          <Box sx={{ mb: 2 }}>
+            <Typography variant="subtitle2" gutterBottom>Destinataire</Typography>
+            <Typography variant="body2">{emailPreview?.email}</Typography>
+          </Box>
+          <Box sx={{ mb: 2 }}>
+            <Typography variant="subtitle2" gutterBottom>Objet</Typography>
+            <Typography variant="body2">{emailPreview?.subject}</Typography>
+          </Box>
+          <Divider sx={{ my: 2 }} />
+          <Box sx={{ mb: 2 }}>
+            <Typography variant="subtitle2" gutterBottom>Contenu</Typography>
+            <Paper 
+              variant="outlined" 
+              sx={{ 
+                p: 2,
+                mb: 2,
+                maxHeight: '400px',
+                overflow: 'auto'
+              }}
+            >
+              <div dangerouslySetInnerHTML={{ __html: emailPreview?.htmlContent || '' }} />
+            </Paper>
+          </Box>
+        </DialogContent>
+        <DialogActions>
+          <Button
+            onClick={cancelCurrentEmail}
+            color="error"
+            startIcon={<Cancel />}
+          >
+            Annuler
+          </Button>
+          <Button
+            onClick={togglePauseSending}
+            color="warning"
+            startIcon={sendingProcess.status === 'paused' ? <PlayArrow /> : <Pause />}
+          >
+            {sendingProcess.status === 'paused' ? 'Reprendre' : 'Pause'}
+          </Button>
+          <Button 
+            onClick={sendCurrentEmail} 
+            variant="contained"
+            color="primary"
+            startIcon={<Send />}
+          >
+            Envoyer maintenant
+          </Button>
+        </DialogActions>
+      </Dialog>
     </>
   );
 }

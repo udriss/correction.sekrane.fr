@@ -9,7 +9,6 @@ import {
   Box, 
   Menu, 
   MenuItem,
-  Container,
   useScrollTrigger,
   Slide,
   IconButton,
@@ -22,12 +21,11 @@ import {
   ListItemAvatar,
   ListItemButton,
   List,
-  Paper,
   CircularProgress,
   Dialog,
   DialogContent,
   Switch,
-  FormControlLabel
+  Tooltip
 } from '@mui/material';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
@@ -39,7 +37,6 @@ import HomeIcon from '@mui/icons-material/Home';
 import ViewListIcon from '@mui/icons-material/ViewList';
 import SchoolIcon from '@mui/icons-material/School';
 import PeopleIcon from '@mui/icons-material/People';
-import MenuBookIcon from '@mui/icons-material/MenuBook';
 import FormatListBulletedIcon from '@mui/icons-material/FormatListBulleted';
 import FilterListIcon from '@mui/icons-material/FilterList';
 import AssignmentIcon from '@mui/icons-material/Assignment';
@@ -55,13 +52,14 @@ import StorageIcon from '@mui/icons-material/Storage';
 import ListAltIcon from '@mui/icons-material/ListAlt';
 import DatabaseMonitoring from '@/components/DatabaseMonitoring';
 import { alpha, useTheme } from '@mui/material/styles';
-import { FeedbackNotification } from '@/lib/services/notificationService';
 import dayjs from 'dayjs';
 import 'dayjs/locale/fr';
 import relativeTime from 'dayjs/plugin/relativeTime';
 import { useNotifications } from '@/lib/contexts/NotificationContext';
 import { useDbCleanup } from '@/lib/contexts/DbCleanupContext';
 import AutoDeleteIcon from '@mui/icons-material/AutoDelete';
+import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
+
 
 // Configurer dayjs pour afficher les dates relatives en français
 dayjs.locale('fr');
@@ -160,6 +158,17 @@ function NotificationBadge() {
   const viewAllNotifications = () => {
     handleClose();
     router.push('/notifications');
+  };
+
+  // Ajouter cette fonction pour naviguer vers la page de l'étudiant
+  const navigateToStudent = (studentId: number, notificationId: number) => {
+    // Marquer la notification comme lue
+    markAsRead(notificationId);
+    // Mettre à jour immédiatement le compteur après marquage
+    fetchNotificationCounts();
+    // Ouvrir dans un nouvel onglet
+    window.open(`/students/${studentId}`, '_blank');
+    handleClose();
   };
 
   return (
@@ -285,60 +294,81 @@ function NotificationBadge() {
                 // Renvoyer le JSX pour les notifications
                 return (
                   <>
-                    {displayNotifications.map((notification) => (
-                      <ListItemButton
-                        key={notification.id}
-                        onClick={() => navigateToFeedback(notification.share_code, notification.id)}
-                        sx={{
-                          borderLeft: '3px solid',
-                          borderColor: notification.readOk ? 'transparent' : 'primary.main',
-                          backgroundColor: notification.readOk ? 'transparent' : alpha(theme.palette.primary.main, 0.04),
-                          '&:hover': {
-                            backgroundColor: alpha(theme.palette.primary.main, 0.08),
-                          },
-                          py: 1
-                        }}
-                      >
-                        <ListItemAvatar>
-                          <Avatar sx={{ bgcolor: notification.readOk ? 'action.disabled' : 'primary.main' }}>
-                            <FeedbackIcon />
-                          </Avatar>
-                        </ListItemAvatar>
-                        <ListItemText 
-                          primary={
-                            <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                              {notification.student_name} a consulté son feedback
-                            </Typography>
+                    {displayNotifications.map((notification) => {
+                      return (
+                        <ListItemButton
+                          key={notification.id}
+                          onClick={() => 
+                            notification.action_type === 'VIEW_STUDENT_CORRECTIONS' 
+                              ? navigateToStudent(notification.student_id, notification.id)
+                              : navigateToFeedback(notification.share_code, notification.id)
                           }
-                          secondary={
-                            <React.Fragment>
-                              <Typography variant="caption" component="span" display="block" sx={{ mt: 0.5 }}>
-                                Activité: {notification.activity_name}
-                              </Typography>
-                              <Typography variant="caption" component="span" display="block">
-                                Note: {notification.final_grade}/20
-                              </Typography>
-                              <Typography variant="caption" component="span" display="block" sx={{ fontStyle: 'italic', mt: 0.5 }}>
-                                {dayjs(notification.viewed_at).fromNow()}
-                              </Typography>
-                            </React.Fragment>
-                          }
-                        />
-                        <MuiTooltip title="Voir le feedback">
-                          <IconButton 
-                            edge="end" 
-                            size="small"
-                            sx={{ mr: 1 }}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              navigateToFeedback(notification.share_code, notification.id);
-                            }}
-                          >
-                            <VisibilityIcon fontSize="small" />
-                          </IconButton>
-                        </MuiTooltip>
-                      </ListItemButton>
-                    ))}
+                          sx={{
+                            borderLeft: '3px solid',
+                            borderColor: notification.readOk ? 'transparent' : 'primary.main',
+                            backgroundColor: notification.readOk ? 'transparent' : alpha(theme.palette.primary.main, 0.04),
+                            '&:hover': {
+                              backgroundColor: alpha(theme.palette.primary.main, 0.08),
+                            },
+                            py: 1,
+                            cursor: 'pointer', // Toujours afficher le curseur pointer
+                          }}
+                        >
+                          <ListItemAvatar>
+                            <Avatar sx={{ bgcolor: notification.readOk ? 'action.disabled' : notification.action_type === 'VIEW_STUDENT_CORRECTIONS' ? 'secondary.main' : 'primary.main' }}>
+                              {notification.action_type === 'VIEW_STUDENT_CORRECTIONS' ? <VisibilityIcon /> : <FeedbackIcon />}
+                            </Avatar>
+                          </ListItemAvatar>
+                          <ListItemText 
+                            primary={notification.student_name}
+                            secondary={
+                              <>
+                                {notification.action_type === 'VIEW_STUDENT_CORRECTIONS' ? (
+                                  <>
+                                    <Typography variant="body2" sx={{ color: 'text.primary' }}>
+                                      a visité sa page de correction
+                                    </Typography>
+                                    <Typography variant="caption" sx={{ display: 'block' }}>
+                                      {new Date(notification.viewed_at).toLocaleString()}
+                                    </Typography>
+                                  </>
+                                ) : (
+                                  <>
+                                    <Typography variant="body2" sx={{ color: 'text.primary' }}>
+                                      a consulté son feedback
+                                    </Typography>
+                                    <Typography variant="caption" sx={{ display: 'block' }}>
+                                      {notification.activity_name && (
+                                        <>
+                                          {notification.activity_name}<br />
+                                        </>
+                                      )}
+                                      {notification.grade || notification.final_grade || 'N/A'}/
+                                      {notification.points || 20}
+                                      <br />
+                                      {new Date(notification.viewed_at).toLocaleString()}
+                                    </Typography>
+                                  </>
+                                )}
+                              </>
+                            }
+                          />
+                          {notification.action_type === 'VIEW_STUDENT_CORRECTIONS' ? (
+                            <Tooltip title="Voir la page de l'étudiant">
+                              <IconButton size="small" color="secondary">
+                                <ArrowForwardIcon fontSize="small" />
+                              </IconButton>
+                            </Tooltip>
+                          ) : (
+                            <Tooltip title="Voir le feedback">
+                              <IconButton size="small" color="primary">
+                                <ArrowForwardIcon fontSize="small" />
+                              </IconButton>
+                            </Tooltip>
+                          )}
+                        </ListItemButton>
+                      );
+                    })}
                     
                     {/* Message d'information sur les notifications supplémentaires */}
                     {totalCount > displayNotifications.length && (
@@ -506,6 +536,15 @@ export default function MainNavbar() {
   
   const handleActivitiesMenuClose = () => {
     setActivitiesMenuAnchor(null);
+  };
+
+  // Gestionnaires pour le menu admin
+  const handleAdminMenuClick = (event: React.MouseEvent<HTMLElement>) => {
+    setAdminMenuAnchor(event.currentTarget);
+  };
+  
+  const handleAdminMenuClose = () => {
+    setAdminMenuAnchor(null);
   };
 
   if (loading) return null;
