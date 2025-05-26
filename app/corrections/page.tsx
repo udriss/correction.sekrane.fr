@@ -823,7 +823,6 @@ function CorrectionsContent() {
       {/* Content based on selected tab */}
       {tabValue === 0 && (
         <CorrectionsListAutres
-          filteredCorrections={adaptCorrections}
           error={error}
           activeFilters={activeFilters}
           handleClearAllFilters={clearAllFilters}
@@ -831,28 +830,24 @@ function CorrectionsContent() {
           highlightedIds={searchParams?.get('highlight')?.split(',').filter(Boolean) || []}
           recentFilter={activeFilters.includes('recent')}
           refreshCorrections={refreshCorrections}
-          isLoading={isLoading}
           getStudentById={getStudentById}
         />
       )}
 
       {tabValue === 1 && (
         <ClassesListAutres
-          filteredCorrections={adaptCorrections}
           error={error}
           activeFilters={activeFilters}
           handleClearAllFilters={clearAllFilters}
           highlightedIds={searchParams?.get('highlight')?.split(',').filter(Boolean) || []}
           getGradeColor={getGradeColor}
           refreshCorrections={refreshCorrections}
-          isLoading={isLoading}
           getStudentById={getStudentById}
         />
       )}
 
       {tabValue === 2 && (
         <StudentsListAutres
-          filteredCorrections={adaptCorrections}
           error={error}
           activeFilters={activeFilters}
           handleClearAllFilters={clearAllFilters}
@@ -860,21 +855,18 @@ function CorrectionsContent() {
           highlightedIds={searchParams?.get('highlight')?.split(',').filter(Boolean) || []}
           recentFilter={activeFilters.includes('recent')}
           refreshCorrections={refreshCorrections}
-          isLoading={isLoading}
           getStudentById={getStudentById}
         />
       )}
 
       {tabValue === 3 && (
         <ChronologyListAutres
-          filteredCorrections={adaptCorrections}
           error={error}
           activeFilters={activeFilters}
           handleClearAllFilters={clearAllFilters}
           getGradeColor={getGradeColor}
           highlightedIds={searchParams?.get('highlight')?.split(',').filter(Boolean) || []}
           recentFilter={activeFilters.includes('recent')}
-          isLoading={isLoading}
           getStudentById={getStudentById}
         />
       )}

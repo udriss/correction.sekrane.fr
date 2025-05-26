@@ -6,25 +6,25 @@ import {
 } from '@mui/material';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import CorrectionCardAutre from '@/components/allCorrectionsAutres/CorrectionCard';
+import Pagination from '@/components/Pagination';
 import { useSnackbar } from 'notistack';
 import ErrorDisplay from '@/components/ui/ErrorDisplay';
 import { changeCorrectionAutreStatus } from '@/lib/services/correctionsAutresService';
 import { CorrectionAutreEnriched } from '@/lib/types';
 import { getBatchShareCodes } from '@/lib/services/shareService';
+import { useCorrectionsAutres } from '@/app/components/CorrectionsAutresDataProvider';
 
 
 interface ClassesListAutresProps {
-  filteredCorrections: CorrectionAutreEnriched[];
   error: Error | null;
   activeFilters: string[];
   handleClearAllFilters: () => void;
   getGradeColor: (grade: number) => "success" | "info" | "primary" | "warning" | "error";
-  highlightedIds?: string[]; // IDs explicitement mis en évidence
-  recentFilter?: boolean; // Indique si le filtre "recent" est actif
-  subClassFilter?: string; // Make sure this is optional and of type string
+  highlightedIds?: string[];
+  recentFilter?: boolean;
+  subClassFilter?: string;
   refreshCorrections?: () => Promise<void>;
-  isLoading?: boolean; // Ajout d'une propriété pour indiquer l'état de chargement
-  getStudentById?: (studentId: number | null) => any; // Fonction pour récupérer un étudiant par son ID
+  getStudentById?: (studentId: number | null) => any;
 }
 
 interface ClassGroup {
@@ -35,17 +35,22 @@ interface ClassGroup {
 }
 
 export default function ClassesListAutres({
-  filteredCorrections,
   error,
   activeFilters,
   handleClearAllFilters,
   getGradeColor,
   highlightedIds = [],
   refreshCorrections,
-  isLoading,
   getStudentById
 }: ClassesListAutresProps) {
   const { enqueueSnackbar } = useSnackbar();
+  const { 
+    corrections: filteredCorrections, 
+    pagination, 
+    goToPage, 
+    setItemsPerPage, 
+    isLoading 
+  } = useCorrectionsAutres();
   const [shareCodesMap, setShareCodesMap] = useState<Map<string, string>>(new Map());
 
   // Chargement en masse des codes de partage quand les corrections changent
@@ -125,6 +130,19 @@ export default function ClassesListAutres({
 
   return (
     <>
+      {/* Pagination en haut */}
+      {filteredCorrections.length > 0 && (
+        <Pagination
+          currentPage={pagination.currentPage}
+          totalPages={pagination.totalPages}
+          totalItems={pagination.totalItems}
+          itemsPerPage={pagination.itemsPerPage}
+          onPageChange={goToPage}
+          onItemsPerPageChange={setItemsPerPage}
+          disabled={isLoading}
+        />
+      )}
+
       {/* Message "Aucune correction trouvée" uniquement s'il n'y a pas de chargement ET que la liste est vide */}
       {!isLoading && (!filteredCorrections || filteredCorrections.length === 0) && (
         <Alert 
@@ -147,47 +165,61 @@ export default function ClassesListAutres({
           {activeFilters.length > 0 && " avec les filtres actuels"}
         </Alert>
       )}
-    <Box>
-      {classGroups.map(({ className, corrections, averageGrade, totalCorrections }) => (
-        <Accordion key={className} defaultExpanded={classGroups.length === 1}>
-          <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, width: '100%' }}>
-              <Typography variant="h6">{className}</Typography>
-              <Chip 
-                label={`${averageGrade.toFixed(2)}/20`}
-                color={getGradeColor(averageGrade)}
-                size="small"
-              />
-              <Typography variant="body2" color="text.secondary" sx={{ ml: 'auto' }}>
-                {totalCorrections} correction{totalCorrections > 1 ? 's' : ''}
-              </Typography>
-            </Box>
-          </AccordionSummary>
-          <AccordionDetails>
-            <Grid container spacing={2}>
-              {corrections.map((correction) => {
-                const isHighlighted = highlightedIds.includes(correction.id.toString());
-                return (
-                  <Grid size={{ xs: 12, md: 6, lg: 4 }} key={correction.id}>
-                    <CorrectionCardAutre 
-                      correction={correction}
-                      highlighted={isHighlighted}
-                      getGradeColor={getGradeColor}
-                      showClass={false}
-                      showStudent={true}
-                      showActivity={true}
-                      onChangeStatus={handleChangeStatus}
-                      preloadedShareCode={shareCodesMap.get(correction.id.toString())}
-                      studentSubClass={getStudentById && correction.student_id ? getStudentById(correction.student_id)?.sub_class : null}
-                    />
-                  </Grid>
-                );
-              })}
-            </Grid>
-          </AccordionDetails>
-        </Accordion>
-      ))}
-    </Box>
+
+      <Box>
+        {classGroups.map(({ className, corrections, averageGrade, totalCorrections }) => (
+          <Accordion key={className} defaultExpanded={classGroups.length === 1}>
+            <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, width: '100%' }}>
+                <Typography variant="h6">{className}</Typography>
+                <Chip 
+                  label={`${averageGrade.toFixed(2)}/20`}
+                  color={getGradeColor(averageGrade)}
+                  size="small"
+                />
+                <Typography variant="body2" color="text.secondary" sx={{ ml: 'auto' }}>
+                  {totalCorrections} correction{totalCorrections > 1 ? 's' : ''}
+                </Typography>
+              </Box>
+            </AccordionSummary>
+            <AccordionDetails>
+              <Grid container spacing={2}>
+                {corrections.map((correction) => {
+                  const isHighlighted = highlightedIds.includes(correction.id.toString());
+                  return (
+                    <Grid size={{ xs: 12, md: 6, lg: 4 }} key={correction.id}>
+                      <CorrectionCardAutre 
+                        correction={correction}
+                        highlighted={isHighlighted}
+                        getGradeColor={getGradeColor}
+                        showClass={false}
+                        showStudent={true}
+                        showActivity={true}
+                        onChangeStatus={handleChangeStatus}
+                        preloadedShareCode={shareCodesMap.get(correction.id.toString())}
+                        studentSubClass={getStudentById && correction.student_id ? getStudentById(correction.student_id)?.sub_class : null}
+                      />
+                    </Grid>
+                  );
+                })}
+              </Grid>
+            </AccordionDetails>
+          </Accordion>
+        ))}
+      </Box>
+
+      {/* Pagination en bas */}
+      {filteredCorrections.length > 0 && (
+        <Pagination
+          currentPage={pagination.currentPage}
+          totalPages={pagination.totalPages}
+          totalItems={pagination.totalItems}
+          itemsPerPage={pagination.itemsPerPage}
+          onPageChange={goToPage}
+          onItemsPerPageChange={setItemsPerPage}
+          disabled={isLoading}
+        />
+      )}
     </>
   );
 }

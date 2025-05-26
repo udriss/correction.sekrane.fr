@@ -9,15 +9,14 @@ import {
 } from '@mui/material';
 import ErrorDisplay from '../ui/ErrorDisplay';
 import CorrectionCardAutre from '@/components/allCorrectionsAutres/CorrectionCard';
-import { CorrectionAutreEnriched } from '@/lib/types';
-import { useBatchDelete } from '@/hooks/useBatchDelete';
+import Pagination from '@/components/Pagination';
 import { changeCorrectionAutreStatus } from '@/lib/services/correctionsAutresService';
 import { useSnackbar } from 'notistack';
 import { getBatchShareCodes } from '@/lib/services/shareService';
+import { useCorrectionsAutres } from '@/app/components/CorrectionsAutresDataProvider';
 
 
 interface CorrectionsListAutresProps {
-  filteredCorrections: CorrectionAutreEnriched[];
   error: Error | null;
   activeFilters: string[];
   handleClearAllFilters: () => void;
@@ -25,12 +24,10 @@ interface CorrectionsListAutresProps {
   highlightedIds?: string[];
   recentFilter?: boolean;
   refreshCorrections?: () => Promise<void>;
-  isLoading?: boolean; // Ajout d'une propriété pour indiquer l'état de chargement
-  getStudentById?: (studentId: number | null) => any; // Fonction pour récupérer un étudiant par son ID
+  getStudentById?: (studentId: number | null) => any;
 }
 
 export default function CorrectionsListAutres({
-  filteredCorrections,
   error,
   activeFilters,
   handleClearAllFilters,
@@ -38,11 +35,16 @@ export default function CorrectionsListAutres({
   highlightedIds = [],
   recentFilter = false,
   refreshCorrections,
-  isLoading,
   getStudentById
 }: CorrectionsListAutresProps) {
-  const { batchDeleteMode, selectedCorrections, setSelectedCorrections, deletingCorrections } = useBatchDelete();
   const { enqueueSnackbar } = useSnackbar();
+  const { 
+    corrections: filteredCorrections, 
+    pagination, 
+    goToPage, 
+    setItemsPerPage, 
+    isLoading 
+  } = useCorrectionsAutres();
 
   const [localSelected, setLocalSelected] = useState<string[]>([]);
   const [shareCodesMap, setShareCodesMap] = useState<Map<string, string>>(new Map());
@@ -98,7 +100,6 @@ export default function CorrectionsListAutres({
 
   return (
     <>
-
       {/* Message "Aucune correction disponible" uniquement s'il n'y a pas de chargement ET filteredCorrections indispo */}
       {isLoading === false && (!filteredCorrections) && (
         <Alert 
@@ -145,6 +146,19 @@ export default function CorrectionsListAutres({
         </Alert>
       )}
       
+      {/* Pagination en haut */}
+      {filteredCorrections.length > 0 && (
+        <Pagination
+          currentPage={pagination.currentPage}
+          totalPages={pagination.totalPages}
+          totalItems={pagination.totalItems}
+          itemsPerPage={pagination.itemsPerPage}
+          onPageChange={goToPage}
+          onItemsPerPageChange={setItemsPerPage}
+          disabled={isLoading}
+        />
+      )}
+      
       {/* Liste des corrections */}
       {filteredCorrections && filteredCorrections.length > 0 && (
         <Grid container spacing={2}>
@@ -171,6 +185,19 @@ export default function CorrectionsListAutres({
             );
           })}
         </Grid>
+      )}
+
+      {/* Pagination en bas */}
+      {filteredCorrections.length > 0 && (
+        <Pagination
+          currentPage={pagination.currentPage}
+          totalPages={pagination.totalPages}
+          totalItems={pagination.totalItems}
+          itemsPerPage={pagination.itemsPerPage}
+          onPageChange={goToPage}
+          onItemsPerPageChange={setItemsPerPage}
+          disabled={isLoading}
+        />
       )}
     </>
   );

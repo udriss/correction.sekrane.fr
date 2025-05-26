@@ -1,7 +1,7 @@
 'use client';
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
-import { CorrectionAutre, ActivityAutre } from '@/lib/types';
+import { CorrectionAutre, CorrectionAutreEnriched, ActivityAutre } from '@/lib/types';
 import { Student as BaseStudent } from '@/lib/types';
 import { useSnackbar } from 'notistack';
 import dayjs from 'dayjs';
@@ -54,8 +54,16 @@ interface Filters {
   selectedCorrectionIds: string; // Ajout de la propriété selectedCorrectionIds
 }
 
+interface PaginationOptions {
+  currentPage: number;
+  itemsPerPage: number;
+  totalItems: number;
+  totalPages: number;
+}
+
 interface ContextValue {
-  corrections: CorrectionAutre[];
+  corrections: CorrectionAutreEnriched[];
+  allCorrections: CorrectionAutreEnriched[]; // Toutes les corrections (pour le cache)
   metaData: MetaData;
   sortOptions: SortOptions;
   setSortOptions: (options: SortOptions) => void;
@@ -68,7 +76,12 @@ interface ContextValue {
   clearAllFilters: () => void;
   refreshCorrections: () => Promise<void>;
   errorString: string;
-  isLoading: boolean; // Ajout de la propriété isLoading
+  isLoading: boolean;
+  // Pagination
+  pagination: PaginationOptions;
+  setPagination: React.Dispatch<React.SetStateAction<PaginationOptions>>;
+  goToPage: (page: number) => void;
+  setItemsPerPage: (itemsPerPage: number) => void;
 }
 
 const CorrectionsAutresContext = createContext<ContextValue | undefined>(undefined);
@@ -83,13 +96,21 @@ export function useCorrectionsAutres() {
 
 export default function CorrectionsAutresProvider({ children, initialFilters, initialSort }: ProviderProps) {
   const { enqueueSnackbar } = useSnackbar();
-  const [corrections, setCorrections] = useState<CorrectionAutre[]>([]);
+  const [allCorrections, setAllCorrections] = useState<CorrectionAutre[]>([]);
   const [metaData, setMetaData] = useState<MetaData>({ activities: [], students: [], classes: [] });
   const [errorString, setErrorString] = useState('');
-  const [isLoading, setIsLoading] = useState<boolean>(true); // Ajout de l'état isLoading
+  const [isLoading, setIsLoading] = useState<boolean>(true);
   const [sortOptions, setSortOptions] = useState<SortOptions>(initialSort || {
     field: 'submission_date',
     direction: 'desc'
+  });
+
+  // État de pagination
+  const [pagination, setPagination] = useState<PaginationOptions>({
+    currentPage: 1,
+    itemsPerPage: 20,
+    totalItems: 0,
+    totalPages: 0
   });
 
   const [filters, setFilters] = useState<Filters>({
@@ -117,19 +138,18 @@ export default function CorrectionsAutresProvider({ children, initialFilters, in
   );
 
   const fetchCorrections = useCallback(async () => {
-    setIsLoading(true); // Activation de l'état de chargement
+    setIsLoading(true);
     try {
       const response = await fetch('/api/corrections_autres');
       if (!response.ok) throw new Error('Failed to fetch corrections');
       const data = await response.json();
-      setCorrections(data);
+      setAllCorrections(data);
     } catch (error) {
       console.error('Error fetching corrections:', error);
       setErrorString('Erreur lors du chargement des corrections');
       enqueueSnackbar('Erreur lors du chargement des corrections', { variant: 'error' });
-      setIsLoading(false); // Désactiver l'état de chargement en cas d'erreur
+      setIsLoading(false);
     }
-    // Ne pas désactiver l'état de chargement ici, il sera désactivé dans le useMemo après filtrage
   }, [enqueueSnackbar]);
 
   const fetchMetaData = useCallback(async () => {
@@ -206,13 +226,50 @@ export default function CorrectionsAutresProvider({ children, initialFilters, in
     });
   };
 
-  // Corrections filtrées avec tous les filtres appliqués
-  const filteredCorrections = useMemo(() => {
-    // Ne pas mettre isLoading à true à chaque recalcul
-    // setIsLoading est désormais géré dans les fonctions de chargement des données uniquement
+  // Fonctions de pagination
+  const goToPage = useCallback((page: number) => {
+    setPagination(prev => ({
+      ...prev,
+      currentPage: Math.max(1, Math.min(page, prev.totalPages))
+    }));
+  }, []);
+
+  const setItemsPerPage = useCallback((itemsPerPage: number) => {
+    setPagination(prev => ({
+      ...prev,
+      itemsPerPage,
+      currentPage: 1, // Reset to first page when changing items per page
+      totalPages: Math.ceil(prev.totalItems / itemsPerPage)
+    }));
+  }, []);
+
+  // Fonction pour enrichir les corrections avec les informations liées
+  const enrichCorrection = useCallback((correction: CorrectionAutre): CorrectionAutreEnriched => {
+    const activity = metaData.activities.find(a => a.id === correction.activity_id);
+    const student = metaData.students.find(s => s.id === correction.student_id);
+    const class_info = metaData.classes.find(c => c.id === correction.class_id);
     
-    // Créer une variable pour stocker les résultats filtrés
-    let result = corrections.filter(correction => {
+    const totalPoints = activity?.points.reduce((sum: number, p: number) => sum + p, 0) || 0;
+    const earnedPoints = correction.points_earned 
+      ? correction.points_earned.reduce((sum: number, p: number) => sum + p, 0) 
+      : 0;
+    const score_percentage = totalPoints > 0 ? (earnedPoints / totalPoints) * 100 : 0;
+    const grade = totalPoints > 0 ? (earnedPoints / totalPoints) * 20 : 0;
+    
+    return {
+      ...correction,
+      activity_name: activity?.name || 'Activité inconnue',
+      student_name: student ? `${student.last_name} ${student.first_name}` : 'Étudiant inconnu',
+      class_name: class_info?.name || 'Classe inconnue',
+      score_percentage,
+      grade: grade,
+      sub_class: student?.sub_class || null
+    };
+  }, [metaData]);
+
+  // Corrections filtrées avec tous les filtres appliqués
+  const filteredAndSortedCorrections = useMemo(() => {
+    let result = allCorrections.filter((correction: CorrectionAutre) => {
       // Filtre par recherche (dans le nom d'activité, étudiant ou classe)
       if (activeFilters.includes('search') && filters.search) {
         const searchLower = filters.search.toLowerCase();
@@ -299,9 +356,9 @@ export default function CorrectionsAutresProvider({ children, initialFilters, in
         const activity = metaData.activities.find(a => a.id === correction.activity_id);
         if (!activity) return false;
         
-        const totalPoints = activity.points.reduce((sum, p) => sum + p, 0);
+        const totalPoints = activity.points.reduce((sum: number, p: number) => sum + p, 0);
         const earnedPoints = correction.points_earned 
-          ? correction.points_earned.reduce((sum, p) => sum + p, 0) 
+          ? correction.points_earned.reduce((sum: number, p: number) => sum + p, 0) 
           : 0;
         const grade = (earnedPoints / totalPoints) * 20;
         
@@ -313,9 +370,9 @@ export default function CorrectionsAutresProvider({ children, initialFilters, in
         const activity = metaData.activities.find(a => a.id === correction.activity_id);
         if (!activity) return false;
         
-        const totalPoints = activity.points.reduce((sum, p) => sum + p, 0);
+        const totalPoints = activity.points.reduce((sum: number, p: number) => sum + p, 0);
         const earnedPoints = correction.points_earned 
-          ? correction.points_earned.reduce((sum, p) => sum + p, 0) 
+          ? correction.points_earned.reduce((sum: number, p: number) => sum + p, 0) 
           : 0;
         const grade = (earnedPoints / totalPoints) * 20;
         
@@ -347,49 +404,32 @@ export default function CorrectionsAutresProvider({ children, initialFilters, in
     });
     
     // Tri des résultats filtrés
-    result = result.sort((a, b) => {
-      // Application du tri
+    result = result.sort((a: CorrectionAutre, b: CorrectionAutre) => {
       switch (sortOptions.field) {
         case 'submission_date':
-          // Vérification que les dates existent avant de les comparer
-          if (!a.submission_date && !b.submission_date) {
-
-            setIsLoading(false);
-            return 0};
-          if (!a.submission_date) {
-
-            setIsLoading(false);
-            return sortOptions.direction === 'asc' ? -1 : 1};
-          if (!b.submission_date) {
-            
-            setIsLoading(false);
-            return sortOptions.direction === 'asc' ? 1 : -1};
+          if (!a.submission_date && !b.submission_date) return 0;
+          if (!a.submission_date) return sortOptions.direction === 'asc' ? -1 : 1;
+          if (!b.submission_date) return sortOptions.direction === 'asc' ? 1 : -1;
           
           const dateA = new Date(a.submission_date).getTime();
           const dateB = new Date(b.submission_date).getTime();
-
-          setIsLoading(false);
           return sortOptions.direction === 'asc' ? dateA - dateB : dateB - dateA;
         
         case 'grade':
           const activityA = metaData.activities.find(act => act.id === a.activity_id);
           const activityB = metaData.activities.find(act => act.id === b.activity_id);
           
-          if (!activityA || !activityB) {
-            
-            setIsLoading(false);
-            return 0};
+          if (!activityA || !activityB) return 0;
           
-          const totalPointsA = activityA.points.reduce((sum, p) => sum + p, 0);
-          const totalPointsB = activityB.points.reduce((sum, p) => sum + p, 0);
+          const totalPointsA = activityA.points.reduce((sum: number, p: number) => sum + p, 0);
+          const totalPointsB = activityB.points.reduce((sum: number, p: number) => sum + p, 0);
           
-          const earnedPointsA = a.points_earned ? a.points_earned.reduce((sum, p) => sum + p, 0) : 0;
-          const earnedPointsB = b.points_earned ? b.points_earned.reduce((sum, p) => sum + p, 0) : 0;
+          const earnedPointsA = a.points_earned ? a.points_earned.reduce((sum: number, p: number) => sum + p, 0) : 0;
+          const earnedPointsB = b.points_earned ? b.points_earned.reduce((sum: number, p: number) => sum + p, 0) : 0;
           
           const gradeA = (earnedPointsA / totalPointsA) * 20;
           const gradeB = (earnedPointsB / totalPointsB) * 20;
           
-          setIsLoading(false);
           return sortOptions.direction === 'asc' ? gradeA - gradeB : gradeB - gradeA;
         
         case 'student_name':
@@ -399,7 +439,6 @@ export default function CorrectionsAutresProvider({ children, initialFilters, in
           const nameA = studentA ? `${studentA.last_name} ${studentA.first_name}`.toLowerCase() : '';
           const nameB = studentB ? `${studentB.last_name} ${studentB.first_name}`.toLowerCase() : '';
           
-          setIsLoading(false);
           return sortOptions.direction === 'asc' 
             ? nameA.localeCompare(nameB)
             : nameB.localeCompare(nameA);
@@ -408,36 +447,48 @@ export default function CorrectionsAutresProvider({ children, initialFilters, in
           const actNameA = metaData.activities.find(act => act.id === a.activity_id)?.name.toLowerCase() || '';
           const actNameB = metaData.activities.find(act => act.id === b.activity_id)?.name.toLowerCase() || '';
           
-          setIsLoading(false);
           return sortOptions.direction === 'asc'
             ? actNameA.localeCompare(actNameB)
             : actNameB.localeCompare(actNameA);
         
         default:
-          setIsLoading(false);
           return 0;
       }
     });
     
-    // Désactiver l'état de chargement une fois que nous avons obtenu des résultats
-    // utiliser requestAnimationFrame pour s'assurer qu'il s'exécute après le rendu
-    if (corrections.length > 0) {
-      requestAnimationFrame(() => {
-        setIsLoading(false);
-      });
-    }
+    return result.map(enrichCorrection);
+  }, [allCorrections, metaData, filters, activeFilters, sortOptions, enrichCorrection]);
+
+  // Mise à jour de la pagination quand les données filtrées changent
+  useEffect(() => {
+    const totalItems = filteredAndSortedCorrections.length;
+    const totalPages = Math.ceil(totalItems / pagination.itemsPerPage);
     
-    return result;
-  }, [corrections, metaData, filters, activeFilters, sortOptions]);
+    setPagination(prev => ({
+      ...prev,
+      totalItems,
+      totalPages,
+      currentPage: Math.max(1, Math.min(prev.currentPage, totalPages || 1))
+    }));
+  }, [filteredAndSortedCorrections.length, pagination.itemsPerPage]);
 
-  // Gérer l'état de chargement uniquement lors du fetch
-  // Afficher le message "Aucune correction trouvée" seulement si isLoading est false ET corrections.length > 0 ET filteredCorrections.length === 0
-  // (rien à changer ici, la logique d'affichage est côté composant d'affichage)
+  // Corrections paginées pour l'affichage
+  const paginatedCorrections = useMemo(() => {
+    const startIndex = (pagination.currentPage - 1) * pagination.itemsPerPage;
+    const endIndex = startIndex + pagination.itemsPerPage;
+    return filteredAndSortedCorrections.slice(startIndex, endIndex);
+  }, [filteredAndSortedCorrections, pagination.currentPage, pagination.itemsPerPage]);
 
-
+  // Gestion de l'état de chargement
+  useEffect(() => {
+    if (allCorrections.length > 0) {
+      setIsLoading(false);
+    }
+  }, [allCorrections.length]);
 
   const value = {
-    corrections: filteredCorrections,
+    corrections: paginatedCorrections,
+    allCorrections: filteredAndSortedCorrections,
     metaData,
     sortOptions,
     setSortOptions,
@@ -450,7 +501,11 @@ export default function CorrectionsAutresProvider({ children, initialFilters, in
     clearAllFilters,
     refreshCorrections,
     errorString,
-    isLoading // isLoading géré uniquement lors du fetch
+    isLoading,
+    pagination,
+    setPagination,
+    goToPage,
+    setItemsPerPage
   };
 
   return (
