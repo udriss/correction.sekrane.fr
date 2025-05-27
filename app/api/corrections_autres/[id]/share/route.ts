@@ -120,21 +120,30 @@ export async function GET(
     const correctionId = parseInt(id);
 
     return await withConnection(async (connection) => {
-      // Chercher le code actif pour cette correction autre
-      const [rows] = await connection.query(
-        `SELECT code FROM share_codes WHERE correction_id = ? AND is_active = TRUE`,
+      // Rechercher un code existant
+      const [shareCodeRecords] = await connection.query(
+        'SELECT code FROM share_codes WHERE correction_id = ?',
         [correctionId]
       );
 
-      if (!Array.isArray(rows) || rows.length === 0) {
-        return NextResponse.json(
-          { exists: false }
-        );
+      if (Array.isArray(shareCodeRecords) && shareCodeRecords.length > 0) {
+        return NextResponse.json({ 
+          exists: true,
+          code: (shareCodeRecords[0] as any).code 
+        });
       }
+
+      // Créer un nouveau code si aucun n'existe
+      const newCode = Math.random().toString(36).substring(2, 10);
+      await connection.query(
+        'INSERT INTO share_codes (correction_id, code, created_at) VALUES (?, ?, NOW())',
+        [correctionId, newCode]
+      );
 
       return NextResponse.json({
         exists: true,
-        code: (rows[0] as any).code
+        code: newCode,
+        isNew: true
       });
     });
   } catch (error) {

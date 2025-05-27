@@ -418,7 +418,7 @@ export default function StudentCorrections({ student, corrections: initialCorrec
                     {correction.points_earned && correction.points_earned.length > 0 && (
                       <>
                         <Typography variant="overline" fontWeight={'bold'} gutterBottom>
-                          Répartition des points
+                          Répartition des point
                         </Typography>
                         
                         <Grid container spacing={1} sx={{ mb: .2 }} direction={'column'}>

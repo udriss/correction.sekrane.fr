@@ -841,7 +841,7 @@ export default function StudentCorrectionsPage() {
                     </Typography>
                   )}
                   <Typography variant="overline" fontWeight={'bold'} gutterBottom>
-                    Répartition des point
+                    Répartition des points
                   </Typography>
                   
                   <Grid container spacing={1} sx={{ mb: .2 }} direction={'column'}>

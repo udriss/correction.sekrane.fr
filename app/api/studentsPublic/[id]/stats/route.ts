@@ -24,9 +24,9 @@ export async function GET(
       const customUser = await getUser(request);
       const userId = customUser?.id || session?.user?.id;
     
-    if (!userId) {
-          return NextResponse.json({ error: 'utilisateur non authentifié' }, { status: 401 });
-      }
+    // if (!userId) {
+    //       return NextResponse.json({ error: 'utilisateur non authentifié' }, { status: 401 });
+    // }
 
     if (isNaN(studentId)) {
       return NextResponse.json({ error: 'Invalid student ID' }, { status: 400 });
