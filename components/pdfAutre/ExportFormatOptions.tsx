@@ -15,7 +15,7 @@ import FileDownloadIcon from '@mui/icons-material/FileDownload';
 import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf';
 import TableChartIcon from '@mui/icons-material/TableChart';
 import InsertDriveFileIcon from '@mui/icons-material/InsertDriveFile';
-import { ExportFormat } from './types';
+import { ExportFormat } from '@/components/pdfAutre/types';
 
 interface ExportFormatOptionsProps {
   exportFormat: ExportFormat;

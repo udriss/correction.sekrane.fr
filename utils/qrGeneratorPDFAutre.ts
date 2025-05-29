@@ -2,7 +2,7 @@
 import { jsPDF } from 'jspdf';
 import QRCode from 'qrcode';
 import { CorrectionAutreEnriched, Student, CorrectionWithShareCode } from '@/lib/types';
-import { CellStyle } from '@/components/pdf/types';
+import { CellStyle } from '@/components/pdfAutre/types';
 import { ActivityAutre } from '@/lib/types';
 
 // Types d'arrangement et sous-arrangement

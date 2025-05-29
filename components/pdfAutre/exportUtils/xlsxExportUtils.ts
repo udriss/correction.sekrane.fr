@@ -1,6 +1,6 @@
 // xlsxExportUtils.ts - Utilitaires pour l'export des données en Excel
 import { Student, CorrectionAutreEnriched, ActivityAutre } from '@/lib/types';
-import { ArrangementType, SubArrangementType, ViewType } from '@/components/pdfAutre/types';
+import { ArrangementType, SubArrangementType, ViewType, getCorrectionCellValues } from '@/components/pdfAutre/types';
 import { formatGrade } from './formatUtils';
 
 // Fonction pour appliquer des styles aux cellules Excel
@@ -38,59 +38,9 @@ export const applyExcelCellStyle = (cell: any, cellValue: any, hasPenalty: boole
         pattern: 'solid',
         fgColor: { argb: 'FFF2F2F2' } // Gris très pâle
       };
-    } else if (cellValue.includes('/')) {
-      // Pour les notes avec format "X/20"
-      const match = cellValue.match(/^(\d+(\.\d+)?)\//);
-      if (match) {
-        const grade = parseFloat(match[1]);
-        
-        // Style spécial pour les notes avec pénalité ou bonus
-        if (hasPenalty) {
-          cell.font = { color: { argb: 'FFCC0000' }, bold: true }; // Rouge et gras
-          cell.fill = {
-            type: 'pattern',
-            pattern: 'solid',
-            fgColor: { argb: 'FFFFEEEE' } // Rouge très pâle
-          };
-        } else if (hasBonus) {
-          cell.font = { color: { argb: 'FF008800' }, bold: true }; // Vert foncé et gras
-          cell.fill = {
-            type: 'pattern',
-            pattern: 'solid',
-            fgColor: { argb: 'FFEEFFEE' } // Vert très pâle
-          };
-        } else {
-          // Style normal basé sur la note
-          if (grade < 5) {
-            cell.fill = {
-              type: 'pattern',
-              pattern: 'solid',
-              fgColor: { argb: 'FFFFCCCC' } // Rouge clair
-            };
-          } else if (grade < 10) {
-            cell.fill = {
-              type: 'pattern',
-              pattern: 'solid',
-              fgColor: { argb: 'FFFFEECC' } // Orange clair
-            };
-          } else if (grade < 15) {
-            cell.fill = {
-              type: 'pattern',
-              pattern: 'solid',
-              fgColor: { argb: 'FFEEFFEE' } // Vert clair
-            };
-          } else {
-            cell.fill = {
-              type: 'pattern',
-              pattern: 'solid',
-              fgColor: { argb: 'FFCCFFCC' } // Vert clair
-            };
-            cell.font = { bold: true };
-          }
-        }
-      }
     } else if (typeof cellValue === 'string' && /^\d+([.,]\d+)?$/.test(cellValue)) {
       // Pour les notes sans format "X/20" (juste un nombre)
+      // Normaliser la virgule en point pour le parsing numérique
       const grade = parseFloat(cellValue.replace(',', '.'));
       
       // Style spécial pour les notes avec pénalité ou bonus
@@ -135,6 +85,58 @@ export const applyExcelCellStyle = (cell: any, cellValue: any, hasPenalty: boole
             fgColor: { argb: 'FFCCFFCC' } // Vert clair
           };
           cell.font = { bold: true };
+        }
+      }
+    } else if (cellValue.includes('/')) {
+      // Pour les notes avec format "X,X/20" ou "X.X/20"
+      const match = cellValue.match(/^(\d+([.,]\d+)?)\//);
+      if (match) {
+        // Normaliser la virgule en point pour le parsing numérique
+        const grade = parseFloat(match[1].replace(',', '.'));
+        
+        // Style spécial pour les notes avec pénalité ou bonus
+        if (hasPenalty) {
+          cell.font = { color: { argb: 'FFCC0000' }, bold: true }; // Rouge et gras
+          cell.fill = {
+            type: 'pattern',
+            pattern: 'solid',
+            fgColor: { argb: 'FFFFEEEE' } // Rouge très pâle
+          };
+        } else if (hasBonus) {
+          cell.font = { color: { argb: 'FF008800' }, bold: true }; // Vert foncé et gras
+          cell.fill = {
+            type: 'pattern',
+            pattern: 'solid',
+            fgColor: { argb: 'FFEEFFEE' } // Vert très pâle
+          };
+        } else {
+          // Style normal basé sur la note
+          if (grade < 5) {
+            cell.fill = {
+              type: 'pattern',
+              pattern: 'solid',
+              fgColor: { argb: 'FFFFCCCC' } // Rouge clair
+            };
+          } else if (grade < 10) {
+            cell.fill = {
+              type: 'pattern',
+              pattern: 'solid',
+              fgColor: { argb: 'FFFFEECC' } // Orange clair
+            };
+          } else if (grade < 15) {
+            cell.fill = {
+              type: 'pattern',
+              pattern: 'solid',
+              fgColor: { argb: 'FFEEFFEE' } // Vert clair
+            };
+          } else {
+            cell.fill = {
+              type: 'pattern',
+              pattern: 'solid',
+              fgColor: { argb: 'FFCCFFCC' } // Vert clair
+            };
+            cell.font = { bold: true };
+          }
         }
       }
     }
@@ -220,34 +222,17 @@ export const createExcelWorksheet = (
       
       // Vérifier si c'est une correction fictive avec status NON_NOTE
       const isPlaceholder = (c.placeholder && c.status === 'NON_NOTE');
-      // Déterminer la valeur à afficher
+      
+      // Utiliser getCorrectionCellValues pour un formatage cohérent avec les virgules
       let displayValue = 'NON NOTÉ XLSX';
+      if (activity) {
+        const cellValues = getCorrectionCellValues(c, activity, true); // useCommaFormat: true pour XLSX
+        displayValue = String(cellValues.totalGradeDisplay);
+      }
+      
+      // Gestion spéciale pour les placeholders
       if (isPlaceholder) {
         displayValue = 'N/A XLSX';
-      } else if (c.status) {
-        switch (c.status) {
-          case 'ACTIVE':
-            displayValue = c.final_grade !== undefined ? `${formatGrade(c.final_grade)}` : 'NON NOTÉ';
-            break;
-          case 'NON_NOTE':
-            displayValue = 'NON NOTÉ';
-            break;
-          case 'ABSENT':
-            displayValue = 'ABSENT';
-            break;
-          case 'NON_RENDU':
-            displayValue = 'NON RENDU';
-            break;
-          case 'DEACTIVATED':
-            displayValue = 'DÉSACTIVÉ';
-            break;
-          default:
-            displayValue = c.final_grade !== undefined ? `${formatGrade(c.final)}` : 'NON NOTÉ';
-        }
-      } else if (c.active === 0) {
-        displayValue = 'DÉSACTIVÉ';
-      } else if (c.final_grade !== undefined) {
-        displayValue = `${c.final_grade}`;
       }
       studentMap[studentKey].grades[activityKey] = displayValue;
     });
@@ -362,51 +347,20 @@ export const createExcelWorksheet = (
       // Vérifier si c'est une correction fictive avec status NON_NOTE
       const isPlaceholder = (c.placeholder && c.status === 'NON_NOTE');
       
-      // Déterminer la valeur à afficher
+      // Utiliser getCorrectionCellValues pour un formatage cohérent avec les virgules
       let gradeDisplay = 'NON NOTÉ';
       let pointsDisplay = 'N/A';
       
+      if (activity) {
+        const cellValues = getCorrectionCellValues(c, activity, true); // useCommaFormat: true pour XLSX
+        gradeDisplay = String(cellValues.totalGradeDisplay);
+        pointsDisplay = cellValues.pointsDisplay;
+      }
+      
+      // Gestion spéciale pour les placeholders
       if (isPlaceholder) {
         gradeDisplay = 'N/A';
         pointsDisplay = 'N/A';
-      } else if (c.status) {
-        switch (c.status) {
-          case 'ACTIVE':
-            gradeDisplay = c.final_grade !== undefined ? 
-              `${formatGrade(c.final_grade)}` : 'NON NOTÉ';
-            pointsDisplay = Array.isArray(c.points_earned) ? 
-              '[' + c.points_earned.join(' ; ') + ']' : 'N/A';
-            break;
-          case 'NON_NOTE':
-            gradeDisplay = 'NON NOTÉ';
-            pointsDisplay = 'NON NOTÉ';
-            break;
-          case 'ABSENT':
-            gradeDisplay = 'ABSENT';
-            pointsDisplay = 'ABSENT';
-            break;
-          case 'NON_RENDU':
-            gradeDisplay = 'NON RENDU';
-            pointsDisplay = 'NON RENDU';
-            break;
-          case 'DEACTIVATED':
-            gradeDisplay = 'DÉSACTIVÉ';
-            pointsDisplay = 'DÉSACTIVÉ';
-            break;
-          default:
-            gradeDisplay = c.final_grade !== undefined ? 
-              `${formatGrade(c.final_grade)}` : 'NON NOTÉ';
-            pointsDisplay = Array.isArray(c.points_earned) ? 
-              '[' + c.points_earned.join(' ; ') + ']' : 'N/A';
-        }
-      } else if (c.active === 0) {
-        gradeDisplay = 'DÉSACTIVÉ';
-        pointsDisplay = 'DÉSACTIVÉ';
-      } else {
-        gradeDisplay = c.final_grade !== undefined ? 
-          `${formatGrade(c.final_grade)}` : 'NON NOTÉ';
-        pointsDisplay = Array.isArray(c.points_earned) ? 
-          '[' + c.points_earned.join(' ; ') + ']' : 'N/A';
       }
       
       // Stocker à la fois la note et les points pour chaque activité
@@ -622,37 +576,19 @@ export const createExcelWorksheet = (
       // Vérifier si c'est une correction fictive avec status NON_NOTE
       const isPlaceholder = (c.placeholder && c.status === 'NON_NOTE');
       
-      // Déterminer le statut
+      // Utiliser getCorrectionCellValues pour un formatage cohérent avec les virgules
+      let gradeDisplay = 'NON NOTÉ';
       let statusDisplay = 'ACTIVE';
-      if (c.status) {
-        switch (c.status) {
-          case 'NON_NOTE': statusDisplay = 'NON NOTÉ'; break;
-          case 'ABSENT': statusDisplay = 'ABSENT'; break;
-          case 'NON_RENDU': statusDisplay = 'NON RENDU'; break;
-          case 'DEACTIVATED': statusDisplay = 'DÉSACTIVÉ'; break;
-          default: statusDisplay = c.status;
-        }
-      } else if (c.active === 0) {
-        statusDisplay = 'DÉSACTIVÉ';
+      
+      if (activity) {
+        const cellValues = getCorrectionCellValues(c, activity, true); // useCommaFormat: true pour XLSX
+        gradeDisplay = String(cellValues.totalGradeDisplay);
+        statusDisplay = cellValues.statusDisplay;
       }
       
-      // Formater la note
-      let gradeDisplay;
-      let totalPoints = 20;
-      if (activity && Array.isArray(activity.points)) {
-        totalPoints = activity.points.reduce((sum, p) => sum + p, 0);
-      }
+      // Gestion spéciale pour les placeholders
       if (isPlaceholder) {
         gradeDisplay = 'N/A';
-      } else if (c.final_grade !== undefined) {
-        if (statusDisplay === 'ACTIVE') {
-          // Remplacer '.' par ',' dans la note et afficher le barème réel
-          gradeDisplay = `${formatGrade(c.final_grade).replace('.', ',')}`;
-        } else {
-          gradeDisplay = statusDisplay;
-        }
-      } else {
-        gradeDisplay = 'NON NOTÉ';
       }
       
       // Préparer les données de base de la ligne
@@ -668,8 +604,8 @@ export const createExcelWorksheet = (
       // Ajouter les points pour chaque partie
       if (!isPlaceholder && Array.isArray(c.points_earned)) {
         c.points_earned.forEach((point: number, index: number) => {
-          // Formater le point avec virgule au lieu de point décimal
-          const formattedPoint = String(point).replace('.', ',');
+          // Utiliser formatGrade pour formater avec virgule de manière cohérente
+          const formattedPoint = formatGrade(point, true); // useComma: true
           rowData[`part_${index}`] = formattedPoint;
         });
       }

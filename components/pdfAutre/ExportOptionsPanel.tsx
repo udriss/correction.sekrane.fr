@@ -15,14 +15,14 @@ import {
 } from '@mui/material';
 import TableChartIcon from '@mui/icons-material/TableChart';
 import ArrangementOptionsAutre from './ArrangementOptionsAutre';
-import ExportFormatOptions from '@/components/pdf/ExportFormatOptions';
-import QRCodeExportOptions from '@/components/pdf/QRCodeExportOptions';
+import ExportFormatOptions from '@/components/pdfAutre/ExportFormatOptions';
+import QRCodeExportOptions from '@/components/pdfAutre/QRCodeExportOptions';
 import { 
   ArrangementType, 
   SubArrangementType, 
   ExportFormat, 
   ViewType
-} from './types';
+} from '@/components/pdfAutre/types';
 
 interface Activity {
   id: number | string;

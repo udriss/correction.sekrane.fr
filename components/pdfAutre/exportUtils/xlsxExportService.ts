@@ -1,7 +1,7 @@
 // xlsxExportService.ts - Service pour l'export des données en XLSX
 import { createExcelWorksheet } from './xlsxExportUtils';
 import { ArrangementType, SubArrangementType, ViewType } from '@/components/pdfAutre/types';
-import { Student, CorrectionAutreEnriched, ActivityAutre } from '@/lib/types';
+import { Student, ActivityAutre } from '@/lib/types';
 
 // Fonction pour exporter les données en XLSX
 export const exportToXLSX = async (
