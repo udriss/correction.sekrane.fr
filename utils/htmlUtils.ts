@@ -136,6 +136,9 @@ export const parseHtmlToItems = (html: string): ContentItem[] => {
 export function generateHtmlFromItems(items: ContentItem[]): string {
   let html = '';
   
+  // Inclure les styles CSS pour les titres d'exercices et fragments
+  html += generateFeedbackStyles();
+  
   // Traiter les éléments principaux
   for (const item of items) {
     if (item.parentId) continue; // Les éléments enfants sont traités avec leurs parents
@@ -156,29 +159,104 @@ function generateHtmlForItem(item: ContentItem, allItems: ContentItem[]): string
   
   switch (item.type) {
     case 'text':
-      // Détection de list à puces (lignes commençant par • ou - ou *)
-      if (item.content && (
-          item.content.trim().split('\n').filter(line => line.trim()).every(line => 
-            line.trim().startsWith('•') || 
-            line.trim().startsWith('-') || 
-            line.trim().startsWith('*')
-          )
-      )) {
-        // C'est une liste à puces, transformer en véritable liste HTML
-        let listItems = item.content
-          .trim()
-          .split('\n')
-          .filter(line => line.trim())
+      // Détection et amélioration des listes à puces (lignes commençant par • ou - ou *)
+      const lines = item.content ? item.content.trim().split('\n').filter(line => line.trim()) : [];
+      
+      // Vérifier si c'est une liste à puces
+      const isFormattedList = lines.length > 0 && lines.every(line => 
+        line.trim().startsWith('•') || 
+        line.trim().startsWith('-') || 
+        line.trim().startsWith('*')
+      );
+      
+      // Vérifier si c'est un fragment de correction, mais exclure les exercise-title qui sont déjà formatés
+      const isExerciseTitle = item.content && (
+        item.content.includes('exercise-title') ||
+        // Détecter les titres d'exercices typiques
+        (item.content.match(/^(Exercice|Question|Partie|Problème)\s*\d+/i)) ||
+        // Détecter les contenus très courts qui ressemblent à des titres
+        (item.content.length < 100 && item.content.match(/^[A-Z][^.!?]*$/))
+      );
+      
+      // Détecter les différents types de corrections
+      const isPreregisteredFragment = !isExerciseTitle && (
+        item.fragmentId || item.originalFragmentId || 
+        (item.isFromFragment === true) ||
+        (item.content && item.content.match(/^Q\d+/)) // Fragments qui commencent par "QX"
+      );
+      
+      const isCustomCorrection = !isExerciseTitle && !isPreregisteredFragment && (
+        (item.isFromFragment === false) ||
+        (item.content && (
+          item.content.includes('.') || 
+          item.content.includes('!') || 
+          item.content.includes('?') ||
+          lines.length > 1 ||
+          (item.content.length > 100) // Longs textes are likely corrections
+        ))
+      );
+      
+      const isFragmentCorrection = isPreregisteredFragment || isCustomCorrection;
+      
+      if (isFormattedList) {
+        // C'est déjà une liste à puces formatée, transformer en véritable liste HTML
+        let listItems = lines
           .map(line => {
             const content = line.trim().substring(1).trim(); // Enlever le symbole de puce
             return `<li>${content}</li>`;
           })
           .join('');
           
-        return `<ul ${commonAttrs} ${updateMarker} class="bullet-list">${listItems}</ul>`;
+        return `<ul ${commonAttrs} ${updateMarker} class="bullet-list formatted-list">${listItems}</ul>`;
+      } else if (isFragmentCorrection && (item.fragmentId || item.originalFragmentId || item.isFromFragment !== undefined)) {
+        // C'est un fragment de correction, créer une liste structurée
+        const fragmentContent = item.content || '';
+        
+        // Déterminer la classe CSS en fonction du type de correction
+        const correctionClass = isPreregisteredFragment ? 'fragment-correction' : 'custom-correction';
+        
+        // Diviser le contenu en phrases ou sections logiques
+        const sentences = fragmentContent
+          .split(/[.!?;]+/)
+          .map(s => s.trim())
+          .filter(s => s.length > 10); // Ignorer les fragments trop courts
+        
+        // Alternative: diviser par lignes si pas assez de phrases
+        const lines = fragmentContent
+          .split(/\n+/)
+          .map(s => s.trim())
+          .filter(s => s.length > 5);
+        
+        // Utiliser la méthode qui donne le plus de points distincts
+        const contentParts = sentences.length > 1 ? sentences : 
+                           lines.length > 1 ? lines : 
+                           [fragmentContent];
+        
+        if (contentParts.length > 1) {
+          // Créer une liste à puces pour les fragments multi-points
+          const listItems = contentParts
+            .map(part => {
+              // Ajouter un point final si nécessaire
+              const trimmed = part.trim();
+              const needsPunctuation = !trimmed.match(/[.!?;:]$/);
+              return `<li>${trimmed}${needsPunctuation ? '.' : ''}</li>`;
+            })
+            .join('');
+          
+          return `<div ${commonAttrs} ${updateMarker} class="${correctionClass}">
+            ${item.fragmentName ? `<div class="fragment-title">${item.fragmentName}</div>` : ''}
+            <ul class="correction-fragment-list">${listItems}</ul>
+          </div>`;
+        } else {
+          // Une seule phrase, afficher comme un paragraphe avec style fragment
+          return `<div ${commonAttrs} ${updateMarker} class="${correctionClass} single-point">
+            ${item.fragmentName ? `<div class="fragment-title">${item.fragmentName}</div>` : ''}
+            <p class="single-correction-point">${fragmentContent}</p>
+          </div>`;
+        }
       }
       
-      // Si ce n'est pas une liste, c'est un paragraphe normal
+      // Si ce n'est pas une liste ni un fragment, c'est un paragraphe normal
       return `<p ${commonAttrs} ${updateMarker} class="text-item">${item.content || ''}</p>`;
       
     case 'image':
@@ -349,12 +427,61 @@ export function extractFormattedText(items: ContentItem[]): string {
     if (item.parentId) continue;
     
     if (item.type === 'text') {
-      text += `${item.content || ''}\n\n`;
+      const content = item.content || '';
+      
+      // Exclure les exercise-title de la transformation en bullet list
+      const isExerciseTitle = content && (
+        content.includes('exercise-title') ||
+        content.match(/^(Exercice|Question|Partie|Problème)\s*\d+/i) ||
+        (content.length < 100 && content.match(/^[A-Z][^.!?]*$/))
+      );
+      
+      // Vérifier si c'est un fragment de correction qui a été transformé
+      if (!isExerciseTitle && (item.fragmentId || item.originalFragmentId || item.isFromFragment !== undefined) && content) {
+        // Traiter comme un fragment de correction avec titre
+        if (item.fragmentName) {
+          text += `${item.fragmentName}:\n`;
+        }
+        
+        // Diviser en phrases et formater comme liste si applicable
+        const sentences = content
+          .split(/[.!?;]+/)
+          .map(s => s.trim())
+          .filter(s => s.length > 10);
+        
+        const lines = content
+          .split(/\n+/)
+          .map(s => s.trim())
+          .filter(s => s.length > 5);
+        
+        const contentParts = sentences.length > 1 ? sentences : 
+                           lines.length > 1 ? lines : 
+                           [content];
+        
+        if (contentParts.length > 1) {
+          for (const part of contentParts) {
+            const trimmed = part.trim();
+            const needsPunctuation = !trimmed.match(/[.!?;:]$/);
+            text += `• ${trimmed}${needsPunctuation ? '.' : ''}\n`;
+          }
+        } else {
+          text += `• ${content}\n`;
+        }
+        text += '\n';
+      } else {
+        // Traitement normal
+        text += `${content}\n\n`;
+      }
     } else if (item.type === 'image') {
       text += `[Image: ${item.alt || 'Image uploadée'}]\n\n`;
     } else if (item.type === 'audio') {
       text += `[Audio${item.content ? `: ${item.content}` : ''}]\n\n`;
     } else if (item.type === 'list') {
+      // Traiter les listes avec leur titre
+      if (item.content) {
+        text += `${item.content}:\n`;
+      }
+      
       // Trouver les enfants de cette liste
       const children = items.filter(child => child.parentId === item.id);
       
@@ -444,3 +571,137 @@ export const syncDraggables = (contentItems: ContentItem[]): void => {
     }
   });
 };
+
+// Générer les styles CSS pour les titres d'exercices et fragments de correction
+export function generateFeedbackStyles(): string {
+  return `
+    <style>
+      .exercise-title {
+        margin-top: 1.5rem;
+        text-align: center;
+        margin-bottom: 2rem;
+        padding: 0.75rem 1rem;
+        font-weight: bold;
+        font-size: 1.1rem;
+        background: linear-gradient(90deg, rgba(25, 118, 210, 0.2), rgba(156, 39, 176, 0.2));
+        border: 1px solid black;
+        box-shadow: 0px 0px 15px 0px #898989;
+        border-radius: 1rem;
+        page-break-before: auto;
+        page-break-after: avoid;
+      }
+      
+      .exercise-title:first-child {
+        margin-top: 0;
+      }
+      
+      /* S'assurer que les titres d'exercices ne sont pas affectés par les styles des paragraphes */
+      .exercise-title::before {
+        content: none !important;
+      }
+      
+      .exercise-title p {
+        margin: 0;
+        padding: 0;
+      }
+      
+      /* Styles pour les fragments de correction */
+      .fragment-correction {
+        margin: 1rem 0;
+        padding: 0.75rem;
+        border-left: 4px solid #1976d2;
+        background-color: rgba(25, 118, 210, 0.05);
+        border-radius: 0 8px 8px 0;
+      }
+      
+      /* Styles pour les corrections personnalisées (non issues de fragments préenregistrés) */
+      .custom-correction {
+        margin: 1rem 0;
+        padding: 0.75rem;
+        border-left: 4px solid #e65100;
+        background-color: rgba(230, 81, 0, 0.08);
+        border-radius: 0 8px 8px 0;
+      }
+      
+      .fragment-title {
+        font-weight: bold;
+        color: #1565c0;
+        margin-bottom: 0.5rem;
+        font-size: 0.9rem;
+      }
+      
+      .custom-correction .fragment-title {
+        color: #bf360c;
+      }
+      
+      .correction-fragment-list {
+        margin: 0.5rem 0;
+        padding-left: 1.5rem;
+        list-style-type: disc;
+      }
+      
+      .correction-fragment-list li {
+        margin: 0.4rem 0;
+        line-height: 1.5;
+        color: #212121;
+        padding-left: 0.25rem;
+      }
+      
+      .single-correction-point {
+        margin: 0.5rem 0;
+        line-height: 1.5;
+        color: #212121;
+      }
+      
+      .fragment-correction.single-point {
+        border-left-color:rgb(39, 82, 176);
+        background-color: rgba(108, 173, 125, 0.05);
+      }
+      
+      .custom-correction.single-point {
+        border-left-color: #d84315;
+        background-color: rgba(216, 67, 21, 0.08);
+      }
+      
+      /* Amélioration des listes déjà formatées */
+      .formatted-list {
+        margin: 1rem 0;
+        padding-left: 2rem;
+        background-color: rgba(2, 136, 209, 0.03);
+        border-radius: 4px;
+        padding: 0.5rem 1rem 0.5rem 2rem;
+      }
+      
+      .formatted-list li {
+        margin: 0.4rem 0;
+        line-height: 1.5;
+      }
+      
+      /* Styles généraux pour les listes à puces */
+      .bullet-list, .correction-list {
+        list-style-type: disc;
+        margin: 0.5rem 0;
+        padding-left: 1.5rem;
+      }
+      
+      .bullet-list li, .correction-list li {
+        margin: 0.3rem 0;
+        line-height: 1.5;
+        padding-left: 0.25rem;
+      }
+      
+      /* Amélioration pour les fragments longs */
+      .fragment-correction p, .fragment-correction li {
+        word-wrap: break-word;
+        overflow-wrap: break-word;
+      }
+      
+      /* Styles pour les paragraphes normaux vs fragments */
+      .text-item {
+        margin: 0.75rem 0;
+        line-height: 1.6;
+        color: #212121;
+      }
+    </style>
+  `;
+}

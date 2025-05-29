@@ -18,8 +18,7 @@ import {
   AccordionDetails,
   Grid,
   useMediaQuery,
-  useTheme,
-  alpha
+  useTheme
 } from '@mui/material';
 import { useRouter } from 'next/navigation';
 import { parseContentItems } from '@/lib/services/correctionService';
@@ -1110,38 +1109,6 @@ export default function FeedbackViewer({ params }: { params: Promise<{ code: str
                     p: 3,
                     boxShadow: 'inset 0 2px 4px 0 rgba(0,0,0,0.06)'
                   }}>
-                    {/* Utilisation de la fonction pour les styles des titres d'exercices */}
-                    <style jsx global>{`
-                      .exercise-title {
-                        margin-top: 1.5rem;
-                        text-align: center;
-                        margin-bottom: 2rem;
-                        padding: 0.75rem 1rem;
-                        font-weight: bold;
-                        font-size: 1.1rem;
-                        background: linear-gradient(90deg, ${alpha(theme.palette.primary.light,.2)}, ${alpha(theme.palette.secondary.light,.2)});
-                        border: 1px solid black;
-                        box-shadow: 0px 0px 15px 0px #898989;
-                        border-radius: 1rem;
-                        page-break-before: auto;
-                        page-break-after: avoid;
-                      }
-                      
-                      .exercise-title:first-child {
-                        margin-top: 0;
-                      }
-                      
-                      /* S'assurer que les titres d'exercices ne sont pas affectés par les styles des paragraphes */
-                      .exercise-title::before {
-                        content: none !important;
-                      }
-                      
-                      .exercise-title p {
-                        margin: 0;
-                        padding: 0;
-                      }
-                    `}</style>
-
                     <SVGImageHandler htmlContent={processHtmlForExerciseTitles(renderedHtml)} />
                   </AccordionDetails>
                 </Accordion>

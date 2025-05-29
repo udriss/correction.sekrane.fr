@@ -148,6 +148,7 @@ export async function PUT(
       grade: updatedCorrection?.grade,
       final_grade: updatedCorrection?.final_grade,
       penalty: updatedCorrection?.penalty,
+      bonus: updatedCorrection?.bonus,
       status: updatedCorrection?.status
     });
   } catch (error) {

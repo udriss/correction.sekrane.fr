@@ -83,6 +83,12 @@ const GradingSectionAutres: React.FC<GradingSectionAutresProps> = ({
   const [isCalculating, setIsCalculating] = useState(false);
   // État local pour la valeur du slider d'ajustement (pendant le drag)
   const [localAdjustmentValue, setLocalAdjustmentValue] = useState<number | null>(null);
+  // Fonction pour stocker temporairement les valeurs pendant le glissement
+  const tempValuesRef = useRef<{ [key: string | number]: number }>({});
+  // Référence pour garder la dernière valeur valide du slider d'ajustement
+  const lastValidAdjustmentRef = useRef<number>(0);
+  // Référence pour stocker la dernière note finale valide (pour éviter les resets du slider)
+  const lastValidFinalGradeRef = useRef<number | null>(null);
 
   // Hook pour les notifications
   const { enqueueSnackbar } = useSnackbar();
@@ -124,21 +130,41 @@ const GradingSectionAutres: React.FC<GradingSectionAutresProps> = ({
     setNeverSubmitted(isNeverSubmitted);
   }, [pointsEarned, totalPoints, correction]);
   
-  // Réinitialiser la valeur locale du slider quand les props penalty/bonus changent
+  // Initialiser la référence de la dernière valeur valide au montage
   useEffect(() => {
-    // Réinitialiser la valeur locale seulement si nous ne sommes pas en train de faire un drag
-    // et que les props ont été mises à jour depuis l'extérieur (par exemple après handleRecalculateGrade)
-    if (localAdjustmentValue !== null && !tempValuesRef.current['adjustment']) {
-      const penaltyValue = parseFloat(penalty) || 0;
-      const bonusValue = parseFloat(bonus) || 0;
-      const currentAdjustmentFromProps = penaltyValue > 0 ? -penaltyValue : bonusValue;
-      
-      // Si la valeur calculée depuis les props est différente de la valeur locale, réinitialiser
-      if (Math.abs(currentAdjustmentFromProps - localAdjustmentValue) > 0.01) {
-        setLocalAdjustmentValue(null);
+    const penaltyValue = parseFloat(penalty) || 0;
+    const bonusValue = parseFloat(bonus) || 0;
+    
+    if (bonusValue > 0) {
+      lastValidAdjustmentRef.current = bonusValue;
+    } else if (penaltyValue > 0) {
+      lastValidAdjustmentRef.current = -penaltyValue;
+    } else {
+      lastValidAdjustmentRef.current = 0;
+    }
+    
+    // Initialiser aussi la note finale si elle existe dans les props
+    if (correction && correction.final_grade !== null && correction.final_grade !== undefined) {
+      const correctionFinalGrade = parseFloat(String(correction.final_grade));
+      if (!isNaN(correctionFinalGrade)) {
+        lastValidFinalGradeRef.current = correctionFinalGrade;
       }
     }
-  }, [penalty, bonus]); // Enlever localAdjustmentValue des dépendances pour éviter la boucle
+  }, []); // Seulement au montage
+  
+  // Réinitialiser la valeur locale du slider quand les props penalty/bonus changent
+  useEffect(() => {
+    // Si nous ne sommes pas en train de faire un drag et que la sauvegarde est terminée
+    if (!tempValuesRef.current['adjustment'] && !saving && !isUpdating) {
+      // Toujours réinitialiser pour forcer la synchronisation avec les props
+      // mais avec un petit délai pour laisser les props se mettre à jour
+      const timer = setTimeout(() => {
+        setLocalAdjustmentValue(null);
+      }, 50);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [penalty, bonus, saving, isUpdating]); // Ajouter saving et isUpdating pour déclencher après sauvegarde
   
   // Fonction pour sauvegarder les notes avec un délai
   const saveGradeWithDebounce = (newPointsEarned: number[], penaltyValue: number, bonusValue: number = 0) => {
@@ -181,6 +207,11 @@ const GradingSectionAutres: React.FC<GradingSectionAutresProps> = ({
           .then((data) => {
             // Mise à jour de l'état local de correction avec les nouvelles valeurs
             if (data && data.points_earned) {
+              // Mettre à jour la référence de la note finale si disponible
+              if (data.final_grade !== null && data.final_grade !== undefined) {
+                lastValidFinalGradeRef.current = data.final_grade;
+              }
+              
               const event = new CustomEvent('gradeUpdated', { 
                 detail: { 
                   message: 'Note mise à jour',
@@ -211,8 +242,8 @@ const GradingSectionAutres: React.FC<GradingSectionAutresProps> = ({
             setSaving(false); // Indiquer que la sauvegarde est terminée
           });
       }
-    }, 3000); // Délai de 2 secondes
-    
+    }, 3000); // Délai de 3 secondes
+
     setSaveGradeTimeout(timeout);
   };
 
@@ -273,7 +304,12 @@ const GradingSectionAutres: React.FC<GradingSectionAutresProps> = ({
             setPenalty(String(data.penalty || 0));
             setBonus(String(data.bonus || 0));
             
-            // NE PAS réinitialiser localAdjustmentValue ici - laisser le useEffect s'en charger
+            // Mettre à jour la référence de la note finale pour éviter les resets
+            if (data.final_grade !== null && data.final_grade !== undefined) {
+              lastValidFinalGradeRef.current = data.final_grade;
+            }
+            
+            // La synchronisation de localAdjustmentValue sera gérée par les useEffect
             
             // Afficher l'indicateur de succès central
             markSaveSuccess();
@@ -307,7 +343,7 @@ const GradingSectionAutres: React.FC<GradingSectionAutresProps> = ({
             // En cas de succès, le useEffect se chargera de la réinitialisation quand nécessaire
           });
       }
-    }, 2000);
+    }, 500);
     
     setSaveGradeTimeout(timeout);
   };
@@ -373,6 +409,9 @@ const GradingSectionAutres: React.FC<GradingSectionAutresProps> = ({
               correction.bonus = 0;
               correction.status = 'NON_RENDU'; // Mettre à jour le statut localement aussi
             }
+            
+            // Mettre à jour la référence de la note finale
+            lastValidFinalGradeRef.current = validatedGrade25;
             
             // Afficher l'indicateur de succès central
             markSaveSuccess();
@@ -453,6 +492,9 @@ const GradingSectionAutres: React.FC<GradingSectionAutresProps> = ({
               correction.status = 'ACTIVE';
             }
             
+            // Mettre à jour la référence de la note finale
+            lastValidFinalGradeRef.current = 0;
+            
             // Afficher l'indicateur de succès central
             markSaveSuccess();
             
@@ -488,16 +530,18 @@ const GradingSectionAutres: React.FC<GradingSectionAutresProps> = ({
   const calculateFinalGrade = (grade: number, penalty: number, bonus: number = 0): number => {
     const totalMaxPoints = totalPoints.reduce((sum, points) => sum + points, 0);
     
-    // Appliquer d'abord le bonus (sans dépasser le maximum)
-    const gradeWithBonus = Math.min(grade + bonus, totalMaxPoints);
-    
-    if (gradeWithBonus < 5) {
-      // Si la note est inférieure à 5, on garde la note originale
-      return gradeWithBonus;
+    // Utiliser la même logique que le serveur (lib/correctionAutre.ts)
+    let finalGrade;
+    if (grade < 5) {
+      // Si la note est inférieure à 5, on conserve la note initiale mais on peut appliquer le bonus
+      finalGrade = Math.max(grade + bonus, grade);
     } else {
-      // Sinon, on prend le maximum entre (note+bonus-pénalité) et 5, sans dépasser le max
-      return Math.min(Math.max(gradeWithBonus - penalty, 5), totalMaxPoints);
+      // Sinon, on applique la pénalité et le bonus mais ne descend pas en dessous de 5
+      finalGrade = Math.max(5, grade - penalty + bonus);
     }
+    
+    // S'assurer que la note finale ne dépasse pas le maximum possible
+    return Math.min(finalGrade, totalMaxPoints);
   };
 
   // Calculer la note totale
@@ -510,14 +554,40 @@ const GradingSectionAutres: React.FC<GradingSectionAutresProps> = ({
     // Si c'est un travail non rendu, renvoyer 25% des points max
     if (neverSubmitted) {
       const totalMaxPoints = totalPoints.reduce((sum, points) => sum + points, 0);
-      return totalMaxPoints * 0.25;
+      const finalGrade = totalMaxPoints * 0.25;
+      lastValidFinalGradeRef.current = finalGrade;
+      return finalGrade;
     }
     
     const totalGrade = calculateTotalGrade();
     const penaltyValue = parseFloat(penalty) || 0;
     const bonusValue = parseFloat(bonus) || 0;
     
-    return calculateFinalGrade(totalGrade, penaltyValue, bonusValue);
+    // Calculer la note finale normalement
+    const calculatedFinalGrade = calculateFinalGrade(totalGrade, penaltyValue, bonusValue);
+    
+    // Si on a une note finale calculée valide (non zéro ou avec des adjustements), la sauvegarder et l'utiliser
+    if (calculatedFinalGrade > 0 || penaltyValue > 0 || bonusValue > 0) {
+      lastValidFinalGradeRef.current = calculatedFinalGrade;
+      return calculatedFinalGrade;
+    }
+    
+    // Si on a une note finale depuis les props de correction, l'utiliser comme fallback
+    if (correction && correction.final_grade !== null && correction.final_grade !== undefined) {
+      const correctionFinalGrade = parseFloat(String(correction.final_grade));
+      if (!isNaN(correctionFinalGrade)) {
+        lastValidFinalGradeRef.current = correctionFinalGrade;
+        return correctionFinalGrade;
+      }
+    }
+    
+    // En dernier recours, utiliser la dernière valeur valide connue si elle existe
+    if (lastValidFinalGradeRef.current !== null && lastValidFinalGradeRef.current > 0) {
+      return lastValidFinalGradeRef.current;
+    }
+    
+    // Sinon, retourner la valeur calculée (même si c'est 0)
+    return calculatedFinalGrade;
   };
   
   // Calculer le pourcentage obtenu
@@ -533,9 +603,6 @@ const GradingSectionAutres: React.FC<GradingSectionAutresProps> = ({
     return totalMaxPoints > 0 ? (totalEarned / totalMaxPoints) * 100 : 0;
   };
 
-  // Fonction pour stocker temporairement les valeurs pendant le glissement
-  const tempValuesRef = useRef<{ [key: string | number]: number }>({});
-  
   // État local pour les valeurs de points pendant le glissement
   const [localPointsEarned, setLocalPointsEarned] = useState<number[]>([]);
   
@@ -585,6 +652,8 @@ const GradingSectionAutres: React.FC<GradingSectionAutresProps> = ({
   const handleAdjustmentDrag = (newValue: number) => {
     // Mettre à jour la valeur locale pour le slider
     setLocalAdjustmentValue(newValue);
+    // Mettre à jour aussi la référence de la dernière valeur valide
+    lastValidAdjustmentRef.current = newValue;
     
     if (newValue < 0) {
       // Valeur négative = pénalité
@@ -629,6 +698,8 @@ const GradingSectionAutres: React.FC<GradingSectionAutresProps> = ({
   const getAdjustmentValue = () => {
     // Si on a une valeur locale (pendant le drag), l'utiliser
     if (localAdjustmentValue !== null) {
+      // Mettre à jour la dernière valeur valide
+      lastValidAdjustmentRef.current = localAdjustmentValue;
       return localAdjustmentValue;
     }
     
@@ -636,10 +707,23 @@ const GradingSectionAutres: React.FC<GradingSectionAutresProps> = ({
     const penaltyValue = parseFloat(penalty) || 0;
     const bonusValue = parseFloat(bonus) || 0;
     
-    if (penaltyValue > 0) {
-      return -penaltyValue; // Retourner une valeur négative pour la pénalité
+    // Calculer la valeur selon les props
+    let adjustmentFromProps = 0;
+    if (bonusValue > 0) {
+      adjustmentFromProps = bonusValue; // Retourner la valeur positive pour le bonus
+    } else if (penaltyValue > 0) {
+      adjustmentFromProps = -penaltyValue; // Retourner une valeur négative pour la pénalité
     }
-    return bonusValue; // Retourner la valeur positive pour le bonus
+    
+    // Si on a une valeur valide depuis les props, l'utiliser et la sauvegarder
+    if (adjustmentFromProps !== 0) {
+      lastValidAdjustmentRef.current = adjustmentFromProps;
+      return adjustmentFromProps;
+    }
+    
+    // En dernier recours, utiliser la dernière valeur valide connue
+    // Cela évite que le slider revienne à 0 pendant les transitions
+    return lastValidAdjustmentRef.current;
   };
   
   // État pour suivre si une sauvegarde a été réussie récemment
@@ -647,7 +731,7 @@ const GradingSectionAutres: React.FC<GradingSectionAutresProps> = ({
   // État pour suivre si une erreur s'est produite récemment
   const [saveError, setSaveError] = useState(false);
   // Durée d'affichage des indicateurs de succès/erreur (en ms)
-  const INDICATOR_DISPLAY_DURATION = 3000;
+  const INDICATOR_DISPLAY_DURATION = 1500;
   
   // Fonction pour indiquer une sauvegarde réussie
   const markSaveSuccess = () => {
