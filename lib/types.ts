@@ -11,6 +11,7 @@ export interface Correction {
   created_at?: Date | string;
   updated_at?: Date | string;
   penalty?: number | null;
+  bonus?: number | null; // Ajout du champ bonus
   final_grade?: number | null; // Note finale: si (grade-penalty) < 5 et grade >= 5 alors 5, si grade < 5 alors grade, sinon (grade-penalty)
   deadline?: Date | string | null;
   group_id: number | null;
@@ -128,6 +129,7 @@ export interface CorrectionAutre {
   created_at?: Date | string;
   updated_at?: Date | string;
   penalty?: number | null;
+  bonus?: number | null; // Ajout du champ bonus
   final_grade?: number | null;
   deadline?: Date | string | null;
   group_id: number | null;

@@ -325,19 +325,19 @@ function NotificationBadge() {
                               <>
                                 {notification.action_type === 'VIEW_STUDENT_CORRECTIONS' ? (
                                   <>
-                                    <Typography variant="body2" sx={{ color: 'text.primary' }}>
+                                    <Typography component="span" variant="body2" sx={{ color: 'text.primary' }}>
                                       a visité sa page de correction
                                     </Typography>
-                                    <Typography variant="caption" sx={{ display: 'block' }}>
+                                    <Typography component="span" variant="caption" sx={{ display: 'block' }}>
                                       {new Date(notification.viewed_at).toLocaleString()}
                                     </Typography>
                                   </>
                                 ) : (
                                   <>
-                                    <Typography variant="body2" sx={{ color: 'text.primary' }}>
+                                    <Typography component="span" variant="body2" sx={{ color: 'text.primary' }}>
                                       a consulté son feedback
                                     </Typography>
-                                    <Typography variant="caption" sx={{ display: 'block' }}>
+                                    <Typography component="span" variant="caption" sx={{ display: 'block' }}>
                                       {notification.activity_name && (
                                         <>
                                           {notification.activity_name}<br />

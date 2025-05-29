@@ -13,7 +13,7 @@ interface CorrectionAutreRow extends RowDataPacket {
   id: number;
   activity_id?: number;
   student_id?: number;
-  penalty?: number | null;
+  bonus?: number | null;
   points_earned?: string | null;
   grade?: number | null;
   [key: string]: any; // Pour les autres propriétés
@@ -40,14 +40,14 @@ export async function PUT(
     const correctionId = parseInt(id);
     
     const data = await request.json();
-    const { penalty } = data;
+    const { bonus } = data;
 
-    // Vérifier si penalty est un nombre valide
-    if (penalty === undefined || isNaN(parseFloat(String(penalty)))) {
-      return NextResponse.json({ error: 'Pénalité invalide' }, { status: 400 });
+    // Vérifier si bonus est un nombre valide
+    if (bonus === undefined || isNaN(parseFloat(String(bonus)))) {
+      return NextResponse.json({ error: 'Bonus invalide' }, { status: 400 });
     }
 
-    const penaltyValue = parseFloat(String(penalty));
+    const bonusValue = parseFloat(String(bonus));
 
     return await withConnection(async (connection) => {
       // Récupérer l'ancienne correction pour le logging
@@ -85,28 +85,28 @@ export async function PUT(
         return NextResponse.json({ error: 'Activité associée non trouvée' }, { status: 404 });
       }
 
-      // Calculer la nouvelle note en prenant en compte la pénalité ET le bonus existant
-      const currentBonus = oldCorrection.bonus || 0;
-      const newGrade = calculateGrade(activity.points, points_earned, penaltyValue, currentBonus);
+      // Calculer la nouvelle note en prenant en compte le bonus ET la pénalité existante
+      const currentPenalty = oldCorrection.penalty || 0;
+      const newGrade = calculateGrade(activity.points, points_earned, currentPenalty, bonusValue);
       
-      // Mettre à jour la pénalité
+      // Mettre à jour le bonus
       await updateCorrectionAutre(correctionId, {
-        penalty: penaltyValue,
+        bonus: bonusValue,
         grade: newGrade.grade,
         final_grade: newGrade.final_grade,
       });
 
-      // Créer un log pour la mise à jour de la pénalité
+      // Créer un log pour la mise à jour du bonus
       await createLogEntry({
-        action_type: 'UPDATE_PENALTY_AUTRE',
-        description: `Modification de la pénalité pour la correction autre #${id}`,
+        action_type: 'UPDATE_BONUS_AUTRE',
+        description: `Modification du bonus pour la correction autre #${id}`,
         entity_type: 'correction_autre',
         entity_id: parseInt(id),
         user_id: customUser?.id,
         username: customUser?.username,
         metadata: {
-          old_penalty: oldCorrection.penalty,
-          new_penalty: penaltyValue,
+          old_bonus: oldCorrection.bonus,
+          new_bonus: bonusValue,
           old_grade: oldCorrection.grade,
           new_grade: newGrade,
           activity_id: oldCorrection.activity_id,
@@ -123,9 +123,9 @@ export async function PUT(
       });
     });
   } catch (error) {
-    console.error('Error updating penalty for correction_autre:', error);
+    console.error('Error updating bonus for correction_autre:', error);
     return NextResponse.json(
-      { error: 'Erreur lors de la mise à jour de la pénalité' },
+      { error: 'Erreur lors de la mise à jour du bonus' },
       { status: 500 }
     );
   }

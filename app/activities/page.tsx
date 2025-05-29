@@ -21,8 +21,6 @@ import {
   Grid,
   Card,
   CardContent,
-  Tabs,
-  Tab,
   alpha,
   useTheme,
   Stepper,
@@ -30,7 +28,12 @@ import {
   StepLabel,
   StepContent,
   List,
-  ListItem
+  ListItem,
+  Select,
+  MenuItem,
+  FormControl,
+  InputLabel,
+  Checkbox
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import SearchIcon from '@mui/icons-material/Search';
@@ -49,6 +52,25 @@ import AssignmentLateIcon from '@mui/icons-material/AssignmentLate';
 import GradientBackground from '@/components/ui/GradientBackground';
 import PatternBackground from '@/components/ui/PatternBackground';
 import LoadingSpinner from '@/components/LoadingSpinner';
+import { fr } from 'date-fns/locale';
+import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
+import { LocalizationProvider, DatePicker } from '@mui/x-date-pickers';
+
+// Configuration française personnalisée pour les DatePickers
+const frenchAdapter = new AdapterDateFns({
+  locale: fr,
+  formats: {
+    keyboardDate: 'dd/MM/yyyy',
+    normalDate: 'dd/MM/yyyy',
+    shortDate: 'dd/MM/yyyy',
+    year: 'yyyy',
+    month: 'MMMM',
+    monthShort: 'MMM',
+    dayOfMonth: 'dd',
+    weekday: 'EEEE',
+    weekdayShort: 'EEE'
+  }
+});
 
 export default function ActivitiesAutresPage() {
   const router = useRouter();
@@ -62,6 +84,7 @@ export default function ActivitiesAutresPage() {
     associated_classes?: number;
     absent_count?: number;
     non_rendu_count?: number;
+    classes?: any[]; // Ajouté pour le filtrage multi-classes
   })[]>([]);
   const [filteredActivities, setFilteredActivities] = useState<(ActivityAutre & {
     correction_count?: number;
@@ -69,14 +92,20 @@ export default function ActivitiesAutresPage() {
     associated_classes?: number;
     absent_count?: number;
     non_rendu_count?: number;
+    classes?: any[]; // Ajouté pour le filtrage multi-classes
   })[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [error, setError] = useState('');
-  const [filterTab, setFilterTab] = useState(0);
   const [showTutorial, setShowTutorial] = useState(false);
   const [confirmingDelete, setConfirmingDelete] = useState<number | null>(null);
   const [selectedActivityId, setSelectedActivityId] = useState<number | null>(null);
+  const [allClasses, setAllClasses] = useState<any[]>([]);
+  const [selectedClassIds, setSelectedClassIds] = useState<number[]>([]);
+  const [dateFrom, setDateFrom] = useState<Date | null>(null);
+  const [dateTo, setDateTo] = useState<Date | null>(null);
+  const [dateModifFrom, setDateModifFrom] = useState<Date | null>(null);
+  const [dateModifTo, setDateModifTo] = useState<Date | null>(null);
   
   useEffect(() => {
     const fetchActivities = async () => {
@@ -97,9 +126,11 @@ export default function ActivitiesAutresPage() {
             // Récupérer le nombre de classes associées
             const classesResponse = await fetch(`/api/activities_autres/${activity.id}/classes`);
             let associatedClassesCount = 0;
+            let associatedClasses: any[] = [];
             if (classesResponse.ok) {
               const classesData = await classesResponse.json();
               associatedClassesCount = Array.isArray(classesData) ? classesData.length : 0;
+              associatedClasses = Array.isArray(classesData) ? classesData : [];
             }
             
             // Récupérer les statistiques des corrections
@@ -146,6 +177,7 @@ export default function ActivitiesAutresPage() {
             return {
               ...activity,
               associated_classes: associatedClassesCount,
+              classes: associatedClasses,
               correction_count: correctionCount,
               inactive_corrections_count: inactiveCorrectionsCount,
               absent_count: absentCount,
@@ -166,7 +198,7 @@ export default function ActivitiesAutresPage() {
         setFilteredActivities(enhancedActivitiesData);
         
         // Afficher le tutoriel
-        setShowTutorial(true);
+        // setShowTutorial(true);
       } catch (err) {
         console.error('Erreur:', err);
         setError(`Erreur: ${(err as Error).message}`);
@@ -178,7 +210,21 @@ export default function ActivitiesAutresPage() {
     fetchActivities();
   }, []);
   
-  // Filtrer les activités lorsque le terme de recherche change ou que l'onglet change
+  // Récupérer toutes les classes pour le filtre
+  useEffect(() => {
+    const fetchClasses = async () => {
+      try {
+        const res = await fetch('/api/classes');
+        if (res.ok) {
+          const data = await res.json();
+          setAllClasses(data);
+        }
+      } catch (e) { /* ignore */ }
+    };
+    fetchClasses();
+  }, []);
+  
+  // Filtrer les activités lorsque le terme de recherche change ou que les filtres changent
   useEffect(() => {
     // Si les activités enrichies ne sont pas encore chargées, ne rien faire
     if (enhancedActivities.length === 0) return;
@@ -194,20 +240,40 @@ export default function ActivitiesAutresPage() {
       );
     }
     
-    // Appliquer le filtre par onglet
-    if (filterTab === 1) {
-      // Filtre "Avec classes"
-      filtered = filtered.filter(activity => activity.associated_classes && activity.associated_classes > 0);
-    } else if (filterTab === 2) {
-      // Filtre "Avec corrections"
-      filtered = filtered.filter(activity => activity.correction_count && activity.correction_count > 0);
+    // Filtre multi-classes
+    if (selectedClassIds.length > 0) {
+      filtered = filtered.filter(activity => {
+        if (!activity.id) return false;
+        // On suppose que chaque activité a une propriété 'classes' (array d'objets {id, name, ...})
+        if (Array.isArray(activity.classes)) {
+          return activity.classes.some((cls: any) => selectedClassIds.includes(cls.id));
+        }
+        // fallback: si pas de détail, on ne filtre que si au moins une classe est associée
+        return false;
+      });
+    }
+    
+    // Filtre date de création
+    if (dateFrom) {
+      filtered = filtered.filter(activity => activity.created_at && new Date(activity.created_at) >= dateFrom);
+    }
+    if (dateTo) {
+      filtered = filtered.filter(activity => activity.created_at && new Date(activity.created_at) <= dateTo);
+    }
+    
+    // Filtre date de modification
+    if (dateModifFrom) {
+      filtered = filtered.filter(activity => activity.updated_at && new Date(activity.updated_at) >= dateModifFrom);
+    }
+    if (dateModifTo) {
+      filtered = filtered.filter(activity => activity.updated_at && new Date(activity.updated_at) <= dateModifTo);
     }
     
     // Trier les activités par nom
     filtered.sort((a, b) => a.name.localeCompare(b.name));
     
     setFilteredActivities(filtered);
-  }, [searchTerm, filterTab, enhancedActivities]);
+  }, [searchTerm, enhancedActivities, selectedClassIds, dateFrom, dateTo, dateModifFrom, dateModifTo]);
   
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setSearchTerm(e.target.value);
@@ -215,10 +281,6 @@ export default function ActivitiesAutresPage() {
   
   const handleCreateActivity = () => {
     router.push('/activities/new');
-  };
-  
-  const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
-    setFilterTab(newValue);
   };
   
   const handleActivitySelect = (activityId: number) => {
@@ -267,6 +329,7 @@ export default function ActivitiesAutresPage() {
     );
   }
   
+
   // Fonction pour afficher une activité
   const renderActivityCard = (activity: ActivityAutre & {
     correction_count?: number;
@@ -820,7 +883,6 @@ export default function ActivitiesAutresPage() {
                }
             }}
           />
-          
           <Button
             variant="outlined"
             color="primary"
@@ -830,24 +892,156 @@ export default function ActivitiesAutresPage() {
             Nouvelle activité
           </Button>
         </Box>
-        
-        <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
-          <Tabs value={filterTab} onChange={handleTabChange}>
-            <Tab label="Toutes" />
-            <Tab label="Avec classes" />
-            <Tab label="Avec corrections" />
-          </Tabs>
+        {/* Filtres avancés : classes et dates */}
+        <LocalizationProvider dateAdapter={AdapterDateFns} adapterLocale={fr}>
+        <Box sx={{
+          display: 'flex',
+          flexWrap: 'wrap',
+          gap: 1.5,
+          mb: 1,
+          alignItems: 'center',
+          rowGap: 1,
+          columnGap: 1.5,
+          px: 0.5,
+          py: 0.5,
+          '@media (max-width: 700px)': { flexDirection: 'column', alignItems: 'stretch', gap: 1 }
+        }}>
+          {/* Filtre multi-classes */}
+          <FormControl sx={{ minWidth: 140, flex: '1 1 120px', m: 0 }} size="small">
+            <InputLabel id="classes-filter-label">Classes</InputLabel>
+            <Select
+              labelId="classes-filter-label"
+              multiple
+              value={selectedClassIds}
+              onChange={e => setSelectedClassIds(typeof e.target.value === 'string' ? e.target.value.split(',').map(Number) : e.target.value)}
+              label="Classes"
+              renderValue={(selected) =>
+                allClasses
+                  .filter(cls => selected.includes(cls.id))
+                  .map(cls => cls.name)
+                  .join(', ') || 'Toutes'
+              }
+              sx={{ minWidth: 140, maxWidth: 220, fontSize: '0.95em', py: 0 }}
+            >
+              {allClasses.map(cls => (
+                <MenuItem key={cls.id} value={cls.id} sx={{ py: 0.5, minHeight: 32 }}>
+                  <Checkbox checked={selectedClassIds.indexOf(cls.id) > -1} size="small" />
+                  <Typography variant="body2">{cls.name}</Typography>
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+          {/* Dates de création */}
+          <DatePicker
+            label="Créée après le"
+            value={dateFrom}
+            onChange={setDateFrom}
+            format="dd/MM/yyyy"
+            slotProps={{ 
+              textField: { 
+                variant: 'outlined',
+                size: 'small', 
+                sx: { minWidth: 140, maxWidth: 160, fontSize: '0.95em', py: 0, m: 0 },
+                placeholder: "",
+                InputLabelProps: { shrink: true },
+                inputProps: { 
+                  'aria-label': 'Date de création minimum',
+                  pattern: '[0-9]{2}/[0-9]{2}/[0-9]{4}'
+                }
+              },
+              openPickerButton: { 'aria-label': 'Choisir la date' },
+              field: { clearable: true }
+            }}
+            closeOnSelect
+            views={['year', 'month', 'day']}
+            openTo="day"
+          />
+          <DatePicker
+            label="Créée avant le"
+            value={dateTo}
+            onChange={setDateTo}
+            format="dd/MM/yyyy"
+            slotProps={{ 
+              textField: { 
+                variant: 'outlined',
+                size: 'small', 
+                sx: { minWidth: 140, maxWidth: 160, fontSize: '0.95em', py: 0, m: 0 },
+                placeholder: "",
+                InputLabelProps: { shrink: true },
+                inputProps: { 
+                  'aria-label': 'Date de création maximum',
+                  pattern: '[0-9]{2}/[0-9]{2}/[0-9]{4}'
+                }
+              },
+              openPickerButton: { 'aria-label': 'Choisir la date' },
+              field: { clearable: true }
+            }}
+            closeOnSelect
+            views={['year', 'month', 'day']}
+            openTo="day"
+          />
+          {/* Dates de modification */}
+          <DatePicker
+            label="Modifiée après le"
+            value={dateModifFrom}
+            onChange={setDateModifFrom}
+            format="dd/MM/yyyy"
+            slotProps={{ 
+              textField: { 
+                variant: 'outlined',
+                size: 'small', 
+                sx: { minWidth: 140, maxWidth: 160, fontSize: '0.95em', py: 0, m: 0 },
+                placeholder: "",
+                InputLabelProps: { shrink: true },
+                inputProps: { 
+                  'aria-label': 'Date de modification minimum',
+                  pattern: '[0-9]{2}/[0-9]{2}/[0-9]{4}'
+                }
+              },
+              openPickerButton: { 'aria-label': 'Choisir la date' },
+              field: { clearable: true }
+            }}
+            closeOnSelect
+            views={['year', 'month', 'day']}
+            openTo="day"
+          />
+          <DatePicker
+            label="Modifiée avant le"
+            value={dateModifTo}
+            onChange={setDateModifTo}
+            format="dd/MM/yyyy"
+            slotProps={{ 
+              textField: { 
+                variant: 'outlined',
+                size: 'small', 
+                sx: { minWidth: 140, maxWidth: 160, fontSize: '0.95em', py: 0, m: 0 },
+                placeholder: "",
+                InputLabelProps: { shrink: true },
+                inputProps: { 
+                  'aria-label': 'Date de modification maximum',
+                  pattern: '[0-9]{2}/[0-9]{2}/[0-9]{4}'
+                }
+              },
+              openPickerButton: { 'aria-label': 'Choisir la date' },
+              field: { clearable: true }
+            }}
+            closeOnSelect
+            views={['year', 'month', 'day']}
+            openTo="day"
+          />
         </Box>
+        </LocalizationProvider>
       </Paper>
 
+      <LocalizationProvider dateAdapter={AdapterDateFns} adapterLocale={fr}>
       {/* Nouvelle mise en page avec menu latéral et contenu principal */}
       <Box sx={{ display: 'flex', gap: 4, alignItems: 'flex-start' }}>
         {/* Menu latéral gauche */}
         <Paper 
           sx={{ 
-            width: 280, 
+            width: 380, 
             flexShrink: 0, 
-            alignSelf: 'flex-start', /* Empêche l'élément de s'étirer */
+            alignSelf: 'flex-start',
             maxHeight: 'calc(100vh - 200px)', 
             overflowY: 'auto',
             position: 'sticky',
@@ -860,71 +1054,137 @@ export default function ActivitiesAutresPage() {
           <Typography variant="h6" gutterBottom sx={{ borderBottom: '1px solid', borderColor: 'divider', pb: 1, mb: 2 }}>
             Liste des activités
           </Typography>
-          
-          {filteredActivities.length === 0 ? (
-            <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'center', py: 3 }}>
-              Aucune activité ne correspond aux critères
-            </Typography>
-          ) : (
-            <List sx={{ p: 0, mb: 2}}>
-              {filteredActivities.map((activity) => (
-                <ListItem 
-                  key={activity.id} 
-                  disablePadding
-                  sx={{ 
-                    display: 'block', 
-                    mb: 0.5, 
-                  }}
-                >
-                  <Button
-                    fullWidth
-                    onClick={() => handleActivitySelect(activity.id!)}
-                    sx={{
-                      justifyContent: 'flex-start',
-                      px: 2,
-                      py: 1,
-                      borderRadius: 2,
-                      textAlign: 'left',
-                      color: selectedActivityId === activity.id ? 'primary.main' : 'text.primary',
-                      fontWeight: selectedActivityId === activity.id ? 'bold' : 'normal',
-                      bgcolor: selectedActivityId === activity.id ? alpha(theme.palette.primary.main, 0.08) : 'transparent',
-                      '&:hover': {
-                        bgcolor: selectedActivityId === activity.id 
-                          ? alpha(theme.palette.primary.main, 0.12) 
-                          : alpha(theme.palette.primary.main, 0.04)
-                      },
-                      position: 'relative',
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis'
-                    }}
-                    startIcon={<MenuBookIcon fontSize="small" />}
-                  >
-                    <Box sx={{ display: 'flex', alignItems: 'center', width: '100%' }}>
-                      <Typography 
-                        variant="body2" 
-                        sx={{ 
-                          flexGrow: 1, 
-                          overflow: 'hidden', 
-                          textOverflow: 'ellipsis', 
-                          whiteSpace: 'nowrap',
-                        }}
-                      >
-                        {activity.name}
-                      </Typography>
-                      {activity.correction_count && activity.correction_count > 0 && (
-                        <Chip
-                          size="small"
-                          label={activity.correction_count}
-                          color="success"
-                          sx={{ ml: 1, minWidth: 0, height: 20, '& .MuiChip-label': { px: 1 } }}
-                        />
-                      )}
+          {/* Rangement par année de création */}
+          {(() => {
+            if (filteredActivities.length === 0) {
+              return (
+                <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'center', py: 3 }}>
+                  Aucune activité ne correspond aux critères
+                </Typography>
+              );
+            }
+            // Regrouper les activités par année de création
+            const activitiesByYear: { [year: string]: typeof filteredActivities } = {};
+            filteredActivities.forEach(activity => {
+              const year = activity.created_at ? new Date(activity.created_at).getFullYear().toString() : 'Inconnue';
+              if (!activitiesByYear[year]) activitiesByYear[year] = [];
+              activitiesByYear[year].push(activity);
+            });
+            // Trier les années (plus récentes en haut)
+            const sortedYears = Object.keys(activitiesByYear).sort((a, b) => b.localeCompare(a));
+            return (
+              <Box>
+                {sortedYears.map(year => (
+                  <Box key={year} sx={{ mb: 2 }}>
+                    <Box
+                      sx={{
+                        bgcolor: 'rgb(89, 113, 138)',
+                        color: 'primary.contrastText',
+                        px: 2,
+                        py: 0.5,
+                        borderRadius: 2,
+                        fontWeight: 'bold',
+                        fontSize: '1.1rem',
+                        letterSpacing: 1,
+                        mb: 1,
+                        boxShadow: 2,
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 1,
+                        textTransform: 'uppercase',
+                        borderLeft: '6px solid',
+                        borderColor: 'secondary.main',
+                      }}
+                    >
+                      <AssessmentIcon sx={{ mr: 1, opacity: 0.7 }} fontSize="small" />
+                      {year}
                     </Box>
-                  </Button>
-                </ListItem>
-              ))}
-            </List>
-          )}
+                    <List sx={{ p: 0, mb: 1 }}>
+                      {activitiesByYear[year]
+                        .sort((a, b) => new Date(b.created_at || '').getTime() - new Date(a.created_at || '').getTime())
+                        .map((activity) => (
+                        <ListItem 
+                          key={activity.id} 
+                          disablePadding
+                          sx={{ 
+                            display: 'block', 
+                            mb: 0.5, 
+                          }}
+                        >
+                          {/* Bouton pour sélectionner l'activité */}
+                          <Button
+                            fullWidth
+                            onClick={() => handleActivitySelect(activity.id!)}
+                            sx={{
+                              justifyContent: 'flex-start',
+                              py: 1.2,
+                              borderRadius: 2,
+                              textAlign: 'left',
+                              color: selectedActivityId === activity.id ? 'primary.main' : 'text.primary',
+                              fontWeight: selectedActivityId === activity.id ? 'bold' : 'normal',
+                              bgcolor: selectedActivityId === activity.id ? 'secondary.lighter' : 'background.paper',
+                              border: selectedActivityId === activity.id ? '2px solid' : '1px solid',
+                              borderColor: selectedActivityId === activity.id ? 'secondary.main' : 'divider',
+                              boxShadow: selectedActivityId === activity.id ? 3 : 0,
+                              '&:hover': {
+                                bgcolor: selectedActivityId === activity.id 
+                                  ? 'secondary.light' 
+                                  : 'primary.50',
+                                borderColor: 'primary.main',
+                                boxShadow: 2,
+                              },
+                              position: 'relative',
+                              overflow: 'hidden',
+                              transition: 'all 0.15s',
+                            }}
+                          >
+                            <Grid container spacing={1} alignItems="center" sx={{ 
+                              width: '100%',
+                              display: 'flex', 
+                              alignItems: 'center', 
+                              justifyContent: 'space-between'
+                            }}>
+                              <Grid size={{ xs: 10  }}>
+                                <Typography 
+                                  variant="body2" 
+                                  sx={{ 
+                                    fontWeight: selectedActivityId === activity.id ? 'bold' : 'normal',
+                                    color: selectedActivityId === activity.id ? 'primary.main' : 'text.primary',
+                                    overflow: 'hidden',
+                                    textOverflow: 'ellipsis',
+                                    whiteSpace: 'nowrap',
+                                    flexGrow: 1, 
+                                  }}
+                                >
+                                  {activity.name}
+                                </Typography>
+                              </Grid>
+                              <Grid size={{ xs: 2 }} 
+                                sx={{ 
+                                  textAlign: 'right',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'flex-end',
+                                }}>
+                                {activity.correction_count && activity.correction_count > 0 && (
+                                  <Chip
+                                    size="small"
+                                    label={activity.correction_count}
+                                    color="success"
+                                    sx={{ minWidth: 0, height: 20, '& .MuiChip-label': { px: 1 } }}
+                                  />
+                                )}
+                              </Grid>   
+                            </Grid>               
+                          </Button>
+                        </ListItem>
+                      ))}
+                    </List>
+                  </Box>
+                ))}
+              </Box>
+            );
+          })()}
         </Paper>
         
         {/* Zone de contenu principal */}
@@ -957,7 +1217,6 @@ export default function ActivitiesAutresPage() {
               <Button 
                 onClick={() => {
                   setSearchTerm('');
-                  setFilterTab(0);
                 }}
                 variant="outlined"
               >
@@ -981,6 +1240,7 @@ export default function ActivitiesAutresPage() {
           )}
         </Box>
       </Box>
+      </LocalizationProvider>
     </Container>
   );
 }

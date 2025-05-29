@@ -18,6 +18,7 @@ interface LocalCorrectionAutre extends Omit<CorrectionAutre, 'activity_id' | 'cl
   score_percentage?: number;
   student_id: number | null;
   points_earned: number[]; // Array of points for each part
+  bonus?: number | null; // Bonus points for the correction
   status?: string;
   student_data?: {
     id?: number;
@@ -365,16 +366,17 @@ export function useCorrectionsAutres(correctionId: string) {
       try {
         // Calculer la note totale
         const totalEarned = pointsEarned.reduce((sum, points) => sum + points, 0);
-        // Récupérer la pénalité actuelle
+        // Récupérer la pénalité et le bonus actuels
         const penaltyValue = correction.penalty || 0;
+        const bonusValue = correction.bonus || 0;
         // Calculer la note finale selon les règles
         let finalGrade;
         if (totalEarned < 5) {
-          // Si note < 5, on garde cette note
-          finalGrade = totalEarned;
+          // Si note < 5, on conserve la note mais on peut appliquer le bonus
+          finalGrade = Math.max(totalEarned + bonusValue, totalEarned);
         } else {
-          // Sinon on prend max(note-pénalité, 5)
-          finalGrade = Math.max(totalEarned - penaltyValue, 5);
+          // Sinon on prend max(note-pénalité+bonus, 5)
+          finalGrade = Math.max(totalEarned - penaltyValue + bonusValue, 5);
         }
         
         const response = await fetch(`/api/corrections_autres/${correctionId}/grade`, {
@@ -386,7 +388,8 @@ export function useCorrectionsAutres(correctionId: string) {
             points_earned: pointsEarned,
             grade: totalEarned,
             final_grade: finalGrade,
-            penalty: penaltyValue
+            penalty: penaltyValue,
+            bonus: bonusValue
           }),
         });
         
@@ -405,7 +408,8 @@ export function useCorrectionsAutres(correctionId: string) {
             points_earned: updatedData.points_earned,
             grade: updatedData.grade,
             final_grade: updatedData.final_grade,
-            penalty: updatedData.penalty
+            penalty: updatedData.penalty,
+            bonus: updatedData.bonus
           };
         });
         
@@ -601,26 +605,30 @@ export function useCorrectionsAutres(correctionId: string) {
       // Determine new grade values based on newStatus
       let gradeUpdate: number | null = null;
       let penaltyUpdate: number | null = null;
+      let bonusUpdate: number | null = null;
       let finalGradeUpdate: number | null = null;
       let updateGrades = false; // Flag to indicate if grades should be updated in the API call
 
       if (['ABSENT', 'DEACTIVATED', 'NON_NOTE'].includes(newStatus)) {
         gradeUpdate = null;
         penaltyUpdate = null;
+        bonusUpdate = null;
         finalGradeUpdate = null;
         updateGrades = true;
       } else if (newStatus === 'ACTIVE') {
         gradeUpdate = 0;
         penaltyUpdate = 0;
+        bonusUpdate = 0;
         finalGradeUpdate = 0;
         updateGrades = true;
       }
 
       // Prepare payload for the API request
-      const payload: { status: string; grade?: number | null; penalty?: number | null; final_grade?: number | null } = { status: newStatus };
+      const payload: { status: string; grade?: number | null; penalty?: number | null; bonus?: number | null; final_grade?: number | null } = { status: newStatus };
       if (updateGrades) {
         payload.grade = gradeUpdate;
         payload.penalty = penaltyUpdate;
+        payload.bonus = bonusUpdate;
         payload.final_grade = finalGradeUpdate;
       }
 
@@ -663,6 +671,7 @@ export function useCorrectionsAutres(correctionId: string) {
         // Determine the final grade values for the local state update
         const finalGrade = updateGrades ? gradeUpdate : prev.grade;
         const finalPenalty = updateGrades ? penaltyUpdate : prev.penalty;
+        const finalBonus = updateGrades ? bonusUpdate : prev.bonus;
         const finalFinalGrade = updateGrades ? finalGradeUpdate : prev.final_grade;
 
         return {
@@ -671,6 +680,7 @@ export function useCorrectionsAutres(correctionId: string) {
           active: newStatus === 'ACTIVE' ? 1 : 0, // Keep active field consistent if used elsewhere
           grade: finalGrade,
           penalty: finalPenalty,
+          bonus: finalBonus,
           final_grade: finalFinalGrade
         };
       });

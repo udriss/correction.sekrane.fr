@@ -603,62 +603,36 @@ function addCorrectionStylingAndInfo(
 async function getShareCodes(corrections: Partial<CorrectionAutreEnriched>[] | any[]): Promise<Record<number, string>> {
   const shareCodes: Record<number, string> = {};
   
-  // Vérifier d'abord si certaines corrections n'ont pas de code de partage
-  const correctionsWithoutQR = corrections.filter(c => 
-    !('shareCode' in c) || !(c as any).shareCode
-  );
-  
-  // Si des corrections n'ont pas de code de partage, en créer en lot
-  if (correctionsWithoutQR.length > 0) {
-    try {
-      // Créer des codes de partage en lot
-      const correctionIds = correctionsWithoutQR.map(c => c.id);
-      const response = await fetch('/api/share/batch', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ correctionIds }),
-      });
-      
-      if (!response.ok) {
-        console.error('Erreur lors de la création des codes de partage');
-      }
-    } catch (error) {
-      console.error('Erreur lors de la création des codes de partage:', error);
-    }
-  }
-  
-  // Récupérer tous les codes de partage en une seule requête
-  try {
-    // Collecter les IDs des corrections
-    const correctionIds = corrections
-      .filter(c => c.id !== undefined)
-      .map(c => c.id);
-      
-    // Récupérer les codes de partage en lot
-    const queryParams = new URLSearchParams();
-    correctionIds.forEach(id => queryParams.append('correctionIds[]', id.toString()));
-    
-    const shareResponse = await fetch(`/api/share/batch?${queryParams.toString()}`, {
-      method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
+  // Récupérer ou créer un code de partage pour chaque correction
+  const shareCodePromises = corrections
+    .filter(c => c.id !== undefined)
+    .map(async (correction) => {
+      try {
+        // Utiliser l'API individuelle qui crée automatiquement un code s'il n'existe pas
+        const response = await fetch(`/api/corrections_autres/${correction.id}/share-code`, {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        });
+        
+        if (response.ok) {
+          const data = await response.json();
+          shareCodes[correction.id] = data.code;
+        } else {
+          console.error(`Erreur lors de la récupération du code de partage pour la correction ${correction.id}`);
+          // En cas d'erreur, utiliser un code temporaire comme fallback
+          shareCodes[correction.id] = `TEMP-${correction.id}`;
+        }
+      } catch (error) {
+        console.error(`Erreur lors de la récupération du code de partage pour la correction ${correction.id}:`, error);
+        // En cas d'erreur, utiliser un code temporaire comme fallback
+        shareCodes[correction.id] = `TEMP-${correction.id}`;
       }
     });
-    
-    if (shareResponse.ok) {
-      const shareData = await shareResponse.json();
-      // Stocker les codes de partage dans le dictionnaire
-      for (const [correctionId, code] of Object.entries(shareData)) {
-        shareCodes[Number(correctionId)] = code as string;
-      }
-    } else {
-      console.warn('Impossible de récupérer les codes de partage en lot');
-    }
-  } catch (error) {
-    console.error('Erreur lors de la récupération des codes de partage:', error);
-  }
+  
+  // Attendre que tous les codes de partage soient récupérés
+  await Promise.all(shareCodePromises);
   
   return shareCodes;
 }
@@ -1070,17 +1044,22 @@ async function generateQRCodesForCorrections(
       // Get share code for this correction
       let shareCode = correction.id && shareCodes[correction.id] 
         ? shareCodes[correction.id] 
-        : `TEMP-${correction.id}`;
+        : null;
       
-      // Generate QR code URL
-      qrData = `${window.location.origin}/feedback/${shareCode}`;
-      const qrCodeDataURL = await QRCode.toDataURL(qrData, {
-        width: 200,
-        margin: 1
-      });
-      
-      // Add QR code to PDF
-      doc.addImage(qrCodeDataURL, 'PNG', x, y, qrSize, qrSize);
+      // Generate QR code URL only if we have a valid share code
+      if (shareCode) {
+        qrData = `${window.location.origin}/feedback/${shareCode}`;
+        const qrCodeDataURL = await QRCode.toDataURL(qrData, {
+          width: 200,
+          margin: 1
+        });
+        
+        // Add QR code to PDF
+        doc.addImage(qrCodeDataURL, 'PNG', x, y, qrSize, qrSize);
+      } else {
+        console.warn(`Aucun code de partage disponible pour la correction ${correction.id}`);
+        // Continue without QR code but still add the correction styling
+      }
     }
     
     // Ajouter style visuel et informations pour cette correction
@@ -1302,32 +1281,36 @@ export async function generateQRCodePDF({
         // Get share code for this correction
         let shareCode = correction.id && shareCodes[correction.id] 
           ? shareCodes[correction.id] 
-          : `TEMP-${correction.id}`;
-        
-        // Generate QR code URL
-        const qrData = `${window.location.origin}/feedback/${shareCode}`;
-        const qrCodeDataURL = await QRCode.toDataURL(qrData, {
-          width: 200,
-          margin: 1
-        });
-        
-        // Calculer les positions en fonction de la page et de l'item
-        const pageOffset = Math.floor(i / itemsPerPage) * itemsPerPage;
-        const positionInPage = i - pageOffset;
-        const rowIndex = Math.floor(positionInPage / itemsPerRow);
-        const colIndex = positionInPage % itemsPerRow;
-        
-        // Position X basée sur la colonne 
-        const x = colPosition[colIndex] - qrSize/2; // Centrer sur la position de la colonne
-        
-        // Position Y basée sur la ligne et la page
-        let y = topMarginOtherPages + (rowIndex * rowHeight);
-        
-        // Add QR code to PDF
-        doc.addImage(qrCodeDataURL, 'PNG', x, y, qrSize, qrSize);
-        
-        // Ajouter style visuel et informations pour cette correction
-        addCorrectionStylingAndInfo(doc, correction as CorrectionAutreEnriched, isActive, correctionStatus, x, y, qrSize, qrData, students, includeDetails, activities);
+          : null;        // Generate QR code URL only if we have a valid share code
+        let qrData = '';
+        if (shareCode) {
+          qrData = `${window.location.origin}/feedback/${shareCode}`;
+          const qrCodeDataURL = await QRCode.toDataURL(qrData, {
+            width: 200,
+            margin: 1
+          });
+          
+          // Calculer les positions en fonction de la page et de l'item
+          const pageOffset = Math.floor(i / itemsPerPage) * itemsPerPage;
+          const positionInPage = i - pageOffset;
+          const rowIndex = Math.floor(positionInPage / itemsPerRow);
+          const colIndex = positionInPage % itemsPerRow;
+          
+          // Position X basée sur la colonne 
+          const x = colPosition[colIndex] - qrSize/2; // Centrer sur la position de la colonne
+          
+          // Position Y basée sur la ligne et la page
+          let y = topMarginOtherPages + (rowIndex * rowHeight);
+          
+          // Add QR code to PDF
+          doc.addImage(qrCodeDataURL, 'PNG', x, y, qrSize, qrSize);
+          
+          // Ajouter style visuel et informations pour cette correction
+          addCorrectionStylingAndInfo(doc, correction as CorrectionAutreEnriched, isActive, correctionStatus, x, y, qrSize, qrData, students, includeDetails, activities);
+        } else {
+          console.warn(`Aucun code de partage disponible pour la correction ${correction.id}, QR code ignoré`);
+          // Note: on pourrait ici générer juste les informations sans QR code si nécessaire
+        }
       }
     }
     

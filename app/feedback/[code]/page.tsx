@@ -33,6 +33,7 @@ import HourglassEmptyIcon from '@mui/icons-material/HourglassEmpty';
 import EventAvailableIcon from '@mui/icons-material/EventAvailable';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import ScheduleIcon from '@mui/icons-material/Schedule';
+import StarIcon from '@mui/icons-material/Star';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import InfoIcon from '@mui/icons-material/Info';
 import GradientBackground from '@/components/ui/GradientBackground';
@@ -175,6 +176,7 @@ interface Correction {
   id: number;
   parts_names: string[];
   penalty: string;
+  bonus: string; // Ajout du champ bonus
   points: number[];
   points_earned: number[];
   shareCode: string;
@@ -518,6 +520,7 @@ export default function FeedbackViewer({ params }: { params: Promise<{ code: str
   // Vérifier si des notes sont présentes
   const hasGrade = correction.grade !== null && correction.grade !== undefined;
   const hasPenalty = correction.penalty !== null && correction.penalty !== undefined && parseFloat(correction.penalty) > 0;
+  const hasBonus = correction.bonus !== null && correction.bonus !== undefined && parseFloat(correction.bonus) > 0;
   
   // Vérifier si c'est un travail non rendu
   const isNeverSubmitted = correction.status === 'NON_RENDU' || (
@@ -537,18 +540,20 @@ export default function FeedbackViewer({ params }: { params: Promise<{ code: str
   };
   
   // Calcul de la note finale selon la règle, avec normalisation sur 20
-  const calculateFinalGrade = (grade: number, penalty: number, totalPoints: number): number => {
+  const calculateFinalGrade = (grade: number, penalty: number, bonus: number, totalPoints: number): number => {
     // Normaliser la note sur 20
     const normalizedGrade = (grade * 20) / totalPoints;
     const normalizedPenalty = (penalty * 20) / totalPoints;
+    const normalizedBonus = (bonus * 20) / totalPoints;
 
     if (normalizedGrade < 5) {
-      // Si la note normalisée est inférieure à 5/20, on garde la note originale sans appliquer de pénalité
-      return grade;
+      // Si la note normalisée est inférieure à 5/20, on garde la note originale mais on peut appliquer le bonus
+      const gradeWithBonus = grade + bonus;
+      return Math.max(gradeWithBonus, grade); // Au minimum la note originale
     } else {
-      // Si la note normalisée est supérieure ou égale à 5/20, on applique la pénalité
+      // Si la note normalisée est supérieure ou égale à 5/20, on applique la pénalité et le bonus
       // mais on ne descend pas en dessous de 5/20 (normalisé sur le barème total)
-      const normalizedResult = Math.max(normalizedGrade - normalizedPenalty, 5);
+      const normalizedResult = Math.max(normalizedGrade - normalizedPenalty + normalizedBonus, 5);
       // Reconvertir le résultat sur le barème original
       return (normalizedResult * totalPoints) / 20;
     }
@@ -564,20 +569,22 @@ export default function FeedbackViewer({ params }: { params: Promise<{ code: str
     // Sinon calculer selon la règle avec normalisation
     const rawTotal = parseFloat(correction.grade) || 0;
     const penalty = parseFloat(correction.penalty) || 0;
-    return calculateFinalGrade(rawTotal, penalty, maxPoints);
+    const bonus = parseFloat(correction.bonus) || 0;
+    return calculateFinalGrade(rawTotal, penalty, bonus, maxPoints);
   };
 
   
   // Données préparées pour les explications
   const rawTotal = hasGrade ? parseFloat(correction.grade) || 0 : 0;
   const penalty = hasPenalty ? parseFloat(correction.penalty) || 0 : 0;
-  const calculatedGrade = rawTotal - penalty;
+  const bonus = hasBonus ? parseFloat(correction.bonus) || 0 : 0;
+  const calculatedGrade = rawTotal - penalty + bonus;
   const finalGrade = hasGrade ? 
-    (hasPenalty ? getFinalGrade() : rawTotal) : 
+    (hasPenalty || hasBonus ? getFinalGrade() : rawTotal) : 
     null;
   
   // Déterminer le cas d'application de la règle pour l'explication
-  const isPenaltyRule5Applied = hasPenalty && rawTotal >= 5 && calculatedGrade < 5;
+  const isPenaltyRule5Applied = hasPenalty && rawTotal >= 5 && (rawTotal - penalty) < 5;
   
   // Formater les dates
   const formatDate = (dateString: string | null) => {
@@ -784,8 +791,25 @@ export default function FeedbackViewer({ params }: { params: Promise<{ code: str
                               </Alert>
                             )}
 
+                            {/* Affichage du bonus */}
+                            {hasBonus && (
+                              <Alert 
+                                severity="success" 
+                                variant="outlined"
+                                sx={{ mb: 1.5 }}
+                                icon={<StarIcon />}
+                              >
+                                <Typography variant="subtitle2" sx={{ fontWeight: 'bold' }}>
+                                  Bonus accordé : + {parseFloat(String(correction.bonus))} point{parseFloat(String(correction.bonus)) > 1 ? 's' : ''}
+                                </Typography>
+                                <Typography variant="caption">
+                                  (pour qualité exceptionnelle du travail)
+                                </Typography>
+                              </Alert>
+                            )}
+
                             {/* Explication du calcul de la note avec règle du seuil de 6/20 */}
-                            {hasPenalty && rawTotal >= 5 && (
+                            {(hasPenalty || hasBonus) && rawTotal >= 5 && (
                               <Paper 
                                 elevation={0} 
                                 sx={{ 
@@ -807,10 +831,19 @@ export default function FeedbackViewer({ params }: { params: Promise<{ code: str
                                     <Typography variant="body2" sx={{ fontWeight: 'bold' }}>{formatGrade(rawTotal)}/20</Typography>
                                   </Box>
                                   
-                                  <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                                    <Typography variant="body2">Pénalité appliquée :</Typography>
-                                    <Typography variant="body2" sx={{ fontWeight: 'bold', color: 'error.main' }}>− {formatGrade(penalty)}</Typography>
-                                  </Box>
+                                  {hasPenalty && (
+                                    <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                                      <Typography variant="body2">Pénalité appliquée :</Typography>
+                                      <Typography variant="body2" sx={{ fontWeight: 'bold', color: 'error.main' }}>− {formatGrade(penalty)}</Typography>
+                                    </Box>
+                                  )}
+                                  
+                                  {hasBonus && (
+                                    <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                                      <Typography variant="body2">Bonus accordé :</Typography>
+                                      <Typography variant="body2" sx={{ fontWeight: 'bold', color: 'success.main' }}>+ {formatGrade(bonus)}</Typography>
+                                    </Box>
+                                  )}
                                   
                                   <Box sx={{ 
                                     display: 'flex', 

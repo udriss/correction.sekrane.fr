@@ -3,7 +3,7 @@ import { withConnection } from '@/lib/db';
 import { getServerSession } from 'next-auth/next';
 import { getUser } from '@/lib/auth';
 import { authOptions } from '@/lib/auth';
-import { getCorrectionAutreById, updateCorrectionAutre } from '@/lib/correctionAutre';
+import { getCorrectionAutreById, updateCorrectionAutre, validateGradeConstraint, calculateGrade } from '@/lib/correctionAutre';
 import { getActivityAutreById } from '@/lib/activityAutre';
 
 export async function PUT(
@@ -43,33 +43,34 @@ export async function PUT(
     }
 
     // Extraire les données nécessaires pour le calcul
-    const { points_earned, penalty, status } = correction;
+    const { points_earned, penalty, bonus, status } = correction;
     
     // Calculer la note finale en fonction du statut
     let finalGrade;
+    let grade;
     
     if (status === 'NON_RENDU') {
       // Pour un travail non rendu, calculer 25% du total des points
       const totalMaxPoints = activity.points.reduce((sum, points) => sum + points, 0);
-      finalGrade = Math.round(totalMaxPoints * 0.25 * 100) / 100; // Arrondir à 2 décimales
+      const grade25Percent = totalMaxPoints * 0.25;
+      grade = validateGradeConstraint(grade25Percent, 'grade');
+      finalGrade = validateGradeConstraint(grade25Percent, 'final_grade');
     } else {
-      // Calculer la note totale
-      const totalGrade = points_earned.reduce((sum, points) => sum + (points || 0), 0);
-      
-      // Appliquer la règle de calcul de note finale
-      if (totalGrade < 5) {
-        // Si la note est inférieure à 5, on garde la note originale
-        finalGrade = totalGrade;
-      } else {
-        // Sinon, on prend le maximum entre (note-pénalité) et 5
-        finalGrade = Math.max(totalGrade - (penalty || 0), 5);
-      }
+      // Utiliser la fonction centralisée calculateGrade qui inclut déjà la validation
+      const calculatedGrades = calculateGrade(
+        activity.points,
+        points_earned,
+        penalty,
+        bonus
+      );
+      grade = calculatedGrades.grade;
+      finalGrade = calculatedGrades.final_grade;
     }
 
     // Mettre à jour la note finale dans la base de données
     const updateData = {
       final_grade: finalGrade,
-      grade: points_earned.reduce((sum, points) => sum + (points || 0), 0)
+      grade: grade
     };
     
     const updated = await updateCorrectionAutre(correctionId, updateData);

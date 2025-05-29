@@ -365,15 +365,16 @@ export default function CorrectionAutreDetail({ params }: { params: Promise<{ id
       
       // Calculer la note totale et finale avec la nouvelle pénalité
       const totalEarned = currentPointsEarned.reduce((sum, points) => sum + points, 0);
+      const currentBonus = correction.bonus || 0;
       
       // Calculer la note finale selon les règles
       let finalGrade;
       if (totalEarned < 5) {
-        // Si note < 5, on garde cette note
-        finalGrade = totalEarned;
+        // Si note < 5, on conserve la note mais on peut appliquer le bonus
+        finalGrade = Math.max(totalEarned + currentBonus, totalEarned);
       } else {
-        // Sinon on prend max(note-pénalité, 5)
-        finalGrade = Math.max(totalEarned - penaltyValue, 5);
+        // Sinon on prend max(note-pénalité+bonus, 5)
+        finalGrade = Math.max(totalEarned - penaltyValue + currentBonus, 5);
       }
 
       // Envoyer à la fois la pénalité et la note finale mises à jour
@@ -381,13 +382,13 @@ export default function CorrectionAutreDetail({ params }: { params: Promise<{ id
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          points_earned: currentPointsEarned,
-          grade: totalEarned,
-          final_grade: finalGrade,
-          penalty: penaltyValue
-        }),
+        },          body: JSON.stringify({
+            points_earned: currentPointsEarned,
+            grade: totalEarned,
+            final_grade: finalGrade,
+            penalty: penaltyValue,
+            bonus: currentBonus
+          }),
       });
       
       if (!response.ok) {
@@ -1057,6 +1058,8 @@ export default function CorrectionAutreDetail({ params }: { params: Promise<{ id
                       partNames={activity.parts_names || []}
                       isPenaltyEnabled={correction.penalty !== undefined && correction.penalty !== null}
                       penalty={correction.penalty?.toString() || '0'}
+                      isBonusEnabled={correction.bonus !== undefined && correction.bonus !== null}
+                      bonus={correction.bonus?.toString() || '0'}
                       setPointsEarned={(index, value) => {
                         const newPointsEarned = [...(correction.points_earned || [])];
                         newPointsEarned[index] = value;
@@ -1069,6 +1072,13 @@ export default function CorrectionAutreDetail({ params }: { params: Promise<{ id
                           penalty: parseFloat(value)
                         }));
                         // Ne pas déclencher l'auto-sauvegarde pour les modifications de pénalité
+                      }}
+                      setBonus={(value) => {
+                        setCorrection(prev => ({
+                          ...prev!,
+                          bonus: parseFloat(value)
+                        }));
+                        // Ne pas déclencher l'auto-sauvegarde pour les modifications de bonus
                       }}
                       saveGradeTimeout={saveGradeTimeout}
                       setSaveGradeTimeout={setSaveGradeTimeout}
@@ -1120,6 +1130,54 @@ export default function CorrectionAutreDetail({ params }: { params: Promise<{ id
                           // S'assurer que l'erreur a tous les détails nécessaires
                           if (!error.details) {
                             const errorWithDetails: any = new Error(error.message || "Erreur lors de la mise à jour de la pénalité");
+                            errorWithDetails.details = error.details || {};
+                            error.status = error.status;
+                            error.statusText = error.statusText;
+                            setError(errorWithDetails);
+                          } else {
+                            setError(error);
+                          }
+                          
+                          throw error;
+                        }
+                      }}
+                      // Fonction pour mettre à jour uniquement le bonus
+                      handleUpdateBonus={async (bonusValue) => {
+                        try {
+                          const response = await fetch(`/api/corrections_autres/${correction.id}/bonus`, {
+                            method: 'PUT',
+                            headers: {
+                              'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify({
+                              bonus: bonusValue
+                            }),
+                          });
+                          
+                          if (!response.ok) {
+                            const errorData = await response.json();
+                            // Créer une instance d'Error et y attacher les détails
+                            const error: any = new Error('Erreur lors de la mise à jour du bonus : ' + (errorData.message || 'Échec de mise à jour'));
+                            error.details = errorData.details || {};
+                            error.status = response.status;
+                            error.statusText = response.statusText;
+                            setError(error);
+                            throw error;
+                          }
+                          
+                          // Mettre à jour l'état local
+                          setCorrection(prev => ({
+                            ...prev!,
+                            bonus: bonusValue
+                          }));
+                          
+                          return await response.json();
+                        } catch (error: any) {
+                          console.error("Erreur lors de la mise à jour du bonus:", error);
+                          
+                          // S'assurer que l'erreur a tous les détails nécessaires
+                          if (!error.details) {
+                            const errorWithDetails: any = new Error(error.message || "Erreur lors de la mise à jour du bonus");
                             errorWithDetails.details = error.details || {};
                             error.status = error.status;
                             error.statusText = error.statusText;

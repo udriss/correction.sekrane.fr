@@ -302,10 +302,18 @@ export async function getCorrectionsForPdfReport(groupId: number): Promise<any[]
       `SELECT 
         c.id, c.student_id, CONCAT(s.first_name, ' ', s.last_name) as student_name, 
         c.grade, c.experimental_points_earned, 
-        c.theoretical_points_earned, c.penalty, a.name as activity_name,
+        c.theoretical_points_earned, c.penalty, c.bonus, a.name as activity_name,
         a.experimental_points as max_experimental_points,
         a.theoretical_points as max_theoretical_points,
-        (c.grade - c.penalty) as final_grade
+        -- Appliquer la règle unifiée bonus/pénalité
+        CASE 
+          WHEN c.grade < 5 THEN 
+            -- Si note < 5, on conserve la note mais on peut appliquer le bonus
+            GREATEST(c.grade + COALESCE(c.bonus, 0), c.grade)
+          ELSE 
+            -- Sinon on prend max(note-pénalité+bonus, 5)
+            GREATEST(c.grade - COALESCE(c.penalty, 0) + COALESCE(c.bonus, 0), 5)
+        END as final_grade
        FROM corrections c 
        JOIN group_corrections gc ON c.id = gc.correction_id
        JOIN activities a ON c.activity_id = a.id 

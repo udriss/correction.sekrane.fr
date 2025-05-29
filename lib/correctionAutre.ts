@@ -66,6 +66,7 @@ export async function createCorrectionAutre(data: {
   class_id: number | null;
   submission_date?: string;
   penalty?: number;
+  bonus?: number;
   deadline?: Date | string | null;
   user_id?: number;
   grade?: number;
@@ -78,6 +79,7 @@ export async function createCorrectionAutre(data: {
     class_id, 
     submission_date, 
     penalty, 
+    bonus,
     deadline,
     user_id,
     grade
@@ -101,11 +103,12 @@ export async function createCorrectionAutre(data: {
       class_id,
       submission_date,
       penalty,
+      bonus,
       deadline,
       grade,
       created_at,
       updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
     [
       activity_id,
       student_id,
@@ -114,6 +117,7 @@ export async function createCorrectionAutre(data: {
       class_id,
       submission_date || null,
       penalty || null,
+      bonus || null,
       deadline || null,
       grade || null
     ]
@@ -131,6 +135,7 @@ export async function updateCorrectionAutre(id: number, data: {
   content_data?: string | Record<string, any> | null; // Corrigé pour accepter null
   submission_date?: Date | string | null;
   penalty?: number | null;
+  bonus?: number | null;
   deadline?: Date | string | null;
   grade?: number | null;
   final_grade?: number | null;
@@ -163,6 +168,11 @@ export async function updateCorrectionAutre(id: number, data: {
   if (data.penalty !== undefined) {
     updates.push('penalty = ?');
     values.push(data.penalty);
+  }
+
+  if (data.bonus !== undefined) {
+    updates.push('bonus = ?');
+    values.push(data.bonus);
   }
 
   if (data.deadline !== undefined) {
@@ -215,13 +225,45 @@ export async function deleteCorrectionAutre(id: number): Promise<boolean> {
 }
 
 /**
+ * Valide qu'une valeur respecte les contraintes de la base de données decimal(4,2)
+ * Les colonnes grade, penalty, bonus, final_grade ont une limite max de 99.99
+ */
+export function validateGradeConstraint(value: number | null | undefined, fieldName: string = 'value'): number {
+  if (value === null || value === undefined) {
+    return 0;
+  }
+  
+  const numValue = Number(value);
+  if (isNaN(numValue)) {
+    return 0;
+  }
+  
+  // Contrainte de la base de données: decimal(4,2) max = 99.99
+  const MAX_DB_VALUE = 99.99;
+  
+  if (numValue > MAX_DB_VALUE) {
+    console.warn(`${fieldName} value ${numValue} exceeds database constraint (max: ${MAX_DB_VALUE}). Capping to ${MAX_DB_VALUE}.`);
+    return MAX_DB_VALUE;
+  }
+  
+  if (numValue < 0) {
+    console.warn(`${fieldName} value ${numValue} is negative. Setting to 0.`);
+    return 0;
+  }
+  
+  // Arrondir à 2 décimales pour correspondre au format decimal(4,2)
+  return Math.round(numValue * 100) / 100;
+}
+
+/**
  * Calcul de la note globale
- * En fonction des points obtenus pour chaque partie, de l'activité et de la pénalité éventuelle
+ * En fonction des points obtenus pour chaque partie, de l'activité, de la pénalité et du bonus éventuels
  */
 export function calculateGrade(
   activityPoints: number[],
   points_earned: number[],
-  penalty: number | null | undefined = 0
+  penalty: number | null | undefined = 0,
+  bonus: number | null | undefined = 0
 ): { grade: number; final_grade: number } {
   // Récupérer le barème total depuis l'activité
   const total_points = activityPoints || [];
@@ -247,25 +289,26 @@ export function calculateGrade(
   // Calculer la note sur le barème total
   const rawGrade = totalEarned;
   
-  // Arrondir à 2 décimales
-  const grade = Math.round(rawGrade * 100) / 100;
+  // Arrondir à 2 décimales et valider les contraintes
+  const grade = validateGradeConstraint(rawGrade, 'grade');
   
-  // Calculer la note finale en appliquant la pénalité selon les règles spécifiques:
+  // Calculer la note finale en appliquant la pénalité et le bonus selon les règles spécifiques:
   // 1. Si la note est inférieure à 5, on garde cette note
-  // 2. Sinon, on prend le maximum entre (note-pénalité) et 5
-  const actualPenalty = penalty || 0; // Utiliser 0 si penalty est null ou undefined
+  // 2. Sinon, on prend le maximum entre (note - pénalité + bonus) et 5
+  const actualPenalty = validateGradeConstraint(penalty, 'penalty');
+  const actualBonus = validateGradeConstraint(bonus, 'bonus');
   
   let final_grade;
   if (grade < 5) {
-    // Si la note est inférieure à 5, on conserve la note initiale
-    final_grade = grade;
+    // Si la note est inférieure à 5, on conserve la note initiale mais on peut appliquer le bonus
+    final_grade = Math.max(grade + actualBonus, grade);
   } else {
-    // Sinon, on applique la pénalité mais ne descend pas en dessous de 5
-    final_grade = Math.max(5, grade - actualPenalty);
+    // Sinon, on applique la pénalité et le bonus mais ne descend pas en dessous de 5
+    final_grade = Math.max(5, grade - actualPenalty + actualBonus);
   }
   
-  // Arrondir à 2 décimales
-  final_grade = Math.round(final_grade * 100) / 100;
+  // Valider les contraintes pour la note finale
+  final_grade = validateGradeConstraint(final_grade, 'final_grade');
   
   return { grade, final_grade };
 }

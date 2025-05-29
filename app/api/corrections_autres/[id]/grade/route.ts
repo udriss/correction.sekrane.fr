@@ -4,7 +4,7 @@ import { withConnection } from '@/lib/db';
 import { getServerSession } from "next-auth/next";
 import authOptions from "@/lib/auth";
 import { getUser } from '@/lib/auth';
-import { updateCorrectionAutre, getCorrectionAutreById } from '@/lib/correctionAutre';
+import { updateCorrectionAutre, getCorrectionAutreById, validateGradeConstraint } from '@/lib/correctionAutre';
 import { getActivityAutreById } from '@/lib/activityAutre';
 
 interface GradeData {
@@ -12,6 +12,7 @@ interface GradeData {
   grade?: number | null;
   final_grade?: number | null;
   penalty?: number | null;
+  bonus?: number | null;
   status?: string; // Important pour gérer NON_RENDU
 }
 
@@ -66,6 +67,7 @@ export async function PUT(
     let gradeValue = data.grade;
     let finalGradeValue = data.final_grade;
     let penaltyValue = data.penalty !== undefined ? data.penalty : (correction.penalty || 0);
+    let bonusValue = data.bonus !== undefined ? data.bonus : (correction.bonus || 0);
     
     // Cas spécial pour travail non rendu
     if (isNonRendu) {
@@ -79,6 +81,7 @@ export async function PUT(
       gradeValue = grade25Percent;
       finalGradeValue = grade25Percent; // Note finale = note brute pour les travaux non rendus
       penaltyValue = 0; // Pas de pénalité pour travail non rendu
+      bonusValue = 0; // Pas de bonus pour travail non rendu
       
       
     } 
@@ -103,23 +106,25 @@ export async function PUT(
       if (finalGradeValue === undefined) {
         // Utiliser 0 comme valeur par défaut si gradeValue est null
         const actualGradeValue = gradeValue ?? 0;
+        const actualBonusValue = bonusValue ?? 0;
         
-        // Si note brute < 5, pas de pénalité
+        // Si note brute < 5, on conserve la note mais on peut appliquer le bonus
         if (actualGradeValue < 5) {
-          finalGradeValue = actualGradeValue;
+          finalGradeValue = Math.max(actualGradeValue + actualBonusValue, actualGradeValue);
         } else {
-          // Sinon, on prend le maximum entre (note-pénalité) et 5
-          finalGradeValue = Math.max(5, actualGradeValue - (penaltyValue ?? 0));
+          // Sinon, on prend le maximum entre (note-pénalité+bonus) et 5
+          finalGradeValue = Math.max(5, actualGradeValue - (penaltyValue ?? 0) + actualBonusValue);
         }
       }
     }
     
-    // Valeurs à mettre à jour
+    // Valeurs à mettre à jour avec validation des contraintes de base de données
     const updateData: GradeData = {
       points_earned: pointsEarned,
-      grade: gradeValue,
-      final_grade: finalGradeValue,
-      penalty: penaltyValue
+      grade: validateGradeConstraint(gradeValue, 'grade'),
+      final_grade: validateGradeConstraint(finalGradeValue, 'final_grade'),
+      penalty: validateGradeConstraint(penaltyValue, 'penalty'),
+      bonus: validateGradeConstraint(bonusValue, 'bonus')
     };
     
     // Ajouter le statut si fourni

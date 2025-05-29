@@ -20,12 +20,13 @@ export interface Correction {
   experimental_points?: number;
   theoretical_points?: number;
   penalty?: number | null; // Correction: utilisation correcte de penalty avec un type number | null
+  bonus?: number | null; // Bonus appliqué à la correction
   created_at: string;
   updated_at: string;
   sub_class?: string | null;
   student_sub_class?: string | null; // Ajout de la propriété student_sub_class
   active?: number; // Ajout du champ active pour identifier les corrections actives/inactives
-  final_grade?: number | null; // Note finale: si (grade-penalty) < 5 et grade >= 5 alors 5, si grade < 5 alors grade, sinon (grade-penalty)
+  final_grade?: number | null; // Note finale avec règle unifiée: si note < 5, max(note + bonus, note), sinon max(note - penalty + bonus, 5)
   points?: number[] | null; // Points de la correction
   points_earned : number[]; // Points obtenus, 
   content: string | null; // Contenu de la correction, 
@@ -330,10 +331,23 @@ export const CorrectionsProvider: React.FC<CorrectionsProviderProps> = ({
           comparison = a.class_name.localeCompare(b.class_name);
           break;
         case 'grade':
-          const gradeA = a.penalty !== undefined && a.penalty !== null ? 
-            Math.max(0, a.grade - a.penalty) : a.grade;
-          const gradeB = b.penalty !== undefined && b.penalty !== null ? 
-            Math.max(0, b.grade - b.penalty) : b.grade;
+          // Appliquer la règle unifiée bonus/pénalité pour le calcul des grades dans le tri
+          const calculateFinalGradeForSort = (correction: Correction): number => {
+            const grade = correction.grade;
+            const penalty = correction.penalty || 0;
+            const bonus = correction.bonus || 0;
+            
+            if (grade < 5) {
+              // Si note < 5, on conserve la note mais on peut appliquer le bonus
+              return Math.max(grade + bonus, grade);
+            } else {
+              // Sinon on prend max(note-pénalité+bonus, 5)
+              return Math.max(grade - penalty + bonus, 5);
+            }
+          };
+          
+          const gradeA = calculateFinalGradeForSort(a);
+          const gradeB = calculateFinalGradeForSort(b);
           comparison = gradeA - gradeB;
           break;
         case 'submission_date':

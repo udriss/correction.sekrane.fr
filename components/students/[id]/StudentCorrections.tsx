@@ -449,8 +449,19 @@ export default function StudentCorrections({ student, corrections: initialCorrec
                             <Grid size={{ xs: 12 }}>
                               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                                 <RemoveCircleIcon color="error" fontSize="small" />
-                                <Typography variant="body2" fontWeight="medium">
-                                  Pénalité: {correction.penalty} pts
+                                <Typography variant="body2" fontWeight="medium" color="error">
+                                  Pénalité: -{correction.penalty} pts
+                                </Typography>
+                              </Box>
+                            </Grid>
+                          )}
+                          
+                          {correction.bonus && parseFloat(String(correction.bonus)) > 0 && (
+                            <Grid size={{ xs: 12 }}>
+                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                <GradeIcon color="success" fontSize="small" />
+                                <Typography variant="body2" fontWeight="medium" color="success.main">
+                                  Bonus: +{correction.bonus} pts
                                 </Typography>
                               </Box>
                             </Grid>
@@ -545,6 +556,7 @@ export default function StudentCorrections({ student, corrections: initialCorrec
                           activity_parts_names={activity?.parts_names || []}
                           activity_points={activity?.points || []}
                           penalty={correction.penalty?.toString()}
+                          bonus={correction.bonus?.toString()}
                         />
                       ) : (
                         <Tooltip title="Attribution d'une note nécessaire pour envoyer par email">

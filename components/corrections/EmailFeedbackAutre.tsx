@@ -43,6 +43,7 @@ interface EmailFeedbackAutreProps {
   activity_parts_names?: string[];
   activity_points?: number[];
   penalty?: string;
+  bonus?: string;
 }
 
 export default function EmailFeedbackAutre({
@@ -52,7 +53,8 @@ export default function EmailFeedbackAutre({
   activityName = '',
   activity_parts_names = [],
   activity_points = [],
-  penalty
+  penalty,
+  bonus
 }: EmailFeedbackAutreProps) {
   const [open, setOpen] = useState(false);
   const [sending, setSending] = useState(false);
@@ -80,9 +82,21 @@ export default function EmailFeedbackAutre({
   const totalPointsEarned = points_earned.reduce((sum, points) => sum + points, 0);
   const totalPossiblePoints = activity_points.reduce((sum, points) => sum + points, 0);
   
-  // Calculate percentage and final grade
+  // Calculate percentage and final grade with bonus/penalty logic
   const percentage = totalPossiblePoints > 0 ? (totalPointsEarned / totalPossiblePoints) * 100 : 0;
-  const finalGrade = penalty ? Math.max(0, totalPointsEarned - parseFloat(penalty)) : totalPointsEarned;
+  
+  // Apply the unified bonus/penalty calculation rule
+  const penaltyValue = penalty ? parseFloat(penalty) : 0;
+  const bonusValue = bonus ? parseFloat(bonus) : 0;
+  
+  let finalGrade;
+  if (totalPointsEarned < 5) {
+    // Si note < 5, on conserve la note mais on peut appliquer le bonus
+    finalGrade = Math.max(totalPointsEarned + bonusValue, totalPointsEarned);
+  } else {
+    // Sinon on prend max(note-pénalité+bonus, 5)
+    finalGrade = Math.max(totalPointsEarned - penaltyValue + bonusValue, 5);
+  }
 
   // Initialiser l'email du destinataire quand student change
   useEffect(() => {
@@ -141,38 +155,65 @@ export default function EmailFeedbackAutre({
       ? `${salutation} ${student.first_name}`
       : 'Bonjour,';
 
-    // Déterminer le texte d'explication de la pénalité en fonction des valeurs
-    let penaltyExplanation = '';
+    // Déterminer le texte d'explication de la pénalité/bonus en fonction des valeurs
+    let adjustmentExplanation = '';
     
-    if (penalty && parseFloat(penalty) > 0) {
-      const penaltyValue = parseFloat(penalty);
+    const hasPenalty = penalty && parseFloat(penalty) > 0;
+    const hasBonus = bonus && parseFloat(bonus) > 0;
+    
+    if (hasPenalty || hasBonus) {
+      const penaltyValue = hasPenalty ? parseFloat(penalty!) : 0;
+      const bonusValue = hasBonus ? parseFloat(bonus!) : 0;
       
       if (totalPointsEarned >= 5) {
-        const calculatedGrade = totalPointsEarned - penaltyValue;
-        if (calculatedGrade < 5) {
-          penaltyExplanation = `
+        // Note ≥ 5 : on applique la règle max(note - pénalité + bonus, 5)
+        const rawCalculatedGrade = totalPointsEarned - penaltyValue + bonusValue;
+        const wasCappled = rawCalculatedGrade < 5;
+        
+        let adjustmentText = '';
+        if (hasPenalty && hasBonus) {
+          adjustmentText = `Une pénalité de <strong>${penaltyValue} points</strong> et un bonus de <strong>+${bonusValue} points</strong> ont été appliqués`;
+        } else if (hasPenalty) {
+          adjustmentText = `Une pénalité de <strong>${penaltyValue} points</strong> a été appliquée`;
+        } else {
+          adjustmentText = `Un bonus de <strong>+${bonusValue} points</strong> a été appliqué`;
+        }
+        
+        if (wasCappled) {
+          adjustmentExplanation = `
           <div style="margin: 15px 0; padding: 15px; border-left: 4px solid #FFD700; background-color: #FFFDF0;">
             <p style="margin-top: 0; font-weight: bold;">💡 À propos de votre note :</p>
-            <p>Sans pénalité, votre note brute aurait été de <strong>${totalPointsEarned.toFixed(1)}/20</strong>.</p>
-            <p>Une pénalité de <strong>${penaltyValue} points</strong> a été appliquée, ce qui aurait normalement donné une note de <strong>${calculatedGrade.toFixed(1)}/20</strong>.</p>
-            <p>Cependant, pour les notes ≥ 5/20, nous appliquons un seuil minimum de 5/20 après pénalité. <strong>Votre note finale est donc de 5/20</strong>.</p>
+            <p>Sans ajustement, votre note brute aurait été de <strong>${totalPointsEarned.toFixed(1)}/20</strong>.</p>
+            <p>${adjustmentText}, ce qui aurait normalement donné une note de <strong>${rawCalculatedGrade.toFixed(1)}/20</strong>.</p>
+            <p>Cependant, pour les notes ≥ 5/20, nous appliquons un seuil minimum de 5/20 après ajustements. <strong>Votre note finale est donc de 5/20</strong>.</p>
           </div>`;
         } else {
-          penaltyExplanation = `
+          adjustmentExplanation = `
           <div style="margin: 15px 0; padding: 15px; border-left: 4px solid #FFD700; background-color: #FFFDF0;">
             <p style="margin-top: 0; font-weight: bold;">💡 À propos de votre note :</p>
-            <p>Sans pénalité, votre note brute aurait été de <strong>${totalPointsEarned.toFixed(1)}/20</strong>.</p>
-            <p>Une pénalité de <strong>${penaltyValue} points</strong> a été appliquée, donnant une note finale de <strong>${finalGrade.toFixed(1)}/20</strong>.</p>
-            <p>Pour rappel, si la pénalité avait fait descendre votre note en dessous de 5/20, vous auriez bénéficié du seuil minimum de 5/20.</p>
+            <p>Sans ajustement, votre note brute aurait été de <strong>${totalPointsEarned.toFixed(1)}/20</strong>.</p>
+            <p>${adjustmentText}, donnant une note finale de <strong>${finalGrade.toFixed(1)}/20</strong>.</p>
+            <p>Pour rappel, si les ajustements avaient fait descendre votre note en dessous de 5/20, vous auriez bénéficié du seuil minimum de 5/20.</p>
           </div>`;
         }
       } else {
-        penaltyExplanation = `
-        <div style="margin: 15px 0; padding: 15px; border-left: 4px solid #FFD700; background-color: #FFFDF0;">
-          <p style="margin-top: 0; font-weight: bold;">💡 À propos de votre note :</p>
-          <p>Votre note brute est de <strong>${totalPointsEarned.toFixed(1)}/20</strong>, ce qui est inférieur au seuil de 5/20.</p>
-          <p>La pénalité de <strong>${penaltyValue} points</strong> n'a donc pas été appliquée, conformément à nos règles qui préservent les notes inférieures à 5/20.</p>
-        </div>`;
+        // Note < 5 : on applique seulement le bonus si positif
+        if (hasBonus && !hasPenalty) {
+          adjustmentExplanation = `
+          <div style="margin: 15px 0; padding: 15px; border-left: 4px solid #FFD700; background-color: #FFFDF0;">
+            <p style="margin-top: 0; font-weight: bold;">💡 À propos de votre note :</p>
+            <p>Votre note brute est de <strong>${totalPointsEarned.toFixed(1)}/20</strong>, ce qui est inférieur au seuil de 5/20.</p>
+            <p>Un bonus de <strong>+${bonusValue} points</strong> a été appliqué, donnant une note finale de <strong>${finalGrade.toFixed(1)}/20</strong>.</p>
+          </div>`;
+        } else {
+          adjustmentExplanation = `
+          <div style="margin: 15px 0; padding: 15px; border-left: 4px solid #FFD700; background-color: #FFFDF0;">
+            <p style="margin-top: 0; font-weight: bold;">💡 À propos de votre note :</p>
+            <p>Votre note brute est de <strong>${totalPointsEarned.toFixed(1)}/20</strong>, ce qui est inférieur au seuil de 5/20.</p>
+            ${hasPenalty ? `<p>La pénalité de <strong>${penaltyValue} points</strong> n'a pas été appliquée, conformément à nos règles qui préservent les notes inférieures à 5/20.</p>` : ''}
+            ${hasBonus ? `<p>Le bonus de <strong>+${bonusValue} points</strong> a été appliqué car il améliore votre note.</p>` : ''}
+          </div>`;
+        }
       }
     }
 
@@ -186,7 +227,7 @@ export default function EmailFeedbackAutre({
   
   <p><a href="${url}">${url}</a></p>
 
-  ${penaltyExplanation}
+  ${adjustmentExplanation}
 
   <p><strong>Points importants à retenir :</strong></p>
   <ul>

@@ -5,6 +5,34 @@ import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
 import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import DoneIcon from '@mui/icons-material/Done';
+import { validateGradeConstraint } from '@/lib/correctionAutre';
+
+/**
+ * Valide qu'une valeur respecte les contraintes de la base de données decima  // Nouveau slider unifié - Fonction pour gérer le changement pendant le glissement
+  const handleAdjustmentChange = (newValue: number) => {
+    // Valider la valeur avant de l'appliquer
+    const validatedValue = validateGradeConstraint(Math.abs(newValue), 'adjustment');
+    const adjustedValue = newValue < 0 ? -validatedValue : validatedValue;
+    
+    if (adjustedValue < 0) {
+      // Valeur négative = pénalité
+      const penaltyValue = Math.abs(adjustedValue);
+      setPenalty(String(penaltyValue));
+      setBonus('0');
+      tempValuesRef.current['penalty'] = penaltyValue;
+      tempValuesRef.current['bonus'] = 0;
+    } else {
+      // Valeur positive = bonus
+      setPenalty('0');
+      setBonus(String(adjustedValue));
+      tempValuesRef.current['penalty'] = 0;
+      tempValuesRef.current['bonus'] = adjustedValue;
+    }
+    tempValuesRef.current['adjustment'] = adjustedValue;
+/**
+ * Valide qu'une valeur respecte les contraintes de la base de données decimal(4,2)
+ * Les colonnes grade, penalty, bonus, final_grade ont une limite max de 99.99
+ */
 
 interface GradingSectionAutresProps {
   pointsEarned: number[]; // Tableau des points gagnés pour chaque partie
@@ -12,12 +40,16 @@ interface GradingSectionAutresProps {
   partNames: string[]; // Noms des différentes parties
   isPenaltyEnabled: boolean;
   penalty: string;
+  isBonusEnabled: boolean;
+  bonus: string;
   setPointsEarned: (index: number, value: number) => void;
   setPenalty: (penalty: string) => void;
+  setBonus: (bonus: string) => void;
   saveGradeTimeout: NodeJS.Timeout | null;
   setSaveGradeTimeout: (timeout: NodeJS.Timeout | null) => void;
   correction: any;
   handleUpdatePenalty?: (penalty: number) => Promise<any>;
+  handleUpdateBonus?: (bonus: number) => Promise<any>;
   saving?: boolean; // Indicateur si une sauvegarde est en cours
   setSaving?: (isSaving: boolean) => void; // Fonction pour mettre à jour l'état de sauvegarde
 }
@@ -28,12 +60,16 @@ const GradingSectionAutres: React.FC<GradingSectionAutresProps> = ({
   partNames,
   isPenaltyEnabled,
   penalty,
+  isBonusEnabled,
+  bonus,
   setPointsEarned,
   setPenalty,
+  setBonus,
   saveGradeTimeout,
   setSaveGradeTimeout,
   correction,
   handleUpdatePenalty,
+  handleUpdateBonus,
   saving = false,
   setSaving = () => {}
 }) => {
@@ -45,6 +81,8 @@ const GradingSectionAutres: React.FC<GradingSectionAutresProps> = ({
   const [isUpdating, setIsUpdating] = useState(false);
   // État pour le chargement du calcul de note finale
   const [isCalculating, setIsCalculating] = useState(false);
+  // État local pour la valeur du slider d'ajustement (pendant le drag)
+  const [localAdjustmentValue, setLocalAdjustmentValue] = useState<number | null>(null);
 
   // Hook pour les notifications
   const { enqueueSnackbar } = useSnackbar();
@@ -86,8 +124,24 @@ const GradingSectionAutres: React.FC<GradingSectionAutresProps> = ({
     setNeverSubmitted(isNeverSubmitted);
   }, [pointsEarned, totalPoints, correction]);
   
+  // Réinitialiser la valeur locale du slider quand les props penalty/bonus changent
+  useEffect(() => {
+    // Réinitialiser la valeur locale seulement si nous ne sommes pas en train de faire un drag
+    // et que les props ont été mises à jour depuis l'extérieur (par exemple après handleRecalculateGrade)
+    if (localAdjustmentValue !== null && !tempValuesRef.current['adjustment']) {
+      const penaltyValue = parseFloat(penalty) || 0;
+      const bonusValue = parseFloat(bonus) || 0;
+      const currentAdjustmentFromProps = penaltyValue > 0 ? -penaltyValue : bonusValue;
+      
+      // Si la valeur calculée depuis les props est différente de la valeur locale, réinitialiser
+      if (Math.abs(currentAdjustmentFromProps - localAdjustmentValue) > 0.01) {
+        setLocalAdjustmentValue(null);
+      }
+    }
+  }, [penalty, bonus]); // Enlever localAdjustmentValue des dépendances pour éviter la boucle
+  
   // Fonction pour sauvegarder les notes avec un délai
-  const saveGradeWithDebounce = (newPointsEarned: number[], penaltyValue: number) => {
+  const saveGradeWithDebounce = (newPointsEarned: number[], penaltyValue: number, bonusValue: number = 0) => {
     // Annuler tout timeout en cours
     if (saveGradeTimeout) {
       clearTimeout(saveGradeTimeout);
@@ -102,10 +156,12 @@ const GradingSectionAutres: React.FC<GradingSectionAutresProps> = ({
         setIsUpdating(true);
         setSaving(true); // Indiquer que la sauvegarde est en cours
         
-        // Calculer la note totale et la note finale
+        // Calculer la note totale et la note finale avec validation des contraintes
         const totalEarned = newPointsEarned.reduce((sum, points) => sum + points, 0);
-        const grade = totalEarned;
-        const finalGrade = calculateFinalGrade(grade, penaltyValue);
+        const grade = validateGradeConstraint(totalEarned, 'grade');
+        const finalGrade = validateGradeConstraint(calculateFinalGrade(grade, penaltyValue, bonusValue), 'final_grade');
+        const validatedPenalty = validateGradeConstraint(penaltyValue, 'penalty');
+        const validatedBonus = validateGradeConstraint(bonusValue, 'bonus');
         
         // Appeler l'API
         fetch(`/api/corrections_autres/${correction.id}/grade`, {
@@ -117,7 +173,8 @@ const GradingSectionAutres: React.FC<GradingSectionAutresProps> = ({
             points_earned: newPointsEarned,
             grade: grade,
             final_grade: finalGrade,
-            penalty: penaltyValue
+            penalty: validatedPenalty,
+            bonus: validatedBonus
           }),
         })
           .then((response) => response.json())
@@ -159,8 +216,14 @@ const GradingSectionAutres: React.FC<GradingSectionAutresProps> = ({
     setSaveGradeTimeout(timeout);
   };
 
-  // Fonction pour mettre à jour uniquement la pénalité
-  const updatePenaltyOnly = (newPenaltyValue: number) => {
+
+
+  // Fonction pour mettre à jour à la fois la pénalité et le bonus (pour les transitions)
+  const updateBothPenaltyAndBonus = (newPenaltyValue: number, newBonusValue: number) => {
+    // Valider les contraintes avant de continuer
+    const validatedPenalty = validateGradeConstraint(newPenaltyValue, 'penalty');
+    const validatedBonus = validateGradeConstraint(newBonusValue, 'bonus');
+    
     // Annuler tout timeout en cours
     if (saveGradeTimeout) {
       clearTimeout(saveGradeTimeout);
@@ -169,34 +232,80 @@ const GradingSectionAutres: React.FC<GradingSectionAutresProps> = ({
     // Configurer un nouveau timeout
     const timeout = setTimeout(() => {
       setIsUpdating(true);
-      setSaving(true); // Indiquer que la sauvegarde est en cours
+      setSaving(true);
       
-      // Si la fonction handleUpdatePenalty est disponible, l'utiliser
-      if (handleUpdatePenalty) {
-        handleUpdatePenalty(newPenaltyValue)
-          .then(() => {
-            const event = new CustomEvent('penaltyUpdated', { 
-              detail: { message: 'Pénalité mise à jour' } 
-            });
-            window.dispatchEvent(event);
+      if (!apiCallInProgressRef.current && correction) {
+        apiCallInProgressRef.current = true;
+        
+        // Calculer la note totale et la note finale avec validation des contraintes
+        const totalEarned = pointsEarned.reduce((sum, points) => sum + points, 0);
+        const grade = validateGradeConstraint(totalEarned, 'grade');
+        const finalGrade = validateGradeConstraint(calculateFinalGrade(grade, validatedPenalty, validatedBonus), 'final_grade');
+        
+        // Appeler l'API avec les deux valeurs en même temps
+        fetch(`/api/corrections_autres/${correction.id}/grade`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ 
+            points_earned: [...pointsEarned],
+            grade: grade,
+            final_grade: finalGrade,
+            penalty: validatedPenalty,
+            bonus: validatedBonus
+          }),
+        })
+          .then((response) => {
+            if (!response.ok) throw new Error('Erreur réseau');
+            return response.json();
+          })
+          .then((data) => {
+            // Mise à jour de l'objet correction avec les nouvelles valeurs
+            if (correction) {
+              correction.penalty = data.penalty;
+              correction.bonus = data.bonus;
+              correction.grade = data.grade;
+              correction.final_grade = data.final_grade;
+            }
+            
+            // Mettre à jour les états locaux pour que le slider reflète les bonnes valeurs
+            setPenalty(String(data.penalty || 0));
+            setBonus(String(data.bonus || 0));
+            
+            // NE PAS réinitialiser localAdjustmentValue ici - laisser le useEffect s'en charger
             
             // Afficher l'indicateur de succès central
             markSaveSuccess();
+            
+            const event = new CustomEvent('gradeUpdated', { 
+              detail: { 
+                message: 'Pénalité/Bonus mis à jour',
+                correction: data 
+              } 
+            });
+            window.dispatchEvent(event);
           })
           .catch(err => {
-            console.error('Erreur lors de la mise à jour de la pénalité:', err);
-            showNotification('Erreur lors de la mise à jour de la pénalité', 'error');
+            console.error('Erreur lors de la mise à jour de la pénalité/bonus:', err);
+            showNotification('Erreur lors de la mise à jour de la pénalité/bonus', 'error');
             
             // Afficher l'indicateur d'erreur central
             markSaveError();
+            
+            const event = new CustomEvent('gradeError', { 
+              detail: { message: 'Erreur lors de la mise à jour de la pénalité/bonus' } 
+            });
+            window.dispatchEvent(event);
           })
           .finally(() => {
+            apiCallInProgressRef.current = false;
             setIsUpdating(false);
-            setSaving(false); // Indiquer que la sauvegarde est terminée
+            setSaving(false);
+            
+            // Réinitialiser la valeur locale seulement en cas d'erreur pour éviter qu'elle reste bloquée
+            // En cas de succès, le useEffect se chargera de la réinitialisation quand nécessaire
           });
-      } else {
-        // Fallback à la méthode complète
-        saveGradeWithDebounce([...pointsEarned], newPenaltyValue);
       }
     }, 2000);
     
@@ -225,14 +334,17 @@ const GradingSectionAutres: React.FC<GradingSectionAutresProps> = ({
         setPointsEarned(index, 0);
       });
       
-      // Désactiver la pénalité
+      // Désactiver la pénalité et le bonus
       setPenalty('0');
+      setBonus('0');
       
       // Configurer un nouveau timeout pour la sauvegarde différée
       if (!apiCallInProgressRef.current && correction) {
         apiCallInProgressRef.current = true;
         
-        // Appeler l'API avec un statut spécial pour "travail non rendu"
+        // Appeler l'API avec un statut spécial pour "travail non rendu" et validation des contraintes
+        const validatedGrade25 = validateGradeConstraint(grade25Percent, 'grade');
+        
         fetch(`/api/corrections_autres/${correction.id}/grade`, {
           method: 'PUT',
           headers: {
@@ -240,9 +352,10 @@ const GradingSectionAutres: React.FC<GradingSectionAutresProps> = ({
           },
           body: JSON.stringify({ 
             points_earned: zeroPoints, // Utiliser le tableau de zéros
-            grade: grade25Percent,
-            final_grade: grade25Percent,
+            grade: validatedGrade25,
+            final_grade: validatedGrade25,
             penalty: 0,
+            bonus: 0,
             status: 'NON_RENDU' // Ajouter le statut explicite
           }),
         })
@@ -253,10 +366,11 @@ const GradingSectionAutres: React.FC<GradingSectionAutresProps> = ({
           .then((data) => {
             // Mise à jour de l'objet correction avec les nouvelles valeurs
             if (correction) {
-              correction.grade = grade25Percent;
-              correction.final_grade = grade25Percent;
+              correction.grade = validatedGrade25;
+              correction.final_grade = validatedGrade25;
               correction.points_earned = zeroPoints; // Utiliser le tableau de zéros
               correction.penalty = 0;
+              correction.bonus = 0;
               correction.status = 'NON_RENDU'; // Mettre à jour le statut localement aussi
             }
             
@@ -296,6 +410,7 @@ const GradingSectionAutres: React.FC<GradingSectionAutresProps> = ({
         setPointsEarned(index, 0);
       });
       setPenalty('0');
+      setBonus('0');
       
       // Annuler tout timeout en cours
       if (saveGradeTimeout) {
@@ -319,6 +434,7 @@ const GradingSectionAutres: React.FC<GradingSectionAutresProps> = ({
             grade: 0,
             final_grade: 0,
             penalty: 0,
+            bonus: 0,
             status: 'ACTIVE' // Réinitialiser le statut
           }),
         })
@@ -333,6 +449,7 @@ const GradingSectionAutres: React.FC<GradingSectionAutresProps> = ({
               correction.final_grade = 0;
               correction.points_earned = new Array(pointsEarned.length).fill(0);
               correction.penalty = 0;
+              correction.bonus = 0;
               correction.status = 'ACTIVE';
             }
             
@@ -368,13 +485,18 @@ const GradingSectionAutres: React.FC<GradingSectionAutresProps> = ({
   };
 
   // Calculer la note finale selon la règle demandée
-  const calculateFinalGrade = (grade: number, penalty: number): number => {
-    if (grade < 5) {
-      // Si la note est inférieure à 6, on garde la note originale
-      return grade;
+  const calculateFinalGrade = (grade: number, penalty: number, bonus: number = 0): number => {
+    const totalMaxPoints = totalPoints.reduce((sum, points) => sum + points, 0);
+    
+    // Appliquer d'abord le bonus (sans dépasser le maximum)
+    const gradeWithBonus = Math.min(grade + bonus, totalMaxPoints);
+    
+    if (gradeWithBonus < 5) {
+      // Si la note est inférieure à 5, on garde la note originale
+      return gradeWithBonus;
     } else {
-      // Sinon, on prend le maximum entre (note-pénalité) et 6
-      return Math.max(grade - penalty, 5);
+      // Sinon, on prend le maximum entre (note+bonus-pénalité) et 5, sans dépasser le max
+      return Math.min(Math.max(gradeWithBonus - penalty, 5), totalMaxPoints);
     }
   };
 
@@ -383,7 +505,7 @@ const GradingSectionAutres: React.FC<GradingSectionAutresProps> = ({
     return pointsEarned.reduce((sum, points) => sum + points, 0);
   };
 
-  // Calculer la note finale (avec application de la pénalité si nécessaire)
+  // Calculer la note finale (avec application de la pénalité et du bonus si nécessaire)
   const getFinalGrade = (): number => {
     // Si c'est un travail non rendu, renvoyer 25% des points max
     if (neverSubmitted) {
@@ -393,8 +515,9 @@ const GradingSectionAutres: React.FC<GradingSectionAutresProps> = ({
     
     const totalGrade = calculateTotalGrade();
     const penaltyValue = parseFloat(penalty) || 0;
+    const bonusValue = parseFloat(bonus) || 0;
     
-    return calculateFinalGrade(totalGrade, penaltyValue);
+    return calculateFinalGrade(totalGrade, penaltyValue, bonusValue);
   };
   
   // Calculer le pourcentage obtenu
@@ -448,30 +571,75 @@ const GradingSectionAutres: React.FC<GradingSectionAutresProps> = ({
     // Sauvegarder après relâchement du slider
     saveGradeWithDebounce(
       newPointsEarned,
-      isPenaltyEnabled ? parseFloat(penalty || '0') : 0
+      isPenaltyEnabled ? parseFloat(penalty || '0') : 0,
+      isBonusEnabled ? parseFloat(bonus || '0') : 0
     );
     
     // Nettoyer la référence temporaire
     delete tempValuesRef.current[index];
   };
 
-  // Fonction pour gérer le glissement du slider de pénalité
-  const handlePenaltyDrag = (newValue: number) => {
-    const newPenalty = String(newValue);
-    setPenalty(newPenalty);
-    tempValuesRef.current['penalty'] = newValue;
+
+
+  // Nouveau slider unifié - Fonction pour gérer le glissement
+  const handleAdjustmentDrag = (newValue: number) => {
+    // Mettre à jour la valeur locale pour le slider
+    setLocalAdjustmentValue(newValue);
+    
+    if (newValue < 0) {
+      // Valeur négative = pénalité
+      const penaltyValue = Math.abs(newValue);
+      setPenalty(String(penaltyValue));
+      setBonus('0');
+      tempValuesRef.current['penalty'] = penaltyValue;
+      tempValuesRef.current['bonus'] = 0;
+    } else {
+      // Valeur positive = bonus
+      setPenalty('0');
+      setBonus(String(newValue));
+      tempValuesRef.current['penalty'] = 0;
+      tempValuesRef.current['bonus'] = newValue;
+    }
+    tempValuesRef.current['adjustment'] = newValue;
   };
 
-  // Fonction pour gérer le relâchement du slider de pénalité
-  const handlePenaltyCommit = () => {
-    const newValue = tempValuesRef.current['penalty'];
-    if (newValue === undefined) return;
+  // Nouveau slider unifié - Fonction pour gérer le relâchement
+  const handleAdjustmentCommit = () => {
+    const adjustmentValue = tempValuesRef.current['adjustment'];
+    if (adjustmentValue === undefined) return;
     
-    // Mettre à jour la pénalité après relâchement
-    updatePenaltyOnly(newValue);
+    if (adjustmentValue < 0) {
+      // Valeur négative = pénalité
+      const penaltyValue = Math.abs(adjustmentValue);
+      updateBothPenaltyAndBonus(penaltyValue, 0);
+    } else {
+      // Valeur positive = bonus
+      updateBothPenaltyAndBonus(0, adjustmentValue);
+    }
     
-    // Nettoyer la référence temporaire
+    // Nettoyer les références temporaires
     delete tempValuesRef.current['penalty'];
+    delete tempValuesRef.current['bonus'];
+    delete tempValuesRef.current['adjustment'];
+    
+    // NE PAS réinitialiser localAdjustmentValue ici - cela sera fait après la sauvegarde
+  };
+
+  // Fonction pour obtenir la valeur actuelle du slider unifié
+  const getAdjustmentValue = () => {
+    // Si on a une valeur locale (pendant le drag), l'utiliser
+    if (localAdjustmentValue !== null) {
+      return localAdjustmentValue;
+    }
+    
+    // Sinon, utiliser les valeurs des props
+    const penaltyValue = parseFloat(penalty) || 0;
+    const bonusValue = parseFloat(bonus) || 0;
+    
+    if (penaltyValue > 0) {
+      return -penaltyValue; // Retourner une valeur négative pour la pénalité
+    }
+    return bonusValue; // Retourner la valeur positive pour le bonus
   };
   
   // État pour suivre si une sauvegarde a été réussie récemment
@@ -744,40 +912,62 @@ const GradingSectionAutres: React.FC<GradingSectionAutresProps> = ({
           </Grid>
         ))}
 
-        {/* Section pour la pénalité */}
-        {isPenaltyEnabled && (
-          <Grid size={{ xs: 12, md: 6 }}>
+        {/* Section pour l'ajustement unifié (pénalité/bonus) */}
+        {(isPenaltyEnabled || isBonusEnabled) && (
+          <Grid size={{ xs: 12 }}>
             <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', position: 'relative' }}>
-              <Typography variant="body2" id="penalty-slider" gutterBottom>
-                Pénalité
+              <Typography variant="body2" id="adjustment-slider" gutterBottom>
+                Ajustement de points
               </Typography>
               <Slider
-                aria-labelledby="penalty-slider"
-                value={parseFloat(penalty) || 0}
+                aria-labelledby="adjustment-slider"
+                value={getAdjustmentValue()}
                 onChange={(_, newValue) => {
-                  handlePenaltyDrag(newValue as number);
+                  handleAdjustmentDrag(newValue as number);
                 }}
-                onChangeCommitted={handlePenaltyCommit}
-                min={0}
-                max={16}
-                step={0.5}
+                onChangeCommitted={handleAdjustmentCommit}
+                min={-15}
+                max={5}
+                step={0.25}
                 valueLabelDisplay="auto"
-                marks
+                marks={[
+                  { value: -15, label: '-15' },
+                  { value: -10, label: '-10' },
+                  { value: -5, label: '-5' },
+                  { value: -2.5, label: '-2.5' },
+                  { value: 0, label: '0' },
+                  { value: 2.5, label: '+2.5' },
+                  { value: 5, label: '+5' }
+                ]}
                 disabled={neverSubmitted || isUpdating || saving}
                 sx={{ 
                   width: "90%",
-                  color: 'error.main',
                   '& .MuiSlider-thumb': {
                     height: 20,
                     width: 20,
+                    color: getAdjustmentValue() < 0 ? 'error.main' : 'success.main',
                   },
                   '& .MuiSlider-rail': {
                     opacity: 0.5,
-                  }
+                  },
+                  '& .MuiSlider-track': {
+                    color: getAdjustmentValue() < 0 ? 'error.main' : 'success.main',
+                  },
                 }}
               />
-              <Typography variant="caption" color="text.secondary" align="center" sx={{ mt: 1 }}>
-                {penalty || '0'} points
+              <Typography 
+                variant="caption" 
+                color="text.secondary" 
+                align="center" 
+                sx={{ 
+                  mt: 1,
+                  color: getAdjustmentValue() < 0 ? 'error.main' : 
+                         getAdjustmentValue() > 0 ? 'success.main' : 'text.secondary'
+                }}
+              >
+                {getAdjustmentValue() === 0 ? 'Aucun ajustement' : 
+                 getAdjustmentValue() < 0 ? `${getAdjustmentValue()} points (pénalité)` : 
+                 `+${getAdjustmentValue()} points (bonus)`}
               </Typography>
             </Box>
           </Grid>
