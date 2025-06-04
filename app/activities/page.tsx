@@ -525,9 +525,15 @@ export default function ActivitiesAutresPage() {
               fullWidth
               target="_blank"
               rel="noopener noreferrer"
-              sx={{color: theme => theme.palette.success.dark, 
-                bgcolor: alpha(theme.palette.success.main, 0.02), 
-                '&:hover': { bgcolor: alpha(theme.palette.success.main, 0.2) }}}
+              sx={{
+              color: theme => theme.palette.success.dark, 
+              bgcolor: alpha(theme.palette.success.main, 0.02), 
+              '&:hover': { bgcolor: alpha(theme.palette.success.main, 0.2) },
+              '& .MuiButton-startIcon': { mr: 0.5 },
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap'
+              }}
             >
               Nouvelle correction
             </Button>

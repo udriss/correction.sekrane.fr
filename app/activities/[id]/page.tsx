@@ -24,14 +24,23 @@ import {
   DialogActions,
   List,
   ListItem,
-  Alert
+  Alert,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
+  OutlinedInput,
+  InputAdornment,
+  Divider
 } from '@mui/material';
 import EditIcon from '@mui/icons-material/Edit';
 import SaveIcon from '@mui/icons-material/Save';
 import CloseIcon from '@mui/icons-material/Close';
 import DeleteIcon from '@mui/icons-material/Delete';
 import CheckIcon from '@mui/icons-material/Check';
-import WarningIcon from '@mui/icons-material/Warning';
+import SearchIcon from '@mui/icons-material/Search';
+import FilterListIcon from '@mui/icons-material/FilterList';
+import ClearIcon from '@mui/icons-material/Clear';
 
 import { useSnackbar } from 'notistack';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
@@ -95,18 +104,67 @@ export default function ActivityAutreDetail({ params }: { params: Promise<{ id: 
   const [students, setStudents] = useState<Student[]>([]);
   const [filteredCorrections, setFilteredCorrections] = useState<CorrectionAutre[]>([]);
   
-  // Calculated values for subclasses
-  const uniqueSubClasses = useMemo(() => {
-    if (!students.length) return [];
+  // States for correction filters  
+  const [searchFilter, setSearchFilter] = useState('');
+  const [selectedClassIds, setSelectedClassIds] = useState<number[]>([]);
+  const [selectedSubClassIds, setSelectedSubClassIds] = useState<string[]>([]);
+  const [allClasses, setAllClasses] = useState<{ id: number; name: string; nbre_subclasses?: number }[]>([]);
+
+  // Calculated values for subclasses - only show when classes are selected
+  const availableSubClasses = useMemo(() => {
+    if (!students.length || selectedClassIds.length === 0) return [];
     
-    // Extract all sub_class values from students
-    const subClasses = students
-      .filter(student => student.sub_class !== undefined && student.sub_class !== null)
-      .map(student => student.sub_class?.toString());
+    // Get students from selected classes only
+    const studentsFromSelectedClasses = students.filter(student => 
+      student.allClasses && 
+      student.allClasses.some(cls => selectedClassIds.includes(cls.classId))
+    );
     
-    // Remove duplicates
-    return Array.from(new Set(subClasses)).sort((a, b) => Number(a) - Number(b));
-  }, [students]);
+    // Build subclass list with unique entries for each class/subclass combination
+    const subClassEntries: { subClass: string; classId: number; className: string; uniqueKey: string }[] = [];
+    
+    studentsFromSelectedClasses.forEach(student => {
+      if (student.sub_class !== undefined && student.sub_class !== null && student.allClasses) {
+        const subClassStr = student.sub_class.toString();
+        
+        // For each class this student belongs to (that is also selected)
+        student.allClasses
+          .filter(cls => selectedClassIds.includes(cls.classId))
+          .forEach(cls => {
+            const className = allClasses.find(c => c.id === cls.classId)?.name;
+            if (className) {
+              const uniqueKey = `${cls.classId}-${subClassStr}`;
+              
+              // Check if this combination already exists
+              const existingEntry = subClassEntries.find(entry => entry.uniqueKey === uniqueKey);
+              if (!existingEntry) {
+                subClassEntries.push({
+                  subClass: subClassStr,
+                  classId: cls.classId,
+                  className: className,
+                  uniqueKey: uniqueKey
+                });
+              }
+            }
+          });
+      }
+    });
+    
+    // Sort by class name first, then by subclass number
+    return subClassEntries.sort((a, b) => {
+      // First sort by class name
+      const classComparison = a.className.localeCompare(b.className);
+      if (classComparison !== 0) return classComparison;
+      
+      // Then sort by subclass number
+      return Number(a.subClass) - Number(b.subClass);
+    });
+  }, [students, selectedClassIds, allClasses]);
+
+  // Reset selected subclasses when classes change
+  useEffect(() => {
+    setSelectedSubClassIds([]);
+  }, [selectedClassIds]);
 
   // Ajout d'un useMemo pour enrichir les corrections avec sub_class
   const adaptedCorrections = useMemo(() => {
@@ -574,7 +632,66 @@ export default function ActivityAutreDetail({ params }: { params: Promise<{ id: 
     }
   }, [tabValue, activityId, fetchFragmentsForActivity]);
 
-  
+  // Fetch all classes for filtering
+  const fetchClasses = useCallback(async () => {
+    try {
+      const response = await fetch('/api/classes');
+      if (response.ok) {
+        const classes = await response.json();
+        setAllClasses(classes);
+      }
+    } catch (error) {
+      console.error('Erreur lors du chargement des classes:', error);
+    }
+  }, []);
+
+  // Load classes when component mounts
+  useEffect(() => {
+    fetchClasses();
+  }, [fetchClasses]);
+
+  // Filter corrections based on search, class, and subclass filters
+  const filteredCorrectionsForDisplay = useMemo(() => {
+    let result = corrections;
+
+    // Apply search filter
+    if (searchFilter.trim()) {
+      const searchLower = searchFilter.toLowerCase();
+      result = result.filter(correction => {
+        const student = students.find(s => s.id === correction.student_id);
+        const studentName = student ? `${student.first_name} ${student.last_name}`.toLowerCase() : '';
+        return studentName.includes(searchLower);
+      });
+    }
+
+    // Apply class filter
+    if (selectedClassIds.length > 0) {
+      result = result.filter(correction => {
+        const student = students.find(s => s.id === correction.student_id);
+        return student && student.allClasses && student.allClasses.some(cls => 
+          selectedClassIds.includes(cls.classId)
+        );
+      });
+    }
+
+    // Apply subclass filter
+    if (selectedSubClassIds.length > 0) {
+      result = result.filter(correction => {
+        const student = students.find(s => s.id === correction.student_id);
+        if (!student || student.sub_class === undefined || student.sub_class === null || !student.allClasses) {
+          return false;
+        }
+        
+        // Check if any of the student's class-subclass combinations match selected filters
+        return student.allClasses.some(cls => {
+          const uniqueKey = `${cls.classId}-${student.sub_class}`;
+          return selectedSubClassIds.includes(uniqueKey);
+        });
+      });
+    }
+
+    return result;
+  }, [corrections, students, searchFilter, selectedClassIds, selectedSubClassIds]);
 
   // Composant pour afficher les parties de l'activité (utilisé en mode lecture)
   const renderParts = () => {
@@ -933,7 +1050,7 @@ export default function ActivityAutreDetail({ params }: { params: Promise<{ id: 
             <div>
               <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
                 <Typography variant="h6">
-                  Corrections ({corrections.length})
+                  Corrections ({filteredCorrectionsForDisplay.length}/{corrections.length})
                 </Typography>
                 <Button
                   variant="contained"
@@ -944,6 +1061,112 @@ export default function ActivityAutreDetail({ params }: { params: Promise<{ id: 
                   Nouvelle correction
                 </Button>
               </Box>
+
+              {/* Filter Panel */}
+              <Paper variant="outlined" sx={{ p: 2, mb: 2 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
+                  <FilterListIcon color="action" />
+                  <Typography variant="subtitle1">Filtres</Typography>
+                  {(searchFilter || selectedClassIds.length > 0 || selectedSubClassIds.length > 0) && (
+                    <Button
+                      size="small"
+                      startIcon={<ClearIcon />}
+                      onClick={() => {
+                        setSearchFilter('');
+                        setSelectedClassIds([]);
+                        setSelectedSubClassIds([]);
+                      }}
+                    >
+                      Effacer les filtres
+                    </Button>
+                  )}
+                </Box>
+
+                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2, alignItems: 'flex-end' }}>
+                  {/* Search Field */}
+                  <TextField
+                    size="small"
+                    placeholder="Rechercher par nom d'étudiant..."
+                    value={searchFilter}
+                    onChange={(e) => setSearchFilter(e.target.value)}
+                    sx={{ minWidth: 200, flexGrow: 1 }}
+                    slotProps={{
+                      input: {
+                        startAdornment: (
+                        <InputAdornment position="start">
+                          <SearchIcon color="action" />
+                        </InputAdornment>
+                      ),
+                    }
+                    }}
+                  />
+
+                  {/* Class Filter */}
+                  <FormControl size="small" sx={{ minWidth: 180 }}>
+                    <InputLabel>Classes</InputLabel>
+                    <Select
+                      multiple
+                      value={selectedClassIds}
+                      onChange={(event) => {
+                        const value = event.target.value;
+                        setSelectedClassIds(typeof value === 'string' ? value.split(',').map(Number) : value);
+                      }}
+                      input={<OutlinedInput label="Classes" />}
+                      renderValue={(selected) => (
+                        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                          {selected.map((classId) => {
+                            const className = allClasses.find(cls => cls.id === classId)?.name || `Classe ${classId}`;
+                            return (
+                              <Chip key={classId} label={className} size="small" />
+                            );
+                          })}
+                        </Box>
+                      )}
+                    >
+                      {allClasses.map((cls) => (
+                        <MenuItem key={cls.id} value={cls.id}>
+                          {cls.name}
+                        </MenuItem>
+                      ))}
+                    </Select>
+                  </FormControl>
+
+                  {/* SubClass Filter - only show if classes are selected and subclasses exist */}
+                  {availableSubClasses.length > 0 && (
+                    <FormControl size="small" sx={{ minWidth: 200 }}>
+                      <InputLabel>Sous-classes</InputLabel>
+                      <Select
+                        multiple
+                        value={selectedSubClassIds}
+                        onChange={(event) => {
+                          const value = event.target.value;
+                          setSelectedSubClassIds(typeof value === 'string' ? value.split(',') : value);
+                        }}
+                        input={<OutlinedInput label="Sous-classes" />}
+                        renderValue={(selected) => (
+                          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                            {selected.map((uniqueKey) => {
+                              const subClassInfo = availableSubClasses.find(sc => sc.uniqueKey === uniqueKey);
+                              const displayLabel = subClassInfo 
+                                ? `${subClassInfo.subClass} (${subClassInfo.className})`
+                                : uniqueKey;
+                              return (
+                                <Chip key={uniqueKey} label={displayLabel} size="small" />
+                              );
+                            })}
+                          </Box>
+                        )}
+                      >
+                        {availableSubClasses.map((subClassInfo) => (
+                          <MenuItem key={subClassInfo.uniqueKey} value={subClassInfo.uniqueKey}>
+                            {subClassInfo.subClass} ({subClassInfo.className})
+                          </MenuItem>
+                        ))}
+                      </Select>
+                    </FormControl>
+                  )}
+                </Box>
+              </Paper>
               
               {corrections.length === 0 ? (
                 <Paper sx={{ p: 4, textAlign: 'center', mb: 2 }}>
@@ -959,12 +1182,18 @@ export default function ActivityAutreDetail({ params }: { params: Promise<{ id: 
                     Ajouter une correction
                   </Button>
                 </Paper>
+              ) : filteredCorrectionsForDisplay.length === 0 ? (
+                <Paper sx={{ p: 4, textAlign: 'center', mb: 2 }}>
+                  <Typography variant="body1" color="textSecondary">
+                    Aucune correction ne correspond aux filtres sélectionnés.
+                  </Typography>
+                </Paper>
               ) : (
                 <Paper variant="outlined" sx={{ mb: 2 }}>
-                  {corrections.map((correction, index) => (
+                  {filteredCorrectionsForDisplay.map((correction, index) => (
                     <Box key={correction.id} sx={{ 
                       p: 2, 
-                      borderBottom: index < corrections.length - 1 ? '1px solid rgba(0,0,0,0.12)' : 'none',
+                      borderBottom: index < filteredCorrectionsForDisplay.length - 1 ? '1px solid rgba(0,0,0,0.12)' : 'none',
                       backgroundColor: correction.status !== 'ACTIVE' ? 'rgba(0,0,0,0.04)' : 'transparent'
                     }}>
                       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>

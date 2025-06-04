@@ -7,33 +7,6 @@ import RefreshIcon from '@mui/icons-material/Refresh';
 import DoneIcon from '@mui/icons-material/Done';
 import { validateGradeConstraint } from '@/lib/correctionAutre';
 
-/**
- * Valide qu'une valeur respecte les contraintes de la base de données decima  // Nouveau slider unifié - Fonction pour gérer le changement pendant le glissement
-  const handleAdjustmentChange = (newValue: number) => {
-    // Valider la valeur avant de l'appliquer
-    const validatedValue = validateGradeConstraint(Math.abs(newValue), 'adjustment');
-    const adjustedValue = newValue < 0 ? -validatedValue : validatedValue;
-    
-    if (adjustedValue < 0) {
-      // Valeur négative = pénalité
-      const penaltyValue = Math.abs(adjustedValue);
-      setPenalty(String(penaltyValue));
-      setBonus('0');
-      tempValuesRef.current['penalty'] = penaltyValue;
-      tempValuesRef.current['bonus'] = 0;
-    } else {
-      // Valeur positive = bonus
-      setPenalty('0');
-      setBonus(String(adjustedValue));
-      tempValuesRef.current['penalty'] = 0;
-      tempValuesRef.current['bonus'] = adjustedValue;
-    }
-    tempValuesRef.current['adjustment'] = adjustedValue;
-/**
- * Valide qu'une valeur respecte les contraintes de la base de données decimal(4,2)
- * Les colonnes grade, penalty, bonus, final_grade ont une limite max de 99.99
- */
-
 interface GradingSectionAutresProps {
   pointsEarned: number[]; // Tableau des points gagnés pour chaque partie
   totalPoints: number[]; // Tableau des points maximums pour chaque partie
@@ -160,7 +133,7 @@ const GradingSectionAutres: React.FC<GradingSectionAutresProps> = ({
       // mais avec un petit délai pour laisser les props se mettre à jour
       const timer = setTimeout(() => {
         setLocalAdjustmentValue(null);
-      }, 50);
+      }, 150);
       
       return () => clearTimeout(timer);
     }
@@ -173,7 +146,6 @@ const GradingSectionAutres: React.FC<GradingSectionAutresProps> = ({
       clearTimeout(saveGradeTimeout);
     }
     
-    
     // Configurer un nouveau timeout pour la sauvegarde différée
     const timeout = setTimeout(() => {
       // Vérifier si une requête API est déjà en cours
@@ -182,31 +154,36 @@ const GradingSectionAutres: React.FC<GradingSectionAutresProps> = ({
         setIsUpdating(true);
         setSaving(true); // Indiquer que la sauvegarde est en cours
         
-        // Calculer la note totale et la note finale avec validation des contraintes
-        const totalEarned = newPointsEarned.reduce((sum, points) => sum + points, 0);
-        const grade = validateGradeConstraint(totalEarned, 'grade');
-        const finalGrade = validateGradeConstraint(calculateFinalGrade(grade, penaltyValue, bonusValue), 'final_grade');
+        // Valider les valeurs d'entrée uniquement (laisser l'API calculer grade et final_grade)
         const validatedPenalty = validateGradeConstraint(penaltyValue, 'penalty');
         const validatedBonus = validateGradeConstraint(bonusValue, 'bonus');
         
-        // Appeler l'API
+        // Valider les points earned individuellement
+        const validatedPointsEarned = newPointsEarned.map((points, index) => 
+          validateGradeConstraint(points, `points_earned[${index}]`)
+        );
+        
+        // Appeler l'API en laissant le serveur calculer grade et final_grade
         fetch(`/api/corrections_autres/${correction.id}/grade`, {
           method: 'PUT',
           headers: {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({ 
-            points_earned: newPointsEarned,
-            grade: grade,
-            final_grade: finalGrade,
+            points_earned: validatedPointsEarned,
             penalty: validatedPenalty,
             bonus: validatedBonus
           }),
         })
-          .then((response) => response.json())
+          .then((response) => {
+            if (!response.ok) {
+              throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            return response.json();
+          })
           .then((data) => {
             // Mise à jour de l'état local de correction avec les nouvelles valeurs
-            if (data && data.points_earned) {
+            if (data && data.points_earned !== undefined) {
               // Mettre à jour la référence de la note finale si disponible
               if (data.final_grade !== null && data.final_grade !== undefined) {
                 lastValidFinalGradeRef.current = data.final_grade;
@@ -242,7 +219,7 @@ const GradingSectionAutres: React.FC<GradingSectionAutresProps> = ({
             setSaving(false); // Indiquer que la sauvegarde est terminée
           });
       }
-    }, 3000); // Délai de 3 secondes
+    }, 500); // Délai de 500ms
 
     setSaveGradeTimeout(timeout);
   };
@@ -268,12 +245,7 @@ const GradingSectionAutres: React.FC<GradingSectionAutresProps> = ({
       if (!apiCallInProgressRef.current && correction) {
         apiCallInProgressRef.current = true;
         
-        // Calculer la note totale et la note finale avec validation des contraintes
-        const totalEarned = pointsEarned.reduce((sum, points) => sum + points, 0);
-        const grade = validateGradeConstraint(totalEarned, 'grade');
-        const finalGrade = validateGradeConstraint(calculateFinalGrade(grade, validatedPenalty, validatedBonus), 'final_grade');
-        
-        // Appeler l'API avec les deux valeurs en même temps
+        // Appeler l'API avec les valeurs de pénalité/bonus et laisser le serveur calculer grade et final_grade
         fetch(`/api/corrections_autres/${correction.id}/grade`, {
           method: 'PUT',
           headers: {
@@ -281,8 +253,6 @@ const GradingSectionAutres: React.FC<GradingSectionAutresProps> = ({
           },
           body: JSON.stringify({ 
             points_earned: [...pointsEarned],
-            grade: grade,
-            final_grade: finalGrade,
             penalty: validatedPenalty,
             bonus: validatedBonus
           }),
@@ -731,7 +701,7 @@ const GradingSectionAutres: React.FC<GradingSectionAutresProps> = ({
   // État pour suivre si une erreur s'est produite récemment
   const [saveError, setSaveError] = useState(false);
   // Durée d'affichage des indicateurs de succès/erreur (en ms)
-  const INDICATOR_DISPLAY_DURATION = 1500;
+  const INDICATOR_DISPLAY_DURATION = 1000;
   
   // Fonction pour indiquer une sauvegarde réussie
   const markSaveSuccess = () => {

@@ -780,7 +780,7 @@ export default function FeedbackViewer({ params }: { params: Promise<{ code: str
                                 icon={<ScheduleIcon />}
                               >
                                 <Typography variant="subtitle2" sx={{ fontWeight: 'bold' }}>
-                                  Pénalité de retard : — {parseFloat(String(correction.penalty))} point{parseFloat(String(correction.penalty)) > 1 ? 's' : ''}
+                                  Pénalité appliquée : — {parseFloat(String(correction.penalty))} point{parseFloat(String(correction.penalty)) > 1 ? 's' : ''}
                                 </Typography>
                                 {isMoreThanOneDayLate && (
                                   <Typography variant="caption">
@@ -807,7 +807,7 @@ export default function FeedbackViewer({ params }: { params: Promise<{ code: str
                               </Alert>
                             )}
 
-                            {/* Explication du calcul de la note avec règle du seuil de 6/20 */}
+                            {/* Explication du calcul de la note avec règle du seuil de 5/20 */}
                             {(hasPenalty || hasBonus) && rawTotal >= 5 && (
                               <Paper 
                                 elevation={0} 
@@ -872,12 +872,12 @@ export default function FeedbackViewer({ params }: { params: Promise<{ code: str
                                         <Typography variant="body2">
                                           <strong>Note finale (seuil minimum) :</strong>
                                         </Typography>
-                                        <Typography variant="body2" sx={{ fontWeight: 'bold', color: 'success.dark' }}>6 / 20</Typography>
+                                        <Typography variant="body2" sx={{ fontWeight: 'bold', color: 'success.dark' }}>05 / 20</Typography>
                                       </Box>
                                       <Typography variant="caption" sx={{ color: 'success.dark', mt: 0.5 }}>
                                         <InfoIcon sx={{ fontSize: 16, verticalAlign: 'text-bottom', mr: 0.5 }} />
-                                        Comme votre note brute était ≥ 6/20 et que le calcul après pénalité donnerait une note inférieure à 6/20, 
-                                        le seuil minimum de 6/20 s'applique.
+                                        Comme votre note brute était ≥ 05/20 et que le calcul après pénalité donnerait une note inférieure à 05/20, 
+                                        le seuil minimum de 05/20 s'applique.
                                       </Typography>
                                     </>
                                   )}
@@ -898,8 +898,8 @@ export default function FeedbackViewer({ params }: { params: Promise<{ code: str
                                       </Box>
                                       <Typography variant="caption" sx={{ color: 'text.secondary', mt: 0.5 }}>
                                         <InfoIcon sx={{ fontSize: 16, verticalAlign: 'text-bottom', mr: 0.5 }} />
-                                        Info : si la pénalité avait fait descendre votre note en dessous de 6/20, 
-                                        vous auriez bénéficié du seuil minimum de 6/20.
+                                        Info : si la pénalité avait fait descendre votre note en dessous de 5/20, 
+                                        vous auriez bénéficié du seuil minimum de 5/20.
                                       </Typography>
                                     </>
                                   )}

@@ -470,7 +470,7 @@ export default function CorrectionAutreDetail({ params }: { params: Promise<{ id
           }
         });
       }
-    }, 1000);
+    }, 500);
     
     setSaveDateTimeout(timeout);
   };
@@ -497,7 +497,7 @@ export default function CorrectionAutreDetail({ params }: { params: Promise<{ id
           }
         });
       }
-    }, 1000);
+    }, 500);
     
     setSaveDateTimeout(timeout);
   };

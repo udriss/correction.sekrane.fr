@@ -4,7 +4,7 @@ import { withConnection } from '@/lib/db';
 import { getServerSession } from "next-auth/next";
 import authOptions from "@/lib/auth";
 import { getUser } from '@/lib/auth';
-import { updateCorrectionAutre, getCorrectionAutreById, validateGradeConstraint } from '@/lib/correctionAutre';
+import { updateCorrectionAutre, getCorrectionAutreById, validateGradeConstraint, calculateGrade } from '@/lib/correctionAutre';
 import { getActivityAutreById } from '@/lib/activityAutre';
 
 interface GradeData {
@@ -97,25 +97,17 @@ export async function PUT(
       // Cas normal: utiliser les points fournis ou existants
       pointsEarned = data.points_earned !== undefined ? data.points_earned : correction.points_earned || [];
       
-      // Calculer la note totale à partir des points si elle n'est pas spécifiée
-      if (gradeValue === undefined) {
-        gradeValue = pointsEarned.reduce((sum, point) => sum + (point || 0), 0);
-      }
+      // Utiliser la fonction calculateGrade centralisée pour assurer la cohérence
+      const calculatedGrades = calculateGrade(
+        activity.points,
+        pointsEarned,
+        penaltyValue,
+        bonusValue
+      );
       
-      // Calculer la note finale selon les règles si elle n'est pas spécifiée
-      if (finalGradeValue === undefined) {
-        // Utiliser 0 comme valeur par défaut si gradeValue est null
-        const actualGradeValue = gradeValue ?? 0;
-        const actualBonusValue = bonusValue ?? 0;
-        
-        // Si note brute < 5, on conserve la note mais on peut appliquer le bonus
-        if (actualGradeValue < 5) {
-          finalGradeValue = Math.max(actualGradeValue + actualBonusValue, actualGradeValue);
-        } else {
-          // Sinon, on prend le maximum entre (note-pénalité+bonus) et 5
-          finalGradeValue = Math.max(5, actualGradeValue - (penaltyValue ?? 0) + actualBonusValue);
-        }
-      }
+      // Utiliser les valeurs calculées par la fonction centralisée
+      gradeValue = calculatedGrades.grade;
+      finalGradeValue = calculatedGrades.final_grade;
     }
     
     // Valeurs à mettre à jour avec validation des contraintes de base de données
