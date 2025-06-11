@@ -33,7 +33,10 @@ import {
   MenuItem,
   FormControl,
   InputLabel,
-  Checkbox
+  Checkbox,
+  Accordion,
+  AccordionSummary,
+  AccordionDetails
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import SearchIcon from '@mui/icons-material/Search';
@@ -49,6 +52,7 @@ import HelpOutlineIcon from '@mui/icons-material/HelpOutline';
 import AssessmentIcon from '@mui/icons-material/Assessment';
 import PersonOffIcon from '@mui/icons-material/PersonOff';
 import AssignmentLateIcon from '@mui/icons-material/AssignmentLate';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import GradientBackground from '@/components/ui/GradientBackground';
 import PatternBackground from '@/components/ui/PatternBackground';
 import LoadingSpinner from '@/components/LoadingSpinner';
@@ -106,6 +110,32 @@ export default function ActivitiesAutresPage() {
   const [dateTo, setDateTo] = useState<Date | null>(null);
   const [dateModifFrom, setDateModifFrom] = useState<Date | null>(null);
   const [dateModifTo, setDateModifTo] = useState<Date | null>(null);
+  const [expandedYears, setExpandedYears] = useState<Set<string>>(new Set());
+
+  // Fonction pour gérer l'expansion/rétraction des accordéons par année
+  const handleYearToggle = (year: string) => {
+    setExpandedYears(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(year)) {
+        newSet.delete(year);
+      } else {
+        newSet.add(year);
+      }
+      return newSet;
+    });
+  };
+
+  // Initialiser les années comme ouvertes par défaut
+  useEffect(() => {
+    if (filteredActivities.length > 0) {
+      const years = new Set<string>();
+      filteredActivities.forEach(activity => {
+        const year = activity.created_at ? new Date(activity.created_at).getFullYear().toString() : 'Inconnue';
+        years.add(year);
+      });
+      setExpandedYears(years);
+    }
+  }, [filteredActivities]);
   
   useEffect(() => {
     const fetchActivities = async () => {
@@ -1060,7 +1090,7 @@ export default function ActivitiesAutresPage() {
           <Typography variant="h6" gutterBottom sx={{ borderBottom: '1px solid', borderColor: 'divider', pb: 1, mb: 2 }}>
             Liste des activités
           </Typography>
-          {/* Rangement par année de création */}
+          {/* Rangement par année de création avec accordéons */}
           {(() => {
             if (filteredActivities.length === 0) {
               return (
@@ -1081,112 +1111,147 @@ export default function ActivitiesAutresPage() {
             return (
               <Box>
                 {sortedYears.map(year => (
-                  <Box key={year} sx={{ mb: 2 }}>
-                    <Box
+                  <Accordion 
+                    key={year} 
+                    expanded={expandedYears.has(year)}
+                    onChange={() => handleYearToggle(year)}
+                    sx={{ 
+                      mb: 1,
+                      boxShadow: 1,
+                      '&:before': { display: 'none' },
+                      '&.Mui-expanded': { margin: '0 0 8px 0' }
+                    }}
+                  >
+                    <AccordionSummary
+                      expandIcon={<ExpandMoreIcon />}
                       sx={{
                         bgcolor: 'rgb(89, 113, 138)',
                         color: 'primary.contrastText',
-                        px: 2,
-                        py: 0.5,
-                        borderRadius: 2,
+                        borderRadius: 1,
                         fontWeight: 'bold',
                         fontSize: '1.1rem',
                         letterSpacing: 1,
-                        mb: 1,
-                        boxShadow: 2,
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: 1,
                         textTransform: 'uppercase',
                         borderLeft: '6px solid',
                         borderColor: 'secondary.main',
+                        minHeight: 48,
+                        '&.Mui-expanded': {
+                          minHeight: 48,
+                          borderBottomLeftRadius: 0,
+                          borderBottomRightRadius: 0,
+                        },
+                        '& .MuiAccordionSummary-content': {
+                          alignItems: 'center',
+                          gap: 1,
+                          margin: '12px 0',
+                          '&.Mui-expanded': {
+                            margin: '12px 0',
+                          }
+                        },
+                        '& .MuiAccordionSummary-expandIconWrapper': {
+                          color: 'primary.contrastText',
+                        }
                       }}
                     >
                       <AssessmentIcon sx={{ mr: 1, opacity: 0.7 }} fontSize="small" />
-                      {year}
-                    </Box>
-                    <List sx={{ p: 0, mb: 1 }}>
-                      {activitiesByYear[year]
-                        .sort((a, b) => new Date(b.created_at || '').getTime() - new Date(a.created_at || '').getTime())
-                        .map((activity) => (
-                        <ListItem 
-                          key={activity.id} 
-                          disablePadding
-                          sx={{ 
-                            display: 'block', 
-                            mb: 0.5, 
-                          }}
-                        >
-                          {/* Bouton pour sélectionner l'activité */}
-                          <Button
-                            fullWidth
-                            onClick={() => handleActivitySelect(activity.id!)}
-                            sx={{
-                              justifyContent: 'flex-start',
-                              py: 1.2,
-                              borderRadius: 2,
-                              textAlign: 'left',
-                              color: selectedActivityId === activity.id ? 'primary.main' : 'text.primary',
-                              fontWeight: selectedActivityId === activity.id ? 'bold' : 'normal',
-                              bgcolor: selectedActivityId === activity.id ? 'secondary.lighter' : 'background.paper',
-                              border: selectedActivityId === activity.id ? '2px solid' : '1px solid',
-                              borderColor: selectedActivityId === activity.id ? 'secondary.main' : 'divider',
-                              boxShadow: selectedActivityId === activity.id ? 3 : 0,
-                              '&:hover': {
-                                bgcolor: selectedActivityId === activity.id 
-                                  ? 'secondary.light' 
-                                  : 'primary.50',
-                                borderColor: 'primary.main',
-                                boxShadow: 2,
-                              },
-                              position: 'relative',
-                              overflow: 'hidden',
-                              transition: 'all 0.15s',
+                      <Typography sx={{ fontWeight: 'bold', fontSize: '1.1rem' }}>
+                        {year}
+                      </Typography>
+                      <Chip
+                        label={`${activitiesByYear[year].length} activité${activitiesByYear[year].length > 1 ? 's' : ''}`}
+                        size="small"
+                        sx={{
+                          ml: 2,
+                          bgcolor: 'rgba(255, 255, 255, 0.2)',
+                          color: 'primary.contrastText',
+                          fontWeight: 'bold'
+                        }}
+                      />
+                    </AccordionSummary>
+                    <AccordionDetails sx={{ p: 0, pt: 1 }}>
+                      <List sx={{ p: 0 }}>
+                        {activitiesByYear[year]
+                          .sort((a, b) => new Date(b.created_at || '').getTime() - new Date(a.created_at || '').getTime())
+                          .map((activity) => (
+                          <ListItem 
+                            key={activity.id} 
+                            disablePadding
+                            sx={{ 
+                              display: 'block', 
+                              mb: 0.5, 
                             }}
                           >
-                            <Grid container spacing={1} alignItems="center" sx={{ 
-                              width: '100%',
-                              display: 'flex', 
-                              alignItems: 'center', 
-                              justifyContent: 'space-between'
-                            }}>
-                              <Grid size={{ xs: 10  }}>
-                                <Typography 
-                                  variant="body2" 
+                            {/* Bouton pour sélectionner l'activité */}
+                            <Button
+                              fullWidth
+                              onClick={() => handleActivitySelect(activity.id!)}
+                              sx={{
+                                justifyContent: 'flex-start',
+                                py: 1.2,
+                                borderRadius: 2,
+                                textAlign: 'left',
+                                color: selectedActivityId === activity.id ? 'primary.main' : 'text.primary',
+                                fontWeight: selectedActivityId === activity.id ? 'bold' : 'normal',
+                                bgcolor: selectedActivityId === activity.id ? 'secondary.lighter' : 'background.paper',
+                                border: selectedActivityId === activity.id ? '2px solid' : '1px solid',
+                                borderColor: selectedActivityId === activity.id ? 'secondary.main' : 'divider',
+                                boxShadow: selectedActivityId === activity.id ? 3 : 0,
+                                '&:hover': {
+                                  bgcolor: selectedActivityId === activity.id 
+                                    ? 'secondary.light' 
+                                    : 'primary.50',
+                                  borderColor: 'primary.main',
+                                  boxShadow: 2,
+                                },
+                                position: 'relative',
+                                overflow: 'hidden',
+                                transition: 'all 0.15s',
+                              }}
+                            >
+                              <Grid container spacing={1} alignItems="center" sx={{ 
+                                width: '100%',
+                                display: 'flex', 
+                                alignItems: 'center', 
+                                justifyContent: 'space-between'
+                              }}>
+                                <Grid size={{ xs: 10  }}>
+                                  <Typography 
+                                    variant="body2" 
+                                    sx={{ 
+                                      fontWeight: selectedActivityId === activity.id ? 'bold' : 'normal',
+                                      color: selectedActivityId === activity.id ? 'primary.main' : 'text.primary',
+                                      overflow: 'hidden',
+                                      textOverflow: 'ellipsis',
+                                      whiteSpace: 'nowrap',
+                                      flexGrow: 1, 
+                                    }}
+                                  >
+                                    {activity.name}
+                                  </Typography>
+                                </Grid>
+                                <Grid size={{ xs: 2 }} 
                                   sx={{ 
-                                    fontWeight: selectedActivityId === activity.id ? 'bold' : 'normal',
-                                    color: selectedActivityId === activity.id ? 'primary.main' : 'text.primary',
-                                    overflow: 'hidden',
-                                    textOverflow: 'ellipsis',
-                                    whiteSpace: 'nowrap',
-                                    flexGrow: 1, 
-                                  }}
-                                >
-                                  {activity.name}
-                                </Typography>
-                              </Grid>
-                              <Grid size={{ xs: 2 }} 
-                                sx={{ 
-                                  textAlign: 'right',
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  justifyContent: 'flex-end',
-                                }}>
-                                {activity.correction_count && activity.correction_count > 0 && (
-                                  <Chip
-                                    size="small"
-                                    label={activity.correction_count}
-                                    color="success"
-                                    sx={{ minWidth: 0, height: 20, '& .MuiChip-label': { px: 1 } }}
-                                  />
-                                )}
-                              </Grid>   
-                            </Grid>               
-                          </Button>
-                        </ListItem>
-                      ))}
-                    </List>
-                  </Box>
+                                    textAlign: 'right',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'flex-end',
+                                  }}>
+                                  {activity.correction_count && activity.correction_count > 0 && (
+                                    <Chip
+                                      size="small"
+                                      label={activity.correction_count}
+                                      color="success"
+                                      sx={{ minWidth: 0, height: 20, '& .MuiChip-label': { px: 1 } }}
+                                    />
+                                  )}
+                                </Grid>   
+                              </Grid>               
+                            </Button>
+                          </ListItem>
+                        ))}
+                      </List>
+                    </AccordionDetails>
+                  </Accordion>
                 ))}
               </Box>
             );

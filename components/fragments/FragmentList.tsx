@@ -14,6 +14,9 @@ interface FragmentListProps {
   onAddToCorrection?: (fragment: Fragment) => void;
   refreshCategories: () => Promise<void>;
   renderPositionChip?: (fragment: Fragment) => React.ReactNode;
+  isSelectable?: boolean;
+  selectedFragments?: number[];
+  onSelectionChange?: (fragmentId: number, selected: boolean) => void;
 }
 
 const FragmentList: React.FC<FragmentListProps> = ({
@@ -26,7 +29,10 @@ const FragmentList: React.FC<FragmentListProps> = ({
   onDelete,
   onAddToCorrection,
   refreshCategories,
-  renderPositionChip
+  renderPositionChip,
+  isSelectable = false,
+  selectedFragments = [],
+  onSelectionChange
 }) => {
   return (
     <Box sx={{ maxHeight: 900, overflowY: 'auto', p: 0.5, '& > *': { mb: 1.5 }, position: 'relative' }}>
@@ -43,6 +49,9 @@ const FragmentList: React.FC<FragmentListProps> = ({
           onAddToCorrection={onAddToCorrection ? () => onAddToCorrection(fragment) : undefined}
           refreshCategories={refreshCategories}
           renderPositionChip={renderPositionChip ? () => renderPositionChip(fragment) : undefined}
+          isSelectable={isSelectable}
+          isSelected={selectedFragments.includes(fragment.id)}
+          onSelectionChange={onSelectionChange}
         />
       ))}
     </Box>

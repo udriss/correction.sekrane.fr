@@ -18,7 +18,7 @@ import TrendingDownIcon from '@mui/icons-material/TrendingDown';
 import GradeDistributionChart from './charts/GradeDistributionChart';
 import { StudentStats } from './types';
 import { CorrectionAutreEnriched } from '@/lib/types';
-import { getGradeColor, getMuiColorProps } from './utils/gradeUtils';
+import { getGradeColor, getMuiColorProps, getPercentageGrade, getNormalizedGradeOn20 } from './utils/gradeUtils';
 
 interface StudentStatisticsProps {
   corrections: CorrectionAutreEnriched[];
@@ -29,7 +29,7 @@ export default function StudentStatistics({ corrections, stats }: StudentStatist
     const activityMap = new Map();
 
     corrections
-      .filter(c => c.grade !== null && c.activity_id)
+      .filter(c => c.final_grade !== null && c.activity_id)
       .forEach(c => {
         const activityName = c.activity_name || `Activité ${c.activity_id}`;
         if (!activityMap.has(activityName)) {
@@ -37,18 +37,21 @@ export default function StudentStatistics({ corrections, stats }: StudentStatist
             id: c.activity_id,
             name: activityName,
             count: 0,
-            totalGrade: 0
+            totalNormalizedGrade: 0
           });
         }
         
         const activityData = activityMap.get(activityName);
         activityData.count++;
-        activityData.totalGrade += c.grade || 0;
+        
+        // Utiliser le nouveau système pour obtenir une note normalisée sur 20
+        const normalizedGrade = getNormalizedGradeOn20(c);
+        activityData.totalNormalizedGrade += normalizedGrade;
       });
     
     return Array.from(activityMap.values()).map(activity => ({
       ...activity,
-      averageGrade: activity.count > 0 ? (activity.totalGrade / activity.count).toFixed(1) : 0
+      averageGrade: activity.count > 0 ? (activity.totalNormalizedGrade / activity.count).toFixed(1) : 0
     }));
   };
 

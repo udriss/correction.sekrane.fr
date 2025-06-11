@@ -10,19 +10,29 @@ import {
   Chip,
   useTheme,
   Tooltip,
-  Button
+  Button,
+  Fab,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  IconButton,
+  CircularProgress,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem
 } from '@mui/material';
-import PersonIcon from '@mui/icons-material/Person';
-import AddIcon from '@mui/icons-material/Add';
+import DeleteIcon from '@mui/icons-material/Delete';
+import SelectAllIcon from '@mui/icons-material/SelectAll';
+import CloseIcon from '@mui/icons-material/Close';
 import LoadingSpinner from '@/components/LoadingSpinner';
 import useAuth from '@/hooks/useAuth';
 import GradientBackground from '@/components/ui/GradientBackground';
 import PatternBackground from '@/components/ui/PatternBackground';
 import ErrorDisplay from '@/components/ui/ErrorDisplay';
-import { FragmentForm, FragmentEditor } from '@/components/fragments';
 
 // Importation des composants extraits
-import { SearchAndFilterBar } from '@/components/fragments/SearchAndFilterBar';
 import { FragmentsList } from '@/components/fragments/FragmentsList';
 import { DeleteFragmentDialog } from '@/components/fragments/DeleteFragmentDialog';
 import { CategoryManagementDialog } from '@/components/fragments/CategoryManagementDialog';
@@ -60,6 +70,7 @@ export default function FragmentsLibraryPage() {
   
   const [searchQuery, setSearchQuery] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('all');
+  const [activityFilter, setActivityFilter] = useState('all');
   const [sortBy, setSortBy] = useState('newest');
   const [userOnly, setUserOnly] = useState(false);
   
@@ -68,6 +79,13 @@ export default function FragmentsLibraryPage() {
   const [fragmentToDelete, setFragmentToDelete] = useState<Fragment | null>(null);
   const [deleteError, setDeleteError] = useState('');
   
+  // États pour la sélection multiple
+  const [isSelectionMode, setIsSelectionMode] = useState(false);
+  const [selectedFragments, setSelectedFragments] = useState<number[]>([]);
+  const [batchDeleteDialogOpen, setBatchDeleteDialogOpen] = useState(false);
+  const [isBatchDeleting, setIsBatchDeleting] = useState(false);
+  const [batchDeleteError, setBatchDeleteError] = useState('');
+  
   const [notification, setNotification] = useState({
     open: false,
     message: '',
@@ -75,7 +93,7 @@ export default function FragmentsLibraryPage() {
   });
   
   const [page, setPage] = useState(1);
-  const [fragmentsPerPage] = useState(10);
+  const [fragmentsPerPage, setFragmentsPerPage] = useState(20);
   
   // États pour la gestion des catégories
   const [categoryDialogOpen, setCategoryDialogOpen] = useState(false);
@@ -243,6 +261,11 @@ export default function FragmentsLibraryPage() {
         }
       }
       
+      // Pour le filtre par activité
+      if (activityFilter !== 'all') {
+        queryParams.append('activityId', activityFilter);
+      }
+      
       if (searchQuery) {
         queryParams.append('search', searchQuery);
       }
@@ -282,7 +305,7 @@ export default function FragmentsLibraryPage() {
     } finally {
       setLoading(false);
     }
-  }, [userOnly, categoryFilter, searchQuery, isAuthenticated, categories]);
+  }, [userOnly, categoryFilter, activityFilter, searchQuery, isAuthenticated, categories]);
   
   const fetchCategories = useCallback(async (): Promise<void> => {
     if (!isAuthenticated) {
@@ -452,6 +475,66 @@ export default function FragmentsLibraryPage() {
     } catch (err) {
       console.error('Error deleting fragment:', err);
       setDeleteError((err as Error).message || 'Erreur lors de la suppression du fragment');
+    }
+  };
+
+  // Fonctions pour la sélection multiple
+  const handleSelectionModeToggle = () => {
+    setIsSelectionMode(!isSelectionMode);
+    setSelectedFragments([]);
+  };
+
+  const handleFragmentSelectionChange = (fragmentId: number, selected: boolean) => {
+    if (selected) {
+      setSelectedFragments(prev => [...prev, fragmentId]);
+    } else {
+      setSelectedFragments(prev => prev.filter(id => id !== fragmentId));
+    }
+  };
+
+  const handleSelectAll = () => {
+    if (selectedFragments.length === currentFragments.length) {
+      setSelectedFragments([]);
+    } else {
+      setSelectedFragments(currentFragments.map(fragment => fragment.id));
+    }
+  };
+
+  const handleBatchDelete = async () => {
+    if (selectedFragments.length === 0) return;
+    
+    setIsBatchDeleting(true);
+    setBatchDeleteError('');
+    
+    try {
+      const response = await fetch('/api/fragments/batch-delete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fragmentIds: selectedFragments }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Erreur lors de la suppression des fragments');
+      }
+
+      setBatchDeleteDialogOpen(false);
+      setSelectedFragments([]);
+      setIsSelectionMode(false);
+      
+      setNotification({
+        open: true,
+        message: `${selectedFragments.length} fragment(s) supprimé(s) avec succès`,
+        severity: 'success'
+      });
+
+      fetchFragments();
+    } catch (err) {
+      console.error('Error batch deleting fragments:', err);
+      setBatchDeleteError((err as Error).message || 'Erreur lors de la suppression des fragments');
+    } finally {
+      setIsBatchDeleting(false);
     }
   };
   
@@ -880,6 +963,58 @@ export default function FragmentsLibraryPage() {
     fetchFragments();
   };
   
+  // Gestionnaire pour le filtre d'activité
+  const handleActivityFilterChange = (newValue: string) => {
+    // Définir le state de manière synchrone
+    setActivityFilter(newValue);
+    
+    // Ajout d'un délai pour s'assurer que l'état est mis à jour avant d'exécuter le fetch
+    setTimeout(() => {
+      // Création explicite de queryParams à l'intérieur du setTimeout 
+      // pour utiliser la valeur la plus récente
+      const queryParams = new URLSearchParams();
+      
+      if (userOnly && isAuthenticated) {
+        queryParams.append('userOnly', 'true');
+      }
+      
+      if (searchQuery) {
+        queryParams.append('search', searchQuery);
+      }
+      
+      // Logique de filtre par catégorie
+      if (categoryFilter !== 'all' && categoryFilter !== 'manage_categories') {
+        const selectedCategory = categories.find(cat => cat.name === categoryFilter);
+        if (selectedCategory) {
+          queryParams.append('categoryId', selectedCategory.id.toString());
+        }
+      }
+      
+      // Logique de filtre par activité ajustée
+      if (newValue !== 'all') {
+        queryParams.append('activityId', newValue);
+      }
+      
+      // Exécution explicite du fetch avec les paramètres construits
+      setLoading(true);
+      fetch(`/api/fragments?${queryParams.toString()}`)
+        .then(response => {
+          if (!response.ok) {
+            throw new Error('Erreur lors du chargement des fragments');
+          }
+          return response.json();
+        })
+        .then(data => {
+          setFragments(data);
+        })
+        .catch(err => {
+          console.error('Error fetching fragments:', err);
+          setError('Impossible de charger les fragments. Veuillez réessayer plus tard.');
+        })
+        .finally(() => setLoading(false));
+    }, 100); // légère augmentation du délai pour garantir la synchronisation
+  };
+  
   // Gestionnaire pour le filtre utilisateur
   const handleUserFilterToggle = () => {
     setUserOnly(prev => !prev);
@@ -887,6 +1022,12 @@ export default function FragmentsLibraryPage() {
     setTimeout(() => {
       fetchFragments();
     }, 50);
+  };
+
+  // Gestionnaire pour le changement du nombre de fragments par page
+  const handleFragmentsPerPageChange = (newValue: number) => {
+    setFragmentsPerPage(newValue);
+    setPage(1); // Réinitialiser à la première page
   };
 
   if (status === 'loading') {
@@ -1031,8 +1172,11 @@ export default function FragmentsLibraryPage() {
         setSearchQuery={setSearchQuery}
         categoryFilter={categoryFilter}
         categories={categories}
+        activityFilter={activityFilter}
+        activities={activities}
         handleSearch={handleSearch}
         handleCategoryChange={handleCategoryChange}
+        handleActivityFilterChange={handleActivityFilterChange}
       />
 
       <Container className="max-w-4xl" sx={{ px: { xs: 2, sm: 3 } }}>
@@ -1058,6 +1202,8 @@ export default function FragmentsLibraryPage() {
           filteredFragmentsCount={filteredFragments.length}
           handleUserFilterToggle={handleUserFilterToggle}
           openNewFragmentModal={() => setNewFragmentModalOpen(true)}
+          fragmentsPerPage={fragmentsPerPage}
+          onFragmentsPerPageChange={handleFragmentsPerPageChange}
         />
 
         {/* Utilisation du composant de liste de fragments */}
@@ -1073,8 +1219,47 @@ export default function FragmentsLibraryPage() {
           theme={theme}
           lastUpdated={fragmentsData.lastUpdated} // Passer le timestamp pour forcer la mise à jour
           updatingFragmentId={updatingFragmentId} // Passer l'ID du fragment en cours de mise à jour
+          isSelectionMode={isSelectionMode}
+          selectedFragments={selectedFragments}
+          onSelectionChange={handleFragmentSelectionChange}
+          onSelectAll={handleSelectAll}
         />
       </Container>
+      
+      {/* Boutons flottants pour la sélection multiple */}
+      <Box sx={{ position: 'fixed', bottom: 24, right: 24, zIndex: 1000 }}>
+        {!isSelectionMode ? (
+          <Fab
+            color="secondary"
+            aria-label="mode sélection"
+            onClick={handleSelectionModeToggle}
+            sx={{ mb: 1 }}
+          >
+            <SelectAllIcon />
+          </Fab>
+        ) : (
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+            {selectedFragments.length > 0 && (
+              <Fab
+                color="error"
+                aria-label="supprimer sélection"
+                onClick={() => setBatchDeleteDialogOpen(true)}
+                sx={{ mb: 1 }}
+              >
+                <DeleteIcon />
+              </Fab>
+            )}
+            <Fab
+              color="primary"
+              aria-label="quitter mode sélection"
+              onClick={handleSelectionModeToggle}
+              size="small"
+            >
+              <CloseIcon />
+            </Fab>
+          </Box>
+        )}
+      </Box>
       
       {/* Utilisation des composants de dialogue */}
       <DeleteFragmentDialog 
@@ -1085,6 +1270,138 @@ export default function FragmentsLibraryPage() {
         handleDeleteFragment={handleDeleteFragment}
         theme={theme}
       />
+      
+      {/* Dialogue de suppression en lot */}
+      <Dialog
+        open={batchDeleteDialogOpen}
+        onClose={() => !isBatchDeleting && setBatchDeleteDialogOpen(false)}
+        maxWidth="md"
+        fullWidth
+      >
+        <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          <DeleteIcon color="error" />
+          Confirmer la suppression en lot
+        </DialogTitle>
+        <DialogContent>
+          <Typography gutterBottom sx={{ mb: 3, fontWeight: 500 }}>
+            Êtes-vous sûr de vouloir supprimer les {selectedFragments.length} fragments sélectionnés ? 
+            Cette action est irréversible.
+          </Typography>
+          
+          {/* Box avec les fragments sélectionnés */}
+          <Box
+            sx={{
+              maxHeight: 500,
+              overflow: 'auto',
+              border: '1px solid',
+              borderColor: 'divider',
+              borderRadius: 2,
+              p: 1,
+              bgcolor: 'background.paper',
+              '&::-webkit-scrollbar': {
+                width: '8px',
+              },
+              '&::-webkit-scrollbar-track': {
+                backgroundColor: 'rgba(0,0,0,0.1)',
+                borderRadius: '4px',
+              },
+              '&::-webkit-scrollbar-thumb': {
+                backgroundColor: 'rgba(0,0,0,0.3)',
+                borderRadius: '4px',
+                '&:hover': {
+                  backgroundColor: 'rgba(0,0,0,0.4)',
+                },
+              },
+            }}
+          >
+            {selectedFragments.map((fragmentId, index) => {
+              const fragment = currentFragments.find(f => f.id === fragmentId);
+              if (!fragment) return null;
+              
+              return (
+                <Paper
+                  key={fragmentId}
+                  elevation={1}
+                  sx={{
+                    p: 2,
+                    mb: 1,
+                    bgcolor: 'rgba(207, 237, 249, 0.31)',
+                    border: '1px solid',
+                    borderColor: 'error.main',
+                    borderRadius: 1,
+                    '&:last-child': { mb: 0 }
+                  }}
+                >
+                  <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1 }}>
+                    <Chip
+                      label={`${index + 1}`}
+                      size="small"
+                      color="error"
+                      sx={{ 
+                        minWidth: '24px', 
+                        height: '24px',
+                        '& .MuiChip-label': { 
+                          px: 1, 
+                          fontSize: '0.75rem',
+                          fontWeight: 'bold'
+                        }
+                      }}
+                    />
+                    <Box sx={{ flex: 1, minWidth: 0 }}>
+                      <Typography
+                        variant="body2"
+                        sx={{
+                          whiteSpace: 'pre-wrap',
+                          wordBreak: 'break-word',
+                          color: 'error.dark',
+                          fontWeight: 500,
+                          display: '-webkit-box',
+                          WebkitLineClamp: 3,
+                          WebkitBoxOrient: 'vertical',
+                          overflow: 'hidden',
+                        }}
+                      >
+                        {fragment.content}
+                      </Typography>
+                      {fragment.content.length > 150 && (
+                        <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5 }}>
+                          ... (contenu tronqué)
+                        </Typography>
+                      )}
+                    </Box>
+                  </Box>
+                </Paper>
+              );
+            })}
+          </Box>
+          
+          {batchDeleteError && (
+            <Alert severity="error" sx={{ mt: 2 }}>
+              {batchDeleteError}
+            </Alert>
+          )}
+        </DialogContent>
+        <DialogActions sx={{ p: 3, pt: 2 }}>
+          <Button 
+            onClick={() => setBatchDeleteDialogOpen(false)} 
+            disabled={isBatchDeleting}
+            variant="outlined"
+            size="large"
+          >
+            Annuler
+          </Button>
+          <Button 
+            onClick={handleBatchDelete} 
+            color="error" 
+            disabled={isBatchDeleting}
+            startIcon={isBatchDeleting ? <CircularProgress size={16} /> : <DeleteIcon />}
+            variant="contained"
+            size="large"
+          >
+            {isBatchDeleting ? 'Suppression...' : `Supprimer ${selectedFragments.length} fragment(s)`}
+          </Button>
+        </DialogActions>
+      </Dialog>
       
       <CategoryManagementDialog 
         open={categoryDialogOpen}

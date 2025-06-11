@@ -115,6 +115,21 @@ export async function GET(
           pointsEarned = [];
         }
 
+        // Parser les parties désactivées
+        let disabledParts = null;
+        try {
+          if (correction.disabled_parts) {
+            if (typeof correction.disabled_parts === 'string') {
+              disabledParts = JSON.parse(correction.disabled_parts);
+            } else {
+              disabledParts = correction.disabled_parts;
+            }
+          }
+        } catch (e) {
+          console.error("Erreur lors du parsing des disabled_parts:", e);
+          disabledParts = null;
+        }
+
         return {
           id: correction.id,
           activity_id: correction.activity_id,
@@ -124,12 +139,15 @@ export async function GET(
           updated_at: correction.updated_at,
           grade: correction.grade,
           penalty: correction.penalty,
+          bonus: correction.bonus,
           deadline: correction.deadline,
           submission_date: correction.submission_date,
           points: points,
           parts_names: partsNames,
           points_earned: pointsEarned,
           final_grade: correction.final_grade,
+          percentage_grade: correction.percentage_grade, // Nouveau champ pour le pourcentage normalisé
+          disabled_parts: disabledParts, // Parties désactivées
           group_id: correction.group_id,
           class_id: correction.class_id,
           student_id: correction.student_id,
@@ -137,7 +155,8 @@ export async function GET(
           student_first_name: correction.student_first_name || '',
           student_last_name: correction.student_last_name || '',
           activity_name: correction.activity_name || 'Activité inconnue',
-          class_name: correction.class_name || 'Sans classe'
+          class_name: correction.class_name || 'Sans classe',
+          status: correction.status || 'ACTIVE'
         };
       });
       

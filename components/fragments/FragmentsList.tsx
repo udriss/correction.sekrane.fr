@@ -14,7 +14,9 @@ import {
   Alert,
   Fade,
   Theme,
-  CircularProgress
+  CircularProgress,
+  Checkbox,
+  Fab
 } from '@mui/material';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import EditIcon from '@mui/icons-material/Edit';
@@ -22,6 +24,7 @@ import DeleteIcon from '@mui/icons-material/Delete';
 import PersonIcon from '@mui/icons-material/Person';
 import HelpOutlineIcon from '@mui/icons-material/HelpOutline';
 import UpdateIcon from '@mui/icons-material/Update';
+import SelectAllIcon from '@mui/icons-material/SelectAll';
 
 interface Fragment {
   id: number;
@@ -50,6 +53,10 @@ interface FragmentsListProps {
   theme: Theme;
   lastUpdated?: number; // Ajouter cette prop pour forcer le rendu
   updatingFragmentId?: number; // ID du fragment en cours de mise à jour
+  isSelectionMode?: boolean;
+  selectedFragments?: number[];
+  onSelectionChange?: (fragmentId: number, selected: boolean) => void;
+  onSelectAll?: () => void;
 }
 
 export const FragmentsList: React.FC<FragmentsListProps> = ({
@@ -63,7 +70,11 @@ export const FragmentsList: React.FC<FragmentsListProps> = ({
   setPage,
   theme,
   lastUpdated,
-  updatingFragmentId
+  updatingFragmentId,
+  isSelectionMode = false,
+  selectedFragments = [],
+  onSelectionChange,
+  onSelectAll
 }) => {
   // Ne pas déclencher de re-rendu global basé sur lastUpdated
   // Utiliser un état local uniquement pour le fragment spécifique en cours de mise à jour
@@ -144,7 +155,25 @@ export const FragmentsList: React.FC<FragmentsListProps> = ({
   }
 
   return (
-    <Box sx={{ mb: 5 }}>
+    <Box sx={{ mb: 5, position: 'relative' }}>
+      {/* Bouton flottant pour sélectionner tout */}
+      {isSelectionMode && (
+        <Fab
+          color="primary"
+          size="medium"
+          onClick={onSelectAll}
+          sx={{
+            position: 'fixed',
+            bottom: 150,
+            right: 24,
+            zIndex: 1000,
+            boxShadow: 3
+          }}
+        >
+          <SelectAllIcon />
+        </Fab>
+      )}
+      
       <Grid container spacing={2}>
         {fragments.map((fragment) => {
           // Utiliser directement le fragment sans créer de copie profonde inutile
@@ -163,10 +192,35 @@ export const FragmentsList: React.FC<FragmentsListProps> = ({
                       transform: 'translateY(-2px)'
                     },
                     border: '1px solid',
-                    borderColor: alpha(theme.palette.divider, 0.1),
+                    borderColor: selectedFragments.includes(fragment.id) 
+                      ? theme.palette.primary.main 
+                      : alpha(theme.palette.divider, 0.1),
+                    bgcolor: selectedFragments.includes(fragment.id) 
+                      ? alpha(theme.palette.primary.main, 0.05) 
+                      : 'inherit',
                     position: 'relative' // Nécessaire pour le positionnement du spinner
                   }}
                 >
+                  {/* Checkbox de sélection */}
+                  {isSelectionMode && (
+                    <Box sx={{ 
+                      position: 'absolute', 
+                      top: 8, 
+                      left: 8, 
+                      zIndex: 1,
+                      bgcolor: 'background.paper',
+                      borderRadius: '50%',
+                      boxShadow: 1
+                    }}>
+                      <Checkbox
+                        checked={selectedFragments.includes(fragment.id)}
+                        onChange={(e) => onSelectionChange?.(fragment.id, e.target.checked)}
+                        size="small"
+                        color="primary"
+                      />
+                    </Box>
+                  )}
+                  
                   {/* Overlay spinner pour le fragment en cours de modification */}
                   {updatingFragmentId === fragment.id && (
                     <Box
@@ -199,7 +253,7 @@ export const FragmentsList: React.FC<FragmentsListProps> = ({
                     </Box>
                   )}
                   
-                  <CardContent>
+                  <CardContent sx={{ pt: isSelectionMode ? 4 : 2 }}>
                     <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                         {fragment.activity_id === null ? (

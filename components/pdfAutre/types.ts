@@ -158,9 +158,51 @@ export const getCorrectionCellValues = (correction: CorrectionAutreEnriched, act
   // Pour les corrections actives, formater les valeurs numériques
   const isActive = isCorrectionActive(correction);
   
-  const grade = correction.grade != null
-    ? parseFloat(correction.grade.toString())
-    : 0;
+  // Utiliser percentage_grade en priorité pour calculer la note normalisée sur 20
+  let gradeToDisplay = 0;
+  let gradeDisplayValue = '';
+  const isNormalized = correction.percentage_grade !== null && correction.percentage_grade !== undefined;
+  
+  if (isNormalized) {
+    // Si on a percentage_grade, afficher la note normalisée sur 20 ET la note originale
+    const normalizedGrade = (correction.percentage_grade !== null && correction.percentage_grade !== undefined) 
+      ? ((correction.percentage_grade / 100) * 20)
+      : NaN;
+    const originalGrade = correction.grade != null ? parseFloat(correction.grade.toString()) : 0;
+    
+    // Calculer le barème original à partir de l'activité en tenant compte des parties désactivées
+    let originalTotal = 20; // Fallback à 20 si pas de barème défini
+    if (activity && activity.points) {
+      // Parser les parties désactivées
+      const disabledParts = correction.disabled_parts && Array.isArray(correction.disabled_parts) 
+        ? correction.disabled_parts 
+        : null;
+      
+      // Calculer le total en excluant les parties désactivées
+      originalTotal = activity.points.reduce((sum: number, points: number, index: number) => {
+        // Exclure les parties désactivées du calcul du barème original
+        if (disabledParts && disabledParts[index]) {
+          return sum;
+        }
+        return sum + points;
+      }, 0);
+      
+      // Si toutes les parties sont désactivées, utiliser le fallback
+      if (originalTotal === 0) {
+        originalTotal = 20;
+      }
+    }
+    
+    gradeDisplayValue = `${formatGrade(normalizedGrade, useCommaFormat)} / 20 [${formatGrade(originalGrade, useCommaFormat)}/${originalTotal}]`;
+    gradeToDisplay = normalizedGrade;
+  } else if (correction.grade != null) {
+    // Fallback sur grade si percentage_grade n'est pas disponible
+    gradeToDisplay = parseFloat(correction.grade.toString());
+    gradeDisplayValue = `${formatGrade(gradeToDisplay, useCommaFormat)} / 20`;
+  } else {
+    gradeToDisplay = 0;
+    gradeDisplayValue = `${formatGrade(gradeToDisplay, useCommaFormat)} / 20`;
+  }
   
   // Formater les points
   const pointsDisplay = isActive 
@@ -168,10 +210,8 @@ export const getCorrectionCellValues = (correction: CorrectionAutreEnriched, act
       ? correction.points_earned.join(' / ')
       : 'N/A'
     : 'DÉSACTIVÉ';
-  
-  // Formater la note totale
   const totalGradeDisplay = isActive
-    ? `${formatGrade(grade, useCommaFormat)}`
+    ? gradeDisplayValue
     : 'DÉSACTIVÉ';
   
   return {

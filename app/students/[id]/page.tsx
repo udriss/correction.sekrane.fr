@@ -36,6 +36,9 @@ import StudentClasses from '@/components/students/[id]/StudentClasses';
 import StudentEditDialogForDetail from '@/components/students/StudentEditDialogForDetail';
 import ErrorDisplay from '@/components/ui/ErrorDisplay';
 import StudentPasswordManager from '@/components/students/StudentPasswordManager';
+import { parseDisabledParts } from '@/lib/correctionAutre';
+import { getPercentageGrade, getNormalizedGradeOn20 } from '@/components/students/[id]/utils/gradeUtils';
+import PercentageGradeExplanation from '@/components/students/[id]/PercentageGradeExplanation';
 
 dayjs.locale('fr');
 
@@ -165,18 +168,13 @@ export default function StudentDetailPage() {
           // On filtre pour ne garder que les corrections notées
           const gradesFiltered = correctionsData.filter((c: CorrectionAutreEnriched) => c.final_grade !== null);
           
-          // Normaliser chaque note sur 20 pour avoir des comparaisons équitables
+          // Utiliser le système percentage_grade pour normaliser les notes sur 20
           const normalizedGrades = gradesFiltered.map((c: CorrectionAutreEnriched) => {
-            // Récupérer l'activité associée pour obtenir les points maximum
+            // Récupérer l'activité associée pour utiliser avec le système percentage_grade
             const activity = activitiesMap.get(c.activity_id);
             
-            // Calculer le total des points maximum à partir de l'activité
-            const maxPoints = activity?.points && activity.points.length > 0 
-              ? activity.points.reduce((sum, p) => sum + (typeof p === 'number' ? p : 0), 0) 
-              : 20; // Si points n'est pas défini, on suppose un barème de 20
-            
-            // Normaliser la note sur 20
-            return maxPoints > 0 ? (Number(c.final_grade) * 20) / maxPoints : 0;
+            // Utiliser la nouvelle fonction qui priorise percentage_grade
+            return getNormalizedGradeOn20(c, activity);
           });
           
           const ungradedCount = correctionsData.length - gradesFiltered.length;
@@ -414,15 +412,21 @@ export default function StudentDetailPage() {
       
       {/* Onglet Corrections */}
       {tabValue === 0 && student && (
-        <StudentCorrections 
-          student={student} 
-          corrections={corrections} 
-        />
+        <>
+          <PercentageGradeExplanation variant="compact" />
+          <StudentCorrections 
+            student={student} 
+            corrections={corrections} 
+          />
+        </>
       )}
       
       {/* Onglet Statistiques */}
       {tabValue === 1 && stats && (
-        <StudentStatistics corrections={corrections} stats={stats} />
+        <>
+          <PercentageGradeExplanation variant="detailed" />
+          <StudentStatistics corrections={corrections} stats={stats} />
+        </>
       )}
       
       {/* Onglet Évolution */}

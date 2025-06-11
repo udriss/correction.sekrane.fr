@@ -70,8 +70,37 @@ export const generateDetailedCSV = (
       gradeDisplay = 'N/A';
     } else if (statusDisplay !== 'ACTIVE' && statusDisplay !== c.status) {
       gradeDisplay = statusDisplay;
+    } else if (c.percentage_grade !== null && c.percentage_grade !== undefined) {
+      // Afficher la note normalisée sur 20 ET la note originale
+      const normalized = (Number(c.percentage_grade) / 100) * 20;
+      const originalGrade = c.grade !== undefined ? Number(c.grade) : 0;
+      
+      // Calculer le barème original à partir de l'activité en tenant compte des parties désactivées
+      let originalTotal = 20; // Fallback à 20 si pas de barème défini
+      if (activity && activity.points) {
+        // Parser les parties désactivées
+        const disabledParts = c.disabled_parts && Array.isArray(c.disabled_parts) 
+          ? c.disabled_parts 
+          : null;
+        
+        // Calculer le total en excluant les parties désactivées
+        originalTotal = activity.points.reduce((sum: number, points: number, index: number) => {
+          // Exclure les parties désactivées du calcul du barème original
+          if (disabledParts && disabledParts[index]) {
+            return sum;
+          }
+          return sum + points;
+        }, 0);
+        
+        // Si toutes les parties sont désactivées, utiliser le fallback
+        if (originalTotal === 0) {
+          originalTotal = 20;
+        }
+      }
+      
+      gradeDisplay = `${formatGrade(normalized, true)} / 20 [${formatGrade(originalGrade, true)} / ${originalTotal}]`;
     } else if (c.grade !== undefined) {
-      gradeDisplay = `${formatGrade(c.grade, true)}/20`;  // Utiliser la virgule pour le CSV
+      gradeDisplay = `${formatGrade(c.grade, true)} / 20`;
     } else {
       gradeDisplay = 'NON NOTÉ';
     }
@@ -132,17 +161,47 @@ export const generateSimplifiedCSV = (
     
     // Déterminer la valeur à afficher
     let displayValue = 'NON NOTÉ';
-    
     // Vérifier si c'est un placeholder
     const isPlaceholder = (c.placeholder && c.status === 'NON_NOTE');
-    
     if (isPlaceholder) {
       displayValue = 'N/A';
     } else if (c.status) {
       switch (c.status) {
         case 'ACTIVE':
-          displayValue = c.grade !== undefined ? 
-            `${formatGrade(c.grade, true)}/20` : 'NON NOTÉ';
+          if (c.percentage_grade !== null && c.percentage_grade !== undefined) {
+            // Afficher la note normalisée sur 20 ET la note originale
+            const normalized = (Number(c.percentage_grade) / 100) * 20;
+            const originalGrade = c.grade !== undefined ? Number(c.grade) : 0;
+            
+            // Calculer le barème original à partir de l'activité en tenant compte des parties désactivées
+            let originalTotal = 20; // Fallback à 20 si pas de barème défini
+            if (activity && activity.points) {
+              // Parser les parties désactivées
+              const disabledParts = c.disabled_parts && Array.isArray(c.disabled_parts) 
+                ? c.disabled_parts 
+                : null;
+              
+              // Calculer le total en excluant les parties désactivées
+              originalTotal = activity.points.reduce((sum: number, points: number, index: number) => {
+                // Exclure les parties désactivées du calcul du barème original
+                if (disabledParts && disabledParts[index]) {
+                  return sum;
+                }
+                return sum + points;
+              }, 0);
+              
+              // Si toutes les parties sont désactivées, utiliser le fallback
+              if (originalTotal === 0) {
+                originalTotal = 20;
+              }
+            }
+            
+            displayValue = `${formatGrade(normalized, true)}/20 [${formatGrade(originalGrade, true)}/${originalTotal}]`;
+          } else if (c.grade !== undefined) {
+            displayValue = `${formatGrade(c.grade, true)}/20`;
+          } else {
+            displayValue = 'NON NOTÉ';
+          }
           break;
         case 'NON_NOTE':
           displayValue = 'NON NOTÉ';
@@ -157,11 +216,72 @@ export const generateSimplifiedCSV = (
           displayValue = 'DÉSACTIVÉ';
           break;
         default:
-          displayValue = c.grade !== undefined ? 
-            `${formatGrade(c.grade, true)}/20` : 'NON NOTÉ';
+          if (c.percentage_grade !== null && c.percentage_grade !== undefined) {
+            // Afficher la note normalisée sur 20 ET la note originale
+            const normalized = (Number(c.percentage_grade) / 100) * 20;
+            const originalGrade = c.grade !== undefined ? Number(c.grade) : 0;
+            
+            // Calculer le barème original à partir de l'activité en tenant compte des parties désactivées
+            let originalTotal = 20; // Fallback à 20 si pas de barème défini
+            if (activity && activity.points) {
+              // Parser les parties désactivées
+              const disabledParts = c.disabled_parts && Array.isArray(c.disabled_parts) 
+                ? c.disabled_parts 
+                : null;
+              
+              // Calculer le total en excluant les parties désactivées
+              originalTotal = activity.points.reduce((sum: number, points: number, index: number) => {
+                // Exclure les parties désactivées du calcul du barème original
+                if (disabledParts && disabledParts[index]) {
+                  return sum;
+                }
+                return sum + points;
+              }, 0);
+              
+              // Si toutes les parties sont désactivées, utiliser le fallback
+              if (originalTotal === 0) {
+                originalTotal = 20;
+              }
+            }
+            
+            displayValue = `${formatGrade(normalized, true)}/20 [${formatGrade(originalGrade, true)}/${originalTotal}]`;
+          } else if (c.grade !== undefined) {
+            displayValue = `${formatGrade(c.grade, true)}/20`;
+          } else {
+            displayValue = 'NON NOTÉ';
+          }
       }
     } else if (c.active === 0) {
       displayValue = 'DÉSACTIVÉ';
+    } else if (c.percentage_grade !== null && c.percentage_grade !== undefined) {
+      // Afficher la note normalisée sur 20 ET la note originale
+      const normalized = (Number(c.percentage_grade) / 100) * 20;
+      const originalGrade = c.grade !== undefined ? Number(c.grade) : 0;
+      
+      // Calculer le barème original à partir de l'activité en tenant compte des parties désactivées
+      let originalTotal = 20; // Fallback à 20 si pas de barème défini
+      if (activity && activity.points) {
+        // Parser les parties désactivées
+        const disabledParts = c.disabled_parts && Array.isArray(c.disabled_parts) 
+          ? c.disabled_parts 
+          : null;
+        
+        // Calculer le total en excluant les parties désactivées
+        originalTotal = activity.points.reduce((sum: number, points: number, index: number) => {
+          // Exclure les parties désactivées du calcul du barème original
+          if (disabledParts && disabledParts[index]) {
+            return sum;
+          }
+          return sum + points;
+        }, 0);
+        
+        // Si toutes les parties sont désactivées, utiliser le fallback
+        if (originalTotal === 0) {
+          originalTotal = 20;
+        }
+      }
+      
+      displayValue = `${formatGrade(normalized, true)}/20 [${formatGrade(originalGrade, true)}/${originalTotal}]`;
     } else if (c.grade !== undefined) {
       displayValue = `${formatGrade(c.grade, true)}/20`;
     }

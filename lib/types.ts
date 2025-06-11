@@ -131,11 +131,13 @@ export interface CorrectionAutre {
   penalty?: number | null;
   bonus?: number | null; // Ajout du champ bonus
   final_grade?: number | null;
+  percentage_grade?: number | null; // Pourcentage de réussite (0-100) basé sur les parties actives
   deadline?: Date | string | null;
   group_id: number | null;
   class_id: number | null;
   active?: number; // 0 = inactive, 1 = active
   status?: string; // Ajout du statut pour compléter les propriétés attendues
+  disabled_parts?: boolean[] | null; // Tableau des parties désactivées pour cette correction
 }
 
 export interface CorrectionAutreWithShareCode extends CorrectionAutre {

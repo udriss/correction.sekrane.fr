@@ -458,6 +458,10 @@ export async function PATCH(
       updateData.grade = parseFloat(data.grade) || 0;
     }
     
+    if (data.disabled_parts !== undefined) {
+      updateData.disabled_parts = data.disabled_parts;
+    }
+    
     if (Object.keys(updateData).length === 0) {
       return NextResponse.json({ error: 'Aucune donnée à mettre à jour' }, { status: 400 });
     }

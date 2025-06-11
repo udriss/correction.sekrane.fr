@@ -39,6 +39,7 @@ export async function PUT(
     let penaltyUpdate: number | null | undefined = undefined;
     let finalGradeUpdate: number | null | undefined = undefined;
     let updateGrades = false;
+    let disabledParts: boolean[] | undefined = undefined;
 
     if ('status' in requestData) {
       status = requestData.status as string; // Assert type as string
@@ -55,6 +56,8 @@ export async function PUT(
           gradeUpdate = requestData.grade === undefined ? undefined : (requestData.grade as number | null);
           penaltyUpdate = requestData.penalty === undefined ? undefined : (requestData.penalty as number | null);
           finalGradeUpdate = requestData.final_grade === undefined ? undefined : (requestData.final_grade as number | null);
+          // Extract disabledParts if provided
+          disabledParts = requestData.disabledParts as boolean[] | undefined;
           // Only set updateGrades to true if all values are explicitly provided (even if null)
           if (gradeUpdate !== undefined && penaltyUpdate !== undefined && finalGradeUpdate !== undefined) {
              updateGrades = true;
@@ -104,6 +107,12 @@ export async function PUT(
             sql += ', grade = ?, penalty = ?, final_grade = ?';
             // Explicitly cast to expected types for the query
             sqlParams.push(gradeUpdate as number | null, penaltyUpdate as number | null, finalGradeUpdate as number | null);
+            
+            // Add disabled_parts if provided
+            if (disabledParts !== undefined) {
+              sql += ', disabled_parts = ?';
+              sqlParams.push(disabledParts ? JSON.stringify(disabledParts) : null);
+            }
         } else {
             // Should not happen if updateGrades is true, but good for safety
             console.warn('updateGrades is true, but grade values are undefined. Skipping grade update.');

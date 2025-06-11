@@ -13,7 +13,8 @@ export async function getCorrectionsAutres(): Promise<CorrectionAutre[]> {
   
   return corrections.map(correction => ({
     ...correction,
-    points_earned: parsePointsEarned(correction.points_earned)
+    points_earned: parsePointsEarned(correction.points_earned),
+    disabled_parts: parseDisabledParts(correction.disabled_parts)
   }));
 }
 
@@ -30,7 +31,8 @@ export async function getCorrectionsAutresByActivityId(activityId: number): Prom
   
   return corrections.map(correction => ({
     ...correction,
-    points_earned: parsePointsEarned(correction.points_earned)
+    points_earned: parsePointsEarned(correction.points_earned),
+    disabled_parts: parseDisabledParts(correction.disabled_parts)
   }));
 }
 
@@ -51,7 +53,8 @@ export async function getCorrectionAutreById(id: number): Promise<CorrectionAutr
   const correction = corrections[0];
   return {
     ...correction,
-    points_earned: parsePointsEarned(correction.points_earned)
+    points_earned: parsePointsEarned(correction.points_earned),
+    disabled_parts: parseDisabledParts(correction.disabled_parts)
   };
 }
 
@@ -123,6 +126,22 @@ export async function createCorrectionAutre(data: {
     ]
   );
   
+  // Si une note a été fournie, calculer percentage_grade
+  if (grade !== undefined && grade !== null && activity?.points) {
+    try {
+      const percentageGrade = calculatePercentageGrade(grade, activity.points, null);
+      if (percentageGrade !== null) {
+        await query(
+          `UPDATE corrections_autres SET percentage_grade = ? WHERE id = ?`,
+          [percentageGrade, result.insertId]
+        );
+      }
+    } catch (error) {
+      console.error('Error calculating percentage_grade on creation:', error);
+      // Ne pas faire échouer la création pour cette erreur
+    }
+  }
+  
   return result.insertId;
 }
 
@@ -140,9 +159,13 @@ export async function updateCorrectionAutre(id: number, data: {
   grade?: number | null;
   final_grade?: number | null;
   status?: string;
+  disabled_parts?: boolean[] | null; // Ajout des parties désactivées
 }): Promise<boolean> {
   const updates = [];
   const values = [];
+  
+  // Indicateur si nous devons recalculer percentage_grade
+  let shouldCalculatePercentageGrade = false;
 
   if (data.points_earned !== undefined) {
     updates.push('points_earned = ?');
@@ -188,11 +211,18 @@ export async function updateCorrectionAutre(id: number, data: {
   if (data.final_grade !== undefined) {
     updates.push('final_grade = ?');
     values.push(data.final_grade);
+    shouldCalculatePercentageGrade = true; // Déclencher le recalcul
   }
 
   if (data.status !== undefined) {
     updates.push('status = ?');
     values.push(data.status);
+  }
+
+  if (data.disabled_parts !== undefined) {
+    updates.push('disabled_parts = ?');
+    values.push(data.disabled_parts !== null ? JSON.stringify(data.disabled_parts) : null);
+    shouldCalculatePercentageGrade = true; // Déclencher le recalcul car les parties ont changé
   }
 
   updates.push('updated_at = NOW()');
@@ -203,11 +233,48 @@ export async function updateCorrectionAutre(id: number, data: {
 
   values.push(id);
   
-
   const result = await query<{ affectedRows: number }>(
     `UPDATE corrections_autres SET ${updates.join(', ')} WHERE id = ?`,
     values
   );
+
+  // Si la mise à jour a réussi et qu'on doit recalculer percentage_grade
+  if (result.affectedRows > 0 && shouldCalculatePercentageGrade) {
+    try {
+      // Récupérer la correction mise à jour pour avoir final_grade et disabled_parts
+      const updatedCorrection = await getCorrectionAutreById(id);
+      if (updatedCorrection) {
+        // Récupérer l'activité pour avoir les points
+        const { getActivityAutreById } = await import('@/lib/activityAutre');
+        const activity = await getActivityAutreById(updatedCorrection.activity_id);
+        
+        if (activity && activity.points) {
+          // Utiliser les disabled_parts mis à jour ou existants
+          const disabledParts = data.disabled_parts !== undefined ? 
+            data.disabled_parts : 
+            updatedCorrection.disabled_parts;
+          
+          // Calculer et mettre à jour percentage_grade
+          const percentageGrade = calculatePercentageGrade(
+            updatedCorrection.final_grade ?? null,
+            activity.points,
+            disabledParts ?? null
+          );
+          
+          // Mettre à jour percentage_grade dans la base de données
+          if (percentageGrade !== null) {
+            await query(
+              `UPDATE corrections_autres SET percentage_grade = ? WHERE id = ?`,
+              [percentageGrade, id]
+            );
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Error calculating percentage_grade:', error);
+      // Ne pas faire échouer la mise à jour principale pour cette erreur
+    }
+  }
 
   return result.affectedRows > 0;
 }
@@ -263,7 +330,8 @@ export function calculateGrade(
   activityPoints: number[],
   points_earned: number[],
   penalty: number | null | undefined = 0,
-  bonus: number | null | undefined = 0
+  bonus: number | null | undefined = 0,
+  disabledParts?: boolean[]
 ): { grade: number; final_grade: number } {
   // Récupérer le barème total depuis l'activité
   const total_points = activityPoints || [];
@@ -277,8 +345,18 @@ export function calculateGrade(
   }
   
   // Calcul des points totaux obtenus et des points totaux possibles
-  const totalEarned = points_earned.reduce((sum: number, points: number) => sum + points, 0);
-  const totalPossible = total_points.reduce((sum: number, points: number) => sum + points, 0);
+  // en excluant les parties désactivées
+  let totalEarned = 0;
+  let totalPossible = 0;
+  
+  for (let i = 0; i < points_earned.length; i++) {
+    // Exclure les parties désactivées du calcul
+    if (disabledParts && disabledParts[i]) {
+      continue;
+    }
+    totalEarned += points_earned[i] || 0;
+    totalPossible += total_points[i] || 0;
+  }
   
   
   // Éviter la division par zéro
@@ -314,6 +392,98 @@ export function calculateGrade(
 }
 
 /**
+ * Calcule le percentage_grade basé sur final_grade et les parties actives
+ * @param finalGrade - Note finale avec bonus/pénalités appliquées
+ * @param activityPoints - Tableau des points de l'activité
+ * @param disabledParts - Parties désactivées
+ * @returns percentage_grade (0-100) ou null si calcul impossible
+ */
+export function calculatePercentageGrade(
+  finalGrade: number | null,
+  activityPoints: number[],
+  disabledParts: boolean[] | null
+): number | null {
+  if (finalGrade === null || finalGrade === undefined) {
+    return null;
+  }
+
+  if (!activityPoints || activityPoints.length === 0) {
+    return null;
+  }
+
+  // Calculer le total des points des parties actives
+  let totalActivePoints = 0;
+  activityPoints.forEach((points, index) => {
+    if (!disabledParts || !disabledParts[index]) {
+      totalActivePoints += points || 0;
+    }
+  });
+
+  if (totalActivePoints <= 0) {
+    return null;
+  }
+
+  // Calculer le pourcentage : (final_grade / total_parties_actives) * 100
+  const percentage = (finalGrade / totalActivePoints) * 100;
+  
+  // Limiter à 100% maximum et arrondir à 2 décimales
+  return Math.min(Math.round(percentage * 100) / 100, 100);
+}
+
+/**
+ * Met à jour le champ percentage_grade d'une correction
+ * @param correctionId - ID de la correction
+ * @param finalGrade - Note finale
+ * @param activityPoints - Points de l'activité
+ * @param disabledParts - Parties désactivées
+ */
+export async function updatePercentageGrade(
+  correctionId: number,
+  finalGrade: number | null,
+  activityPoints: number[],
+  disabledParts: boolean[] | null
+): Promise<void> {
+  const percentageGrade = calculatePercentageGrade(finalGrade, activityPoints, disabledParts);
+  
+  await query(
+    `UPDATE corrections_autres 
+     SET percentage_grade = ? 
+     WHERE id = ?`,
+    [percentageGrade, correctionId]
+  );
+}
+
+/**
+ * Recalcule et met à jour le percentage_grade pour toutes les corrections
+ * Utilise lors de migrations ou corrections en masse
+ */
+export async function recalculateAllPercentageGrades(): Promise<void> {
+  // Récupérer toutes les corrections avec leurs activités
+  const corrections = await query<any[]>(`
+    SELECT 
+      ca.id,
+      ca.final_grade,
+      ca.disabled_parts,
+      aa.points
+    FROM corrections_autres ca
+    JOIN activities_autres aa ON ca.activity_id = aa.id
+    WHERE ca.final_grade IS NOT NULL
+  `);
+
+  for (const correction of corrections) {
+    const activityPoints = parsePointsEarned(correction.points);
+    const disabledParts = parseDisabledParts(correction.disabled_parts);
+    
+    await updatePercentageGrade(
+      correction.id,
+      correction.final_grade,
+      activityPoints,
+      disabledParts
+    );
+  }
+}
+
+/**
  * Récupère les statistiques des corrections pour une activité spécifique
  * @param activityId ID de l'activité
  * @param includeInactive Inclure les corrections inactives (désactivées)
@@ -342,10 +512,11 @@ export async function getCorrectionAutreStatsByActivity(activityId: number, incl
       c.activity_id = ? ${statusCondition}
   `;
   
-  // Requête séparée pour récupérer tous les points_earned
+  // Requête séparée pour récupérer tous les points_earned et disabled_parts
   const pointsQuery = `
     SELECT 
-      c.points_earned
+      c.points_earned,
+      c.disabled_parts
     FROM 
       corrections_autres c
     WHERE 
@@ -382,12 +553,22 @@ export async function getCorrectionAutreStatsByActivity(activityId: number, incl
   // Traiter les points obtenus pour chaque partie
   let allPointsEarned: number[][] = [];
   
-  // Traiter chaque résultat de points_earned individuellement
+  // Traiter chaque résultat de points_earned individuellement en excluant les parties désactivées
   if (pointsResults && pointsResults.length > 0) {
     allPointsEarned = pointsResults
       .map(row => {
         // Utiliser notre fonction utilitaire pour parser les points_earned
-        return parsePointsEarned(row.points_earned);
+        const pointsEarned = parsePointsEarned(row.points_earned);
+        const disabledParts = parseDisabledParts(row.disabled_parts);
+        
+        // Si des parties sont désactivées, les exclure du calcul
+        if (disabledParts && Array.isArray(pointsEarned)) {
+          return pointsEarned.map((points, index) => 
+            disabledParts[index] ? 0 : points
+          );
+        }
+        
+        return pointsEarned;
       })
       .filter(points => Array.isArray(points) && points.length > 0);
   }
@@ -556,4 +737,42 @@ function parsePointsEarned(points: any): number[] {
   // Cas par défaut, on retourne un tableau vide
   console.error('Format de points_earned non reconnu:', points);
   return [];
+}
+
+/**
+ * Fonction utilitaire pour parser correctement le champ disabled_parts
+ * Gère les différents cas de figure (string JSON, déjà parsé, etc.)
+ */
+export function parseDisabledParts(disabledParts: any): boolean[] | null {
+  // Si disabledParts est null ou undefined, on retourne null
+  if (disabledParts === null || disabledParts === undefined) {
+    return null;
+  }
+  
+  // Si disabledParts est déjà un tableau, on le retourne tel quel
+  if (Array.isArray(disabledParts)) {
+    return disabledParts;
+  }
+  
+  // Si disabledParts est une chaîne JSON, on la parse
+  if (typeof disabledParts === 'string') {
+    try {
+      const parsed = JSON.parse(disabledParts);
+      
+      // Vérifier que le résultat est bien un tableau
+      if (Array.isArray(parsed)) {
+        return parsed;
+      } else {
+        console.error('Le JSON parsé pour disabled_parts n\'est pas un tableau:', parsed);
+        return null;
+      }
+    } catch (error) {
+      console.error('Erreur lors du parsing de disabled_parts:', error);
+      return null;
+    }
+  }
+  
+  // Cas par défaut, on retourne null
+  console.error('Format de disabled_parts non reconnu:', disabledParts);
+  return null;
 }

@@ -9,6 +9,8 @@ import ToggleOnIcon from '@mui/icons-material/ToggleOn';
 import ToggleOffIcon from '@mui/icons-material/ToggleOff';
 import PersonOffIcon from '@mui/icons-material/PersonOff';
 import AssignmentLateIcon from '@mui/icons-material/AssignmentLate';
+import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
+import BlockIcon from '@mui/icons-material/Block';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { CorrectionAutreEnriched } from '@/lib/types';
@@ -17,6 +19,7 @@ import ShareModal from '@/app/components/ShareModal';
 import RecentActorsIcon from '@mui/icons-material/RecentActors';
 import CircularProgress from '@mui/material/CircularProgress';
 import Chip from '@mui/material/Chip';
+import { parseDisabledParts } from '@/lib/correctionAutre';
 
 // Fonction pour vérifier si useBatchDelete est disponible dans le contexte
 const useOptionalBatchDelete = () => {
@@ -259,9 +262,33 @@ const CorrectionCardAutre: React.FC<CorrectionCardProps> = ({
 
   // Calcul du total de points possibles
   // Utiliser le barème de l'activité si disponible via additionalProps
-  const totalPossiblePoints = additionalProps?.activity?.points 
-    ? additionalProps.activity.points.reduce((sum: number, p: number) => sum + p, 0) 
-    : (grade > 0 ? grade / (correction.score_percentage || 1) * 100 : 0);
+  const totalPossiblePoints = (() => {
+    if (additionalProps?.activity?.points) {
+      // Parser les parties désactivées pour calculer le total correct
+      const disabledParts = parseDisabledParts(correction.disabled_parts);
+      let totalPossible = 0;
+      
+      additionalProps.activity.points.forEach((points: number, index: number) => {
+        if (!disabledParts || !disabledParts[index]) {
+          totalPossible += points;
+        }
+      });
+      
+      return totalPossible || additionalProps.activity.points.reduce((sum: number, p: number) => sum + p, 0);
+    }
+    
+    // Si percentage_grade est disponible, calculer le total basé sur final_grade
+    if (correction.percentage_grade && finalGrade !== null) {
+      return (finalGrade / correction.percentage_grade) * 100;
+    }
+    
+    return grade > 0 ? grade / (correction.score_percentage || 1) * 100 : 0;
+  })();
+  
+  // Calculer la note normalisée sur 20 en utilisant percentage_grade
+  const normalizedGradeOn20 = correction.percentage_grade ? 
+    (correction.percentage_grade / 100) * 20 : 
+    null;
   
   return (
     <Paper
@@ -452,10 +479,16 @@ const CorrectionCardAutre: React.FC<CorrectionCardProps> = ({
             / {totalPossiblePoints > 0 ? totalPossiblePoints.toFixed(1) : '-'}
           </Typography>
 
-          {additionalProps && additionalProps.showNormalizedGrade && additionalProps.normalizeGrade && additionalProps.activity && (
+          {additionalProps && additionalProps.showNormalizedGrade && (
             <Tooltip title="Note normalisée sur 20">
               <Typography variant="body2" sx={{ ml: 1, borderLeft: '1px solid rgba(255,255,255,0.3)', pl: 1 }}>
-                {additionalProps.normalizeGrade(gradeWithPenalty, additionalProps.activity).toFixed(1)}/20
+                {normalizedGradeOn20 !== null ? 
+                  `${normalizedGradeOn20.toFixed(1)}/20` : 
+                  (additionalProps.normalizeGrade && additionalProps.activity ? 
+                    `${additionalProps.normalizeGrade(gradeWithPenalty, additionalProps.activity).toFixed(1)}/20` :
+                    '-/20'
+                  )
+                }
               </Typography>
             </Tooltip>
           )}
@@ -492,6 +525,26 @@ const CorrectionCardAutre: React.FC<CorrectionCardProps> = ({
           <Typography variant="caption" color="text.secondary">
             {modifiedDate}
           </Typography>
+          
+          {/* Indicateur des parties désactivées */}
+          {(() => {
+            const disabledParts = parseDisabledParts(correction.disabled_parts);
+            const hasDisabledParts = disabledParts && Object.values(disabledParts).some(Boolean);
+            if (hasDisabledParts) {
+              const disabledCount = Object.values(disabledParts).filter(Boolean).length;
+              return (
+                <Typography 
+                  variant="caption" 
+                  color="warning.main"
+                  sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}
+                >
+                  <VisibilityOffIcon fontSize="small" />
+                  {disabledCount} partie{disabledCount > 1 ? 's' : ''} désactivée{disabledCount > 1 ? 's' : ''}
+                </Typography>
+              );
+            }
+            return null;
+          })()}
         </Box>
         
         {/* Points par partie */}
@@ -508,14 +561,26 @@ const CorrectionCardAutre: React.FC<CorrectionCardProps> = ({
               Points par partie :
             </Typography>
             <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
-              {correction.points_earned.map((points, index) => (
-                <Chip
-                  key={index}
-                  label={`P${index + 1} : ${points}`}
-                  size="small"
-                  variant="outlined"
-                />
-              ))}
+              {correction.points_earned.map((points, index) => {
+                // Parser les parties désactivées
+                const disabledParts = parseDisabledParts(correction.disabled_parts);
+                const isDisabled = disabledParts && disabledParts[index];
+                
+                return (
+                  <Chip
+                    key={index}
+                    label={`P${index + 1} : ${points}`}
+                    size="small"
+                    variant="outlined"
+                    icon={isDisabled ? <BlockIcon /> : undefined}
+                    sx={{
+                      opacity: isDisabled ? 0.5 : 1,
+                      textDecoration: isDisabled ? 'line-through' : 'none',
+                      color: isDisabled ? 'text.disabled' : 'text.primary'
+                    }}
+                  />
+                );
+              })}
             </Box>
           </Box>
         )}

@@ -236,8 +236,15 @@ const FragmentsSidebar: React.FC<FragmentsSidebarProps> = ({
           >
             {activities.map((activity) => (
               <MenuItem key={activity.id} value={activity.id}>
-                {activity.name} 
-                {correctionActivityId && activity.id === correctionActivityId ? ' (courante)' : ''}
+          <Box sx={{ 
+            overflow: 'hidden', 
+            textOverflow: 'ellipsis', 
+            whiteSpace: 'nowrap',
+            maxWidth: '100%'
+          }}>
+            {activity.name.length > 35 ? `${activity.name.substring(0, 35)}...` : activity.name}
+            {correctionActivityId && activity.id === correctionActivityId ? ' (courante)' : ''}
+          </Box>
               </MenuItem>
             ))}
           </Select>

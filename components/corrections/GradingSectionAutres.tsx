@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Typography, Slider, Box, Grid, Alert, FormControlLabel, Checkbox, CircularProgress, Stack, Fade, Button } from '@mui/material';
+import { Typography, Slider, Box, Grid, Alert, FormControlLabel, Checkbox, CircularProgress, Stack, Fade, Button, IconButton, Tooltip } from '@mui/material';
 import { useSnackbar } from 'notistack';
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
 import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import DoneIcon from '@mui/icons-material/Done';
+import CloseIcon from '@mui/icons-material/Close';
 import { validateGradeConstraint } from '@/lib/correctionAutre';
 
 interface GradingSectionAutresProps {
@@ -25,6 +26,8 @@ interface GradingSectionAutresProps {
   handleUpdateBonus?: (bonus: number) => Promise<any>;
   saving?: boolean; // Indicateur si une sauvegarde est en cours
   setSaving?: (isSaving: boolean) => void; // Fonction pour mettre à jour l'état de sauvegarde
+  disabledParts?: boolean[]; // Tableau des parties désactivées
+  setDisabledParts?: (disabledParts: boolean[]) => void; // Fonction pour gérer les parties désactivées
 }
 
 const GradingSectionAutres: React.FC<GradingSectionAutresProps> = ({
@@ -44,7 +47,9 @@ const GradingSectionAutres: React.FC<GradingSectionAutresProps> = ({
   handleUpdatePenalty,
   handleUpdateBonus,
   saving = false,
-  setSaving = () => {}
+  setSaving = () => {},
+  disabledParts = [],
+  setDisabledParts,
 }) => {
   // État pour le checkbox "Travail non rendu"
   const [neverSubmitted, setNeverSubmitted] = useState(false);
@@ -80,6 +85,55 @@ const GradingSectionAutres: React.FC<GradingSectionAutresProps> = ({
       enqueueSnackbar(message, { variant });
       lastNotificationTimeRef.current = now;
     }
+  };
+
+  // Fonction pour gérer la désactivation/activation d'une partie
+  const handleTogglePartDisabled = (partIndex: number) => {
+    if (!setDisabledParts) return;
+    
+    const newDisabledParts = [...disabledParts];
+    
+    // Debug: log de l'état avant modification
+    console.log('handleTogglePartDisabled - avant:', { partIndex, disabledParts, newDisabledParts });
+    
+    // Assurer que le tableau a la bonne taille
+    while (newDisabledParts.length < partNames.length) {
+      newDisabledParts.push(false);
+    }
+    
+    // Basculer l'état de la partie
+    newDisabledParts[partIndex] = !newDisabledParts[partIndex];
+    
+    // Debug: log de l'état après modification
+    console.log('handleTogglePartDisabled - après:', { partIndex, newDisabledParts });
+    
+    // Si on désactive la partie, remettre ses points à 0
+    if (newDisabledParts[partIndex]) {
+      setPointsEarned(partIndex, 0);
+      showNotification(`Partie "${partNames[partIndex]}" désactivée pour cette correction`, 'warning');
+    } else {
+      showNotification(`Partie "${partNames[partIndex]}" réactivée pour cette correction`, 'info');
+    }
+    
+    // Mettre à jour les parties désactivées (cela déclenchera automatiquement l'auto-save dans le parent)
+    setDisabledParts(newDisabledParts);
+    
+    // Déclencher aussi la sauvegarde immédiate des notes pour persister l'état
+    setTimeout(() => {
+      const newPointsEarned = [...pointsEarned];
+      if (newDisabledParts[partIndex]) {
+        newPointsEarned[partIndex] = 0;
+      }
+      
+      // TOUJOURS sauvegarder, que ce soit pour désactiver ou réactiver une partie
+      // Passer explicitement les nouvelles parties désactivées
+      saveGradeWithDebounce(
+        newPointsEarned,
+        isPenaltyEnabled ? parseFloat(penalty || '0') : 0,
+        isBonusEnabled ? parseFloat(bonus || '0') : 0,
+        newDisabledParts // Passer les parties désactivées mises à jour
+      );
+    }, 100);
   };
   
   // Vérifier si la notation correspond au cas "travail non rendu"
@@ -140,7 +194,7 @@ const GradingSectionAutres: React.FC<GradingSectionAutresProps> = ({
   }, [penalty, bonus, saving, isUpdating]); // Ajouter saving et isUpdating pour déclencher après sauvegarde
   
   // Fonction pour sauvegarder les notes avec un délai
-  const saveGradeWithDebounce = (newPointsEarned: number[], penaltyValue: number, bonusValue: number = 0) => {
+  const saveGradeWithDebounce = (newPointsEarned: number[], penaltyValue: number, bonusValue: number = 0, customDisabledParts?: boolean[]) => {
     // Annuler tout timeout en cours
     if (saveGradeTimeout) {
       clearTimeout(saveGradeTimeout);
@@ -163,7 +217,14 @@ const GradingSectionAutres: React.FC<GradingSectionAutresProps> = ({
           validateGradeConstraint(points, `points_earned[${index}]`)
         );
         
+        // Utiliser les parties désactivées personnalisées si fournies, sinon utiliser l'état actuel
+        const partsToSave = customDisabledParts !== undefined ? customDisabledParts : disabledParts;
+        
+        // Debug: vérifier que les parties désactivées sont correctement transmises
+        console.log('saveGradeWithDebounce - disabledParts à sauvegarder:', partsToSave);
+        
         // Appeler l'API en laissant le serveur calculer grade et final_grade
+        // en passant les parties désactivées
         fetch(`/api/corrections_autres/${correction.id}/grade`, {
           method: 'PUT',
           headers: {
@@ -172,7 +233,8 @@ const GradingSectionAutres: React.FC<GradingSectionAutresProps> = ({
           body: JSON.stringify({ 
             points_earned: validatedPointsEarned,
             penalty: validatedPenalty,
-            bonus: validatedBonus
+            bonus: validatedBonus,
+            disabledParts: partsToSave
           }),
         })
           .then((response) => {
@@ -246,6 +308,7 @@ const GradingSectionAutres: React.FC<GradingSectionAutresProps> = ({
         apiCallInProgressRef.current = true;
         
         // Appeler l'API avec les valeurs de pénalité/bonus et laisser le serveur calculer grade et final_grade
+        // en passant les parties désactivées
         fetch(`/api/corrections_autres/${correction.id}/grade`, {
           method: 'PUT',
           headers: {
@@ -254,7 +317,8 @@ const GradingSectionAutres: React.FC<GradingSectionAutresProps> = ({
           body: JSON.stringify({ 
             points_earned: [...pointsEarned],
             penalty: validatedPenalty,
-            bonus: validatedBonus
+            bonus: validatedBonus,
+            disabledParts: disabledParts
           }),
         })
           .then((response) => {
@@ -328,9 +392,15 @@ const GradingSectionAutres: React.FC<GradingSectionAutresProps> = ({
     
     if (isChecked) {
       
-      // Pour un travail non rendu, on attribue directement 25% des points max
-      const totalMaxPoints = totalPoints.reduce((sum, points) => sum + points, 0);
-      const grade25Percent = totalMaxPoints * 0.25; // 25% des points maximums
+      // Pour un travail non rendu, on attribue directement 25% des points max (en excluant les parties désactivées)
+      const totalMaxPoints = totalPoints.reduce((sum, points, index) => {
+        // Exclure les parties désactivées du calcul du total maximum
+        if (disabledParts[index]) {
+          return sum;
+        }
+        return sum + points;
+      }, 0);
+      const grade25Percent = totalMaxPoints * 0.25; // 25% des points maximums ajustés
       
       // Créer un tableau de zéros avec la même longueur que totalPoints
       const zeroPoints = new Array(totalPoints.length).fill(0);
@@ -362,7 +432,8 @@ const GradingSectionAutres: React.FC<GradingSectionAutresProps> = ({
             final_grade: validatedGrade25,
             penalty: 0,
             bonus: 0,
-            status: 'NON_RENDU' // Ajouter le statut explicite
+            status: 'NON_RENDU', // Ajouter le statut explicite
+            disabledParts: disabledParts // Passer les parties désactivées
           }),
         })
           .then((response) => {
@@ -444,7 +515,8 @@ const GradingSectionAutres: React.FC<GradingSectionAutresProps> = ({
             final_grade: 0,
             penalty: 0,
             bonus: 0,
-            status: 'ACTIVE' // Réinitialiser le statut
+            status: 'ACTIVE', // Réinitialiser le statut
+            disabledParts: disabledParts // Passer les parties désactivées
           }),
         })
           .then((response) => {
@@ -498,7 +570,14 @@ const GradingSectionAutres: React.FC<GradingSectionAutresProps> = ({
 
   // Calculer la note finale selon la règle demandée
   const calculateFinalGrade = (grade: number, penalty: number, bonus: number = 0): number => {
-    const totalMaxPoints = totalPoints.reduce((sum, points) => sum + points, 0);
+    // Calculer le total maximum en excluant les parties désactivées
+    const totalMaxPoints = totalPoints.reduce((sum, points, index) => {
+      // Exclure les parties désactivées du calcul du total maximum
+      if (disabledParts[index]) {
+        return sum;
+      }
+      return sum + points;
+    }, 0);
     
     // Utiliser la même logique que le serveur (lib/correctionAutre.ts)
     let finalGrade;
@@ -516,14 +595,26 @@ const GradingSectionAutres: React.FC<GradingSectionAutresProps> = ({
 
   // Calculer la note totale
   const calculateTotalGrade = (): number => {
-    return pointsEarned.reduce((sum, points) => sum + points, 0);
+    return pointsEarned.reduce((sum, points, index) => {
+      // Exclure les parties désactivées du calcul
+      if (disabledParts[index]) {
+        return sum;
+      }
+      return sum + points;
+    }, 0);
   };
 
   // Calculer la note finale (avec application de la pénalité et du bonus si nécessaire)
   const getFinalGrade = (): number => {
-    // Si c'est un travail non rendu, renvoyer 25% des points max
+    // Si c'est un travail non rendu, renvoyer 25% des points max (en excluant les parties désactivées)
     if (neverSubmitted) {
-      const totalMaxPoints = totalPoints.reduce((sum, points) => sum + points, 0);
+      const totalMaxPoints = totalPoints.reduce((sum, points, index) => {
+        // Exclure les parties désactivées du calcul du total maximum
+        if (disabledParts[index]) {
+          return sum;
+        }
+        return sum + points;
+      }, 0);
       const finalGrade = totalMaxPoints * 0.25;
       lastValidFinalGradeRef.current = finalGrade;
       return finalGrade;
@@ -568,7 +659,14 @@ const GradingSectionAutres: React.FC<GradingSectionAutresProps> = ({
     }
     
     const totalEarned = calculateTotalGrade();
-    const totalMaxPoints = totalPoints.reduce((sum, points) => sum + points, 0);
+    // Calculer le total maximum en excluant les parties désactivées
+    const totalMaxPoints = totalPoints.reduce((sum, points, index) => {
+      // Exclure les parties désactivées du calcul du total maximum
+      if (disabledParts[index]) {
+        return sum;
+      }
+      return sum + points;
+    }, 0);
     
     return totalMaxPoints > 0 ? (totalEarned / totalMaxPoints) * 100 : 0;
   };
@@ -763,12 +861,15 @@ const GradingSectionAutres: React.FC<GradingSectionAutresProps> = ({
     try {
       setIsCalculating(true);
       
-      // Appeler l'API de recalcul de note finale
+      // Appeler l'API de recalcul de note finale en passant les parties désactivées
       const response = await fetch(`/api/corrections_autres/${correction.id}/recalculate-grade`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
-        }
+        },
+        body: JSON.stringify({
+          disabledParts: disabledParts
+        })
       });
       
       if (!response.ok) {
@@ -813,7 +914,20 @@ const GradingSectionAutres: React.FC<GradingSectionAutresProps> = ({
     <>
       <Box sx={{ mb: 3 }}>
         <Typography variant="h6" sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <span>Notation sur {totalPoints.reduce((sum, points) => sum + points, 0)} points</span>
+          <span>
+            Notation sur {totalPoints.reduce((sum, points, index) => {
+              // Exclure les parties désactivées du calcul du total pour l'affichage
+              if (disabledParts[index]) {
+                return sum;
+              }
+              return sum + points;
+            }, 0)} points
+            {disabledParts.some(disabled => disabled) && (
+              <span style={{ color: '#ff9800', fontSize: '0.8rem', marginLeft: '8px' }}>
+                (sur {totalPoints.reduce((sum, points) => sum + points, 0)} total)
+              </span>
+            )}
+          </span>
           <Button 
             variant="outlined" 
             size="small" 
@@ -931,9 +1045,39 @@ const GradingSectionAutres: React.FC<GradingSectionAutresProps> = ({
         {partNames.map((partName, index) => (
           <Grid size={{ xs: 12, md: 6 }} key={index}>
             <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', position: 'relative' }}>
-              <Typography variant="body2" id={`slider-${index}`} gutterBottom>
-                {partName}
-              </Typography>
+              {/* Titre de la partie avec bouton de désactivation */}
+              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1, mb: 1 }}>
+                <Typography 
+                  variant="body2" 
+                  id={`slider-${index}`} 
+                  sx={{
+                    textDecoration: disabledParts[index] ? 'line-through' : 'none',
+                    opacity: disabledParts[index] ? 0.5 : 1,
+                    color: disabledParts[index] ? 'text.disabled' : 'inherit'
+                  }}
+                >
+                  {partName}
+                </Typography>
+                {setDisabledParts && (
+                  <Tooltip title={disabledParts[index] ? "Réactiver cette partie" : "Désactiver cette partie"}>
+                    <IconButton
+                      size="small"
+                      onClick={() => handleTogglePartDisabled(index)}
+                      disabled={neverSubmitted || isUpdating || saving}
+                      sx={{
+                        color: disabledParts[index] ? 'error.main' : 'text.secondary',
+                        '&:hover': {
+                          color: disabledParts[index] ? 'error.dark' : 'error.main',
+                          backgroundColor: disabledParts[index] ? 'error.lighter' : 'action.hover'
+                        },
+                        transition: 'all 0.2s'
+                      }}
+                    >
+                      <CloseIcon fontSize="small" />
+                    </IconButton>
+                  </Tooltip>
+                )}
+              </Box>
               <Slider
                 aria-labelledby={`slider-${index}`}
                 value={localPointsEarned[index] || 0}
@@ -946,10 +1090,11 @@ const GradingSectionAutres: React.FC<GradingSectionAutresProps> = ({
                 step={0.25}
                 valueLabelDisplay="auto"
                 marks
-                disabled={neverSubmitted || isUpdating || saving}
+                disabled={neverSubmitted || isUpdating || saving || disabledParts[index]}
                 sx={{ 
                   width: "90%",
                   color: index % 2 === 0 ? 'primary.main' : 'secondary.main',
+                  opacity: disabledParts[index] ? 0.4 : 1,
                   '& .MuiSlider-thumb': {
                     height: 20,
                     width: 20,
@@ -959,8 +1104,17 @@ const GradingSectionAutres: React.FC<GradingSectionAutresProps> = ({
                   }
                 }}
               />
-              <Typography variant="caption" color="text.secondary" align="center" sx={{ mt: 1 }}>
-                {localPointsEarned[index] || '0'} / {totalPoints[index]}
+              <Typography 
+                variant="caption" 
+                align="center" 
+                sx={{ 
+                  mt: 1,
+                  opacity: disabledParts[index] ? 0.5 : 1,
+                  color: disabledParts[index] ? 'text.disabled' : 'text.secondary',
+                  textDecoration: disabledParts[index] ? 'line-through' : 'none'
+                }}
+              >
+                {disabledParts[index] ? 'Désactivé' : `${localPointsEarned[index] || '0'} / ${totalPoints[index]}`}
               </Typography>
             </Box>
           </Grid>
@@ -1036,7 +1190,13 @@ const GradingSectionAutres: React.FC<GradingSectionAutresProps> = ({
             <Slider
               aria-labelledby="total-grade-slider"
               value={getFinalGrade()}
-              max={totalPoints.reduce((sum, points) => sum + points, 0)}
+              max={totalPoints.reduce((sum, points, index) => {
+                // Exclure les parties désactivées du calcul du maximum pour l'affichage
+                if (disabledParts[index]) {
+                  return sum;
+                }
+                return sum + points;
+              }, 0)}
               disabled
               sx={{ 
                 width: 280,
@@ -1051,7 +1211,18 @@ const GradingSectionAutres: React.FC<GradingSectionAutresProps> = ({
               }}
             />
             <Typography variant="caption" color="text.secondary" align="center" sx={{ fontSize: "1rem", mt: 1 }}>
-              {getFinalGrade().toFixed(1)} / {totalPoints.reduce((sum, points) => sum + points, 0)}
+              {getFinalGrade().toFixed(1)} / {totalPoints.reduce((sum, points, index) => {
+                // Afficher le total ajusté en excluant les parties désactivées
+                if (disabledParts[index]) {
+                  return sum;
+                }
+                return sum + points;
+              }, 0)}
+              {disabledParts.some(disabled => disabled) && (
+                <span style={{ color: '#ff9800', marginLeft: '8px' }}>
+                  (Parties désactivées exclues)
+                </span>
+              )}
             </Typography>
           </Box>
         </Grid>

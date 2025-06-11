@@ -20,6 +20,7 @@ import {
 } from 'recharts';
 import { StudentStats } from '../types';
 import { CorrectionAutreEnriched } from '@/lib/types';
+import { getNormalizedGradeOn20 } from '../utils/gradeUtils';
 
 interface GradeDistributionChartProps {
   corrections: CorrectionAutreEnriched[];
@@ -49,14 +50,16 @@ export default function GradeDistributionChart({ corrections, stats }: GradeDist
     ];
 
     corrections
-      .filter(c => c.grade !== null)
+      .filter(c => c.final_grade !== null)
       .forEach(c => {
-        const grade = c.grade || 0;
-        if (grade < 5) ranges[0].count++;
-        else if (grade < 10) ranges[1].count++;
-        else if (grade < 12) ranges[2].count++;
-        else if (grade < 14) ranges[3].count++;
-        else if (grade < 16) ranges[4].count++;
+        // Utiliser le nouveau système pour obtenir une note normalisée sur 20
+        const normalizedGrade = getNormalizedGradeOn20(c);
+        
+        if (normalizedGrade < 5) ranges[0].count++;
+        else if (normalizedGrade < 10) ranges[1].count++;
+        else if (normalizedGrade < 12) ranges[2].count++;
+        else if (normalizedGrade < 14) ranges[3].count++;
+        else if (normalizedGrade < 16) ranges[4].count++;
         else ranges[5].count++;
       });
 

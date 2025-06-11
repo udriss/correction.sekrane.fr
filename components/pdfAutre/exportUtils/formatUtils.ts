@@ -76,18 +76,51 @@ export const getDisplayValues = (
     pointsDisplay = '[' + correction.points_earned.join(' ; ') + ']';
   }
   
-  // Formater la note
+  // Formater la note en utilisant percentage_grade en priorité
   let gradeDisplay;
   if (isPlaceholder) {
     gradeDisplay = 'N/A';
-  } else if (correction.grade !== undefined) {
-    if (statusDisplay === 'ACTIVE') {
-      gradeDisplay = `${formatGrade(correction.grade)} / ${totalPoints}`;
+  } else if (statusDisplay === 'ACTIVE') {
+    const isNormalized = correction.percentage_grade !== null && correction.percentage_grade !== undefined;
+    
+    if (isNormalized) {
+      // Si on a percentage_grade, afficher la note normalisée sur 20 ET la note originale
+      const normalizedGrade = ((correction.percentage_grade ?? 0) / 100) * 20;
+      const originalGrade = correction.grade != null ? parseFloat(correction.grade.toString()) : 0;
+      
+      // Calculer le barème original à partir de l'activité en tenant compte des parties désactivées
+      let originalTotal = 20; // Fallback à 20 si pas de barème défini
+      if (activity && activity.points) {
+        // Parser les parties désactivées
+        const disabledParts = correction.disabled_parts && Array.isArray(correction.disabled_parts) 
+          ? correction.disabled_parts 
+          : null;
+        
+        // Calculer le total en excluant les parties désactivées
+        originalTotal = activity.points.reduce((sum: number, points: number, index: number) => {
+          // Exclure les parties désactivées du calcul du barème original
+          if (disabledParts && disabledParts[index]) {
+            return sum;
+          }
+          return sum + points;
+        }, 0);
+        
+        // Si toutes les parties sont désactivées, utiliser le fallback
+        if (originalTotal === 0) {
+          originalTotal = 20;
+        }
+      }
+      
+      gradeDisplay = `${formatGrade(normalizedGrade)} / 20 [${formatGrade(originalGrade)} / ${originalTotal}]`;
+    } else if (correction.grade != null) {
+      // Fallback sur grade si percentage_grade n'est pas disponible
+      const gradeToDisplay = parseFloat(correction.grade.toString());
+      gradeDisplay = `${formatGrade(gradeToDisplay)} / 20`;
     } else {
-      gradeDisplay = statusDisplay;
+      gradeDisplay = `${formatGrade(0)} / 20`;
     }
   } else {
-    gradeDisplay = 'NON NOTÉ';
+    gradeDisplay = statusDisplay;
   }
   
   return { statusDisplay, pointsDisplay, gradeDisplay };

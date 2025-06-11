@@ -3,6 +3,7 @@ import { query } from '@/lib/db';
 import { getServerSession } from 'next-auth';
 import { getUser } from '@/lib/auth';
 import authOptions from '@/lib/auth';
+import { parseDisabledParts } from '@/lib/correctionAutre';
 
 export async function GET(request: NextRequest) {
   try {
@@ -163,6 +164,7 @@ export async function GET(request: NextRequest) {
         c.id,
         c.activity_id,
         c.points_earned,
+        c.disabled_parts,
         a.points,
         a.parts_names
       FROM 
@@ -231,9 +233,23 @@ export async function GET(request: NextRequest) {
         };
       }
       
-      // Calculer le pourcentage global pour cette correction
-      const totalEarned = pointsEarned.reduce((sum, points) => sum + points, 0);
-      const totalMax = maxPoints.reduce((sum, points) => sum + points, 0);
+      // Parse disabled parts and exclude them from calculation
+      const disabledParts = parseDisabledParts(correction.disabled_parts);
+      
+      // Calculer le pourcentage global pour cette correction en excluant les parties désactivées
+      let totalEarned = 0;
+      let totalMax = 0;
+      
+      pointsEarned.forEach((points, index) => {
+        // Exclure les parties désactivées
+        if (disabledParts && disabledParts[index]) {
+          return;
+        }
+        totalEarned += points || 0;
+        if (maxPoints[index]) {
+          totalMax += maxPoints[index] || 0;
+        }
+      });
       
       const percentage = totalMax > 0 ? (totalEarned / totalMax) * 100 : 0;
       
@@ -274,9 +290,17 @@ export async function GET(request: NextRequest) {
         return;
       }
       
+      // Parse disabled parts for this correction
+      const disabledParts = parseDisabledParts(correction.disabled_parts);
+      
       // Traiter chaque partie si elle a un nom
       partsNames.forEach((name, index) => {
         if (!name) return; // Ignorer les parties sans nom
+        
+        // Exclure les parties désactivées
+        if (disabledParts && disabledParts[index]) {
+          return;
+        }
         
         if (!partResults[name]) {
           partResults[name] = { earned: 0, max: 0, count: 0 };
@@ -450,6 +474,7 @@ export async function GET(request: NextRequest) {
         cs.class_id,
         c.id as correction_id,
         c.points_earned,
+        c.disabled_parts,
         c.grade,
         a.points
       FROM 
@@ -513,8 +538,23 @@ export async function GET(request: NextRequest) {
         return;
       }
       
-      const totalEarned = pointsEarned.reduce((sum, points) => sum + points, 0);
-      const totalMax = maxPoints.reduce((sum, points) => sum + points, 0);
+      // Parse disabled parts and exclude them from calculation
+      const disabledParts = parseDisabledParts(item.disabled_parts);
+      
+      // Calculer les totaux en excluant les parties désactivées
+      let totalEarned = 0;
+      let totalMax = 0;
+      
+      pointsEarned.forEach((points, index) => {
+        // Exclure les parties désactivées
+        if (disabledParts && disabledParts[index]) {
+          return;
+        }
+        totalEarned += points || 0;
+        if (maxPoints[index]) {
+          totalMax += maxPoints[index] || 0;
+        }
+      });
       
       const percentage = totalMax > 0 ? (totalEarned / totalMax) * 100 : 0;
       
@@ -553,6 +593,7 @@ export async function GET(request: NextRequest) {
         c.id,
         c.activity_id,
         c.points_earned,
+        c.disabled_parts,
         a.points
       FROM 
         corrections_autres c
@@ -629,8 +670,23 @@ export async function GET(request: NextRequest) {
         monthlyResults[month] = { earned: 0, max: 0, count: 0 };
       }
       
-      const totalEarned = pointsEarned.reduce((sum, points) => sum + points, 0);
-      const totalMax = maxPoints.reduce((sum, points) => sum + points, 0);
+      // Parse disabled parts and exclude them from calculation
+      const disabledParts = parseDisabledParts(correction.disabled_parts);
+      
+      // Calculer les totaux en excluant les parties désactivées
+      let totalEarned = 0;
+      let totalMax = 0;
+      
+      pointsEarned.forEach((points, index) => {
+        // Exclure les parties désactivées
+        if (disabledParts && disabledParts[index]) {
+          return;
+        }
+        totalEarned += points || 0;
+        if (maxPoints[index]) {
+          totalMax += maxPoints[index] || 0;
+        }
+      });
       
       monthlyResults[month].earned += totalEarned;
       monthlyResults[month].max += totalMax;

@@ -14,6 +14,8 @@ interface GradeData {
   penalty?: number | null;
   bonus?: number | null;
   status?: string; // Important pour gérer NON_RENDU
+  disabledParts?: boolean[]; // Tableau des parties désactivées
+  disabled_parts?: boolean[] | null; // Champ pour la base de données
 }
 
 // Route pour mettre à jour la note et pénalité d'une correction
@@ -59,8 +61,16 @@ export async function PUT(
     // Vérifier si on a un statut NON_RENDU spécifique
     const isNonRendu = data.status === 'NON_RENDU';
     
-    // Total des points maximums pour l'activité
-    const totalMaxPoints = activity.points.reduce((sum, point) => sum + point, 0);
+    // Récupérer les parties désactivées depuis les données
+    const disabledParts = data.disabledParts as boolean[] | undefined;
+    
+    // Total des points maximums pour l'activité en excluant les parties désactivées
+    let totalMaxPoints = 0;
+    for (let i = 0; i < activity.points.length; i++) {
+      if (!disabledParts || !disabledParts[i]) {
+        totalMaxPoints += activity.points[i];
+      }
+    }
     
     // Valeurs par défaut
     let pointsEarned = data.points_earned;
@@ -74,7 +84,7 @@ export async function PUT(
       // Créer un tableau de zéros
       pointsEarned = new Array(activity.points.length).fill(0);
       
-      // Calculer 25% des points max pour grade et final_grade
+      // Calculer 25% des points max pour grade et final_grade (en excluant les parties désactivées)
       const grade25Percent = totalMaxPoints * 0.25;
       
       // Définir explicitement les valeurs pour "travail non rendu"
@@ -98,11 +108,13 @@ export async function PUT(
       pointsEarned = data.points_earned !== undefined ? data.points_earned : correction.points_earned || [];
       
       // Utiliser la fonction calculateGrade centralisée pour assurer la cohérence
+      // en passant les parties désactivées
       const calculatedGrades = calculateGrade(
         activity.points,
         pointsEarned,
         penaltyValue,
-        bonusValue
+        bonusValue,
+        disabledParts
       );
       
       // Utiliser les valeurs calculées par la fonction centralisée
@@ -116,7 +128,8 @@ export async function PUT(
       grade: validateGradeConstraint(gradeValue, 'grade'),
       final_grade: validateGradeConstraint(finalGradeValue, 'final_grade'),
       penalty: validateGradeConstraint(penaltyValue, 'penalty'),
-      bonus: validateGradeConstraint(bonusValue, 'bonus')
+      bonus: validateGradeConstraint(bonusValue, 'bonus'),
+      disabled_parts: disabledParts || null // Sauvegarder les parties désactivées
     };
     
     // Ajouter le statut si fourni

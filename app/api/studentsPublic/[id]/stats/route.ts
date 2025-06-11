@@ -3,6 +3,7 @@ import { query } from '@/lib/db';
 import { getServerSession } from 'next-auth';
 import { getUser } from '@/lib/auth';
 import authOptions from '@/lib/auth';
+import { parseDisabledParts } from '@/lib/correctionAutre';
 
 // Fonction utilitaire pour normaliser une note sur 20
 const normalizeGrade = (grade: number, maxPoints: number): number => {
@@ -58,6 +59,7 @@ export async function GET(
             'grade', grade,
             'final_grade', final_grade,
             'points_earned', points_earned,
+            'disabled_parts', disabled_parts,
             'points', (
               SELECT points 
               FROM activities_autres 
@@ -93,9 +95,23 @@ export async function GET(
             const pointsEarned = correction.points_earned;
             const maxPoints = correction.points;
             
-            // Calculer les points totaux pour cette correction
-            const totalEarned = pointsEarned.reduce((sum: number, points: number) => sum + (typeof points === 'number' ? points : 0), 0);
-            const totalMax = maxPoints.reduce((sum: number, points: number) => sum + (typeof points === 'number' ? points : 0), 0);
+            // Parse disabled parts for this correction
+            const disabledParts = parseDisabledParts(correction.disabled_parts);
+            
+            // Calculer les points totaux pour cette correction en excluant les parties désactivées
+            let totalEarned = 0;
+            let totalMax = 0;
+            
+            pointsEarned.forEach((points: number, index: number) => {
+              // Exclure les parties désactivées du calcul
+              if (disabledParts && disabledParts[index]) {
+                return;
+              }
+              totalEarned += typeof points === 'number' ? points : 0;
+              if (maxPoints[index]) {
+                totalMax += typeof maxPoints[index] === 'number' ? maxPoints[index] : 0;
+              }
+            });
             
             // Utiliser final_grade en priorité si disponible, sinon utiliser grade
             const gradeToUse = correction.final_grade !== null && correction.final_grade !== undefined 
@@ -108,10 +124,15 @@ export async function GET(
               normalizedGrades.push(normalizedGrade);
             }
             
-            // Accumuler les points normalisés pour chaque partie
+            // Accumuler les points normalisés pour chaque partie (en excluant les parties désactivées)
             pointsEarned.forEach((points: number, index: number) => {
               if (!sums[index]) sums[index] = 0;
               if (!counts[index]) counts[index] = 0;
+              
+              // Exclure les parties désactivées
+              if (disabledParts && disabledParts[index]) {
+                return;
+              }
               
               if (typeof points === 'number' && !isNaN(points) && typeof maxPoints[index] === 'number' && maxPoints[index] > 0) {
                 // Normaliser les points de cette partie sur 20 avant de les additionner

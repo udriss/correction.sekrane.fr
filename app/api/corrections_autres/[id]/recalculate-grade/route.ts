@@ -30,6 +30,10 @@ export async function PUT(
       return NextResponse.json({ error: 'Format d\'ID invalide' }, { status: 400 });
     }
     
+    // Récupérer les données du body de la requête pour les parties désactivées
+    const body = await request.json().catch(() => ({}));
+    const disabledParts = body.disabledParts as boolean[] | undefined;
+    
     // Récupérer la correction existante avec l'activité associée
     const correction = await getCorrectionAutreById(correctionId);
     if (!correction) {
@@ -51,17 +55,25 @@ export async function PUT(
     
     if (status === 'NON_RENDU') {
       // Pour un travail non rendu, calculer 25% du total des points
-      const totalMaxPoints = activity.points.reduce((sum, points) => sum + points, 0);
+      // en excluant les parties désactivées
+      let totalMaxPoints = 0;
+      for (let i = 0; i < activity.points.length; i++) {
+        if (!disabledParts || !disabledParts[i]) {
+          totalMaxPoints += activity.points[i];
+        }
+      }
       const grade25Percent = totalMaxPoints * 0.25;
       grade = validateGradeConstraint(grade25Percent, 'grade');
       finalGrade = validateGradeConstraint(grade25Percent, 'final_grade');
     } else {
       // Utiliser la fonction centralisée calculateGrade qui inclut déjà la validation
+      // en passant les parties désactivées
       const calculatedGrades = calculateGrade(
         activity.points,
         points_earned,
         penalty,
-        bonus
+        bonus,
+        disabledParts
       );
       grade = calculatedGrades.grade;
       finalGrade = calculatedGrades.final_grade;
@@ -70,7 +82,8 @@ export async function PUT(
     // Mettre à jour la note finale dans la base de données
     const updateData = {
       final_grade: finalGrade,
-      grade: grade
+      grade: grade,
+      disabled_parts: disabledParts || null // Sauvegarder les parties désactivées
     };
     
     const updated = await updateCorrectionAutre(correctionId, updateData);

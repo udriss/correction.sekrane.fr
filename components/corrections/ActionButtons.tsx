@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Paper, Box, IconButton, CircularProgress, Chip, Switch, Tooltip } from '@mui/material';
+import { Paper, Box, IconButton, CircularProgress, Switch, Tooltip } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import UndoIcon from '@mui/icons-material/Undo';
 import SaveIcon from '@mui/icons-material/Save';
@@ -7,7 +7,7 @@ import ShareIcon from '@mui/icons-material/Share';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import OpenInNewIcon from '@mui/icons-material/OpenInNew';
-import AutorenewIcon from '@mui/icons-material/Autorenew';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import ImageUploader from '@/app/components/ImageUploader';
 import AudioUploader from '@/app/components/AudioUploader';
 import { Typography } from '@mui/material';
@@ -49,6 +49,7 @@ const ActionButtons: React.FC<ActionButtonsProps> = ({
   lastAutoSave = null
 }) => {
   const [shareCode, setShareCode] = useState<string | null>(null);
+  const [currentTime, setCurrentTime] = useState(new Date());
 
   useEffect(() => {
     if (correctionId) {
@@ -64,28 +65,83 @@ const ActionButtons: React.FC<ActionButtonsProps> = ({
     }
   }, [correctionId]);
 
+  // Timer pour mettre à jour l'heure actuelle et rafraîchir les couleurs
+  useEffect(() => {
+    if (autoSaveActive && lastAutoSave) {
+      const interval = setInterval(() => {
+        setCurrentTime(new Date());
+      }, 15000); // Mise à jour toutes les 15 secondes
+
+      return () => clearInterval(interval);
+    }
+  }, [autoSaveActive, lastAutoSave]);
+
   // Formatter la date de dernière sauvegarde automatique
   const formatLastSaveTime = () => {
     if (!lastAutoSave) return '';
     
-    const now = new Date();
-    const diffInMinutes = Math.floor((now.getTime() - lastAutoSave.getTime()) / 60000);
+    const diffInSeconds = Math.floor((currentTime.getTime() - lastAutoSave.getTime()) / 1000);
+    const diffInMinutes = Math.floor(diffInSeconds / 60);
+    const timeString = lastAutoSave.toLocaleTimeString('fr-FR', { 
+      hour: '2-digit', 
+      minute: '2-digit', 
+      second: '2-digit' 
+    });
     
     if (diffInMinutes < 1) {
-      return 'à l\'instant';
+      return `à l'instant (${timeString})`;
     } else if (diffInMinutes === 1) {
-      return 'il y a 1 minute';
+      return `il y a 1 minute (${timeString})`;
     } else if (diffInMinutes < 60) {
-      return `il y a ${diffInMinutes} minutes`;
+      return `il y a ${diffInMinutes} minutes (${timeString})`;
     } else {
       const hours = Math.floor(diffInMinutes / 60);
       const mins = diffInMinutes % 60;
       if (hours === 1) {
-        return mins > 0 ? `il y a 1h${mins}` : 'il y a 1 heure';
+      return mins > 0 ? `il y a 1h${mins} (${timeString})` : `il y a 1 heure (${timeString})`;
       } else {
-        return mins > 0 ? `il y a ${hours}h${mins}` : `il y a ${hours} heures`;
+      return mins > 0 ? `il y a ${hours}h${mins} (${timeString})` : `il y a ${hours} heures (${timeString})`;
       }
     }
+    };
+
+  // Fonction pour déterminer la couleur de l'encoche selon le temps écoulé
+  const getCheckColor = () => {
+    if (!lastAutoSave) return 'disabled';
+    
+    const diffInMinutes = Math.floor((currentTime.getTime() - lastAutoSave.getTime()) / 60000);
+    
+    // Échelle de couleurs basée sur le temps écoulé
+    if (diffInMinutes < 0.5) {
+      return 'success'; // Vert - très récent
+    } else if (diffInMinutes < 1) {
+      return 'info'; // Bleu - récent
+    } else if (diffInMinutes < 2) {
+      return 'warning'; // Orange - modérément ancien
+    } else {
+      return 'error'; // Rouge - ancien
+    }
+  };
+
+  // Fonction pour obtenir le message du tooltip
+  const getCheckTooltipMessage = () => {
+    if (!lastAutoSave) return 'Aucune sauvegarde automatique';
+    
+    const diffInMinutes = Math.floor((currentTime.getTime() - lastAutoSave.getTime()) / 60000);
+    
+    let freshness = '';
+    if (diffInMinutes < 0.5) {
+      freshness = '(très récent)';
+    } else if (diffInMinutes < 1) {
+      freshness = '(récent)';
+    } else if (diffInMinutes < 2) {
+      freshness = '(modérément ancien)';
+    } else {
+      freshness = '(ancien)';
+    }
+    
+    //return `Auto-enregistré ${formatLastSaveTime()} ${freshness}. Enregistrement automatique toutes les 90 secondes.`;
+    return `Auto-enregistré ${formatLastSaveTime()}. Enregistrement automatique toutes les 90 secondes.`;
   };
 
   const getShareUrl = () => {
@@ -186,17 +242,19 @@ const ActionButtons: React.FC<ActionButtonsProps> = ({
         </Typography>
       </Box>
       {autoSaveActive && lastAutoSave && (
-          <Tooltip title={`Enregistrement automatique toutes les 70 secondes. Dernière sauvegarde: ${lastAutoSave.toLocaleTimeString()}`}>
-        <Chip
-          icon={<AutorenewIcon fontSize="small" />}
-          label={`Auto-enregistré ${formatLastSaveTime()}`}
-          size="small"
-          variant="outlined"
-          color="info"
-          sx={{ mt: 1, fontSize: '0.7rem' }}
-        />
-          </Tooltip>
-        )}
+        <Tooltip title={getCheckTooltipMessage()}>
+          <Box sx={{ display: 'flex', alignItems: 'center', ml: 1 }}>
+            <CheckCircleIcon 
+              color={getCheckColor()} 
+              fontSize="small"
+              sx={{ 
+                transition: 'color 0.3s ease',
+                filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.1))'
+              }}
+            />
+          </Box>
+        </Tooltip>
+      )}
       </Box>
       </div>
       

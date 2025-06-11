@@ -110,6 +110,63 @@ export default function ActivityAutreDetail({ params }: { params: Promise<{ id: 
   const [selectedSubClassIds, setSelectedSubClassIds] = useState<string[]>([]);
   const [allClasses, setAllClasses] = useState<{ id: number; name: string; nbre_subclasses?: number }[]>([]);
 
+  /**
+   * Calcule le pourcentage de réussite normalisé en utilisant percentage_grade ou un fallback
+   * @param correction - La correction à évaluer
+   * @param activity - L'activité associée
+   * @returns Le pourcentage de réussite (0-100)
+   * 
+   * Cette fonction priorise l'utilisation du champ percentage_grade qui est calculé automatiquement
+   * par le système en tenant compte des parties désactivées. Si ce champ n'est pas disponible,
+   * elle effectue un calcul de fallback basé sur final_grade et les parties actives.
+   */
+  const getPercentageGrade = (correction: CorrectionAutreEnriched, activity: ActivityAutre): number => {
+    // Vérifications de sécurité
+    if (!correction || !activity) return 0;
+    
+    // Priorité à percentage_grade si disponible
+    if (correction.percentage_grade !== null && correction.percentage_grade !== undefined) {
+      const percentage = Number(correction.percentage_grade);
+      return isNaN(percentage) || !isFinite(percentage) ? 0 : Math.max(0, Math.min(100, percentage));
+    }
+    
+    // Fallback: calcul manuel basé sur final_grade et parties actives
+    if (correction.final_grade && activity.points) {
+      // Calculer le total des points actifs
+      let totalActivePoints = 0;
+      activity.points.forEach((points, idx) => {
+        if (!correction.disabled_parts || !correction.disabled_parts[idx]) {
+          totalActivePoints += points || 0;
+        }
+      });
+      
+      if (totalActivePoints > 0) {
+        const finalGrade = parseFloat(String(correction.final_grade));
+        if (!isNaN(finalGrade) && isFinite(finalGrade)) {
+          const percentage = (finalGrade / totalActivePoints) * 100;
+          return Math.max(0, Math.min(100, Math.round(percentage * 100) / 100));
+        }
+      }
+    }
+    
+    return 0;
+  };
+
+  /**
+   * Calcule la note normalisée sur 20 en utilisant le système percentage_grade
+   * @param correction - La correction à évaluer
+   * @param activity - L'activité associée
+   * @returns La note sur 20
+   * 
+   * Cette fonction convertit le pourcentage de réussite en note sur 20, 
+   * permettant une normalisation cohérente peu importe le barème original de l'activité.
+   */
+  const getNormalizedGradeOn20 = (correction: CorrectionAutreEnriched, activity: ActivityAutre): number => {
+    const percentageGrade = getPercentageGrade(correction, activity);
+    const normalizedGrade = (percentageGrade / 100) * 20;
+    return isNaN(normalizedGrade) || !isFinite(normalizedGrade) ? 0 : normalizedGrade;
+  };
+
   // Calculated values for subclasses - only show when classes are selected
   const availableSubClasses = useMemo(() => {
     if (!students.length || selectedClassIds.length === 0) return [];
@@ -1202,6 +1259,18 @@ export default function ActivityAutreDetail({ params }: { params: Promise<{ id: 
                             `Correction pour ${students.find(s => s.id === correction.student_id)?.first_name} ${students.find(s => s.id === correction.student_id)?.last_name}` 
                             : `Correction pour l&apos;étudiant #${correction.student_id}`) 
                           : 'Correction sans étudiant assigné'}
+                          
+                          {/* Indicateur de parties désactivées */}
+                          {correction.disabled_parts && correction.disabled_parts.some(disabled => disabled) && (
+                            <Chip 
+                              size="small" 
+                              label={`${correction.disabled_parts.filter(disabled => disabled).length} partie(s) désactivée(s)`}
+                              color="warning" 
+                              variant="outlined"
+                              sx={{ ml: 1, height: 20, fontSize: '0.65rem' }}
+                            />
+                          )}
+                          
                           {correction.status && correction.status !== 'ACTIVE' && (
                             <Chip 
                               size="small" 
@@ -1221,30 +1290,93 @@ export default function ActivityAutreDetail({ params }: { params: Promise<{ id: 
                               ? (correction.final_grade 
                                   ? (() => {
                                       const value = parseFloat(String(correction.final_grade));
-                                      return `${isNaN(value) ? correction.final_grade : value.toFixed(1)} / ${activity.points?.reduce((sum, p) => sum + p, 0) || 0}`;
+                                      // Calculer le total des points actifs (en excluant les parties désactivées)
+                                      let totalActivePoints = 0;
+                                      if (activity.points && Array.isArray(activity.points)) {
+                                        activity.points.forEach((points, idx) => {
+                                          // Exclure les parties désactivées si la correction a des disabled_parts
+                                          if (!correction.disabled_parts || !correction.disabled_parts[idx]) {
+                                            totalActivePoints += points || 0;
+                                          }
+                                        });
+                                      }
+                                      return `${isNaN(value) ? correction.final_grade : value.toFixed(1)} / ${totalActivePoints || 0}`;
                                     })()
                                   : 'Non noté')
                               : "NaN"}
                           </Typography>
                           {correction.status === 'ACTIVE' && correction.final_grade && (
-                            <Chip
-                              size="small"
-                              label={`${((parseFloat(correction.final_grade.toString()) / (activity.points?.reduce((sum, p) => sum + p, 0) || 1)) * 20).toFixed(1)}/20`}
-                              color="secondary"
-                              sx={{ ml: 1, fontSize: '0.7rem', height: 20 }}
-                            />
+                            <>
+                              <Chip
+                                size="small"
+                                label={`${getNormalizedGradeOn20(correction, activity).toFixed(1)}/20`}
+                                color="secondary"
+                                sx={{ ml: 1, fontSize: '0.7rem', height: 20 }}
+                              />
+                              <Chip
+                                size="small"
+                                label={`${getPercentageGrade(correction, activity).toFixed(1)}%`}
+                                color="primary"
+                                variant="outlined"
+                                sx={{ ml: 0.5, fontSize: '0.65rem', height: 20 }}
+                              />
+                            </>
                           )}
                         </Box>
                       </Box>
                       
                       <Box sx={{ mt: 1, display: 'flex', flexDirection: 'column', gap: 1 }}>
-                        {correction.points_earned && Array.isArray(activity.parts_names) && activity.parts_names.map((name, idx) => (
-                          <Box key={idx} sx={{ display: 'flex', justifyContent: 'end' }}>
-                            <Typography variant="body2">
-                              {name} : {correction.points_earned[idx]} / {activity.points?.[idx]} pts
+                        {correction.points_earned && Array.isArray(activity.parts_names) && activity.parts_names.map((name, idx) => {
+                          // Vérifier si cette partie est désactivée
+                          const isDisabled = correction.disabled_parts && correction.disabled_parts[idx];
+                          
+                          return (
+                            <Box key={idx} sx={{ 
+                              display: 'flex', 
+                              justifyContent: 'space-between',
+                              alignItems: 'center',
+                              opacity: isDisabled ? 0.5 : 1,
+                              textDecoration: isDisabled ? 'line-through' : 'none'
+                            }}>
+                              <Typography 
+                                variant="body2" 
+                                sx={{ 
+                                  color: isDisabled ? 'text.disabled' : 'text.primary',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: 0.5
+                                }}
+                              >
+                                {isDisabled && (
+                                  <Chip 
+                                    size="small" 
+                                    label="DÉSACTIVÉ" 
+                                    color="default" 
+                                    variant="outlined"
+                                    sx={{ fontSize: '0.6rem', height: 16 }} 
+                                  />
+                                )}
+                                {name} : {correction.points_earned[idx] || 0} / {activity.points?.[idx] || 0} pts
+                              </Typography>
+                            </Box>
+                          );
+                        })}
+                        
+                        {/* Afficher un résumé des parties désactivées s'il y en a */}
+                        {correction.disabled_parts && correction.disabled_parts.some(disabled => disabled) && (
+                          <Box sx={{ 
+                            mt: 1, 
+                            p: 1, 
+                            bgcolor: 'warning.50', 
+                            borderRadius: 1,
+                            border: '1px solid',
+                            borderColor: 'warning.200'
+                          }}>
+                            <Typography variant="caption" color="warning.dark" sx={{ fontWeight: 'bold' }}>
+                              ⚠️ {correction.disabled_parts.filter(disabled => disabled).length} partie(s) désactivée(s) non comptabilisée(s) dans la note
                             </Typography>
                           </Box>
-                        ))}
+                        )}
                       </Box>
                       
                       <Box sx={{ mt: 2, display: 'flex', justifyContent: 'flex-end', gap: 1 }}>
@@ -1295,29 +1427,49 @@ export default function ActivityAutreDetail({ params }: { params: Promise<{ id: 
                 
                 <Typography variant="body1" >
                   Note moyenne : <strong>
-                    {corrections.filter(c => c.status === 'ACTIVE').length > 0
-                      ? (corrections.filter(c => c.status === 'ACTIVE').reduce((sum, c) => {
-                          // Convertir final_grade en nombre pour s'assurer que la somme fonctionne correctement
-                          const grade = typeof c.final_grade === 'string' 
-                            ? parseFloat(c.final_grade) 
-                            : (c.final_grade || 0);
-                          
-                          return sum + (isNaN(grade) ? 0 : grade);
-                        }, 0) / 
-                         corrections.filter(c => c.status === 'ACTIVE').length).toFixed(1)
-                      : 'N/A'}
+                    {(() => {
+                      const activeCorrections = corrections.filter(c => c.status === 'ACTIVE');
+                      if (activeCorrections.length === 0) return 'N/A';
+                      
+                      // Utiliser percentage_grade pour calculer la moyenne normalisée
+                      const averagePercentage = activeCorrections.reduce((sum, c) => {
+                        return sum + getPercentageGrade(c, activity);
+                      }, 0) / activeCorrections.length;
+                      
+                      const averageOn20 = (averagePercentage / 100) * 20;
+                      return averageOn20.toFixed(1);
+                    })()}
                   </strong>
-                  {corrections.filter(c => c.status === 'ACTIVE').length > 0 && 
-                    <Chip
-                      size="small"
-                      label={`${((corrections.filter(c => c.status === 'ACTIVE').reduce((sum, c) => {
-                        const grade = typeof c.final_grade === 'string' ? parseFloat(c.final_grade) : (c.final_grade || 0);
-                        return sum + (isNaN(grade) ? 0 : grade);
-                      }, 0) / corrections.filter(c => c.status === 'ACTIVE').length / (activity.points?.reduce((sum, p) => sum + p, 0) || 1)) * 20).toFixed(1)} / 20`}
-                      color="secondary"
-                      sx={{ ml: 1, fontSize: '0.7rem', height: 20 }}
-                    />
-                  }
+                  {corrections.filter(c => c.status === 'ACTIVE').length > 0 && (
+                    <>
+                      <Chip
+                        size="small"
+                        label={`${(() => {
+                          const activeCorrections = corrections.filter(c => c.status === 'ACTIVE');
+                          const averagePercentage = activeCorrections.reduce((sum, c) => {
+                            return sum + getPercentageGrade(c, activity);
+                          }, 0) / activeCorrections.length;
+                          const averageOn20 = (averagePercentage / 100) * 20;
+                          return averageOn20.toFixed(1);
+                        })()} / 20`}
+                        color="secondary"
+                        sx={{ ml: 1, fontSize: '0.7rem', height: 20 }}
+                      />
+                      <Chip
+                        size="small"
+                        label={`${(() => {
+                          const activeCorrections = corrections.filter(c => c.status === 'ACTIVE');
+                          const averagePercentage = activeCorrections.reduce((sum, c) => {
+                            return sum + getPercentageGrade(c, activity);
+                          }, 0) / activeCorrections.length;
+                          return averagePercentage.toFixed(1);
+                        })()}%`}
+                        color="primary"
+                        variant="outlined"
+                        sx={{ ml: 0.5, fontSize: '0.65rem', height: 20 }}
+                      />
+                    </>
+                  )}
                 </Typography>
               </Box>
               
@@ -1328,23 +1480,51 @@ export default function ActivityAutreDetail({ params }: { params: Promise<{ id: 
               
               {Array.isArray(activity.parts_names) && activity.parts_names.map((name, idx) => {
                 const maxPoints = activity.points?.[idx];
-                const avgPoints = corrections.length > 0
-                  ? corrections.reduce((sum, c) => {
+                
+                // Calculer la moyenne seulement pour les corrections où cette partie n'est pas désactivée
+                const relevantCorrections = corrections.filter(c => 
+                  c.status === 'ACTIVE' && 
+                  (!c.disabled_parts || !c.disabled_parts[idx])
+                );
+                
+                const avgPoints = relevantCorrections.length > 0
+                  ? relevantCorrections.reduce((sum, c) => {
                       const pts = Array.isArray(c.points_earned) && c.points_earned[idx] !== undefined
                         ? c.points_earned[idx]
                         : 0;
                       return sum + pts;
-                    }, 0) / corrections.length
+                    }, 0) / relevantCorrections.length
                   : 0;
                 
                 const percentage = maxPoints > 0 ? (avgPoints / maxPoints) * 100 : 0;
                 
+                // Compter les corrections où cette partie est désactivée
+                const disabledCount = corrections.filter(c => 
+                  c.disabled_parts && c.disabled_parts[idx]
+                ).length;
+                
                 return (
                   <Box key={idx} sx={{ mb: 1 }}>
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
-                      <Typography variant="body2">{name}</Typography>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5, alignItems: 'center' }}>
+                      <Typography variant="body2" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        {name}
+                        {disabledCount > 0 && (
+                          <Chip
+                            size="small"
+                            label={`${disabledCount} désactivée(s)`}
+                            color="warning"
+                            variant="outlined"
+                            sx={{ fontSize: '0.6rem', height: 16 }}
+                          />
+                        )}
+                      </Typography>
                       <Typography variant="body2">
                         {avgPoints.toFixed(1)} / {maxPoints} pts ({percentage.toFixed(1)}%)
+                        {relevantCorrections.length !== corrections.length && (
+                          <Typography variant="caption" color="text.secondary" sx={{ ml: 1 }}>
+                            (sur {relevantCorrections.length}/{corrections.length})
+                          </Typography>
+                        )}
                       </Typography>
                     </Box>
                     <Box
@@ -1360,13 +1540,71 @@ export default function ActivityAutreDetail({ params }: { params: Promise<{ id: 
                         sx={{
                           width: `${percentage}%`,
                           height: '100%',
-                          bgcolor: idx % 2 === 0 ? 'primary.main' : 'secondary.main',
+                          bgcolor: disabledCount > 0 ? 'warning.main' : (idx % 2 === 0 ? 'primary.main' : 'secondary.main'),
                         }}
                       />
                     </Box>
                   </Box>
                 );
               })}
+              
+              {/* Statistiques sur les parties désactivées et le système percentage_grade */}
+              <Box sx={{ mt: 4, mb: 4 }}>
+                <Typography variant="subtitle1" gutterBottom>
+                  Système de notation avec parties désactivées:
+                </Typography>
+                
+                <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 2, mb: 2 }}>
+                  {/* Corrections avec parties désactivées */}
+                  <Paper sx={{ p: 2, textAlign: 'center', bgcolor: 'warning.50', border: '1px solid', borderColor: 'warning.200' }}>
+                    <Typography variant="h6" color="warning.dark">
+                      {corrections.filter(c => c.disabled_parts && c.disabled_parts.some(disabled => disabled)).length}
+                    </Typography>
+                    <Typography variant="caption" color="warning.dark">
+                      Corrections avec parties désactivées
+                    </Typography>
+                  </Paper>
+                  
+                  {/* Corrections avec percentage_grade */}
+                  <Paper sx={{ p: 2, textAlign: 'center', bgcolor: 'success.50', border: '1px solid', borderColor: 'success.200' }}>
+                    <Typography variant="h6" color="success.dark">
+                      {corrections.filter(c => c.percentage_grade !== null && c.percentage_grade !== undefined).length}
+                    </Typography>
+                    <Typography variant="caption" color="success.dark">
+                      Corrections avec percentage_grade
+                    </Typography>
+                  </Paper>
+                  
+                  {/* Note moyenne normalisée */}
+                  <Paper sx={{ p: 2, textAlign: 'center', bgcolor: 'primary.50', border: '1px solid', borderColor: 'primary.200' }}>
+                    <Typography variant="h6" color="primary.dark">
+                      {(() => {
+                        const activeCorrections = corrections.filter(c => c.status === 'ACTIVE');
+                        if (activeCorrections.length === 0) return 'N/A';
+                        const averagePercentage = activeCorrections.reduce((sum, c) => {
+                          return sum + getPercentageGrade(c, activity);
+                        }, 0) / activeCorrections.length;
+                        
+                        // S'assurer que averagePercentage est un nombre valide avant d'appeler toFixed
+                        if (isNaN(averagePercentage) || !isFinite(averagePercentage)) {
+                          return 'N/A';
+                        }
+                        
+                        return averagePercentage.toFixed(1) + '%';
+                      })()}
+                    </Typography>
+                    <Typography variant="caption" color="primary.dark">
+                      Pourcentage moyen de réussite
+                    </Typography>
+                  </Paper>
+                </Box>
+                
+                {/* Explication du système */}
+                <Typography variant="body2" color="text.secondary" sx={{ fontStyle: 'italic' }}>
+                  Le système percentage_grade calcule automatiquement le pourcentage de réussite en tenant compte des parties désactivées. 
+                  Cela permet une normalisation équitable des notes même lorsque certaines parties ne sont pas évaluées.
+                </Typography>
+              </Box>
               
               {/* Ajout du composant ActivityStatsGraphs */}
               <Box sx={{ mt: 4 }}>

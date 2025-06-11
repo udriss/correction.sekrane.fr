@@ -120,6 +120,9 @@ export default function CorrectionAutreDetail({ params }: { params: Promise<{ id
   const [saveDateTimeout, setSaveDateTimeout] = useState<NodeJS.Timeout | null>(null);
   const [saveGradeTimeout, setSaveGradeTimeout] = useState<NodeJS.Timeout | null>(null);
 
+  // État pour les parties désactivées de l'activité
+  const [disabledParts, setDisabledParts] = useState<boolean[]>([]);
+
   // État pour suivre si des changements sont en attente d'auto-sauvegarde
   const [changesDetected, setChangesDetected] = useState(false);
   const [contentChangeTimestamp, setContentChangeTimestamp] = useState<number | null>(null);
@@ -150,6 +153,19 @@ export default function CorrectionAutreDetail({ params }: { params: Promise<{ id
       setSubmissionDate(correction.submission_date ? dayjs(correction.submission_date) : null);
     }
   }, [correction]);
+
+  // Initialiser le tableau des parties désactivées lorsque l'activité ou la correction change
+  useEffect(() => {
+    if (activity?.parts_names) {
+      // Si la correction a des parties désactivées sauvegardées, les utiliser
+      if (correction?.disabled_parts && Array.isArray(correction.disabled_parts)) {
+        setDisabledParts(correction.disabled_parts);
+      } else {
+        // Sinon, initialiser avec toutes les parties activées
+        setDisabledParts(new Array(activity.parts_names.length).fill(false));
+      }
+    }
+  }, [activity, correction?.disabled_parts]);
 
   // Fonction de sauvegarde des dates
   const handleSaveDates = async (deadline: string | null, submissionDate: string | null) => {
@@ -530,13 +546,13 @@ export default function CorrectionAutreDetail({ params }: { params: Promise<{ id
         clearInterval(autoSaveTimerRef.current);
       }
       
-      // Configure l'intervalle qui s'exécute toutes les 70 secondes
+      // Configure l'intervalle qui s'exécute toutes les 90 secondes
       // indépendamment de tout changement d'état
       autoSaveTimerRef.current = setInterval(() => {
         // Vérifie l'état actuel de autoSaveActive au moment de l'exécution
         if (autoSaveActive) {
           
-          handleSaveCorrection()
+          handleSaveCorrection(disabledParts)
             .then(() => {
               setLastAutoSave(new Date());
               
@@ -548,7 +564,7 @@ export default function CorrectionAutreDetail({ params }: { params: Promise<{ id
         } else {
           
         }
-      }, 70000); // Auto-save every 70 seconds
+      }, 90000); // Auto-save every 90 seconds
     }
 
     return () => {
@@ -556,7 +572,7 @@ export default function CorrectionAutreDetail({ params }: { params: Promise<{ id
         clearInterval(autoSaveTimerRef.current);
       }
     };
-  }, [correction, handleSaveCorrection]); // Ne pas inclure autoSaveActive dans les dépendances
+  }, [correction, handleSaveCorrection, disabledParts]); // Ne pas inclure autoSaveActive dans les dépendances
 
   // Écouter les événements de mise à jour des grades/pénalités
   useEffect(() => {
@@ -619,9 +635,9 @@ export default function CorrectionAutreDetail({ params }: { params: Promise<{ id
       return;
     }
     
-    // Calculer le temps restant avant la sauvegarde (70 secondes après le dernier changement)
+    // Calculer le temps restant avant la sauvegarde (90 secondes après le dernier changement)
     const timeElapsed = Date.now() - contentChangeTimestamp;
-    const timeToWait = Math.max(0, 70000 - timeElapsed);
+    const timeToWait = Math.max(0, 90000 - timeElapsed);
     
     
     
@@ -630,7 +646,7 @@ export default function CorrectionAutreDetail({ params }: { params: Promise<{ id
       if (autoSaveActive && changesDetected) {
         
         
-        handleSaveCorrection()
+        handleSaveCorrection(disabledParts)
           .then(() => {
             setLastAutoSave(new Date());
             // Réinitialiser le détecteur de changements après sauvegarde réussie
@@ -654,7 +670,8 @@ export default function CorrectionAutreDetail({ params }: { params: Promise<{ id
     changesDetected,
     contentChangeTimestamp,
     correction,
-    handleSaveCorrection
+    handleSaveCorrection,
+    disabledParts
   ]);
 
   // Function to update an item's content
@@ -896,7 +913,7 @@ export default function CorrectionAutreDetail({ params }: { params: Promise<{ id
                   email={email || 'Adresse mail introuvable'}
                   setEmail={(value) => setEmail?.(value)}
                   correctionStatus={correctionStatus}
-                  handleChangeStatus={handleChangeStatus}
+                  handleChangeStatus={(newStatus: string) => handleChangeStatus(newStatus, disabledParts)}
                 />
               </GradientBackground>
             </Box>
@@ -1092,6 +1109,13 @@ export default function CorrectionAutreDetail({ params }: { params: Promise<{ id
                           // Fallback en utilisant l'état local
                           // Cette partie est exécutée seulement si setSaving n'est pas disponible dans le hook
                         }
+                      }}
+                      // Props pour les parties désactivées
+                      disabledParts={disabledParts}
+                      setDisabledParts={(newDisabledParts) => {
+                        setDisabledParts(newDisabledParts);
+                        // Déclencher la détection des changements pour l'auto-sauvegarde
+                        handleContentChange();
                       }}
                       // Fonction pour mettre à jour uniquement la pénalité
                       handleUpdatePenalty={async (penaltyValue) => {

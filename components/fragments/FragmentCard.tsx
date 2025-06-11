@@ -19,7 +19,8 @@ import {
   Tooltip,
   alpha,
   Theme,
-  CircularProgress
+  CircularProgress,
+  Checkbox
 } from '@mui/material';
 import AddCircleIcon from '@mui/icons-material/AddCircle';
 import EditIcon from '@mui/icons-material/Edit';
@@ -40,6 +41,9 @@ interface FragmentCardProps {
   onAddToCorrection?: () => void;
   refreshCategories: () => Promise<void>;
   renderPositionChip?: () => React.ReactNode;
+  isSelectable?: boolean;
+  isSelected?: boolean;
+  onSelectionChange?: (fragmentId: number, selected: boolean) => void;
 }
 
 export default function FragmentCard({ 
@@ -52,7 +56,10 @@ export default function FragmentCard({
   onDelete,
   onAddToCorrection,
   refreshCategories,
-  renderPositionChip
+  renderPositionChip,
+  isSelectable = false,
+  isSelected = false,
+  onSelectionChange
 }: FragmentCardProps) {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
@@ -118,6 +125,12 @@ export default function FragmentCard({
     }
   };
 
+  const handleSelectionChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    if (onSelectionChange) {
+      onSelectionChange(fragment.id, event.target.checked);
+    }
+  };
+
   // Si en mode édition, afficher l'éditeur de fragment
   if (isEditing) {
     return (
@@ -133,8 +146,30 @@ export default function FragmentCard({
 
   return (
     <Card variant="outlined" sx={{
-      position: 'relative',}}
-      >
+      position: 'relative',
+      border: isSelected ? '2px solid' : undefined,
+      borderColor: isSelected ? 'primary.main' : undefined,
+      bgcolor: isSelected ? 'action.selected' : undefined,
+    }}
+    >
+      {isSelectable && (
+        <Box sx={{ 
+          position: 'absolute', 
+          top: 8, 
+          left: 8, 
+          zIndex: 1,
+          bgcolor: 'background.paper',
+          borderRadius: '50%',
+          boxShadow: 1
+        }}>
+          <Checkbox
+            checked={isSelected}
+            onChange={handleSelectionChange}
+            size="small"
+            color="primary"
+          />
+        </Box>
+      )}
       <CardContent>
         {renderPositionChip && renderPositionChip()}
         

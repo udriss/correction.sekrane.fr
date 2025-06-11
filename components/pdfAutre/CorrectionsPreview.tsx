@@ -49,7 +49,7 @@ const CorrectionsPreview: React.FC<CorrectionsPreviewProps> = ({
       <Typography variant="h6" gutterBottom>
         Aperçu ({corrections.length} corrections)
       </Typography>
-      
+
       {loading ? (
         <Typography>Chargement...</Typography>
       ) : corrections.length > 0 ? (
@@ -78,15 +78,75 @@ const CorrectionsPreview: React.FC<CorrectionsPreviewProps> = ({
                       <TableCell>{student ? `${student.first_name} ${student.last_name}` : 'N/A'}</TableCell>
                       <TableCell>{className}</TableCell>
                       <TableCell>{activity?.name}</TableCell>
-                      <TableCell>{Array.isArray(correction.points_earned) ? '[' + correction.points_earned.join(' ; ') + ']' : 'N/A'}</TableCell>
+                      <TableCell>
+                        {(() => {
+                          if (!Array.isArray(correction.points_earned)) {
+                            return 'N/A';
+                          }
+                          
+                          // Calculer les parties désactivées
+                          const disabledParts = correction.disabled_parts && Array.isArray(correction.disabled_parts) 
+                            ? correction.disabled_parts 
+                            : null;
+                          
+                          // Créer l'affichage des points avec indicateurs
+                          const pointsDisplay = correction.points_earned.map((point, index) => {
+                            if (disabledParts && disabledParts[index]) {
+                              return `${point} (désactivée)`;
+                            }
+                            return point.toString();
+                          }).join(' ; ');
+                          
+                          return `[${pointsDisplay}]`;
+                        })()}
+                      </TableCell>
                       <TableCell align="center">
                         <Chip
-                          label={correction.grade ? 
-                             `${formatGrade(correction.grade)} / 20` 
-                             : 'Non noté'}
-                          color={correction.grade !== null && correction.grade !== undefined 
-                             ? (correction.grade >= 10 ? 'success' : 'error') 
-                             : 'default'}
+                          label={(() => {
+                            // Utiliser percentage_grade en priorité
+                            if (correction.percentage_grade !== null && correction.percentage_grade !== undefined) {
+                              const normalizedGrade = (correction.percentage_grade / 100) * 20;
+                              const originalGrade = correction.grade || 0;
+                              const activity = getActivityById(correction.activity_id);
+                              
+                              // Calculer le barème original en tenant compte des parties désactivées
+                              let originalTotal = 20; // Fallback à 20 si pas de barème défini
+                              if (activity && activity.points) {
+                                // Parser les parties désactivées
+                                const disabledParts = correction.disabled_parts && Array.isArray(correction.disabled_parts) 
+                                  ? correction.disabled_parts 
+                                  : null;
+                                
+                                // Calculer le total en excluant les parties désactivées
+                                originalTotal = activity.points.reduce((sum: number, points: number, index: number) => {
+                                  // Exclure les parties désactivées du calcul du barème original
+                                  if (disabledParts && disabledParts[index]) {
+                                    return sum;
+                                  }
+                                  return sum + points;
+                                }, 0);
+                                
+                                // Si toutes les parties sont désactivées, utiliser le fallback
+                                if (originalTotal === 0) {
+                                  originalTotal = 20;
+                                }
+                              }
+                              
+                              return `${formatGrade(normalizedGrade)} / 20 [${formatGrade(originalGrade)} / ${originalTotal}]`;
+                            } else if (correction.grade !== null && correction.grade !== undefined) {
+                              return `${formatGrade(correction.grade)} / 20`;
+                            }
+                            return 'Non noté';
+                          })()}
+                          color={(() => {
+                            let gradeToDisplay = 0;
+                            if (correction.percentage_grade !== null && correction.percentage_grade !== undefined) {
+                              gradeToDisplay = (correction.percentage_grade / 100) * 20;
+                            } else if (correction.grade !== null && correction.grade !== undefined) {
+                              gradeToDisplay = correction.grade;
+                            }
+                            return gradeToDisplay >= 10 ? 'success' : 'error';
+                          })()}
                           variant="outlined"
                         />
                       </TableCell>

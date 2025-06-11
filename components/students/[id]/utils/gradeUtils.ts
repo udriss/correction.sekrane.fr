@@ -125,3 +125,59 @@ export const getGradeColorForSx = (grade: number, theme: Theme) => {
   }
   return theme.palette.text.primary; // Fallback en cas d'erreur
 };
+
+/**
+ * Calcule le pourcentage de réussite normalisé en utilisant percentage_grade ou un fallback
+ * @param correction - La correction à évaluer
+ * @param activity - L'activité associée (optionnelle)
+ * @returns Le pourcentage de réussite (0-100)
+ * 
+ * Cette fonction priorise l'utilisation du champ percentage_grade qui est calculé automatiquement
+ * par le système en tenant compte des parties désactivées. Si ce champ n'est pas disponible,
+ * elle effectue un calcul de fallback basé sur final_grade et les parties actives.
+ */
+export const getPercentageGrade = (correction: any, activity?: any): number => {
+  // Vérifications de sécurité
+  if (!correction) return 0;
+  
+  // Priorité à percentage_grade si disponible
+  if (correction.percentage_grade !== null && correction.percentage_grade !== undefined) {
+    const percentage = Number(correction.percentage_grade);
+    return isNaN(percentage) || !isFinite(percentage) ? 0 : Math.max(0, Math.min(100, percentage));
+  }
+  
+  // Fallback: calcul manuel basé sur final_grade et parties actives
+  if (correction.final_grade && activity?.points) {
+    // Calculer le total des points actifs
+    let totalActivePoints = 0;
+    activity.points.forEach((points: number, idx: number) => {
+      if (!correction.disabled_parts || !correction.disabled_parts[idx]) {
+        totalActivePoints += points || 0;
+      }
+    });
+    
+    if (totalActivePoints > 0) {
+      const finalGrade = parseFloat(String(correction.final_grade));
+      if (!isNaN(finalGrade) && isFinite(finalGrade)) {
+        const percentage = (finalGrade / totalActivePoints) * 100;
+        return Math.max(0, Math.min(100, Math.round(percentage * 100) / 100));
+      }
+    }
+  }
+  
+  return 0;
+};
+
+/**
+ * Calcule la note normalisée sur 20 en utilisant le système percentage_grade
+ * @param correction - La correction à évaluer
+ * @param activity - L'activité associée (optionnelle)
+ * @returns La note sur 20
+ * 
+ * Cette fonction convertit le pourcentage de réussite en note sur 20, 
+ * permettant une normalisation cohérente peu importe le barème original de l'activité.
+ */
+export const getNormalizedGradeOn20 = (correction: any, activity?: any): number => {
+  const percentageGrade = getPercentageGrade(correction, activity);
+  return (percentageGrade / 100) * 20;
+};

@@ -40,6 +40,11 @@ import ScienceIcon from '@mui/icons-material/Science';
 import MenuBookIcon from '@mui/icons-material/MenuBook';
 import LockIcon from '@mui/icons-material/Lock';
 import KeyIcon from '@mui/icons-material/Key';
+import BlockIcon from '@mui/icons-material/Block';
+
+// Importer les fonctions utilitaires pour le système percentage_grade
+import { getPercentageGrade, getNormalizedGradeOn20 } from '@/components/students/[id]/utils/gradeUtils';
+import PercentageGradeExplanation from '@/components/students/[id]/PercentageGradeExplanation';
 
 // Types
 interface Student {
@@ -77,8 +82,10 @@ interface Correction {
   parts_names?: string[]; // Noms des parties
   points_earned?: number[]; // Points gagnés pour chaque partie
   max_points?: number; // Calculé côté client
-  score_percentage?: number; // Calculé côté client
+  score_percentage?: number; // Calculé côté client (legacy)
   final_grade?: number | null; // Note finale calculée côté client
+  percentage_grade?: number | null; // Nouveau champ pour le pourcentage normalisé
+  disabled_parts?: boolean[] | null; // Parties désactivées
 }
 
 interface StudentStats {
@@ -338,23 +345,32 @@ export default function StudentCorrectionsPage() {
         return;
       }
       const correctionsData = await correctionsResponse.json();
-      // Enrichir les corrections avec le pourcentage de score et les points max
+      // Enrichir les corrections avec le nouveau système percentage_grade
       const enrichedCorrections = correctionsData.map((correction: any) => {
         // S'assurer que les valeurs numériques sont traitées comme des nombres
         const grade = typeof correction.grade === 'string' ? parseFloat(correction.grade) : correction.grade;
         
-        // Calculer le total des points maximum à partir du tableau points
+        // Calculer le total des points maximum à partir du tableau points (legacy fallback)
         const maxPoints = correction.points ? 
           correction.points.reduce((sum: number, p: number) => sum + (typeof p === 'number' ? p : parseFloat(String(p))), 0) : 
           20; // Fallback à 20 si aucun point n'est défini
         
-        const scorePercentage = maxPoints > 0 ? (grade / maxPoints) * 100 : 0;
+        // Utiliser percentage_grade en priorité, sinon calculer le legacy score_percentage
+        let scorePercentage = 0;
+        if (correction.percentage_grade !== null && correction.percentage_grade !== undefined) {
+          scorePercentage = correction.percentage_grade;
+        } else {
+          // Legacy calculation pour compatibilité
+          scorePercentage = maxPoints > 0 ? (grade / maxPoints) * 100 : 0;
+        }
         
         return {
           ...correction,
           grade: grade,
           max_points: maxPoints,
-          score_percentage: scorePercentage
+          score_percentage: scorePercentage,
+          percentage_grade: correction.percentage_grade || null,
+          disabled_parts: correction.disabled_parts || null
         };
       });
       
@@ -446,7 +462,7 @@ export default function StudentCorrectionsPage() {
   // Fonction pour obtenir la couleur selon la note
   const getGradeColor = (percentage: number) => {
     if (percentage >= 80) return 'success';
-    if (percentage >= 60) return 'info';
+    if (percentage >= 65) return 'info';
     if (percentage >= 50) return 'primary';
     if (percentage >= 40) return 'warning';
     return 'error';
@@ -752,6 +768,8 @@ export default function StudentCorrectionsPage() {
       </Paper>
       
       {/* Liste des corrections */}
+      <PercentageGradeExplanation variant="compact" />
+      
       <Typography variant="h5" sx={{ mb: 3, fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: 1 }}>
         <AssignmentIcon color="primary" />
         Corrections ({corrections.length})
@@ -841,58 +859,105 @@ export default function StudentCorrectionsPage() {
                     </Typography>
                   )}
                   <Typography variant="overline" fontWeight={'bold'} gutterBottom>
-                    Répartition des points
+                    Répartition des points par partie
                   </Typography>
                   
                   <Grid container spacing={1} sx={{ mb: .2 }} direction={'column'}>
-                    {correction.parts_names?.map((partName, index) => (
+                    {correction.parts_names?.map((partName, index) => {
+                      const isDisabled = correction.disabled_parts && correction.disabled_parts[index];
+                      return (
                         <Grid size={{ xs: 12 }} key={index}>
-                          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1 }}>
+                          <Box sx={{ 
+                            display: 'flex', 
+                            alignItems: 'center', 
+                            justifyContent: 'space-between', 
+                            gap: 1,
+                            opacity: isDisabled ? 0.6 : 1,
+                          }}>
                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                              {index === 0 ? (
-                                <ScienceIcon color="primary" fontSize="small" />
+                              {isDisabled ? (
+                                <BlockIcon 
+                                  color="disabled" 
+                                  fontSize="small" 
+                                />
+                              ) : index === 0 ? (
+                                <ScienceIcon 
+                                  color="primary" 
+                                  fontSize="small" 
+                                />
                               ) : (
-                                <MenuBookIcon color="secondary" fontSize="small" />
+                                <MenuBookIcon 
+                                  color="secondary" 
+                                  fontSize="small" 
+                                />
                               )}
-                              <Typography variant="overline" fontWeight="medium">
-                              {partName} : {String(correction.points_earned?.[index] || 0).replace('.', ',')} / {correction.points?.[index] || 0} pts
+                              <Typography 
+                                variant="overline" 
+                                fontWeight="medium"
+                                color={isDisabled ? "text.disabled" : "text.primary"}
+                                sx={{ textDecoration: isDisabled ? 'line-through' : 'none' }}
+                              >
+                                {partName} : {String(correction.points_earned?.[index] || 0).replace('.', ',')} / {correction.points?.[index] || 0} pts
                               </Typography>
+                                {isDisabled && (
+                                <Chip
+                                  size="small"
+                                  label="(DÉSACTIVÉE)"
+                                  color="error"
+                                  sx={{ 
+                                  fontSize: '0.65rem',
+                                  height: '20px',
+                                  textDecoration: 'none',
+                                  opacity: 1,
+                                  }}
+                                />
+                                )}
                             </Box>
-                            {correction.status && (
-                              <Chip
-                                size="small"
-                                label={correction.status === 'NON_RENDU' ? 'Non rendu' : 
-                                       correction.status === 'ABSENT' ? 'Absent' : 
-                                       correction.status === 'NON_NOTE' ? 'Non noté' : 
-                                       correction.status === 'DEACTIVATED' ? 'Désactivé' : ''}
-                                color={correction.status === 'NON_RENDU' ? 'error' : 
-                                       correction.status === 'ABSENT' ? 'warning' : 
-                                       correction.status === 'NON_NOTE' ? 'info' : 
-                                       correction.status === 'DEACTIVATED' ? 'default' : 'default'}
-                                sx={{ 
-                                  display: ['NON_RENDU', 'ABSENT', 'NON_NOTE', 'DEACTIVATED'].includes(correction.status) ? 'flex' : 'none',
-                                  fontSize: '0.65rem'
-                                }}
-                              />
-                            )}
                           </Box>
                         </Grid>
-                    ))}
+                      );
+                    })}
                   </Grid>
                   
                   <Box sx={{ mt: 2 }}>
                     <Typography variant="caption" color="text.secondary" gutterBottom>
-                      Pourcentage de réussite
+                      Note et pourcentage de réussite
                     </Typography>
-                    <LinearProgress 
-                      variant="determinate" 
-                      value={correction.score_percentage ?? 0} 
-                      color={getGradeColor(correction.score_percentage ?? 0) as "primary" | "secondary" | "error" | "info" | "success" | "warning" | undefined}
-                      sx={{ height: 10, borderRadius: 5 }}
-                    />
-                    <Typography variant="caption" sx={{ display: 'block', textAlign: 'right', mt: 0.5 }}>
-                      {(correction.score_percentage ?? 0).toFixed(1)}%
-                    </Typography>
+                    {(() => {
+                      // Utiliser les fonctions utilitaires pour le calcul des notes
+                      const percentageToDisplay = getPercentageGrade(correction);
+                      const normalizedGrade = getNormalizedGradeOn20(correction);
+                      const isNormalized = correction.percentage_grade !== null && correction.percentage_grade !== undefined;
+                      
+                      return (
+                        <>
+                          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+                            <Typography variant="h6" fontWeight="bold">
+                              {normalizedGrade.toFixed(1)}/20
+                              {isNormalized && (
+                                <Typography component="span" variant="caption" color="primary.main" sx={{ ml: 1 }}>
+                                  (normalisé)
+                                </Typography>
+                              )}
+                            </Typography>
+                            <Typography variant="body2" color="text.secondary">
+                              {percentageToDisplay.toFixed(1)}%
+                            </Typography>
+                          </Box>
+                          <LinearProgress 
+                            variant="determinate" 
+                            value={percentageToDisplay} 
+                            color={getGradeColor(percentageToDisplay) as "primary" | "secondary" | "error" | "info" | "success" | "warning" | undefined}
+                            sx={{ height: 10, borderRadius: 5 }}
+                          />
+                          {isNormalized && correction.disabled_parts && correction.disabled_parts.some(Boolean) && (
+                            <Typography variant="caption" color="info.main" sx={{ display: 'block', mt: 0.5, fontStyle: 'italic' }}>
+                              * Note calculée en excluant {correction.disabled_parts.filter(Boolean).length} partie(s) désactivée(s)
+                            </Typography>
+                          )}
+                        </>
+                      );
+                    })()}
                   </Box>
                 </CardContent>
                 

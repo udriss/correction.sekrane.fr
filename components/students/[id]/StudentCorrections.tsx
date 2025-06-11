@@ -26,8 +26,9 @@ import {
 } from '@mui/material';
 import Link from 'next/link';
 import { CorrectionAutreEnriched, Student, ActivityAutre } from '@/lib/types';
-import { getGradeColor } from './utils/gradeUtils';
+import { getGradeColor, getPercentageGrade, getNormalizedGradeOn20 } from './utils/gradeUtils';
 import { useTheme } from '@mui/material/styles';
+import { parseDisabledParts } from '@/lib/correctionAutre';
 
 // Importation des composants de partage et d'email
 import EmailFeedbackAutre from '@/components/corrections/EmailFeedbackAutre';
@@ -47,6 +48,8 @@ import FilterListIcon from '@mui/icons-material/FilterList';
 import ShareIcon from '@mui/icons-material/Share';
 import EmailIcon from '@mui/icons-material/Email';
 import RemoveCircleIcon from '@mui/icons-material/RemoveCircle';
+import BlockIcon from '@mui/icons-material/Block';
+import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
 
 interface StudentCorrectionsProps {
   student: Student;
@@ -185,26 +188,8 @@ export default function StudentCorrections({ student, corrections: initialCorrec
 
   // Calculer le pourcentage de score pour une correction
   const calculateScorePercentage = (correction: CorrectionAutreEnriched, activity?: ActivityAutre): number => {
-    if (!correction.points_earned || correction.points_earned.length === 0) {
-      return 0;
-    }
-    
-    // Utiliser les points de l'activité ou ceux fournis dans la correction
-    const activityPoints = activity?.points || [];
-    
-    if (activityPoints.length === 0) {
-      return 0;
-    }
-    
-    // Calculer le total des points gagnés et le total possible
-    const totalEarned = correction.points_earned.reduce((sum, points) => sum + (points || 0), 0);
-    const totalPossible = activityPoints.reduce((sum, points) => sum + (points || 0), 0);
-    
-    if (totalPossible <= 0) {
-      return 0;
-    }
-    
-    return (totalEarned / totalPossible) * 100;
+    // Utiliser la nouvelle fonction utilitaire qui priorise percentage_grade
+    return getPercentageGrade(correction, activity);
   };
 
   // Obtenir une activité par son ID
@@ -367,15 +352,27 @@ export default function StudentCorrections({ student, corrections: initialCorrec
                         <Chip 
                           label={
                             correction.final_grade !== null && correction.final_grade !== undefined
-                              ?
-                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0 }}>
-                              <Typography variant="overline" fontWeight='700' noWrap>
-                                {correction.final_grade}&nbsp;
-                              </Typography>
-                              <Typography variant="overline" noWrap>
-                              / {activity?.points?.reduce((a, b) => a + b, 0)}
-                              </Typography>
-                              </Box>
+                              ? (() => {
+                                  // Calculer le total en excluant les parties désactivées
+                                  const disabledParts = parseDisabledParts(correction.disabled_parts);
+                                  let totalPossible = 0;
+                                  activity?.points?.forEach((points, index) => {
+                                    if (!disabledParts || !disabledParts[index]) {
+                                      totalPossible += points || 0;
+                                    }
+                                  });
+                                  
+                                  return (
+                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0 }}>
+                                      <Typography variant="overline" fontWeight='700' noWrap>
+                                        {correction.final_grade}&nbsp;
+                                      </Typography>
+                                      <Typography variant="overline" noWrap>
+                                        / {totalPossible || activity?.points?.reduce((a, b) => a + b, 0)}
+                                      </Typography>
+                                    </Box>
+                                  );
+                                })()
                               : 'Non notée'
                           }
                           sx={{
@@ -412,6 +409,26 @@ export default function StudentCorrections({ student, corrections: initialCorrec
                           Date limite : {formatDate(correction.deadline)}
                         </Typography>
                       )}
+                      
+                      {/* Indicateur des parties désactivées */}
+                      {(() => {
+                        const disabledParts = parseDisabledParts(correction.disabled_parts);
+                        const hasDisabledParts = disabledParts && Object.values(disabledParts).some(Boolean);
+                        if (hasDisabledParts) {
+                          const disabledCount = Object.values(disabledParts).filter(Boolean).length;
+                          return (
+                            <Typography 
+                              variant="overline" 
+                              color="warning.main"
+                              sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: .2 }}
+                            >
+                              <VisibilityOffIcon fontSize="small" color="warning" />
+                              {disabledCount} partie{disabledCount > 1 ? 's' : ''} désactivée{disabledCount > 1 ? 's' : ''}
+                            </Typography>
+                          );
+                        }
+                        return null;
+                      })()}
                     </Box>
                     
                     {/* Affichage des points par partie */}
@@ -429,16 +446,41 @@ export default function StudentCorrections({ student, corrections: initialCorrec
                             // Obtenir les points max de la partie
                             const maxPoints = activity?.points?.[index] || 0;
                             
+                            // Parser les parties désactivées
+                            const disabledParts = parseDisabledParts(correction.disabled_parts);
+                            const isDisabled = disabledParts && disabledParts[index];
+                            
                             return (
                               <Grid size={{ xs: 12 }} key={`part-${index}`}>
-                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                                  {index === 0 ? (
+                                <Box sx={{ 
+                                  display: 'flex', 
+                                  alignItems: 'center', 
+                                  gap: 1,
+                                  opacity: isDisabled ? 0.5 : 1,
+                                  textDecoration: isDisabled ? 'line-through' : 'none'
+                                }}>
+                                  {isDisabled ? (
+                                    <BlockIcon color="disabled" fontSize="small" />
+                                  ) : index === 0 ? (
                                     <ScienceIcon color="primary" fontSize="small" />
                                   ) : (
                                     <MenuBookIcon color="secondary" fontSize="small" />
                                   )}
-                                  <Typography variant="overline" fontWeight="medium">
-                                  {partName} : {(points || 0).toString().replace('.', ',')} / {maxPoints} pts
+                                  <Typography 
+                                    variant="overline" 
+                                    fontWeight="medium"
+                                    color={isDisabled ? 'text.disabled' : 'text.primary'}
+                                  >
+                                    {partName} : {(points || 0).toString().replace('.', ',')} / {maxPoints} pts
+                                    {isDisabled && (
+                                      <Chip 
+                                        label="Désactivée" 
+                                        size="small" 
+                                        color="default"
+                                        variant="outlined"
+                                        sx={{ ml: 1, fontSize: '0.7rem', height: '20px' }}
+                                      />
+                                    )}
                                   </Typography>
                                 </Box>
                               </Grid>
@@ -471,41 +513,72 @@ export default function StudentCorrections({ student, corrections: initialCorrec
                         {correction.final_grade !== null && correction.final_grade !== undefined && (
                           <Box sx={{ mt: 2 }}>
                             <Typography variant="caption" color="text.secondary" gutterBottom>
-                              Pourcentage de réussite
+                              Note et pourcentage de réussite
                             </Typography>
-                            <LinearProgress 
-                              variant="determinate" 
-                              value={correction.score_percentage || 0} 
-                              sx={{ 
-                              height: 10, 
-                              borderRadius: 5,
-                                // Styliser le fond (partie non remplie)
-                                backgroundColor: theme => {
-                                  const grade = correction.final_grade || 0;
-                                  if (grade >= 16) return alpha(theme.palette.success.main, 0.15);
-                                  if (grade >= 14) return alpha(theme.palette.primary.light, 0.15);
-                                  if (grade >= 12) return alpha(theme.palette.info.main, 0.15);
-                                  if (grade >= 10) return alpha(theme.palette.warning.light, 0.15);
-                                  if (grade >= 5) return alpha(theme.palette.warning.main, 0.15);
-                                  return alpha(theme.palette.error.main, 0.15);
-                                },
-                                // Styliser la barre de progression (partie remplie)
-                                '& .MuiLinearProgress-bar': {
-                                  backgroundColor: theme => {
-                                    const grade = correction.final_grade || 0;
-                                    if (grade >= 16) return theme.palette.success.main;
-                                    if (grade >= 14) return theme.palette.primary.light;
-                                    if (grade >= 12) return theme.palette.info.main;
-                                    if (grade >= 10) return theme.palette.warning.light;
-                                    if (grade >= 5) return theme.palette.warning.main;
-                                    return theme.palette.error.main;
-                                  }
-                                }
-                              }}
-                            />
-                            <Typography variant="caption" sx={{ display: 'block', textAlign: 'right', mt: 0.5 }}>
-                              {(correction.score_percentage || 0).toFixed(1)}%
-                            </Typography>
+                            {(() => {
+                              // Utiliser les fonctions utilitaires pour obtenir les notes normalisées
+                              const percentageToDisplay = getPercentageGrade(correction, activity);
+                              const normalizedGrade = getNormalizedGradeOn20(correction, activity);
+                              const isNormalized = correction.percentage_grade !== null && correction.percentage_grade !== undefined;
+                              
+                              // Vérifier s'il y a des parties désactivées
+                              const disabledParts = parseDisabledParts(correction.disabled_parts);
+                              const hasDisabledParts = disabledParts && Object.values(disabledParts).some(Boolean);
+                              
+                              return (
+                                <>
+                                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+                                    <Typography variant="h6" fontWeight="bold">
+                                      {normalizedGrade.toFixed(1)}/20
+                                      {isNormalized && (
+                                        <Typography component="span" variant="caption" color="primary.main" sx={{ ml: 1 }}>
+                                          (normalisé)
+                                        </Typography>
+                                      )}
+                                    </Typography>
+                                    <Typography variant="body2" color="text.secondary">
+                                      {percentageToDisplay.toFixed(1)}%
+                                    </Typography>
+                                  </Box>
+                                  
+                                  <LinearProgress 
+                                    variant="determinate" 
+                                    value={percentageToDisplay} 
+                                    sx={{ 
+                                    height: 10, 
+                                    borderRadius: 5,
+                                      // Styliser le fond (partie non remplie)
+                                      backgroundColor: theme => {
+                                        if (normalizedGrade >= 16) return alpha(theme.palette.success.main, 0.15);
+                                        if (normalizedGrade >= 14) return alpha(theme.palette.primary.light, 0.15);
+                                        if (normalizedGrade >= 12) return alpha(theme.palette.info.main, 0.15);
+                                        if (normalizedGrade >= 10) return alpha(theme.palette.warning.light, 0.15);
+                                        if (normalizedGrade >= 5) return alpha(theme.palette.warning.main, 0.15);
+                                        return alpha(theme.palette.error.main, 0.15);
+                                      },
+                                      // Styliser la barre de progression (partie remplie)
+                                      '& .MuiLinearProgress-bar': {
+                                        backgroundColor: theme => {
+                                          if (normalizedGrade >= 16) return theme.palette.success.main;
+                                          if (normalizedGrade >= 14) return theme.palette.primary.light;
+                                          if (normalizedGrade >= 12) return theme.palette.info.main;
+                                          if (normalizedGrade >= 10) return theme.palette.warning.light;
+                                          if (normalizedGrade >= 5) return theme.palette.warning.main;
+                                          return theme.palette.error.main;
+                                        }
+                                      }
+                                    }}
+                                  />
+                                  
+                                  {/* Explication pour les notes normalisées avec parties désactivées */}
+                                  {isNormalized && hasDisabledParts && (
+                                    <Typography variant="caption" color="info.main" sx={{ display: 'block', mt: 0.5, fontStyle: 'italic' }}>
+                                      * Note calculée en excluant {Object.values(disabledParts).filter(Boolean).length} partie(s) désactivée(s)
+                                    </Typography>
+                                  )}
+                                </>
+                              );
+                            })()}
                           </Box>
                         )}
                       </>

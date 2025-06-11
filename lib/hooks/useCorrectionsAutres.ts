@@ -168,7 +168,7 @@ export function useCorrectionsAutres(correctionId: string) {
   }, [correctionId]);
 
   // Save the correction
-  const handleSaveCorrection = useCallback(async () => {
+  const handleSaveCorrection = useCallback(async (disabledParts?: boolean[]) => {
     if (!correction) return;
     
     setSaving(true);
@@ -186,16 +186,24 @@ export function useCorrectionsAutres(correctionId: string) {
         return '';
       }).join('\n\n');
       
-      // Save correction with current content items
+      // Prepare request body with content and disabled parts
+      const requestBody: any = {
+        content: formattedContent,
+        content_data: { version: '1.0', items: contentItems }
+      };
+      
+      // Include disabled_parts if provided
+      if (disabledParts !== undefined) {
+        requestBody.disabled_parts = disabledParts;
+      }
+      
+      // Save correction with current content items and optionally disabled parts
       const response = await fetch(`/api/corrections_autres/${correctionId}`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          content: formattedContent,
-          content_data: { version: '1.0', items: contentItems }
-        }),
+        body: JSON.stringify(requestBody),
       });
       
       
@@ -341,7 +349,7 @@ export function useCorrectionsAutres(correctionId: string) {
   }, [correction, correctionId, firstName, lastName, email]);
 
   // Update points earned for a specific part with debounce
-  const updatePointsEarned = useCallback(async (pointsEarned: number[]) => {
+  const updatePointsEarned = useCallback(async (pointsEarned: number[], disabledParts?: boolean[]) => {
     if (!correction) return false;
     
 
@@ -389,7 +397,8 @@ export function useCorrectionsAutres(correctionId: string) {
             grade: totalEarned,
             final_grade: finalGrade,
             penalty: penaltyValue,
-            bonus: bonusValue
+            bonus: bonusValue,
+            disabledParts: disabledParts
           }),
         });
         
@@ -591,7 +600,7 @@ export function useCorrectionsAutres(correctionId: string) {
   }, [correction, correctionId]);
 
   // Change correction status (ACTIVE, DEACTIVATED, ABSENT, NON_RENDU, NON_NOTE)
-  const handleChangeStatus = useCallback(async (newStatus: string) => {
+  const handleChangeStatus = useCallback(async (newStatus: string, disabledParts?: boolean[]) => {
     if (!correction || !correction.id) return;
     
     // If clicking on current status, toggle back to ACTIVE
@@ -624,12 +633,13 @@ export function useCorrectionsAutres(correctionId: string) {
       }
 
       // Prepare payload for the API request
-      const payload: { status: string; grade?: number | null; penalty?: number | null; bonus?: number | null; final_grade?: number | null } = { status: newStatus };
+      const payload: { status: string; grade?: number | null; penalty?: number | null; bonus?: number | null; final_grade?: number | null; disabledParts?: boolean[] } = { status: newStatus };
       if (updateGrades) {
         payload.grade = gradeUpdate;
         payload.penalty = penaltyUpdate;
         payload.bonus = bonusUpdate;
         payload.final_grade = finalGradeUpdate;
+        payload.disabledParts = disabledParts; // Inclure les parties désactivées
       }
 
       // API call to update status and potentially grades

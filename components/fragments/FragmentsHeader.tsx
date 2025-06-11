@@ -15,13 +15,21 @@ interface Category {
   name: string;
 }
 
+interface Activity {
+  id: number;
+  name: string;
+}
+
 interface FragmentsHeaderProps {
   searchQuery: string;
   setSearchQuery: (query: string) => void;
   categoryFilter: string;
   categories: Category[];
+  activityFilter: string;
+  activities: Activity[];
   handleSearch: () => void;
   handleCategoryChange: (category: string) => void;
+  handleActivityFilterChange: (activity: string) => void;
 }
 
 export const FragmentsHeader: React.FC<FragmentsHeaderProps> = ({
@@ -29,8 +37,11 @@ export const FragmentsHeader: React.FC<FragmentsHeaderProps> = ({
   setSearchQuery,
   categoryFilter,
   categories,
+  activityFilter,
+  activities,
   handleSearch,
   handleCategoryChange,
+  handleActivityFilterChange,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   
@@ -75,8 +86,11 @@ export const FragmentsHeader: React.FC<FragmentsHeaderProps> = ({
               setSearchQuery={setSearchQuery}
               categoryFilter={categoryFilter}
               categories={categories}
+              activityFilter={activityFilter}
+              activities={activities}
               handleSearch={handleSearch}
               handleCategoryChange={handleCategoryChange}
+              handleActivityFilterChange={handleActivityFilterChange}
             />
           </div>
         </Fade>

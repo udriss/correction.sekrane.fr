@@ -62,7 +62,7 @@ const MicroscopeExitPupilDemo = () => {
         <Grid size={{ xs: 12, md: 6 }}>
           <Paper elevation={1} sx={{ p: 2, mb: 2, bgcolor: 'background.paper' }}>
             <Typography variant="subtitle1" gutterBottom>
-              Formule simplifiée:
+              Formule simplifiée :
             </Typography>
             <Box sx={{ p: 1, fontFamily: 'monospace' }}>
               <Typography variant="body2" sx={{ fontWeight: 'bold' }}>

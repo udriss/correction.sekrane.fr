@@ -23,6 +23,7 @@ import {
 import { useRouter } from 'next/navigation';
 import { parseContentItems } from '@/lib/services/correctionService';
 import { generateHtmlFromItems } from '@/utils/htmlUtils';
+import { parseDisabledParts } from '@/lib/correctionAutre';
 import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import RuleIcon from '@mui/icons-material/Rule';
@@ -185,6 +186,7 @@ interface Correction {
   student_name: string;
   submission_date: string;
   updated_at: string;
+  disabled_parts?: boolean[] | string | null; // Parties désactivées (peut être un JSON string ou un tableau)
 }
 
 export default function FeedbackViewer({ params }: { params: Promise<{ code: string }> }) {
@@ -212,6 +214,8 @@ export default function FeedbackViewer({ params }: { params: Promise<{ code: str
   const [gradesExpanded, setGradesExpanded] = useState<boolean>(false);
   // Nouvel état pour l'accordéon du contenu de correction
   const [contentExpanded, setContentExpanded] = useState<boolean>(true);
+  // État pour les parties désactivées
+  const [disabledParts, setDisabledParts] = useState<boolean[]>([]);
 
   // Effet pour ajuster l'état de l'accordéon en fonction de la taille de l'écran
   useEffect(() => {
@@ -219,6 +223,26 @@ export default function FeedbackViewer({ params }: { params: Promise<{ code: str
     // On garde le contenu de la correction toujours ouvert par défaut
     setContentExpanded(true);
   }, [isMediumScreen]);
+
+  // Effet pour initialiser les parties désactivées à partir des données de correction
+  useEffect(() => {
+    if (correction?.parts_names) {
+      // Parser les parties désactivées depuis la correction
+      const parsedDisabledParts = parseDisabledParts(correction.disabled_parts);
+      
+      if (parsedDisabledParts && Array.isArray(parsedDisabledParts)) {
+        // S'assurer que le tableau a la bonne taille
+        const correctSizeArray = new Array(correction.parts_names.length).fill(false);
+        for (let i = 0; i < Math.min(parsedDisabledParts.length, correctSizeArray.length); i++) {
+          correctSizeArray[i] = parsedDisabledParts[i];
+        }
+        setDisabledParts(correctSizeArray);
+      } else {
+        // Aucune partie désactivée ou format invalide, toutes les parties sont activées
+        setDisabledParts(new Array(correction.parts_names.length).fill(false));
+      }
+    }
+  }, [correction]);
 
   // Version améliorée de formatGrade
   const formatGrade = (value: number | string | null | undefined) => {
@@ -558,6 +582,21 @@ export default function FeedbackViewer({ params }: { params: Promise<{ code: str
     }
   };
   
+  
+  // Calculer le total des points disponibles en excluant les parties désactivées
+  const maxPoints = correction.points ? 
+    correction.points.reduce((sum, points, index) => {
+      // Exclure les parties désactivées du calcul du total
+      return sum + (disabledParts[index] ? 0 : points);
+    }, 0) : 20;
+
+  // Calculer les points obtenus en excluant les parties désactivées
+  const earnedPoints = correction.points_earned ?
+    correction.points_earned.reduce((sum, points, index) => {
+      // Exclure les parties désactivées du calcul du total obtenu
+      return sum + (disabledParts[index] ? 0 : (typeof points === 'number' ? points : parseFloat(String(points || '0'))));
+    }, 0) : 0;
+
   // Récupérer final_grade de la correction ou la calculer si elle n'est pas disponible
   const getFinalGrade = () => {
     // Si final_grade est déjà défini dans la correction, l'utiliser
@@ -565,16 +604,15 @@ export default function FeedbackViewer({ params }: { params: Promise<{ code: str
       return correction.final_grade;
     }
     
-    // Sinon calculer selon la règle avec normalisation
-    const rawTotal = parseFloat(correction.grade) || 0;
+    // Sinon calculer selon la règle avec normalisation en utilisant les points ajustés
+    const rawTotal = earnedPoints; // Utiliser earnedPoints au lieu de parseFloat(correction.grade)
     const penalty = parseFloat(correction.penalty) || 0;
     const bonus = parseFloat(correction.bonus) || 0;
     return calculateFinalGrade(rawTotal, penalty, bonus, maxPoints);
   };
 
-  
-  // Données préparées pour les explications
-  const rawTotal = hasGrade ? parseFloat(correction.grade) || 0 : 0;
+  // Données préparées pour les explications - utiliser les points ajustés (sans parties désactivées)
+  const rawTotal = hasGrade ? earnedPoints : 0; // Utiliser earnedPoints au lieu de correction.grade
   const penalty = hasPenalty ? parseFloat(correction.penalty) || 0 : 0;
   const bonus = hasBonus ? parseFloat(correction.bonus) || 0 : 0;
   const calculatedGrade = rawTotal - penalty + bonus;
@@ -614,11 +652,6 @@ export default function FeedbackViewer({ params }: { params: Promise<{ code: str
   const isOneDayLate = daysLate === 1;
   const isMoreThanOneDayLate = daysLate > 1;
   const isOnTime = !isLate && correction.deadline && correction.submission_date;
-
-
-  
-  // Calculer le total des points disponibles
-  const maxPoints = correction.points ? correction.points.reduce((sum, points) => sum + points, 0) : 20;
 
   return (
     <Box 
@@ -735,41 +768,87 @@ export default function FeedbackViewer({ params }: { params: Promise<{ code: str
                             <Grid container spacing={2} sx={{ mb: 2.5 }}>
                               {correction.points_earned && 
                               correction.parts_names && 
-                               correction.parts_names.map((partName: string, index: number) => (
+                               correction.parts_names.map((partName: string, index: number) => {
+                                const isPartDisabled = disabledParts[index] || false;
+                                return (
                                 <Grid size={{ xs: 12, md: 6 }} key={index}>
                                   <Paper sx={{ 
                                     p: 2, 
                                     border: 1, 
-                                    borderColor: 'divider',
+                                    borderColor: isPartDisabled ? 'warning.main' : 'divider',
                                     boxShadow: (theme) => theme.shadows[1],
                                     transition: 'all 0.2s',
                                     '&:hover': { boxShadow: (theme) => theme.shadows[3] },
-                                    bgcolor: 'background.paper',
+                                    bgcolor: isPartDisabled ? 'warning.50' : 'background.paper',
+                                    opacity: isPartDisabled ? 0.6 : 1,
+                                    position: 'relative'
                                   }}>
+                                    {isPartDisabled && (
+                                      <Box sx={{
+                                        position: 'absolute',
+                                        top: 8,
+                                        right: 8,
+                                        bgcolor: 'warning.main',
+                                        color: 'warning.contrastText',
+                                        px: 1,
+                                        py: 0.5,
+                                        borderRadius: 1,
+                                        fontSize: '0.75rem',
+                                        fontWeight: 'bold'
+                                      }}>
+                                        EXCLUE
+                                      </Box>
+                                    )}
                                     <Typography variant="subtitle2" sx={{ 
-                                      color: 'text.secondary', mb: 0.5,
+                                      color: isPartDisabled ? 'warning.dark' : 'text.secondary', 
+                                      mb: 0.5,
                                       justifyContent: 'center', 
                                       alignItems: 'center', 
-                                      display: 'flex'                                
+                                      display: 'flex',
+                                      textDecoration: isPartDisabled ? 'line-through' : 'none'
                                     }}>
                                       {partName.toUpperCase()}
                                     </Typography>
                                     <Typography variant="h4" sx={{ 
                                       fontWeight: 'bold', 
-                                      color: 'primary.light', 
+                                      color: isPartDisabled ? 'warning.dark' : 'primary.light', 
                                       display: 'flex', 
                                       alignItems: 'center', 
-                                      justifyContent: 'center'
+                                      justifyContent: 'center',
+                                      textDecoration: isPartDisabled ? 'line-through' : 'none'
                                     }}>
-                                      {formatGradeWithNonRendu(correction.points_earned[index])} 
-                                      <Box component="span" sx={{ color: 'text.secondary', fontSize: '1rem', ml: 0.5 }}>
+                                      {isPartDisabled ? '−' : formatGradeWithNonRendu(correction.points_earned[index])} 
+                                      <Box component="span" sx={{ 
+                                        color: isPartDisabled ? 'warning.dark' : 'text.secondary', 
+                                        fontSize: '1rem', 
+                                        ml: 0.5,
+                                        textDecoration: isPartDisabled ? 'line-through' : 'none'
+                                      }}>
                                         / {correction.points ? correction.points[index] : '?'}
                                       </Box>
                                     </Typography>
                                   </Paper>
                                 </Grid>
-                              ))}
+                              )})}
                             </Grid>
+                            
+                            {/* Affichage d'un message informatif si des parties sont désactivées */}
+                            {disabledParts.some(disabled => disabled) && (
+                              <Alert 
+                                severity="info" 
+                                variant="outlined"
+                                sx={{ mb: 2.5 }}
+                                icon={<InfoIcon />}
+                              >
+                                <Typography variant="subtitle2" sx={{ fontWeight: 'bold' }}>
+                                  Parties exclues du calcul de la note
+                                </Typography>
+                                <Typography variant="body2">
+                                  {disabledParts.filter(disabled => disabled).length} partie{disabledParts.filter(disabled => disabled).length > 1 ? 's' : ''} 
+                                  {disabledParts.filter(disabled => disabled).length > 1 ? ' ont été exclues' : ' a été exclue'} du calcul de votre note finale.
+                                </Typography>
+                              </Alert>
+                            )}
                             
                             {/* Affichage des pénalités */}
                             {hasPenalty && (

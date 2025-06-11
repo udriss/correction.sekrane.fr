@@ -12,9 +12,15 @@ import {
 } from '@mui/material';
 import SearchIcon from '@mui/icons-material/Search';
 import CategoryIcon from '@mui/icons-material/CategoryOutlined';
+import AssignmentIcon from '@mui/icons-material/Assignment';
 import SettingsIcon from '@mui/icons-material/Settings';
 
 interface Category {
+  id: number;
+  name: string;
+}
+
+interface Activity {
   id: number;
   name: string;
 }
@@ -24,8 +30,11 @@ interface SearchAndFilterBarProps {
   setSearchQuery: (query: string) => void;
   categoryFilter: string;
   categories: Category[];
+  activityFilter: string;
+  activities: Activity[];
   handleSearch: () => void;
   handleCategoryChange: (category: string) => void;
+  handleActivityFilterChange: (activity: string) => void;
 }
 
 export const SearchAndFilterBar: React.FC<SearchAndFilterBarProps> = ({
@@ -33,8 +42,11 @@ export const SearchAndFilterBar: React.FC<SearchAndFilterBarProps> = ({
   setSearchQuery,
   categoryFilter,
   categories,
+  activityFilter,
+  activities,
   handleSearch,
   handleCategoryChange,
+  handleActivityFilterChange,
 }) => {
   return (
     <Paper 
@@ -48,7 +60,7 @@ export const SearchAndFilterBar: React.FC<SearchAndFilterBarProps> = ({
       }}
     >
       <Grid container spacing={2} alignItems="center">
-        <Grid size={{ xs: 12, md: 5, sm: 6 }}>
+        <Grid size={{ xs: 12, md: 4 }}>
           <TextField
             label="Rechercher"
             variant="outlined"
@@ -73,7 +85,7 @@ export const SearchAndFilterBar: React.FC<SearchAndFilterBarProps> = ({
             fullWidth
           />
         </Grid>
-        <Grid size={{ xs: 12, md: 5, sm: 6 }}>
+        <Grid size={{ xs: 12, md: 4 }}>
           <FormControl size="small" fullWidth>
             <InputLabel id="category-filter-label">Catégorie</InputLabel>
             <Select
@@ -97,6 +109,25 @@ export const SearchAndFilterBar: React.FC<SearchAndFilterBarProps> = ({
                 <SettingsIcon fontSize="small" sx={{ mr: 1 }} />
                 Gérer les catégories
               </MenuItem>
+            </Select>
+          </FormControl>
+        </Grid>
+        <Grid size={{ xs: 12, md: 4 }}>
+          <FormControl size="small" fullWidth>
+            <InputLabel id="activity-filter-label">Activité</InputLabel>
+            <Select
+              labelId="activity-filter-label"
+              value={activityFilter}
+              onChange={(e) => handleActivityFilterChange(e.target.value)}
+              label="Activité"
+              startAdornment={<AssignmentIcon fontSize="small" sx={{ mr: 1, color: 'text.secondary' }} />}
+            >
+              <MenuItem value="all">Toutes</MenuItem>
+              {activities.map((activity) => (
+                <MenuItem key={activity.id} value={activity.id.toString()}>
+                  {activity.name}
+                </MenuItem>
+              ))}
             </Select>
           </FormControl>
         </Grid>

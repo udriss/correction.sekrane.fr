@@ -12,6 +12,7 @@ import Grid from '@mui/material/Grid';
 import { useSnackbar } from 'notistack';
 import { ActivityAutre } from '@/lib/types';
 import { Student as BaseStudent } from '@/lib/types';
+import { parseDisabledParts } from '@/lib/correctionAutre';
 
 // Date management
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
@@ -324,10 +325,28 @@ function CorrectionsContent() {
       const activity = metaData.activities.find(a => a.id === correction.activity_id);
       const student = metaData.students.find(s => s.id === correction.student_id);
       const classInfo = metaData.classes.find(c => c.id === correction.class_id);
-      // Calculate total points and grade
-      const totalPoints = activity ? activity.points.reduce((sum, p) => sum + p, 0) : 20;
-      const earnedPoints = correction.points_earned ? correction.points_earned.reduce((sum, p) => sum + p, 0) : 0;
-      const calculatedGrade = (earnedPoints / totalPoints) * 20;
+      
+      // Parse disabled parts
+      const disabledParts = parseDisabledParts(correction.disabled_parts);
+      
+      // Calculate total points and grade excluding disabled parts
+      const totalPoints = activity ? activity.points.reduce((sum, p, index) => {
+        // Exclude disabled parts from total
+        if (disabledParts && disabledParts[index]) {
+          return sum;
+        }
+        return sum + p;
+      }, 0) : 20;
+      
+      const earnedPoints = correction.points_earned ? correction.points_earned.reduce((sum, p, index) => {
+        // Exclude disabled parts from earned points
+        if (disabledParts && disabledParts[index]) {
+          return sum;
+        }
+        return sum + p;
+      }, 0) : 0;
+      
+      const calculatedGrade = totalPoints > 0 ? (earnedPoints / totalPoints) * 20 : 0;
 
       return {
         ...correction,
@@ -337,7 +356,8 @@ function CorrectionsContent() {
         points_earned: correction.points_earned || [],
         grade: calculatedGrade,
         score_percentage: (calculatedGrade / 20) * 100,
-        sub_class : student?.sub_class
+        sub_class : student?.sub_class,
+        disabled_parts: disabledParts
       };
     });
   }, [filteredCorrections, metaData]);

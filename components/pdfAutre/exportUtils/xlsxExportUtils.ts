@@ -225,28 +225,52 @@ export const createExcelWorksheet = (
       
       // Utiliser getCorrectionCellValues pour un formatage cohérent avec les virgules
       let displayValue = 'NON NOTÉ XLSX';
+      let numericValue: number | string = '';
       if (activity) {
         const cellValues = getCorrectionCellValues(c, activity, true); // useCommaFormat: true pour XLSX
         displayValue = String(cellValues.totalGradeDisplay);
+        
+        // Calculer la note numérique pour la colonne de calcul Excel
+        if (c.percentage_grade !== null && c.percentage_grade !== undefined) {
+          numericValue = (c.percentage_grade / 100) * 20;
+        } else if (c.grade !== null && c.grade !== undefined) {
+          numericValue = c.grade;
+        } else {
+          numericValue = '';
+        }
       }
       
       // Gestion spéciale pour les placeholders
       if (isPlaceholder) {
         displayValue = 'N/A XLSX';
+        numericValue = '';
       }
       studentMap[studentKey].grades[activityKey] = displayValue;
+      studentMap[studentKey].grades[`${activityKey}_numeric`] = numericValue;
     });
     // Convertir les activités en tableau pour les colonnes
     const activityArray = Array.from(activitySet);
-    // Définir les colonnes avec les en-têtes
+    // Définir les colonnes avec les en-têtes - ajouter une colonne supplémentaire pour la note numérique par activité
+    const activityColumns: any[] = [];
+    activityArray.forEach(activity => {
+      // Colonne principale avec formatage complet
+      activityColumns.push({
+        header: activity,
+        key: activity,
+        width: 20
+      });
+      // Colonne supplémentaire pour la note numérique seule (pour calculs Excel)
+      activityColumns.push({
+        header: `${activity} (Note)`,
+        key: `${activity}_numeric`,
+        width: 12
+      });
+    });
+    
     worksheet.columns = [
       { header: 'Nom', key: 'last_name', width: 20 },
       { header: 'Prénom', key: 'first_name', width: 20 },
-      ...activityArray.map(activity => ({
-        header: activity,
-        key: activity,
-        width: 15
-      }))
+      ...activityColumns
     ];
     // Ajouter les données
     // --- Tri des entrées de la map par nom d'étudiant --- 
@@ -258,6 +282,7 @@ export const createExcelWorksheet = (
     sortedStudentEntries.forEach(({ last_name, first_name, grades }) => {
       const rowData: any = { last_name, first_name };
       activityArray.forEach(activity => {
+        // Valeur formatée pour affichage
         let displayValue;
         if (grades[activity] !== undefined) {
           displayValue = grades[activity];
@@ -282,16 +307,43 @@ export const createExcelWorksheet = (
           }
         }
         rowData[activity] = displayValue;
+        
+        // Valeur numérique pour calculs Excel
+        let numericValue = grades[`${activity}_numeric`];
+        if (numericValue === undefined || numericValue === '') {
+          // Si pas de valeur numérique, mettre vide (pas de texte)
+          numericValue = '';
+        }
+        rowData[`${activity}_numeric`] = numericValue;
       });
       const row = worksheet.addRow(rowData);
-      activityArray.forEach((activity, index) => {
+      
+      // Appliquer les styles en tenant compte des nouvelles colonnes
+      let columnIndex = 3; // Commencer après Nom et Prénom
+      activityArray.forEach((activity) => {
         const cellValue = rowData[activity];
+        const numericValue = rowData[`${activity}_numeric`];
+        
         if (cellValue) {
-          const cell = row.getCell(index + 3); // +3 car 1=Nom, 2=Prénom
+          const cell = row.getCell(columnIndex);
           const hasPenalty = penaltyMap[`${last_name} ${first_name}-${activity}`] || false;
           const hasBonus = bonusMap[`${last_name} ${first_name}-${activity}`] || false;
           applyExcelCellStyle(cell, cellValue, hasPenalty, hasBonus);
         }
+        
+        // Style pour la colonne numérique (plus simple, juste centré)
+        if (numericValue !== '') {
+          const numericCell = row.getCell(columnIndex + 1);
+          numericCell.alignment = { horizontal: 'center', vertical: 'middle' };
+          // Appliquer un style subtil pour distinguer les colonnes de calcul
+          numericCell.fill = {
+            type: 'pattern',
+            pattern: 'solid',
+            fgColor: { argb: 'FFF8F8F8' } // Gris très très pâle
+          };
+        }
+        
+        columnIndex += 2; // Passer aux 2 prochaines colonnes (formatée + numérique)
       });
     });
     
@@ -350,22 +402,34 @@ export const createExcelWorksheet = (
       // Utiliser getCorrectionCellValues pour un formatage cohérent avec les virgules
       let gradeDisplay = 'NON NOTÉ';
       let pointsDisplay = 'N/A';
+      let numericGrade: number | string = '';
       
       if (activity) {
         const cellValues = getCorrectionCellValues(c, activity, true); // useCommaFormat: true pour XLSX
         gradeDisplay = String(cellValues.totalGradeDisplay);
         pointsDisplay = cellValues.pointsDisplay;
+        
+        // Calculer la note numérique pour la colonne de calcul Excel
+        if (c.percentage_grade !== null && c.percentage_grade !== undefined) {
+          numericGrade = (c.percentage_grade / 100) * 20;
+        } else if (c.grade !== null && c.grade !== undefined) {
+          numericGrade = c.grade;
+        } else {
+          numericGrade = '';
+        }
       }
       
       // Gestion spéciale pour les placeholders
       if (isPlaceholder) {
         gradeDisplay = 'N/A';
         pointsDisplay = 'N/A';
+        numericGrade = '';
       }
       
       // Stocker à la fois la note et les points pour chaque activité
       studentMap[studentKey][`${activityKey}-grade`] = gradeDisplay;
       studentMap[studentKey][`${activityKey}-points`] = pointsDisplay;
+      studentMap[studentKey][`${activityKey}-numeric`] = numericGrade;
     });
     
     // Convertir les activités en tableau pour les colonnes
@@ -402,16 +466,18 @@ export const createExcelWorksheet = (
       fgColor: { argb: '4287F5' } // Bleu
     };
     
-    // Pour chaque activité, ajouter deux colonnes et fusionner les cellules d'en-tête
+    // Pour chaque activité, ajouter trois colonnes et fusionner les cellules d'en-tête
     let colIndex = 2; // Commencer après la colonne Étudiant
     activityArray.forEach(activity => {
-      // Ajouter les colonnes pour cette activité
+      // Ajouter les colonnes pour cette activité (points, note formatée, note numérique)
       worksheet.getColumn(colIndex).width = 25; // Points par partie
-      worksheet.getColumn(colIndex + 1).width = 15; // Note
+      worksheet.getColumn(colIndex + 1).width = 18; // Note formatée
+      worksheet.getColumn(colIndex + 2).width = 12; // Note numérique
       
       // Ajouter les en-têtes
       headerRow1.getCell(colIndex).value = activity;
       headerRow1.getCell(colIndex + 1).value = activity;
+      headerRow1.getCell(colIndex + 2).value = activity;
       
       // Obtenir l'activité à partir de son nom pour récupérer les noms des parties
       const activityObj = Array.from(corrections).find(c => {
@@ -428,9 +494,10 @@ export const createExcelWorksheet = (
           ? `Points par partie (${activityObj.parts_names.join(', ')})`
           : `Points par partie`;
       headerRow2.getCell(colIndex + 1).value = 'Note';
+      headerRow2.getCell(colIndex + 2).value = 'Note (num.)';
       
-      // Fusionner les cellules du titre de l'activité
-      worksheet.mergeCells(1, colIndex, 1, colIndex + 1);
+      // Fusionner les cellules du titre de l'activité sur les 3 colonnes
+      worksheet.mergeCells(1, colIndex, 1, colIndex + 2);
       
       // Appliquer les styles aux en-têtes
       headerRow1.getCell(colIndex).fill = {
@@ -441,33 +508,32 @@ export const createExcelWorksheet = (
       headerRow1.getCell(colIndex).font = { bold: true, color: { argb: 'FFFFFF' } };
       headerRow1.getCell(colIndex).alignment = { horizontal: 'center' };
       
-      headerRow2.getCell(colIndex).fill = {
-        type: 'pattern',
-        pattern: 'solid',
-        fgColor: { argb: '98C0F7' } // Bleu légèrement différent
-      };
-      headerRow2.getCell(colIndex + 1).fill = {
-        type: 'pattern',
-        pattern: 'solid',
-        fgColor: { argb: '98C0F7' } // Bleu légèrement différent
-      };
-      headerRow2.getCell(colIndex).font = { bold: true, color: { argb: 'FFFFFF' } };
-      headerRow2.getCell(colIndex + 1).font = { bold: true, color: { argb: 'FFFFFF' } };
+      // Styles pour les sous-en-têtes
+      [colIndex, colIndex + 1, colIndex + 2].forEach(idx => {
+        headerRow2.getCell(idx).fill = {
+          type: 'pattern',
+          pattern: 'solid',
+          fgColor: { argb: '98C0F7' } // Bleu légèrement différent
+        };
+        headerRow2.getCell(idx).font = { bold: true, color: { argb: 'FFFFFF' } };
+      });
       
-      colIndex += 2; // Passer à la prochaine paire de colonnes
+      colIndex += 3; // Passer aux 3 prochaines colonnes
     });
     
     // Ajouter les données des étudiants
     sortedStudentEntries.forEach(([studentName, data], index) => {
       const rowData: any[] = [studentName]; // Commencer avec le nom de l'étudiant
       
-      // Pour chaque activité, ajouter les points et la note
+      // Pour chaque activité, ajouter les points, la note formatée et la note numérique
       activityArray.forEach(activity => {
         const points = data[`${activity}-points`] || 'N/A';
         const grade = data[`${activity}-grade`] || 'NON NOTÉ';
+        const numericGrade = data[`${activity}-numeric`] || '';
         
-        rowData.push(points); // Points par partie
-        rowData.push(grade);  // Note
+        rowData.push(points);     // Points par partie
+        rowData.push(grade);      // Note formatée
+        rowData.push(numericGrade); // Note numérique
       });
       
       const row = worksheet.addRow(rowData);
@@ -475,20 +541,31 @@ export const createExcelWorksheet = (
       // Appliquer des styles aux cellules
       row.getCell(1).font = { bold: true }; // Nom de l'étudiant en gras
       
-      // Appliquer des styles aux points et notes
+      // Appliquer des styles aux points, notes et notes numériques
       let cellIndex = 2;
       activityArray.forEach(activity => {
         const pointsCell = row.getCell(cellIndex);
         const gradeCell = row.getCell(cellIndex + 1);
+        const numericCell = row.getCell(cellIndex + 2);
         
         // Déterminer si cette correction a une pénalité ou un bonus
         const hasPenalty = penaltyMap[`${studentName}-${activity}`] || false;
         const hasBonus = bonusMap[`${studentName}-${activity}`] || false;
         
         applyExcelCellStyle(pointsCell, rowData[cellIndex - 1], false, false); // Les points ne sont pas affectés par le style de pénalité/bonus
-        applyExcelCellStyle(gradeCell, rowData[cellIndex], hasPenalty, hasBonus); // Mais la note l'est
+        applyExcelCellStyle(gradeCell, rowData[cellIndex], hasPenalty, hasBonus); // La note formatée l'est
         
-        cellIndex += 2;
+        // Style pour la colonne numérique (plus simple, juste centré)
+        if (rowData[cellIndex + 1] !== '') {
+          numericCell.alignment = { horizontal: 'center', vertical: 'middle' };
+          numericCell.fill = {
+            type: 'pattern',
+            pattern: 'solid',
+            fgColor: { argb: 'FFF8F8F8' } // Gris très très pâle
+          };
+        }
+        
+        cellIndex += 3; // Passer aux 3 prochaines colonnes
       });
     });
     
@@ -547,7 +624,8 @@ export const createExcelWorksheet = (
     
     // Ajouter les colonnes finales
     const finalColumns = [
-      { header: 'Note', key: 'grade', width: 15 },
+      { header: 'Note', key: 'grade', width: 18 },
+      { header: 'Note (num.)', key: 'grade_numeric', width: 12 },
       { header: 'Statut', key: 'status', width: 15 }
     ];
     
@@ -579,16 +657,27 @@ export const createExcelWorksheet = (
       // Utiliser getCorrectionCellValues pour un formatage cohérent avec les virgules
       let gradeDisplay = 'NON NOTÉ';
       let statusDisplay = 'ACTIVE';
+      let numericGrade: number | string = '';
       
       if (activity) {
         const cellValues = getCorrectionCellValues(c, activity, true); // useCommaFormat: true pour XLSX
         gradeDisplay = String(cellValues.totalGradeDisplay);
         statusDisplay = cellValues.statusDisplay;
+        
+        // Calculer la note numérique pour la colonne de calcul Excel
+        if (c.percentage_grade !== null && c.percentage_grade !== undefined) {
+          numericGrade = (c.percentage_grade / 100) * 20;
+        } else if (c.grade !== null && c.grade !== undefined) {
+          numericGrade = c.grade;
+        } else {
+          numericGrade = '';
+        }
       }
       
       // Gestion spéciale pour les placeholders
       if (isPlaceholder) {
         gradeDisplay = 'N/A';
+        numericGrade = '';
       }
       
       // Préparer les données de base de la ligne
@@ -598,6 +687,7 @@ export const createExcelWorksheet = (
         class: className,
         activity: activity?.name || `Activité ${c.activity_id}`,
         grade: gradeDisplay,
+        grade_numeric: numericGrade,
         status: statusDisplay
       };
       
@@ -629,6 +719,18 @@ export const createExcelWorksheet = (
       
       // Appliquer des styles aux cellules
       applyExcelCellStyle(row.getCell('grade'), gradeDisplay, hasPenalty, hasBonus);
+      
+      // Style pour la colonne numérique (plus simple)
+      const numericCell = row.getCell('grade_numeric');
+      if (numericGrade !== '') {
+        numericCell.alignment = { horizontal: 'center', vertical: 'middle' };
+        numericCell.fill = {
+          type: 'pattern',
+          pattern: 'solid',
+          fgColor: { argb: 'FFF8F8F8' } // Gris très très pâle
+        };
+      }
+      
       applyExcelCellStyle(row.getCell('status'), statusDisplay, false, false);
       
       // Appliquer des styles aux cellules de points (pas affectées par le style de pénalité/bonus)
